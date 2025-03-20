@@ -1,0 +1,65 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "1337:1337"
+    volumes:    # Maps the local backend directory to the container's /app directory. Changes made in the local directory will be reflected in the container in real-time.
+      - ./backend:/app
+      # Prevent the node_modules directory from being copied to the container.
+      - /app/node_modules
+      - ./backend/uploads:/app/public/uploads # Maps the local uploads directory to the container's /app/public/uploads directory.
+    command: ["./wait-for-it.sh", "strapiDB:5432", "--", "npm", "run", "develop"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_CLIENT: ${DATABASE_CLIENT}
+      DATABASE_HOST: strapiDB
+      DATABASE_PORT: ${DATABASE_PORT}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      APP_KEYS: ${APP_KEYS}
+    depends_on:
+      - strapiDB
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/
+      # Prevent the node_modules and .next directories from being copied to the container. 
+      - /app/node_modules
+      - /app/.next
+
+  strapiDB:
+    image: postgres:14
+    container_name: strapiDB
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U renlephy -d main"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./db:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+    environment:
+      ADMINER_DEFAULT_SERVER: strapiDB
