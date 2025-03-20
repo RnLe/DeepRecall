@@ -1,0 +1,19 @@
+{
+    "General": {
+        "username": "Username",
+        "email": "Email",
+        "password": "Password",
+        "register": "Register",
+        "login": "Login",
+        "authRedirect": "You must be logged in to access this page"
+    },
+    "LoginForm": {
+        "noAccountInfo": "Don't have an account?"
+    },
+    "RegisterForm": {
+        "title": "Create new account",
+        "confirmPassword": "Confirm password",
+        "haveAccountInfo": "Already have an account?",
+        "backLogin": "Back to login"
+    }
+}
