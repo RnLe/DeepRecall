@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "book_series",
+  "info": {
+    "singularName": "book-serie",
+    "pluralName": "book-series",
+    "displayName": "BookSerie",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "works": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::work.work"
+    }
+  }
+}
