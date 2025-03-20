@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "script_versions",
+  "info": {
+    "singularName": "script-version",
+    "pluralName": "script-versions",
+    "displayName": "ScriptVersion"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "file_hash": {
+      "type": "string"
+    },
+    "scripts": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::script.script",
+      "mappedBy": "script_version"
+    },
+    "year": {
+      "type": "integer",
+      "required": true
+    },
+    "version": {
+      "type": "string"
+    },
+    "pdf_file": {
+      "allowedTypes": [
+        "files"
+      ],
+      "type": "media",
+      "multiple": false,
+      "required": false
+    }
+  }
+}

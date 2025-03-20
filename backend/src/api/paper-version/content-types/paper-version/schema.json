@@ -1,0 +1,43 @@
+{
+  "kind": "collectionType",
+  "collectionName": "paper_versions",
+  "info": {
+    "singularName": "paper-version",
+    "pluralName": "paper-versions",
+    "displayName": "PaperVersion"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "file_hash": {
+      "type": "string"
+    },
+    "paper": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::paper.paper"
+    },
+    "pdf_file": {
+      "allowedTypes": [
+        "files"
+      ],
+      "type": "media",
+      "multiple": false
+    },
+    "version_number": {
+      "type": "string"
+    },
+    "year": {
+      "type": "integer",
+      "required": true
+    },
+    "volume": {
+      "type": "string"
+    },
+    "pages": {
+      "type": "string"
+    }
+  }
+}
