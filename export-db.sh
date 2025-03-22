@@ -9,7 +9,7 @@ mkdir -p backups
 
 # Create dump (custom format, compressed)
 docker exec strapiDB_deeprecall \
-    pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc \
+    pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_NAME}" -Fc \
     > backups/main.dump
 echo "✅ Backup created: backups/main.dump"
 
