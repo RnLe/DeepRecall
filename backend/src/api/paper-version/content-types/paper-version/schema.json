@@ -4,7 +4,8 @@
   "info": {
     "singularName": "paper-version",
     "pluralName": "paper-versions",
-    "displayName": "PaperVersion"
+    "displayName": "PaperVersion",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -14,17 +15,13 @@
     "file_hash": {
       "type": "string"
     },
-    "paper": {
-      "type": "relation",
-      "relation": "oneToOne",
-      "target": "api::paper.paper"
-    },
     "pdf_file": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
       "allowedTypes": [
         "files"
-      ],
-      "type": "media",
-      "multiple": false
+      ]
     },
     "version_number": {
       "type": "string"
@@ -38,6 +35,12 @@
     },
     "pages": {
       "type": "string"
+    },
+    "paper": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::paper.paper",
+      "inversedBy": "paper_versions"
     }
   }
 }

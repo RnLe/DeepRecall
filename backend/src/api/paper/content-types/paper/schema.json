@@ -25,7 +25,8 @@
     "paper_versions": {
       "type": "relation",
       "relation": "oneToMany",
-      "target": "api::paper-version.paper-version"
+      "target": "api::paper-version.paper-version",
+      "mappedBy": "paper"
     },
     "authors": {
       "type": "relation",

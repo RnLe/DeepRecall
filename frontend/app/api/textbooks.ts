@@ -1,39 +1,38 @@
-// papers.ts
+// textbooks.ts
 import { Author } from "./authors";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
-const BASE_URL = "http://localhost:1337/api/papers";
-const BASE_VERSION_URL = "http://localhost:1337/api/paper-versions";
+const BASE_URL = "http://localhost:1337/api/textbooks";
+const BASE_VERSION_URL = "http://localhost:1337/api/textbook-versions";
 
-export interface PaperVersion {
+export interface TextbookVersion {
   id: number;
   file_hash?: string;
-  paper: number; // References the created paper
-  pdf_file: number;
-  version_number?: string;
+  textbook: number; // References the created textbook
+  edition_number: number;
   year: number;
-  volume?: string;
-  pages?: string;
+  pdf_file?: number;
+  tasks_pdf?: string;
 }
 
-export interface Paper {
+export interface Textbook {
   id: number;
   title: string;
-  journal?: string;
+  description?: string;
+  isbn?: string;
   doi?: string;
   // Relations (versions, authors) are handled separately
 }
 
-export interface PaperResponse {
-  data: Paper[];
+export interface TextbookResponse {
+  data: Textbook[];
 }
 
-// Fetch Papers including Versions + Authors
-export const fetchPapers = async (): Promise<Paper[]> => {
+export const fetchTextbooks = async (): Promise<Textbook[]> => {
   const params = new URLSearchParams();
-  params.append('populate[0]', 'paper_versions');
+  params.append('populate[0]', 'textbook_versions');
   params.append('populate[1]', 'authors');
-  params.append('populate[paper_versions][populate]', '*');
+  params.append('populate[textbook_versions][populate]', '*');
   params.append('populate[authors][populate]', '*');
 
   const response = await fetch(`${BASE_URL}?${params.toString()}`, {
@@ -46,25 +45,25 @@ export const fetchPapers = async (): Promise<Paper[]> => {
     throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorBody)}`);
   }
 
-  const json: PaperResponse = await response.json();
+  const json: TextbookResponse = await response.json();
   return json.data;
 };
 
 /**
- * Creates a new paper entry.
- * @param paperData - Object with paper fields (e.g., title, journal, doi)
- * @returns The created paper entry.
+ * Creates a new textbook entry.
+ * @param textbookData - Object with textbook fields (e.g., title, description, isbn, doi)
+ * @returns The created textbook entry.
  */
-export const createPaper = async (
-  paperData: Omit<Paper, "id">
-): Promise<Paper> => {
+export const createTextbook = async (
+  textbookData: Omit<Textbook, "id">
+): Promise<Textbook> => {
   const response = await fetch(BASE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${API_TOKEN}`,
     },
-    body: JSON.stringify({ data: paperData }),
+    body: JSON.stringify({ data: textbookData }),
   });
 
   if (!response.ok) {
@@ -77,13 +76,13 @@ export const createPaper = async (
 };
 
 /**
- * Creates a new paper version entry linked to an existing paper.
- * @param versionData - Object with paper version fields, including the related paper_id.
- * @returns The created paper version entry.
+ * Creates a new textbook version entry linked to an existing textbook.
+ * @param versionData - Object with textbook version fields, including textbook_id.
+ * @returns The created textbook version entry.
  */
-export const createPaperVersion = async (
-  versionData: Omit<PaperVersion, "id">
-): Promise<PaperVersion> => {
+export const createTextbookVersion = async (
+  versionData: Omit<TextbookVersion, "id">
+): Promise<TextbookVersion> => {
   const response = await fetch(BASE_VERSION_URL, {
     method: "POST",
     headers: {

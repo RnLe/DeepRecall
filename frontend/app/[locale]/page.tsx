@@ -8,7 +8,7 @@ import React from 'react';
 // Import logger
 import logger from '@/src/logger';
 // Import Custom Components
-import PaperList from '../ui/PaperList';
+import PaperList from '../ui/literatureList';
  
 export default async function HomePage() {
   // Logging
@@ -19,7 +19,7 @@ export default async function HomePage() {
   // Return the JSX
   return (
     <div className="w-full h-full flex">
-      <PaperList />
+      
     </div>
   );
 }
