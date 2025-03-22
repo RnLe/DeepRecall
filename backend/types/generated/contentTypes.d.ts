@@ -399,75 +399,11 @@ export interface ApiAuthorAuthor extends Struct.CollectionTypeSchema {
   };
 }
 
-export interface ApiBookSerieBookSerie extends Struct.CollectionTypeSchema {
-  collectionName: 'book_series';
-  info: {
-    description: '';
-    displayName: 'BookSerie';
-    pluralName: 'book-series';
-    singularName: 'book-serie';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    description: Schema.Attribute.RichText;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::book-serie.book-serie'
-    > &
-      Schema.Attribute.Private;
-    name: Schema.Attribute.String & Schema.Attribute.Required;
-    publishedAt: Schema.Attribute.DateTime;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    works: Schema.Attribute.Relation<'oneToMany', 'api::work.work'>;
-  };
-}
-
-export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
-  collectionName: 'editions';
-  info: {
-    displayName: 'Edition';
-    pluralName: 'editions';
-    singularName: 'edition';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    edition_number: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<1>;
-    file_hash: Schema.Attribute.String;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::edition.edition'
-    > &
-      Schema.Attribute.Private;
-    pdf_file: Schema.Attribute.Media<'files'> & Schema.Attribute.Required;
-    publishedAt: Schema.Attribute.DateTime;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    work: Schema.Attribute.Relation<'oneToOne', 'api::work.work'>;
-    year: Schema.Attribute.Integer & Schema.Attribute.Required;
-  };
-}
-
 export interface ApiPaperVersionPaperVersion
   extends Struct.CollectionTypeSchema {
   collectionName: 'paper_versions';
   info: {
+    description: '';
     displayName: 'PaperVersion';
     pluralName: 'paper-versions';
     singularName: 'paper-version';
@@ -487,7 +423,7 @@ export interface ApiPaperVersionPaperVersion
     > &
       Schema.Attribute.Private;
     pages: Schema.Attribute.String;
-    paper: Schema.Attribute.Relation<'oneToOne', 'api::paper.paper'>;
+    paper: Schema.Attribute.Relation<'manyToOne', 'api::paper.paper'>;
     pdf_file: Schema.Attribute.Media<'files'>;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
@@ -536,6 +472,7 @@ export interface ApiScriptVersionScriptVersion
   extends Struct.CollectionTypeSchema {
   collectionName: 'script_versions';
   info: {
+    description: '';
     displayName: 'ScriptVersion';
     pluralName: 'script-versions';
     singularName: 'script-version';
@@ -556,7 +493,7 @@ export interface ApiScriptVersionScriptVersion
       Schema.Attribute.Private;
     pdf_file: Schema.Attribute.Media<'files'>;
     publishedAt: Schema.Attribute.DateTime;
-    scripts: Schema.Attribute.Relation<'oneToMany', 'api::script.script'>;
+    script: Schema.Attribute.Relation<'manyToOne', 'api::script.script'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -588,8 +525,8 @@ export interface ApiScriptScript extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    script_version: Schema.Attribute.Relation<
-      'manyToOne',
+    script_versions: Schema.Attribute.Relation<
+      'oneToMany',
       'api::script-version.script-version'
     >;
     title: Schema.Attribute.String & Schema.Attribute.Required;
@@ -599,33 +536,70 @@ export interface ApiScriptScript extends Struct.CollectionTypeSchema {
   };
 }
 
-export interface ApiWorkWork extends Struct.CollectionTypeSchema {
-  collectionName: 'works';
+export interface ApiTextbookVersionTextbookVersion
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'textbook_versions';
   info: {
     description: '';
-    displayName: 'Work';
-    pluralName: 'works';
-    singularName: 'work';
+    displayName: 'TextbookVersion';
+    pluralName: 'textbook-versions';
+    singularName: 'textbook-version';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition_number: Schema.Attribute.BigInteger & Schema.Attribute.Required;
+    file_hash: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::textbook-version.textbook-version'
+    > &
+      Schema.Attribute.Private;
+    pdf_file: Schema.Attribute.Media<'files'>;
+    publishedAt: Schema.Attribute.DateTime;
+    textbook: Schema.Attribute.Relation<'manyToOne', 'api::textbook.textbook'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    year: Schema.Attribute.BigInteger & Schema.Attribute.Required;
+  };
+}
+
+export interface ApiTextbookTextbook extends Struct.CollectionTypeSchema {
+  collectionName: 'textbooks';
+  info: {
+    description: '';
+    displayName: 'Textbook';
+    pluralName: 'textbooks';
+    singularName: 'textbook';
   };
   options: {
     draftAndPublish: true;
   };
   attributes: {
     authors: Schema.Attribute.Relation<'oneToMany', 'api::author.author'>;
-    book_sery: Schema.Attribute.Relation<
-      'oneToOne',
-      'api::book-serie.book-serie'
-    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     description: Schema.Attribute.RichText;
-    DOI: Schema.Attribute.String;
-    ISBN: Schema.Attribute.String;
+    doi: Schema.Attribute.String;
+    isbn: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<'oneToMany', 'api::work.work'> &
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::textbook.textbook'
+    > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
+    textbook_versions: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::textbook-version.textbook-version'
+    >;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -991,13 +965,12 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::author.author': ApiAuthorAuthor;
-      'api::book-serie.book-serie': ApiBookSerieBookSerie;
-      'api::edition.edition': ApiEditionEdition;
       'api::paper-version.paper-version': ApiPaperVersionPaperVersion;
       'api::paper.paper': ApiPaperPaper;
       'api::script-version.script-version': ApiScriptVersionScriptVersion;
       'api::script.script': ApiScriptScript;
-      'api::work.work': ApiWorkWork;
+      'api::textbook-version.textbook-version': ApiTextbookVersionTextbookVersion;
+      'api::textbook.textbook': ApiTextbookTextbook;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

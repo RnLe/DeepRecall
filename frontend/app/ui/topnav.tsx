@@ -20,7 +20,7 @@ export default function TopNav({isLoggedIn} : TopNavProps) {
     // Prepare navigation items based on login status
     const loginNav = (
         <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">
-            <Link className="flex justify-center items-center w-full h-full" href="/login">Login</Link>
+            <Link className="flex justify-center items-center w-full h-full" href="/uploads">Uploads</Link>
         </li>
     )
     const profileNav = (

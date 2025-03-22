@@ -1,10 +1,10 @@
 {
   "kind": "collectionType",
-  "collectionName": "scripts",
+  "collectionName": "textbooks",
   "info": {
-    "singularName": "script",
-    "pluralName": "scripts",
-    "displayName": "Script",
+    "singularName": "textbook",
+    "pluralName": "textbooks",
+    "displayName": "Textbook",
     "description": ""
   },
   "options": {
@@ -16,16 +16,25 @@
       "type": "string",
       "required": true
     },
+    "description": {
+      "type": "richtext"
+    },
+    "isbn": {
+      "type": "string"
+    },
+    "doi": {
+      "type": "string"
+    },
     "authors": {
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::author.author"
     },
-    "script_versions": {
+    "textbook_versions": {
       "type": "relation",
       "relation": "oneToMany",
-      "target": "api::script-version.script-version",
-      "mappedBy": "script"
+      "target": "api::textbook-version.textbook-version",
+      "mappedBy": "textbook"
     }
   }
 }

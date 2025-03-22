@@ -4,7 +4,8 @@
   "info": {
     "singularName": "script-version",
     "pluralName": "script-versions",
-    "displayName": "ScriptVersion"
+    "displayName": "ScriptVersion",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -14,11 +15,11 @@
     "file_hash": {
       "type": "string"
     },
-    "scripts": {
+    "script": {
       "type": "relation",
-      "relation": "oneToMany",
+      "relation": "manyToOne",
       "target": "api::script.script",
-      "mappedBy": "script_version"
+      "inversedBy": "script_versions"
     },
     "year": {
       "type": "integer",
@@ -28,12 +29,12 @@
       "type": "string"
     },
     "pdf_file": {
-      "allowedTypes": [
-        "files"
-      ],
       "type": "media",
       "multiple": false,
-      "required": false
+      "required": false,
+      "allowedTypes": [
+        "files"
+      ]
     }
   }
 }
