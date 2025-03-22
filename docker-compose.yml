@@ -10,19 +10,19 @@ services:
       # Prevent the node_modules directory from being copied to the container.
       - /app/node_modules
       - ./backend/uploads:/app/public/uploads # Maps the local uploads directory to the container's /app/public/uploads directory.
-    command: ["./wait-for-it.sh", "strapiDB:5432", "--", "npm", "run", "develop"]
+    command: ["bash", "./wait-for-it.sh", "strapiDB_deeprecall:5432", "--", "npm", "run", "develop"]
     env_file:
       - .env
     environment:
       DATABASE_CLIENT: ${DATABASE_CLIENT}
-      DATABASE_HOST: strapiDB
+      DATABASE_HOST: strapiDB_deeprecall
       DATABASE_PORT: ${DATABASE_PORT}
       DATABASE_NAME: ${DATABASE_NAME}
       DATABASE_USERNAME: ${DATABASE_USERNAME}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       APP_KEYS: ${APP_KEYS}
     depends_on:
-      - strapiDB
+      - strapiDB_deeprecall
 
   frontend:
     build:
@@ -38,9 +38,9 @@ services:
       - /app/node_modules
       - /app/.next
 
-  strapiDB:
+  strapiDB_deeprecall:
     image: postgres:14
-    container_name: strapiDB
+    container_name: strapiDB_deeprecall
     env_file: .env
     environment:
       POSTGRES_USER: ${DATABASE_USERNAME}
@@ -62,4 +62,4 @@ services:
     ports:
       - 8080:8080
     environment:
-      ADMINER_DEFAULT_SERVER: strapiDB
+      ADMINER_DEFAULT_SERVER: strapiDB_deeprecall
