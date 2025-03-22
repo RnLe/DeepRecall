@@ -1,5 +1,4 @@
 # Ignore sensitive files
-.env
 trace
 
 # Ignore installation folders in all directories
