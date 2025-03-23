@@ -1,24 +1,9 @@
 // scripts.ts
-import { Author } from "./authors";
+import { Script, ScriptVersionPayload } from "../helpers/mediaTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/scripts";
 const BASE_VERSION_URL = "http://localhost:1337/api/script-versions";
-
-export interface ScriptVersion {
-  id: number;
-  file_hash?: string;
-  script: number; // References the created script
-  year: number;
-  version?: string;
-  pdf_file: number;
-}
-
-export interface Script {
-  id: number;
-  title: string;
-  // Relations (authors, versions) are handled separately
-}
 
 export interface ScriptResponse {
   data: Script[];
@@ -44,6 +29,7 @@ export const fetchScripts = async (): Promise<Script[]> => {
   }
 
   const json: ScriptResponse = await response.json();
+  console.log(json.data);
   return json.data;
 };
 
@@ -79,8 +65,8 @@ export const createScript = async (
  * @returns The created script version entry.
  */
 export const createScriptVersion = async (
-  versionData: Omit<ScriptVersion, "id">
-): Promise<ScriptVersion> => {
+  versionData: Omit<ScriptVersionPayload, "id">
+): Promise<ScriptVersionPayload> => {
   const response = await fetch(BASE_VERSION_URL, {
     method: "POST",
     headers: {

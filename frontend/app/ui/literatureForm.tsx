@@ -1,11 +1,11 @@
 // literatureForm.tsx
 
 import React, { useState } from "react";
-import { MediaType } from "../helpers/mediaTypes";
+import { MediaType, Textbook, Paper, Script } from "../helpers/mediaTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createTextbook, Textbook } from "../api/textbooks";
-import { createPaper, Paper } from "../api/papers";
-import { createScript, Script } from "../api/scripts";
+import { createTextbook } from "../api/textbooks";
+import { createPaper } from "../api/papers";
+import { createScript } from "../api/scripts";
 
 interface LiteratureFormProps {
   mediaType: MediaType;

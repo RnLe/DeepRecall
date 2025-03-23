@@ -1,28 +1,9 @@
 // textbooks.ts
-import { Author } from "./authors";
+import { Textbook, TextbookVersionPayload } from "../helpers/mediaTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/textbooks";
 const BASE_VERSION_URL = "http://localhost:1337/api/textbook-versions";
-
-export interface TextbookVersion {
-  id: number;
-  file_hash?: string;
-  textbook: number; // References the created textbook
-  edition_number: number;
-  year: number;
-  pdf_file?: number;
-  tasks_pdf?: string;
-}
-
-export interface Textbook {
-  id: number;
-  title: string;
-  description?: string;
-  isbn?: string;
-  doi?: string;
-  // Relations (versions, authors) are handled separately
-}
 
 export interface TextbookResponse {
   data: Textbook[];
@@ -46,6 +27,7 @@ export const fetchTextbooks = async (): Promise<Textbook[]> => {
   }
 
   const json: TextbookResponse = await response.json();
+  console.log(json.data);
   return json.data;
 };
 
@@ -81,8 +63,8 @@ export const createTextbook = async (
  * @returns The created textbook version entry.
  */
 export const createTextbookVersion = async (
-  versionData: Omit<TextbookVersion, "id">
-): Promise<TextbookVersion> => {
+  versionData: Omit<TextbookVersionPayload, "id">
+): Promise<TextbookVersionPayload> => {
   const response = await fetch(BASE_VERSION_URL, {
     method: "POST",
     headers: {

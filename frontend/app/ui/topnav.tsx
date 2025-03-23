@@ -49,14 +49,8 @@ export default function TopNav({isLoggedIn} : TopNavProps) {
                     <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">
                         <Link className="flex justify-center items-center w-full h-full" href="/">Home</Link>
                     </li>
-                    <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">
-                        <Link className="flex justify-center items-center w-full h-full" href="/page1">Page 1</Link>
-                    </li>
-                    <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">
-                        <Link className="flex justify-center items-center w-full h-full" href="/page2">Page 2</Link>
-                    </li>
                     {isLoggedIn ? profileNav : loginNav}
-                    <li className="relative flex justify-center items-center p-1 max-w-12 max-h-full">
+                    {/* <li className="relative flex justify-center items-center p-1 max-w-12 max-h-full">
                         <div className="group inline-block relative max-w-full">
                             <button className="flex justify-center items-center w-full">
                                 <LocaleIcon locale={useLocale()} />
@@ -71,7 +65,7 @@ export default function TopNav({isLoggedIn} : TopNavProps) {
                                 ))}
                             </ul>
                         </div>
-                    </li>
+                    </li> */}
                 </ul>
             </nav>
         </div>
