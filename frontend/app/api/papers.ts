@@ -1,28 +1,9 @@
 // papers.ts
-import { Author } from "./authors";
+import { Paper, PaperVersionPayload } from "../helpers/mediaTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/papers";
 const BASE_VERSION_URL = "http://localhost:1337/api/paper-versions";
-
-export interface PaperVersion {
-  id: number;
-  file_hash?: string;
-  paper: number; // References the created paper
-  pdf_file: number;
-  version_number?: string;
-  year: number;
-  volume?: string;
-  pages?: string;
-}
-
-export interface Paper {
-  id: number;
-  title: string;
-  journal?: string;
-  doi?: string;
-  // Relations (versions, authors) are handled separately
-}
 
 export interface PaperResponse {
   data: Paper[];
@@ -47,6 +28,7 @@ export const fetchPapers = async (): Promise<Paper[]> => {
   }
 
   const json: PaperResponse = await response.json();
+  console.log(json.data);
   return json.data;
 };
 
@@ -82,8 +64,8 @@ export const createPaper = async (
  * @returns The created paper version entry.
  */
 export const createPaperVersion = async (
-  versionData: Omit<PaperVersion, "id">
-): Promise<PaperVersion> => {
+  versionData: Omit<PaperVersionPayload, "id">
+): Promise<PaperVersionPayload> => {
   const response = await fetch(BASE_VERSION_URL, {
     method: "POST",
     headers: {

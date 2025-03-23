@@ -1,12 +1,20 @@
 // versionForm.tsx
 import React, { useState, useEffect } from "react";
 import SparkMD5 from "spark-md5";
-import { MediaType } from "../helpers/mediaTypes";
+import { MediaType, TextbookVersionPayload, ScriptVersionPayload, PaperVersionPayload } from "../helpers/mediaTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createTextbookVersion, TextbookVersion } from "../api/textbooks";
-import { createPaperVersion, PaperVersion } from "../api/papers";
-import { createScriptVersion, ScriptVersion } from "../api/scripts";
+import { createTextbookVersion } from "../api/textbooks";
+import { createPaperVersion } from "../api/papers";
+import { createScriptVersion } from "../api/scripts";
 import { uploadFile } from "../api/uploadFile";
+
+import * as pdfjsLib from 'pdfjs-dist/webpack.mjs';
+
+const getPDFPageCount = async (file: File): Promise<number> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  return pdf.numPages;
+};
 
 // Helper: Compute MD5 hash of the file using spark-md5
 function computeMD5(file: File): Promise<string> {
@@ -26,6 +34,7 @@ function computeMD5(file: File): Promise<string> {
 interface VersionFormProps {
   mediaType: MediaType;
   file: File;
+  thumbnail: File;
   entry: {
     id: number;
     title: string;
@@ -34,7 +43,7 @@ interface VersionFormProps {
   className?: string;
 }
 
-const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, className }) => {
+const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, className, thumbnail }) => {
     // State for file hash
     const [fileHash, setFileHash] = useState("");
     // State for Textbook-specific fields:
@@ -64,9 +73,9 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, class
 
     // Define mutation hooks for each version type
     const createTextbookVersionMutation = useMutation<
-    TextbookVersion,
+    TextbookVersionPayload,
     Error,
-    Omit<TextbookVersion, "id">
+    Omit<TextbookVersionPayload, "id">
     >({
     mutationFn: createTextbookVersion,            // mutation function
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
@@ -74,9 +83,9 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, class
     });
 
     const createPaperVersionMutation = useMutation<
-    PaperVersion,
+    PaperVersionPayload,
     Error,
-    Omit<PaperVersion, "id">
+    Omit<PaperVersionPayload, "id">
     >({
     mutationFn: createPaperVersion,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
@@ -84,9 +93,9 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, class
     });
 
     const createScriptVersionMutation = useMutation<
-    ScriptVersion,
+    ScriptVersionPayload,
     Error,
-    Omit<ScriptVersion, "id">
+    Omit<ScriptVersionPayload, "id">
     >({
     mutationFn: createScriptVersion,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
@@ -106,21 +115,25 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, class
           // Build payload for textbook version
           // First, try to upload the file to the server
           const uploadedFileId = await uploadFile(file);
-          const payload: Omit<TextbookVersion, "id"> = {
+          const uploadedThumbnailId = await uploadFile(thumbnail);
+          const payload: Omit<TextbookVersionPayload, "id"> = {
             file_hash: fileHash,
             textbook: entry.id,
             edition_number: Number(editionNumber),
             year: Number(year),
             tasks_pdf: tasksPdf ? tasksPdf : undefined,
-            // Here we use the file name as placeholder; in der Praxis könnte dies ein URL oder Dateipfad sein.
             pdf_file: uploadedFileId,
+            thumbnail: uploadedThumbnailId,
+            page_count: await getPDFPageCount(file),
+            file_size: file.size,
           };
           created = await createTextbookVersionMutation.mutateAsync(payload);
           break;
         }
         case "Paper": {
-            const uploadedFileId = await uploadFile(file);
-          const payload: Omit<PaperVersion, "id"> = {
+          const uploadedFileId = await uploadFile(file);
+          const uploadedThumbnailId = await uploadFile(thumbnail);
+          const payload: Omit<PaperVersionPayload, "id"> = {
             file_hash: fileHash,
             paper: entry.id,
             version_number: versionNumber ? versionNumber : undefined,
@@ -128,18 +141,25 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, class
             volume: volume ? volume : undefined,
             pages: pages ? pages : undefined,
             pdf_file: uploadedFileId,
+            thumbnail: uploadedThumbnailId,
+            page_count: await getPDFPageCount(file),
+            file_size: file.size,
           };
           created = await createPaperVersionMutation.mutateAsync(payload);
           break;
         }
         case "Script": {
             const uploadedFileId = await uploadFile(file);
-          const payload: Omit<ScriptVersion, "id"> = {
+          const uploadedThumbnailId = await uploadFile(thumbnail);
+          const payload: Omit<ScriptVersionPayload, "id"> = {
             file_hash: fileHash,
             script: entry.id,
             year: Number(year),
             version: scriptVersion ? scriptVersion : undefined,
             pdf_file: uploadedFileId,
+            thumbnail: uploadedThumbnailId,
+            page_count: await getPDFPageCount(file),
+            file_size: file.size,
           };
           created = await createScriptVersionMutation.mutateAsync(payload);
           break;

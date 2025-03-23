@@ -8,11 +8,11 @@ docker-compose up -d strapiDB_deeprecall
 sleep 5
 
 # Reset the database (optional)
-docker exec strapiDB_deeprecall psql -U "${POSTGRES_USER}" -c "DROP DATABASE IF EXISTS \"${POSTGRES_DB}\";"
-docker exec strapiDB_deeprecall psql -U "${POSTGRES_USER}" -c "CREATE DATABASE \"${POSTGRES_DB}\";"
+docker exec strapiDB_deeprecall psql -U "${POSTGRES_USER}" -c "DROP DATABASE IF EXISTS \"${POSTGRES_NAME}\";"
+docker exec strapiDB_deeprecall psql -U "${POSTGRES_USER}" -c "CREATE DATABASE \"${POSTGRES_NAME}\";"
 
 # Import the dump
-docker exec -i strapiDB_deeprecall pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --clean < backups/main.dump
+docker exec -i strapiDB_deeprecall pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_NAME}" --clean < backups/main.dump
 echo "✅ Data imported"
 
 # Command to import

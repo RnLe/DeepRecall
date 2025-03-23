@@ -36,6 +36,22 @@
       "relation": "manyToOne",
       "target": "api::textbook.textbook",
       "inversedBy": "textbook_versions"
+    },
+    "thumbnail": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "page_count": {
+      "type": "integer",
+      "required": true
+    },
+    "file_size": {
+      "type": "integer",
+      "required": true
     }
   }
 }

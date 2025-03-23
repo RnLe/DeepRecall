@@ -416,16 +416,19 @@ export interface ApiPaperVersionPaperVersion
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     file_hash: Schema.Attribute.String;
+    file_size: Schema.Attribute.Integer & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::paper-version.paper-version'
     > &
       Schema.Attribute.Private;
+    page_count: Schema.Attribute.Integer & Schema.Attribute.Required;
     pages: Schema.Attribute.String;
     paper: Schema.Attribute.Relation<'manyToOne', 'api::paper.paper'>;
     pdf_file: Schema.Attribute.Media<'files'>;
     publishedAt: Schema.Attribute.DateTime;
+    thumbnail: Schema.Attribute.Media<'images'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -485,15 +488,18 @@ export interface ApiScriptVersionScriptVersion
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     file_hash: Schema.Attribute.String;
+    file_size: Schema.Attribute.Integer & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::script-version.script-version'
     > &
       Schema.Attribute.Private;
+    page_count: Schema.Attribute.Integer & Schema.Attribute.Required;
     pdf_file: Schema.Attribute.Media<'files'>;
     publishedAt: Schema.Attribute.DateTime;
     script: Schema.Attribute.Relation<'manyToOne', 'api::script.script'>;
+    thumbnail: Schema.Attribute.Media<'images'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -554,15 +560,18 @@ export interface ApiTextbookVersionTextbookVersion
       Schema.Attribute.Private;
     edition_number: Schema.Attribute.BigInteger & Schema.Attribute.Required;
     file_hash: Schema.Attribute.String;
+    file_size: Schema.Attribute.Integer & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::textbook-version.textbook-version'
     > &
       Schema.Attribute.Private;
+    page_count: Schema.Attribute.Integer & Schema.Attribute.Required;
     pdf_file: Schema.Attribute.Media<'files'>;
     publishedAt: Schema.Attribute.DateTime;
     textbook: Schema.Attribute.Relation<'manyToOne', 'api::textbook.textbook'>;
+    thumbnail: Schema.Attribute.Media<'images'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

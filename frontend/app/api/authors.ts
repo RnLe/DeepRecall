@@ -1,14 +1,9 @@
 // authors.ts
 
+import { Author } from "../helpers/mediaTypes";
+
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/authors";
-
-export interface Author {
-  id: number;
-  first_name: string;
-  last_name: string;
-  orcid?: string;
-}
 
 /**
  * Creates a new author entry in the database.

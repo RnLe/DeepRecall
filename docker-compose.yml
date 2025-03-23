@@ -9,7 +9,7 @@ services:
       - ./backend:/app
       # Prevent the node_modules directory from being copied to the container.
       - /app/node_modules
-      - ./backend/uploads:/app/public/uploads # Maps the local uploads directory to the container's /app/public/uploads directory.
+      - ./backend/uploads:/app/uploads # Maps the local uploads directory to the container's /app/uploads directory.
     command: ["bash", "./wait-for-it.sh", "strapiDB_deeprecall:5432", "--", "npm", "run", "develop"]
     env_file:
       - .env
