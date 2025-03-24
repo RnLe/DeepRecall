@@ -464,6 +464,7 @@ export interface ApiPaperPaper extends Struct.CollectionTypeSchema {
       'api::paper-version.paper-version'
     >;
     publishedAt: Schema.Attribute.DateTime;
+    subtitle: Schema.Attribute.String;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -535,6 +536,7 @@ export interface ApiScriptScript extends Struct.CollectionTypeSchema {
       'oneToMany',
       'api::script-version.script-version'
     >;
+    subtitle: Schema.Attribute.String;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -605,6 +607,7 @@ export interface ApiTextbookTextbook extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
+    subtitle: Schema.Attribute.String;
     textbook_versions: Schema.Attribute.Relation<
       'oneToMany',
       'api::textbook-version.textbook-version'

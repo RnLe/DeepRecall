@@ -35,6 +35,9 @@
       "relation": "oneToMany",
       "target": "api::textbook-version.textbook-version",
       "mappedBy": "textbook"
+    },
+    "subtitle": {
+      "type": "string"
     }
   }
 }

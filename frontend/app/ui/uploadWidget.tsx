@@ -1,4 +1,5 @@
 // uploadWidget.tsx
+
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import VersionForm from "./versionForm";
 import LiteratureForm from "./literatureForm";
@@ -14,6 +15,17 @@ interface UploadWidgetProps {
   className?: string;
 }
 
+// Updated mapping interface (optional)
+interface LiteratureItem {
+  id: number;
+  title: string;
+  type: MediaType;
+  createdAt?: string;
+  updatedAt?: string;
+  versions?: any[]; // Array of Version objects (TextbookVersion, PaperVersion, ScriptVersion)
+  authors?: any[];  // Array of Author objects
+}
+
 const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   // State for the selected literature type (set via banners)
   const [selectedType, setSelectedType] = useState<MediaType | "">("");
@@ -22,7 +34,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   // State for file validation errors
   const [error, setError] = useState<string>("");
   // State for selected literature entry (if adding a new version)
-  const [selectedEntry, setSelectedEntry] = useState<{ id: number; title: string; type: MediaType } | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<LiteratureItem | null>(null);
   // State to toggle new literature creation form
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
   // Reference to the hidden file input
@@ -33,31 +45,66 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   // State for the thumbnail file
   const [thumbnail, setThumbnail] = useState<File | null>(null);
+  // State for form visibility
+  const [formsVisible, setFormVisibility] = useState<boolean>(false);
 
   // Fetch existing literature data
   const { data, isLoading, error: fetchError } = useLiterature();
 
-  // Memoized list of literature entries for the selected type
-  const entries = useMemo(() => {
+  // Reset drop zone
+  const handleResetDropZone = () => {
+    setFile(null);
+    setThumbnailUrl(null);
+    setPageCount(null);
+    setFormVisibility(false);
+  };
+
+  // Make form visible
+  const handleFormVisibility = () => {
+    setFormVisibility(true);
+  };
+
+  // Make form invisible
+  const handleFormInvisibility = () => {
+    setFormVisibility(false);
+  };
+
+  // Updated mapping: include createdAt, updatedAt, versions and authors
+  const entries: LiteratureItem[] = useMemo(() => {
     if (!data || !selectedType) return [];
     switch (selectedType) {
       case "Textbook":
-        return data.textbooks.map(tb => ({
+        return data.textbooks.map((tb: any) => ({
           id: tb.id,
           title: tb.title || "Untitled Textbook",
-          type: "Textbook" as MediaType
+          subtitle: tb.subtitle,
+          type: "Textbook" as MediaType,
+          createdAt: tb.createdAt,
+          updatedAt: tb.updatedAt,
+          versions: tb.textbook_versions,
+          authors: tb.authors,
         }));
       case "Paper":
-        return data.papers.map(p => ({
+        return data.papers.map((p: any) => ({
           id: p.id,
           title: p.title || "Untitled Paper",
-          type: "Paper" as MediaType
+          subtitle: p.subtitle,
+          type: "Paper" as MediaType,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          versions: p.paper_versions,
+          authors: p.authors,
         }));
       case "Script":
-        return data.scripts.map(s => ({
+        return data.scripts.map((s: any) => ({
           id: s.id,
           title: s.title || "Untitled Script",
-          type: "Script" as MediaType
+          subtitle: s.subtitle,
+          type: "Script" as MediaType,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+          versions: s.script_versions,
+          authors: s.authors,
         }));
       default:
         return [];
@@ -78,7 +125,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   // Handle file drop event
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (!file) { // Only allow file selection if not already selected
+    if (!file) {
       validateFile(e.dataTransfer.files[0]);
     }
   };
@@ -110,14 +157,11 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   }, [file]);
 
   // Generate a thumbnail from the first page when a file is selected
-  // and convert it to a File object
   useEffect(() => {
     if (file) {
-      // Render the first page as a thumbnail at a smaller scale (0.5)
       renderPdfPageToImage(file, 1, 0.5)
         .then(url => {
           setThumbnailUrl(url);
-          // Convert the URL (data URL) to a File object
           const thumbFile = dataURLtoFile(url, "thumbnail.png");
           setThumbnail(thumbFile);
         })
@@ -133,15 +177,17 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   }, [file]);
 
   // Handle clicking on an existing literature entry
-  const handleEntryClick = (entry: { id: number; title: string; type: MediaType }) => {
+  const handleEntryClick = (entry: LiteratureItem) => {
     setSelectedEntry(entry);
     setIsCreatingNew(false);
+    setFormVisibility(true);
   };
 
   // Handle clicking the "Create New" button
   const handleCreateNewClick = () => {
     setSelectedEntry(null);
     setIsCreatingNew(true);
+    setFormVisibility(true);
   };
 
   // Allow the user to change the selected file
@@ -149,7 +195,12 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
     setFile(null);
     setThumbnailUrl(null);
     setPageCount(null);
+    // Reset the input's value so that a new selection triggers onChange
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
+
 
   return (
     <div className={`p-4 ${className}`}>
@@ -161,8 +212,9 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
         onDragOver={e => e.preventDefault()}
         onDrop={handleDrop}
         onClick={() => {
-          // Always open the file picker on click
-          fileInputRef.current?.click();
+          if (!file) {
+            fileInputRef.current?.click()
+          }
         }}
       >
         {file ? (
@@ -189,13 +241,18 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
             <p className="text-gray-500">Drag & drop a PDF here or click to select</p>
           </div>
         )}
-        <input 
-          type="file" 
-          accept=".pdf" 
-          ref={fileInputRef} 
-          className="absolute inset-0 opacity-0" 
-          onChange={handleFileSelect} 
-        />
+          <input 
+            type="file" 
+            accept=".pdf" 
+            ref={fileInputRef} 
+            className="absolute inset-0 opacity-0" 
+            style={{ pointerEvents: "none" }} // Disable direct clicks on the input
+            onChange={(e) => {
+              handleFileSelect(e);
+              // Reset the input so the same file can be selected again if needed
+              e.target.value = "";
+            }} 
+          />
       </div>
 
       {/* "Change File" button */}
@@ -210,23 +267,24 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
         </div>
       )}
 
-      {/* Banner container replacing the dropdown.
-          The banners are displayed side by side and clicking one sets the literature type. */}
+      {/* Banner container replacing the dropdown */}
       <div className="flex gap-4 mb-4">
         {MEDIA_TYPES.map((type) => (
           <LiteratureBannerCard 
             key={type}
             type={type}
             className={`flex-1 ${selectedType === type ? 'ring-4 ring-blue-500' : ''}`}
-            onClick={() => setSelectedType(type)}
+            onClick={() => {
+              setSelectedType(type);
+              setFormVisibility(false);
+            }}
           />
         ))}
       </div>
 
       {error && <p className="text-red-500">{error}</p>}
 
-      {/* Literature entries and forms are displayed once a literature type is selected.
-          Note: We no longer require a file to be selected for these elements to show. */}
+      {/* Literature entries and forms */}
       {selectedType && (
         <div className="flex gap-4 mt-4">
           {/* Left side: List of existing entries and "Create New" button */}
@@ -239,18 +297,14 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
             ) : (
               <div className="space-y-4">
                 {entries.length > 0 ? (
-                  entries.map(entry => (
+                  entries.map((entry) => (
                     <div 
                       key={entry.id} 
                       onClick={() => handleEntryClick(entry)} 
                       className="cursor-pointer"
                     >
                       <LiteratureCardL
-                        title={entry.title}
-                        authors={[]}
-                        editionOrVersion={undefined}
-                        year={undefined}
-                        uploadedDate={new Date().toISOString()}
+                        {...entry}
                         className={selectedEntry?.id === entry.id ? 'bg-gray-300' : ''}
                       />
                     </div>
@@ -267,12 +321,24 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
               </div>
             )}
           </div>
+          
           {/* Right side: Form area */}
           <div className="w-1/2 pl-2">
-            {selectedEntry ? (
-              <VersionForm mediaType={selectedType as MediaType} entry={selectedEntry} file={file} thumbnail={thumbnail} />
-            ) : (
-              <LiteratureForm mediaType={selectedType as MediaType} />
+            {formsVisible && (
+              selectedEntry ? (
+                <VersionForm 
+                  mediaType={selectedType as MediaType} 
+                  entry={selectedEntry} 
+                  file={file} 
+                  thumbnail={thumbnail} 
+                  onSuccess={handleResetDropZone} 
+                />
+              ) : (
+                <LiteratureForm 
+                  mediaType={selectedType as MediaType} 
+                  onSuccess={handleFormInvisibility} 
+                />
+              )
             )}
           </div>
         </div>

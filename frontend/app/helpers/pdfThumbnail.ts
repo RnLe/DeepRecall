@@ -8,6 +8,8 @@ import * as pdfjsLib from 'pdfjs-dist/webpack.mjs';
  * @param scale – zoom factor (default = 1.5)
  * @returns base64 PNG data URL
  */
+// pdfThumbnail.ts
+
 export async function renderPdfPageToImage(
   pdfSource: string | File | Uint8Array,
   pageNumber: number,
@@ -22,28 +24,25 @@ export async function renderPdfPageToImage(
   }
 
   // Load PDF document
-  const loadingTask = pdfjsLib.getDocument(data);
+  const loadingTask = pdfjsLib.getDocument({ data });
   const pdf = await loadingTask.promise;
 
-  // Guard page bounds
   if (pageNumber < 1 || pageNumber > pdf.numPages) {
     throw new Error(`Page index out of range: ${pageNumber} / ${pdf.numPages}`);
   }
 
-  // Get page and viewport
   const page = await pdf.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
 
-  // Render into an offscreen <canvas>
   const canvas = document.createElement('canvas');
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not create canvas context');
 
-  await page.render({ canvasContext: ctx, viewport }).promise;
+  // Use the "print" intent for slightly better color handling.
+  await page.render({ canvasContext: ctx, viewport, intent: "print" }).promise;
 
-  // Convert to data URL (PNG)
   return canvas.toDataURL('image/png');
 }
 
