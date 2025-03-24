@@ -41,9 +41,10 @@ interface VersionFormProps {
     type: MediaType;
   };
   className?: string;
+  onSuccess?: () => void; // callback prop
 }
 
-const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, className, thumbnail }) => {
+const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, className, thumbnail, onSuccess }) => {
     // State for file hash
     const [fileHash, setFileHash] = useState("");
     // State for Textbook-specific fields:
@@ -176,6 +177,11 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, file, entry, class
       setVersionNumber("");
       setVolume("");
       setPages("");
+
+      // Notify the parent that the submission was successful
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error: any) {
       console.error(error);
       setErrorMsg(error.message || "An unexpected error occurred");

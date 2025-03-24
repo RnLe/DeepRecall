@@ -26,6 +26,9 @@
       "relation": "oneToMany",
       "target": "api::script-version.script-version",
       "mappedBy": "script"
+    },
+    "subtitle": {
+      "type": "string"
     }
   }
 }

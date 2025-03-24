@@ -1,9 +1,7 @@
 // versionBannerCardM.tsx
 import React from 'react';
-import { TextbookVersion, ScriptVersion, PaperVersion, MediaFile } from '../helpers/mediaTypes';
+import { Version } from '../helpers/mediaTypes';
 import { getStrapiMedia } from "../helpers/getStrapiMedia";
-
-export type Version = TextbookVersion | ScriptVersion | PaperVersion;
 
 export interface VersionBannerCardMProps {
   version: Version;

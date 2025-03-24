@@ -43,7 +43,7 @@ export default function TopNav({isLoggedIn} : TopNavProps) {
     const u = useTranslations('General');
     // const t = useTranslations('TopNavigation');
     return (
-        <div className="bg-gray-200 h-40 w-full text-3xl">
+        <div className="bg-gray-200 h-15 w-full text-3xl">
             <nav className="h-full">
                 <ul className="flex justify-between items-center h-full">
                     <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">

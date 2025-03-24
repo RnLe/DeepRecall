@@ -32,6 +32,9 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::author.author"
+    },
+    "subtitle": {
+      "type": "string"
     }
   }
 }

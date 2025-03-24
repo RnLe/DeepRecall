@@ -3,6 +3,8 @@
 export const MEDIA_TYPES = ["Textbook", "Paper", "Script"] as const;
 export type MediaType = typeof MEDIA_TYPES[number];
 
+export type Version = TextbookVersion | ScriptVersion | PaperVersion;
+
 // General notes on the structure of the media types:
 // - Each media type (Textbook, Paper, Script) has a corresponding version type (TextbookVersion, PaperVersion, ScriptVersion)
 // - The payload types (TextbookVersionPayload, PaperVersionPayload, ScriptVersionPayload) are used for creating new versions.
@@ -44,6 +46,7 @@ export interface Textbook {
     createdAt?: string;
     updatedAt?: string;
     title: string;
+    subtitle?: string;
     description?: string;
     isbn?: string;
     doi?: string;
@@ -82,6 +85,7 @@ export interface Script {
     createdAt?: string;
     updatedAt?: string;
     title: string;
+    subtitle?: string;
     authors?: Author[];
     script_versions?: ScriptVersion[];
 }
@@ -121,6 +125,7 @@ export interface Paper {
     createdAt?: string;
     updatedAt?: string;
     title: string;
+    subtitle?: string;
     journal?: string;
     doi?: string;
     authors?: Author[] ;
@@ -128,7 +133,7 @@ export interface Paper {
 }
 
 export interface Author {
-    id: number;
+    id?: number;
     createdAt?: string;
     updatedAt?: string;
     first_name: string;
