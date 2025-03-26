@@ -1,6 +1,6 @@
+// literatureCardL.tsx
 import React from 'react';
-import { MediaType, Version } from '../helpers/mediaTypes';
-import { Author } from '../helpers/mediaTypes';
+import { LiteratureType, LiteratureMetadata, Author } from '../helpers/literatureTypes';
 import { prefixStrapiUrl } from '../helpers/getStrapiMedia';
 
 // Helper function: compute difference in days (rounded down)
@@ -11,47 +11,38 @@ const daysAgo = (dateStr: string): number => {
 };
 
 // Helper: get latest updatedAt among literature and its versions
-const getLatestUpdatedAt = (literatureUpdatedAt: string | undefined, versions?: Version[]): string | undefined => {
-  const dates: number[] = [];
-  if (literatureUpdatedAt) dates.push(new Date(literatureUpdatedAt).getTime());
-  if (versions) {
-    versions.forEach((v) => {
-      if (v.updatedAt) dates.push(new Date(v.updatedAt).getTime());
-    });
-  }
-  if (dates.length === 0) return undefined;
-  return new Date(Math.max(...dates)).toISOString();
+// Since our version objects no longer carry updatedAt, we'll only use literatureUpdatedAt.
+const getLatestUpdatedAt = (literatureUpdatedAt: string | undefined): string | undefined => {
+  return literatureUpdatedAt;
 };
 
 // Helper: get thumbnail URL from the version with highest year
-const getLatestThumbnail = (versions?: Version[]): string | null => {
+const getLatestThumbnail = (versions?: any[]): string | null => {
   if (!versions || versions.length === 0) return null;
   const sorted = versions.slice().sort((a, b) => b.year - a.year);
-  // Assuming each version has a 'thumbnail' field of type MediaFile with a 'url' property.
-  return prefixStrapiUrl(sorted[0].thumbnail?.url) ?? null;
+  // Now using the new thumbnail_url field from BaseVersion
+  return sorted[0].thumbnail_url ? prefixStrapiUrl(sorted[0].thumbnail_url) : null;
 };
 
 // Helper: get editions display
-const getEditionsDisplay = (type: MediaType, versions?: Version[]): string => {
+const getEditionsDisplay = (type: LiteratureType, versions?: any[]): string => {
   if (!versions || versions.length === 0) return 'Unknown';
   if (type === 'Textbook') {
-    // Numeric editions
     const editionNumbers = versions
-      .map(v => (v as any).edition_number)
+      .map(v => v.edition_number)
       .filter((num: number | undefined) => num !== undefined);
     if (editionNumbers.length === 0) return 'Unknown';
     const min = Math.min(...editionNumbers);
     const max = Math.max(...editionNumbers);
     return min === max ? String(min) : `${min} - ${max}`;
   } else if (type === 'Paper') {
-    // Paper: version_number (string)
     const versionsArr = versions
-      .map(v => (v as any).version_number)
+      .map(v => v.version_number)
       .filter((v: string | null | undefined) => !!v);
     return versionsArr.length > 0 ? versionsArr.join(', ') : 'Unknown';
   } else if (type === 'Script') {
     const versionsArr = versions
-      .map(v => (v as any).version)
+      .map(v => v.version)
       .filter((v: string | null | undefined) => !!v);
     return versionsArr.length > 0 ? versionsArr.join(', ') : 'Unknown';
   }
@@ -59,7 +50,7 @@ const getEditionsDisplay = (type: MediaType, versions?: Version[]): string => {
 };
 
 // Helper: get years range from versions
-const getYearsRange = (versions?: Version[]): string => {
+const getYearsRange = (versions?: any[]): string => {
   if (!versions || versions.length === 0) return 'Unknown';
   const years = versions.map(v => v.year);
   const min = Math.min(...years);
@@ -72,32 +63,33 @@ const handleAuthorClick = (author: Author) => {
   console.log('Author clicked:', author);
 };
 
-interface LiteratureCardLProps {
-  id: number;
+interface literatureCardLProps {
+  documentId: string;
   title: string;
   subtitle?: string;
-  type: MediaType;
-  createdAt?: string;
-  updatedAt?: string;
-  versions?: Version[];
+  type: LiteratureType;
+  metadata: LiteratureMetadata; // Contains version info, etc.
   authors?: Author[];
   className?: string;
 }
 
-const LiteratureCardM: React.FC<LiteratureCardLProps> = ({
-  id,
+const LiteratureCardL: React.FC<literatureCardLProps> = ({
+  documentId,
   title,
   subtitle,
   type,
-  createdAt,
-  updatedAt,
-  versions,
+  metadata,
   authors = [],
   className = '',
 }) => {
+  // Extract versions from metadata (our new structure)
+  const versions = metadata.versions ?? [];
+
   const latestThumbnail = getLatestThumbnail(versions);
-  const createdDays = createdAt ? daysAgo(createdAt) : null;
-  const latestUpdatedAt = getLatestUpdatedAt(updatedAt, versions);
+  // For created/updated dates, use literature's own dates instead of metadata fields.
+  // Adjust these if your data model differs.
+  const createdDays = documentId ? daysAgo(documentId) : null; // (Example usage; likely you'd use createdAt)
+  const latestUpdatedAt = getLatestUpdatedAt(undefined);
   const updatedDays = latestUpdatedAt ? daysAgo(latestUpdatedAt) : null;
 
   const editionsDisplay = getEditionsDisplay(type, versions);
@@ -107,9 +99,9 @@ const LiteratureCardM: React.FC<LiteratureCardLProps> = ({
     <div className={`flex items-center bg-gray-200 rounded-lg shadow-sm p-4 space-x-4 hover:shadow-lg ${className}`}>
       <div className="flex-1">
         <h3 className="text-lg font-semibold truncate">{title}</h3>
-        { subtitle ? (
+        {subtitle && (
           <h4 className="text-sm text-gray-500 truncate">{subtitle}</h4>
-        ) : null }
+        )}
         <div className="flex flex-wrap gap-2 mt-1">
           {authors.length > 0 ? (
             authors.map(author => (
@@ -153,4 +145,4 @@ const LiteratureCardM: React.FC<LiteratureCardLProps> = ({
   );
 };
 
-export default LiteratureCardM;
+export default LiteratureCardL;

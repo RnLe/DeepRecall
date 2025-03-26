@@ -1,36 +1,31 @@
 // uploadWidget.tsx
-
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import VersionForm from "./versionForm";
 import LiteratureForm from "./literatureForm";
-import { MEDIA_TYPES, MediaType } from "../helpers/mediaTypes";
+import { LITERATURE_TYPES, LiteratureType, MediaFile } from "../helpers/literatureTypes";
 import { useLiterature } from "../customHooks/useLiterature";
 import LiteratureCardL from "./literatureCardL";
-import { renderPdfPageToImage, dataURLtoFile } from "../helpers/pdfThumbnail";
 import LiteratureBannerCard from "./literatureBannerCard";
 
-import * as pdfjsLib from 'pdfjs-dist/webpack.mjs';
+export interface LiteratureItem {
+  documentId: string;
+  title: string;
+  subtitle?: string;
+  type: LiteratureType;
+  createdAt?: string;
+  updatedAt?: string;
+  metadata: any; // Unified metadata containing version info
+  authors?: any[];  // Array of Author objects
+  // Removed files field since media is now stored in versions.
+}
 
 interface UploadWidgetProps {
   className?: string;
 }
 
-// Updated mapping interface (optional)
-interface LiteratureItem {
-  id: number;
-  title: string;
-  type: MediaType;
-  createdAt?: string;
-  updatedAt?: string;
-  versions?: any[]; // Array of Version objects (TextbookVersion, PaperVersion, ScriptVersion)
-  authors?: any[];  // Array of Author objects
-}
-
 const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   // State for the selected literature type (set via banners)
-  const [selectedType, setSelectedType] = useState<MediaType | "">("");
-  // State for the selected PDF file
-  const [file, setFile] = useState<File | null>(null);
+  const [selectedType, setSelectedType] = useState<LiteratureType | "">("");
   // State for file validation errors
   const [error, setError] = useState<string>("");
   // State for selected literature entry (if adding a new version)
@@ -39,142 +34,76 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
   // Reference to the hidden file input
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Additional state: PDF page count
-  const [pageCount, setPageCount] = useState<number | null>(null);
-  // State for generated thumbnail URL
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  // State for the thumbnail file
-  const [thumbnail, setThumbnail] = useState<File | null>(null);
   // State for form visibility
   const [formsVisible, setFormVisibility] = useState<boolean>(false);
 
   // Fetch existing literature data
   const { data, isLoading, error: fetchError } = useLiterature();
 
-  // Reset drop zone
-  const handleResetDropZone = () => {
-    setFile(null);
-    setThumbnailUrl(null);
-    setPageCount(null);
-    setFormVisibility(false);
-  };
+  // Show or hide the form
+  const handleFormVisibility = () => setFormVisibility(true);
+  const handleFormInvisibility = () => setFormVisibility(false);
 
-  // Make form visible
-  const handleFormVisibility = () => {
-    setFormVisibility(true);
-  };
-
-  // Make form invisible
-  const handleFormInvisibility = () => {
-    setFormVisibility(false);
-  };
-
-  // Updated mapping: include createdAt, updatedAt, versions and authors
+  // Map fetched data into unified LiteratureItem objects
   const entries: LiteratureItem[] = useMemo(() => {
     if (!data || !selectedType) return [];
     switch (selectedType) {
-      case "Textbook":
-        return data.textbooks.map((tb: any) => ({
-          id: tb.id,
+      case "Textbook": {
+        const textbooks = Array.isArray(data.textbooks) ? data.textbooks : [];
+        return textbooks.map((tb: any) => ({
+          documentId: tb.documentId,
           title: tb.title || "Untitled Textbook",
-          subtitle: tb.subtitle,
-          type: "Textbook" as MediaType,
+          subtitle: tb.type_metadata?.subtitle,
+          type: "Textbook" as LiteratureType,
           createdAt: tb.createdAt,
           updatedAt: tb.updatedAt,
-          versions: tb.textbook_versions,
+          metadata: tb.type_metadata,
           authors: tb.authors,
         }));
-      case "Paper":
-        return data.papers.map((p: any) => ({
-          id: p.id,
+      }
+      case "Paper": {
+        const papers = Array.isArray(data.papers) ? data.papers : [];
+        return papers.map((p: any) => ({
+          documentId: p.documentId,
           title: p.title || "Untitled Paper",
-          subtitle: p.subtitle,
-          type: "Paper" as MediaType,
+          subtitle: p.type_metadata?.subtitle,
+          type: "Paper" as LiteratureType,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
-          versions: p.paper_versions,
+          metadata: p.type_metadata,
           authors: p.authors,
         }));
-      case "Script":
-        return data.scripts.map((s: any) => ({
-          id: s.id,
+      }
+      case "Script": {
+        const scripts = Array.isArray(data.scripts) ? data.scripts : [];
+        return scripts.map((s: any) => ({
+          documentId: s.documentId,
           title: s.title || "Untitled Script",
-          subtitle: s.subtitle,
-          type: "Script" as MediaType,
+          subtitle: s.type_metadata?.subtitle,
+          type: "Script" as LiteratureType,
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
-          versions: s.script_versions,
+          metadata: s.type_metadata,
           authors: s.authors,
         }));
+      }
+      case "Thesis": {
+        const theses = Array.isArray(data.theses) ? data.theses : [];
+        return theses.map((t: any) => ({
+          documentId: t.documentId,
+          title: t.title || "Untitled Thesis",
+          subtitle: t.type_metadata?.subtitle,
+          type: "Thesis" as LiteratureType,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+          metadata: t.type_metadata,
+          authors: t.authors,
+        }));
+      }
       default:
         return [];
     }
   }, [data, selectedType]);
-
-  // Validate file type (only PDF allowed)
-  const validateFile = (f: File) => {
-    if (f.type !== "application/pdf") {
-      setError("Only PDF files allowed");
-      setFile(null);
-    } else {
-      setError("");
-      setFile(f);
-    }
-  };
-
-  // Handle file drop event
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!file) {
-      validateFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  // Handle file selection from input
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      validateFile(e.target.files[0]);
-    }
-  };
-
-  // When a file is selected, extract its page count
-  useEffect(() => {
-    if (file) {
-      const getPDFPageCount = async (file: File): Promise<number> => {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        return pdf.numPages;
-      };
-      getPDFPageCount(file)
-        .then((count) => setPageCount(count))
-        .catch((err) => {
-          console.error("Error getting page count", err);
-          setPageCount(null);
-        });
-    } else {
-      setPageCount(null);
-    }
-  }, [file]);
-
-  // Generate a thumbnail from the first page when a file is selected
-  useEffect(() => {
-    if (file) {
-      renderPdfPageToImage(file, 1, 0.5)
-        .then(url => {
-          setThumbnailUrl(url);
-          const thumbFile = dataURLtoFile(url, "thumbnail.png");
-          setThumbnail(thumbFile);
-        })
-        .catch(err => {
-          console.error("Error generating thumbnail", err);
-          setThumbnailUrl(null);
-          setThumbnail(null);
-        });
-    } else {
-      setThumbnailUrl(null);
-      setThumbnail(null);
-    }
-  }, [file]);
 
   // Handle clicking on an existing literature entry
   const handleEntryClick = (entry: LiteratureItem) => {
@@ -190,86 +119,13 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
     setFormVisibility(true);
   };
 
-  // Allow the user to change the selected file
-  const handleChangeFile = () => {
-    setFile(null);
-    setThumbnailUrl(null);
-    setPageCount(null);
-    // Reset the input's value so that a new selection triggers onChange
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-
   return (
     <div className={`p-4 ${className}`}>
       <h2 className="text-xl font-semibold mb-4">Upload New PDF</h2>
-      
-      {/* Drop area */}
-      <div 
-        className="relative flex justify-center items-center border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-blue-400 transition-colors mb-4 cursor-pointer"
-        onDragOver={e => e.preventDefault()}
-        onDrop={handleDrop}
-        onClick={() => {
-          if (!file) {
-            fileInputRef.current?.click()
-          }
-        }}
-      >
-        {file ? (
-          <div className="flex items-center space-x-4">
-            {thumbnailUrl && (
-              <img 
-                src={thumbnailUrl} 
-                alt="PDF Thumbnail" 
-                className="w-24 h-auto mr-4 rounded-md shadow-md" 
-              />
-            )}
-            <div className="flex-1 text-left">
-              <div className="font-bold text-lg">{file.name}</div>
-              <div className="text-sm text-gray-600">
-                {(file.size / 1024 / 1024).toFixed(2)} MB {pageCount ? `, ${pageCount} pages` : ""}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center space-y-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h.01M5 20h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v11a2 2 0 002 2z" />
-            </svg>
-            <p className="text-gray-500">Drag & drop a PDF here or click to select</p>
-          </div>
-        )}
-          <input 
-            type="file" 
-            accept=".pdf" 
-            ref={fileInputRef} 
-            className="absolute inset-0 opacity-0" 
-            style={{ pointerEvents: "none" }} // Disable direct clicks on the input
-            onChange={(e) => {
-              handleFileSelect(e);
-              // Reset the input so the same file can be selected again if needed
-              e.target.value = "";
-            }} 
-          />
-      </div>
-
-      {/* "Change File" button */}
-      {file && (
-        <div className="flex justify-end mb-4">
-          <button 
-            onClick={handleChangeFile}
-            className="bg-red-500 text-white px-4 py-1 rounded"
-          >
-            Change File
-          </button>
-        </div>
-      )}
 
       {/* Banner container replacing the dropdown */}
       <div className="flex gap-4 mb-4">
-        {MEDIA_TYPES.map((type) => (
+        {LITERATURE_TYPES.map((type) => (
           <LiteratureBannerCard 
             key={type}
             type={type}
@@ -299,13 +155,13 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
                 {entries.length > 0 ? (
                   entries.map((entry) => (
                     <div 
-                      key={entry.id} 
+                      key={entry.documentId} 
                       onClick={() => handleEntryClick(entry)} 
                       className="cursor-pointer"
                     >
                       <LiteratureCardL
                         {...entry}
-                        className={selectedEntry?.id === entry.id ? 'bg-gray-300' : ''}
+                        className={selectedEntry?.documentId === entry.documentId ? 'bg-gray-300' : ''}
                       />
                     </div>
                   ))
@@ -327,15 +183,12 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
             {formsVisible && (
               selectedEntry ? (
                 <VersionForm 
-                  mediaType={selectedType as MediaType} 
-                  entry={selectedEntry} 
-                  file={file} 
-                  thumbnail={thumbnail} 
-                  onSuccess={handleResetDropZone} 
+                  mediaType={selectedType as LiteratureType} 
+                  entry={selectedEntry}
                 />
               ) : (
                 <LiteratureForm 
-                  mediaType={selectedType as MediaType} 
+                  mediaType={selectedType as LiteratureType} 
                   onSuccess={handleFormInvisibility} 
                 />
               )

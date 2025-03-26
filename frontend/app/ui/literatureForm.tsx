@@ -1,12 +1,8 @@
 // literatureForm.tsx
-
 import React, { useState, useEffect, useRef } from "react";
-import { MediaType, Textbook, Paper, Script, Author } from "../helpers/mediaTypes";
+import { LiteratureType, Literature, TextbookMetadata, PaperMetadata, ScriptMetadata, ThesisMetadata, Author } from "../helpers/literatureTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createTextbook } from "../api/textbooks";
-import { createPaper } from "../api/papers";
-import { createScript } from "../api/scripts";
-// Import the author-related functions
+import { createLiterature } from "../api/literatureService";
 import { createAuthor, searchAuthors } from "../api/authors";
 
 // Local type to keep track of selected authors and whether they’re new
@@ -16,7 +12,7 @@ interface SelectedAuthor {
 }
 
 interface LiteratureFormProps {
-  mediaType: MediaType;
+  mediaType: LiteratureType;
   className?: string;
   onSuccess?: () => void;
 }
@@ -25,12 +21,19 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
   // Common form fields
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
+
   // Textbook-specific fields
   const [description, setDescription] = useState("");
   const [isbn, setIsbn] = useState("");
   const [doi, setDoi] = useState("");
+
   // Paper-specific fields
   const [journal, setJournal] = useState("");
+
+  // Thesis-specific fields
+  const [institution, setInstitution] = useState("");
+  const [advisor, setAdvisor] = useState("");
+
   // Error and loading states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,32 +48,16 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
   // Get react-query's queryClient instance
   const queryClient = useQueryClient();
 
-  // Define mutation hooks for each media type
-  const createTextbookMutation = useMutation<
-    Textbook,
+  // Use a unified mutation hook for creating literature
+  const createLiteratureMutation = useMutation<
+    Literature,
     Error,
-    Omit<Textbook, "id">
+    Omit<Literature, "documentId">
   >({
-    mutationFn: createTextbook,
+    mutationFn: createLiterature,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
     onError: (error: Error) => {
-      console.error("Failed to create textbook:", error);
-    },
-  });
-
-  const createPaperMutation = useMutation<Paper, Error, Omit<Paper, "id">>({
-    mutationFn: createPaper,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
-    onError: (error: Error) => {
-      console.error("Failed to create paper:", error);
-    },
-  });
-  
-  const createScriptMutation = useMutation<Script, Error, Omit<Script, "id">>({
-    mutationFn: createScript,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
-    onError: (error: Error) => {
-      console.error("Failed to create script:", error);
+      console.error("Failed to create literature:", error);
     },
   });
 
@@ -126,7 +113,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
         }
         const last_name = parts.pop()!;
         const first_name = parts.join(" ");
-        // Create a temporary author object; id is set to 0 for new entries
+        // Create a temporary author object (id is undefined for new entries)
         const newAuthor: Author = {
           first_name,
           last_name,
@@ -156,52 +143,65 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
         })
       );
 
-      // Collect author IDs to include in the literature payload
-      const authorsIds = processedAuthors.map((a) => a.id);
+      // Build the literature payload using unified types.
+      // Authors will be stored in the metadata.
+      let payload: Omit<Literature, "documentId"> = {
+        title,
+        type: mediaType,
+        type_metadata: {} as TextbookMetadata | PaperMetadata | ScriptMetadata | ThesisMetadata,
+      };
 
-      // Build and send the literature payload (ensure your API supports an "authors" field)
-      let created;
-      switch (mediaType) {
-        case "Textbook": {
-          const textbookPayload: Omit<Textbook, "id"> = {
-            title,
-            description,
-            isbn,
-            doi,
-            // Include authors if supported by your API
-            authors: authorsIds,
-          } as any;
-          created = await createTextbookMutation.mutateAsync(textbookPayload);
-          break;
-        }
-        case "Paper": {
-          const paperPayload: Omit<Paper, "id"> = {
-            title,
-            journal,
-            doi,
-            authors: authorsIds,
-          } as any;
-          created = await createPaperMutation.mutateAsync(paperPayload);
-          break;
-        }
-        case "Script": {
-          const scriptPayload: Omit<Script, "id"> = { 
-            title,
-            authors: authorsIds,
-          } as any;
-          created = await createScriptMutation.mutateAsync(scriptPayload);
-          break;
-        }
-        default:
-          throw new Error("Unsupported media type");
+      // Build type-specific metadata:
+      if (mediaType === "Textbook") {
+        const meta: TextbookMetadata = {
+          subtitle,
+          description,
+          isbn,
+          doi,
+          authors: processedAuthors,
+          versions: [] // Start with no versions.
+        };
+        payload.type_metadata = meta;
+      } else if (mediaType === "Paper") {
+        const meta: PaperMetadata = {
+          subtitle,
+          journal,
+          doi,
+          authors: processedAuthors,
+          versions: []
+        };
+        payload.type_metadata = meta;
+      } else if (mediaType === "Script") {
+        const meta: ScriptMetadata = {
+          subtitle,
+          authors: processedAuthors,
+          versions: []
+        };
+        payload.type_metadata = meta;
+      } else if (mediaType === "Thesis") {
+        const meta: ThesisMetadata = {
+          subtitle,
+          institution,
+          advisor,
+          authors: processedAuthors,
+          versions: []
+        };
+        payload.type_metadata = meta;
+      } else {
+        throw new Error("Unsupported media type");
       }
+
+      const created = await createLiteratureMutation.mutateAsync(payload);
       console.log("Created entry:", created);
-      // Reset all fields on success
+      // Reset form fields on success
       setTitle("");
+      setSubtitle("");
       setDescription("");
       setIsbn("");
       setDoi("");
       setJournal("");
+      setInstitution("");
+      setAdvisor("");
       setSelectedAuthors([]);
       setAuthorQuery("");
       setSuggestions([]);
@@ -235,16 +235,14 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
 
         {/* Subtitle input */}
         <div>
-            <label className="block text-sm font-medium">
-                Subtitle (optional)
-            </label>
-            <input
-                type="text"
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
-                placeholder="Enter subtitle..."
-                className="mt-1 block w-full border border-gray-300 p-2"
-            />
+          <label className="block text-sm font-medium">Subtitle (optional)</label>
+          <input
+            type="text"
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="Enter subtitle..."
+            className="mt-1 block w-full border border-gray-300 p-2"
+          />
         </div>
 
         {/* Authors input */}
@@ -270,12 +268,8 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
                   }}
                   className="p-2 hover:bg-gray-100 cursor-pointer"
                 >
-                  <span className="underline">
-                    {suggestion.first_name}
-                  </span>
-                  <span className="font-bold">
-                    {" "}{suggestion.last_name}
-                  </span>
+                  <span className="underline">{suggestion.first_name}</span>
+                  <span className="font-bold"> {suggestion.last_name}</span>
                 </li>
               ))}
             </ul>
@@ -285,9 +279,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
             {selectedAuthors.map((sa, index) => (
               <div
                 key={index}
-                className={`flex items-center border border-gray-300 p-2 rounded ${
-                  sa.isNew ? "bg-green-100" : "bg-white"
-                }`}
+                className={`flex items-center border border-gray-300 p-2 rounded ${sa.isNew ? "bg-green-100" : "bg-white"}`}
               >
                 <div>
                   <span className="underline">{sa.author.first_name}</span>
@@ -305,7 +297,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
           </div>
         </div>
 
-        {/* Textbook-specific inputs */}
+        {/* Type-specific inputs */}
         {mediaType === "Textbook" && (
           <>
             <div>
@@ -337,7 +329,6 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
           </>
         )}
 
-        {/* Paper-specific inputs */}
         {mediaType === "Paper" && (
           <>
             <div>
@@ -361,15 +352,36 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
           </>
         )}
 
+        {mediaType === "Thesis" && (
+          <>
+            <div>
+              <label className="block text-sm font-medium">Institution</label>
+              <input
+                type="text"
+                value={institution}
+                onChange={(e) => setInstitution(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 p-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Advisor</label>
+              <input
+                type="text"
+                value={advisor}
+                onChange={(e) => setAdvisor(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 p-2"
+              />
+            </div>
+          </>
+        )}
+
         {/* No additional fields required for Script */}
 
         {errorMsg && <p className="text-red-500">{errorMsg}</p>}
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`bg-green-500 text-white px-4 py-2 rounded ${
-            isSubmitting ? "opacity-50 cursor-not-allowed" : ""
-          }`}
+          className={`bg-green-500 text-white px-4 py-2 rounded ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           {isSubmitting ? "Creating…" : "Submit"}
         </button>

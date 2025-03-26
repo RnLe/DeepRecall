@@ -1,18 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchPapers } from '../api/papers';
-import { fetchTextbooks } from '../api/textbooks';
-import { fetchScripts } from '../api/scripts';
+import { fetchLiteratures } from '../api/literatureService';
+import { LiteratureType } from '../helpers/literatureTypes';
 
+// Updated custom hook that fetches literature for each type concurrently.
+// Each call to fetchLiteratures (when provided a type) returns a flat array of literature items.
 export const useLiterature = () => {
   return useQuery({
-    queryKey: ['literature'], // Correctly specify the query key
+    queryKey: ['literature'],
     queryFn: async () => {
-      const [papers, textbooks, scripts] = await Promise.all([
-        fetchPapers(),
-        fetchTextbooks(),
-        fetchScripts(),
+      // Fetch each literature type concurrently
+      const [papers, textbooks, scripts, theses] = await Promise.all([
+        fetchLiteratures('Paper' as LiteratureType),
+        fetchLiteratures('Textbook' as LiteratureType),
+        fetchLiteratures('Script' as LiteratureType),
+        fetchLiteratures('Thesis' as LiteratureType),
       ]);
-      return { papers, textbooks, scripts };
+      // Return an object with each type's literature array.
+      return { papers, textbooks, scripts, theses };
     },
   });
 };
