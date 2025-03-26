@@ -1,23 +1,22 @@
 // literatureBannerCard.tsx
-
 import React from 'react';
+import { LiteratureType } from '../helpers/literatureTypes';
 
-export type literatureBannerType = "Script" | "Textbook" | "Paper";
-
-export interface literatureBannerCardProps {
-  type: literatureBannerType;
+export interface LiteratureBannerCardProps {
+  type: LiteratureType;
   className?: string; // Additional Tailwind CSS classes
   onClick?: () => void;
   children?: React.ReactNode;
 }
 
-const backgroundImages: Record<literatureBannerType, string> = {
+const backgroundImages: Record<LiteratureType, string> = {
   Script: '/banners/script_banner_bg.webp',
   Textbook: '/banners/textbook_banner_bg.webp',
   Paper: '/banners/paper_banner_bg.webp',
+  Thesis: '/banners/thesis_banner_bg.webp', // Added banner for Thesis
 };
 
-const LiteratureBannerCard: React.FC<literatureBannerCardProps> = ({ type, className = "", onClick, children }) => {
+const LiteratureBannerCard: React.FC<LiteratureBannerCardProps> = ({ type, className = "", onClick, children }) => {
   return (
     <div
       onClick={onClick}

@@ -1,6 +1,6 @@
 // getStrapiMedia.ts
 
-import { MediaFile } from "./mediaTypes";
+import { MediaFile } from "./literatureTypes";
 
 export function getStrapiMedia(media: MediaFile | undefined | null): string {
   if (!media) return "";

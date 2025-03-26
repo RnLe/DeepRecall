@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "literatures",
+  "info": {
+    "singularName": "literature",
+    "pluralName": "literatures",
+    "displayName": "Literature",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "type": {
+      "type": "string",
+      "required": true
+    },
+    "files": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "type_metadata": {
+      "type": "json",
+      "required": true
+    }
+  }
+}

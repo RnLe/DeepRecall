@@ -1,10 +1,10 @@
 // versionBannerCardM.tsx
 import React from 'react';
-import { Version } from '../helpers/mediaTypes';
+import { LiteratureVersion } from '../helpers/literatureTypes';
 import { getStrapiMedia } from "../helpers/getStrapiMedia";
 
 export interface VersionBannerCardMProps {
-  version: Version;
+  version: LiteratureVersion;
   className?: string;
   onDownload?: () => void;
   onClick?: () => void;
@@ -30,23 +30,26 @@ const VersionBannerCardM: React.FC<VersionBannerCardMProps> = ({ version, classN
     pagesLabel = `${version.page_count} pages`;
   }
 
-  // File size: computed from the pdf_file property.
+  // File size: computed from the file_size property.
   let fileSizeLabel = "";
   if (version.file_size) {
-    // Assuming size is in bytes. Convert to MB.
+    // Assuming file_size is in bytes. Convert to MB.
     const sizeInMB = (version.file_size / (1024 * 1024)).toFixed(2);
     fileSizeLabel = `${sizeInMB} MB`;
   }
 
-  const thumbnailUrl = getStrapiMedia(version.thumbnail);
+  // For now, if a thumbnail is present (as in the old structure) we use it.
+  // In the unified scheme you may only have a thumbnail_media_id.
+  const thumbnailUrl = (version as any).thumbnail ? getStrapiMedia((version as any).thumbnail) : null;
 
-  // Implement onDownload: If onDownload is provided as a prop, call it. Otherwise, download the pdf_file.
+  // Implement onDownload: If onDownload is provided as a prop, call it.
+  // Otherwise, attempt to download using the pdf_file property.
   const handleDownload = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (onDownload) {
       onDownload();
-    } else if (version.pdf_file) {
-      const pdfUrl = getStrapiMedia(version.pdf_file);
+    } else if ((version as any).pdf_file) {
+      const pdfUrl = getStrapiMedia((version as any).pdf_file);
       if (pdfUrl) {
         fetch(pdfUrl)
           .then((response) => response.blob())
@@ -96,11 +99,11 @@ const VersionBannerCardM: React.FC<VersionBannerCardMProps> = ({ version, classN
       {/* Right side: Thumbnail image */}
       <div className="w-24 h-auto flex-shrink-0">
         {thumbnailUrl ? (
-            <img 
-              src={thumbnailUrl}
-              alt="Version Thumbnail"
-              className="w-full h-full object-cover rounded-md"
-            />
+          <img 
+            src={thumbnailUrl}
+            alt="Version Thumbnail"
+            className="w-full h-full object-cover rounded-md"
+          />
         ) : (
           <div className="w-full h-full bg-gray-200 rounded-md flex items-center justify-center text-gray-500">
             No Thumbnail
