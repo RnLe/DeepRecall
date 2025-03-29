@@ -1,10 +1,15 @@
 // literatureTypes.ts
 
+// When creating a new literature type, changes have to be made in multiple places.
+// This is necessary because of the different styles and metadata associated with each type.
+// This is a list of files and components, where literature types are defined and used.
+
 export const LITERATURE_TYPES = [
     "Textbook",
     "Paper",
     "Script",
     "Thesis",
+    "Manual",
   ] as const;
   
   export type LiteratureType = typeof LITERATURE_TYPES[number];
@@ -12,12 +17,14 @@ export const LITERATURE_TYPES = [
     | TextbookMetadata
     | PaperMetadata
     | ScriptMetadata
-    | ThesisMetadata;
+    | ThesisMetadata
+    | ManualMetadata;
   export type LiteratureVersion =
     | TextbookVersion
     | PaperVersion
     | ScriptVersion
-    | ThesisVersion;
+    | ThesisVersion
+    | ManualVersion;
   
   // Strapi MediaFile. Stores any type of media (not changeable)
   export interface MediaFile {
@@ -121,6 +128,16 @@ export const LITERATURE_TYPES = [
   export interface ThesisVersion extends BaseVersion {
     // No additional fields are needed for ThesisVersion.
   }
+
+  export interface ManualMetadata {
+    subtitle?: string;
+    authors?: Author[];
+    versions?: ManualVersion[];
+  }
+
+  export interface ManualVersion extends BaseVersion {
+    // No additional fields are needed for Manual
+  }
   
   export interface Author {
     id?: number;
@@ -130,4 +147,38 @@ export const LITERATURE_TYPES = [
     last_name: string;
     orcid?: string;
   }
-  
+
+  export const LITERATURE_TYPE_MAP: Record<LiteratureType, { dataKey: string; defaultTitle: string }> = {
+    Textbook: { dataKey: "textbooks", defaultTitle: "Untitled Textbook" },
+    Paper: { dataKey: "papers", defaultTitle: "Untitled Paper" },
+    Script: { dataKey: "scripts", defaultTitle: "Untitled Script" },
+    Thesis: { dataKey: "theses", defaultTitle: "Untitled Thesis" },
+    Manual: { dataKey: "manuals", defaultTitle: "Untitled Manual" },
+};
+
+export interface LiteratureItem {
+  documentId: string;
+  title: string;
+  subtitle?: string;
+  type: LiteratureType;
+  createdAt?: string;
+  updatedAt?: string;
+  metadata: any; // Unified metadata containing version info
+  authors?: any[];
+}
+
+export const mapLiteratureItems = (data: any, selectedType: LiteratureType): LiteratureItem[] => {
+    const config = LITERATURE_TYPE_MAP[selectedType];
+    if (!config) return [];
+    const items = Array.isArray(data[config.dataKey]) ? data[config.dataKey] : [];
+    return items.map((item: any) => ({
+        documentId: item.documentId,
+        title: item.title || config.defaultTitle,
+        subtitle: item.type_metadata?.subtitle,
+        type: selectedType,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        metadata: item.type_metadata,
+        authors: item.authors,
+    }));
+};
