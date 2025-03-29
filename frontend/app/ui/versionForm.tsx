@@ -1,12 +1,18 @@
 // versionForm.tsx
 import React, { useState, useEffect, useRef } from "react";
 import SparkMD5 from "spark-md5";
-import { LiteratureType, Literature, LiteratureVersion, BaseVersion, TextbookVersion, PaperVersion, ScriptVersion, ThesisVersion } from '../helpers/literatureTypes';
+import {
+  LiteratureType,
+  Literature,
+  LiteratureVersion,
+  BaseVersion,
+  LITERATURE_VERSION_FORM_FIELDS,
+} from "../helpers/literatureTypes";
 import { LiteratureItem } from "./uploadWidget";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateLiterature } from "../api/literatureService";
 import { uploadFile, UploadedFileInfo } from "../api/uploadFile";
-import * as pdfjsLib from 'pdfjs-dist/webpack.mjs';
+import * as pdfjsLib from "pdfjs-dist/webpack.mjs";
 import { renderPdfPageToImage, dataURLtoFile } from "../helpers/pdfThumbnail";
 
 // Compute PDF page count
@@ -38,7 +44,7 @@ interface VersionFormProps {
 }
 
 const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, onSuccess }) => {
-  // File upload state (moved here)
+  // File upload state
   const [file, setFile] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string>("");
@@ -48,22 +54,27 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
   const [fileHash, setFileHash] = useState("");
   useEffect(() => {
     if (file) {
-      computeMD5(file).then(hash => setFileHash(hash));
+      computeMD5(file).then((hash) => setFileHash(hash));
     }
   }, [file]);
 
-  // Additional form fields for version creation:
-  const [editionNumber, setEditionNumber] = useState("");
-  const [versionNumber, setVersionNumber] = useState("");
-  const [volume, setVolume] = useState("");
-  const [pages, setPages] = useState("");
-  const [scriptVersion, setScriptVersion] = useState("");
+  // Common field: Year
   const [year, setYear] = useState("");
-  const [tasksPdf, setTasksPdf] = useState("");
 
+  // Extra version-specific fields (state is keyed by field names)
+  const [extraFields, setExtraFields] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const fields = LITERATURE_VERSION_FORM_FIELDS[mediaType] || [];
+    const initial: Record<string, string> = {};
+    fields.forEach((field) => {
+      initial[field.name] = "";
+    });
+    setExtraFields(initial);
+  }, [mediaType]);
+
+  // Error and submitting states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const queryClient = useQueryClient();
 
   const updateLiteratureMutation = useMutation<
@@ -92,7 +103,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     }
   };
 
-  // Extract PDF page count when file changes
+  // Get PDF page count when file changes
   const [pageCount, setPageCount] = useState<number | null>(null);
   useEffect(() => {
     if (file) {
@@ -116,12 +127,12 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
   useEffect(() => {
     if (file) {
       renderPdfPageToImage(file, 1, 0.5)
-        .then(url => {
+        .then((url) => {
           setThumbnailUrl(url);
           const thumbFile = dataURLtoFile(url, "thumbnail.png");
           setThumbnail(thumbFile);
         })
-        .catch(err => {
+        .catch((err) => {
           console.error("Error generating thumbnail", err);
           setThumbnailUrl(null);
           setThumbnail(null);
@@ -132,100 +143,71 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     }
   }, [file]);
 
+  // Handle extra field changes dynamically
+  const handleExtraFieldChange = (fieldName: string, value: string) => {
+    setExtraFields((prev) => ({ ...prev, [fieldName]: value }));
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
     setIsSubmitting(true);
-  
+
     if (!file) {
       setErrorMsg("Please select a PDF file.");
       setIsSubmitting(false);
       return;
     }
-  
+
     try {
-      // Upload file and thumbnail, getting both ID and URL
+      // Upload file and thumbnail
       const uploadedFile: UploadedFileInfo = await uploadFile(file);
       const uploadedThumbnail: UploadedFileInfo = await uploadFile(thumbnail);
       const pageCountValue = await getPDFPageCount(file);
       const fileSize = file.size;
-  
-      // Create a common base version with shared properties
-      // BaseVersion is defined in your types (see previous refactoring) with common fields
+
+      // Create common base version
       const baseVersion: BaseVersion = {
         year: Number(year),
         file_hash: fileHash,
         file_id: uploadedFile.id,
-        file_url: uploadedFile.url, // new field for file URL
+        file_url: uploadedFile.url,
         thumbnail_media_id: uploadedThumbnail.id,
-        thumbnail_url: uploadedThumbnail.url, // new field for thumbnail URL
+        thumbnail_url: uploadedThumbnail.url,
         page_count: pageCountValue,
         file_size: fileSize,
       };
-  
-      // Create the appropriate literature version based on media type
-      let newVersion: LiteratureVersion;
-      switch (mediaType) {
-        case "Textbook": {
-          newVersion = {
-            ...baseVersion,
-            edition_number: Number(editionNumber),
-          } as TextbookVersion;
-          break;
+
+      // Convert extra fields from string to proper types
+      const fieldsConfig = LITERATURE_VERSION_FORM_FIELDS[mediaType] || [];
+      const extraVersionFields: Record<string, any> = {};
+      fieldsConfig.forEach((field) => {
+        if (extraFields[field.name] !== "") {
+          extraVersionFields[field.name] =
+            field.type === "number" ? Number(extraFields[field.name]) : extraFields[field.name];
         }
-        case "Paper": {
-          newVersion = {
-            ...baseVersion,
-            version_number: versionNumber || undefined,
-            volume: volume || undefined,
-            pages: pages || undefined,
-          } as PaperVersion;
-          break;
-        }
-        case "Script": {
-          newVersion = {
-            ...baseVersion,
-            version: scriptVersion || undefined,
-          } as ScriptVersion;
-          break;
-        }
-        case "Thesis": {
-          newVersion = {
-            ...baseVersion,
-          } as ThesisVersion;
-          break;
-        }
-        default:
-          throw new Error("Unsupported media type");
-      }
-  
+      });
+
+      // Combine into new version
+      const newVersion: LiteratureVersion = { ...baseVersion, ...extraVersionFields };
+
       const currentVersions = entry.metadata.versions || [];
-      const newMetadata = {
-        ...entry.metadata,
-        versions: [...currentVersions, newVersion],
-      };
-  
+      const newMetadata = { ...entry.metadata, versions: [...currentVersions, newVersion] };
+
       await updateLiteratureMutation.mutateAsync({
         documentId: entry.documentId,
         data: { type_metadata: newMetadata },
       });
-  
+
       console.log("Updated literature with new version.");
-  
+
       // Reset fields on success
-      setEditionNumber("");
       setYear("");
-      setTasksPdf("");
-      setScriptVersion("");
-      setVersionNumber("");
-      setVolume("");
-      setPages("");
+      setExtraFields({});
       setFile(null);
       setThumbnail(null);
-      if (onSuccess) {
-        onSuccess();
-      }
+      if (onSuccess) onSuccess();
     } catch (error: any) {
       console.error(error);
       setErrorMsg(error.message || "An unexpected error occurred");
@@ -236,9 +218,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
 
   return (
     <div className={`p-4 border rounded shadow mt-4 ${className}`}>
-      <h3 className="text-lg font-semibold mb-2">
-        Create new version for: {entry.title}
-      </h3>
+      <h3 className="text-lg font-semibold mb-2">Create new version for: {entry.title}</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* File Upload Field */}
         <div>
@@ -256,23 +236,13 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
         {/* File Hash Field (read-only) */}
         <div>
           <label className="block text-sm font-medium">File Hash</label>
-          <input
-            type="text"
-            value={fileHash}
-            disabled
-            className="mt-1 block w-full bg-gray-200 border-gray-300 p-2"
-          />
+          <input type="text" value={fileHash} disabled className="mt-1 block w-full bg-gray-200 border-gray-300 p-2" />
         </div>
 
         {/* Relation Field (read-only) */}
         <div>
           <label className="block text-sm font-medium">{mediaType} ID</label>
-          <input
-            type="text"
-            value={entry.documentId}
-            disabled
-            className="mt-1 block w-full bg-gray-200 border-gray-300 p-2"
-          />
+          <input type="text" value={entry.documentId} disabled className="mt-1 block w-full bg-gray-200 border-gray-300 p-2" />
         </div>
 
         {/* Common Field: Year */}
@@ -287,83 +257,28 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
           />
         </div>
 
-        {mediaType === "Textbook" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium">Edition Number</label>
-              <input
-                type="number"
-                value={editionNumber}
-                onChange={(e) => setEditionNumber(e.target.value)}
-                required
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Tasks PDF (optional)</label>
-              <input
-                type="text"
-                value={tasksPdf}
-                onChange={(e) => setTasksPdf(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-          </>
-        )}
-
-        {mediaType === "Paper" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium">Version Number (optional)</label>
-              <input
-                type="text"
-                value={versionNumber}
-                onChange={(e) => setVersionNumber(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Volume (optional)</label>
-              <input
-                type="text"
-                value={volume}
-                onChange={(e) => setVolume(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Pages (optional)</label>
-              <input
-                type="text"
-                value={pages}
-                onChange={(e) => setPages(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-          </>
-        )}
-
-        {mediaType === "Script" && (
-          <div>
-            <label className="block text-sm font-medium">Version (optional)</label>
+        {/* Dynamically Render Version-Specific Extra Fields */}
+        {LITERATURE_VERSION_FORM_FIELDS[mediaType]?.map((field) => (
+          <div key={field.name}>
+            <label className="block text-sm font-medium">
+              {field.label}{field.required ? " *" : ""}
+            </label>
             <input
-              type="text"
-              value={scriptVersion}
-              onChange={(e) => setScriptVersion(e.target.value)}
+              type={field.type}
+              value={extraFields[field.name] || ""}
+              onChange={(e) => handleExtraFieldChange(field.name, e.target.value)}
+              placeholder={field.placeholder}
               className="mt-1 block w-full border border-gray-300 p-2"
+              required={field.required}
             />
           </div>
-        )}
-
-        {/* No extra fields for Thesis beyond Year */}
+        ))}
 
         {errorMsg && <p className="text-red-500">{errorMsg}</p>}
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`bg-green-500 text-white px-4 py-2 rounded ${
-            isSubmitting ? "opacity-50 cursor-not-allowed" : ""
-          }`}
+          className={`bg-green-500 text-white px-4 py-2 rounded ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           {isSubmitting ? "Creating…" : "Submit"}
         </button>
