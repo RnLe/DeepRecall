@@ -1,7 +1,7 @@
 // versionBannerCardM.tsx
 import React from 'react';
 import { LiteratureVersion } from '../helpers/literatureTypes';
-import { getStrapiMedia } from "../helpers/getStrapiMedia";
+import { getStrapiMedia, prefixStrapiUrl } from "../helpers/getStrapiMedia";
 
 export interface VersionBannerCardMProps {
   version: LiteratureVersion;
@@ -38,9 +38,7 @@ const VersionBannerCardM: React.FC<VersionBannerCardMProps> = ({ version, classN
     fileSizeLabel = `${sizeInMB} MB`;
   }
 
-  // For now, if a thumbnail is present (as in the old structure) we use it.
-  // In the unified scheme you may only have a thumbnail_media_id.
-  const thumbnailUrl = (version as any).thumbnail ? getStrapiMedia((version as any).thumbnail) : null;
+  const thumbnailUrl = prefixStrapiUrl(version.thumbnail_url);
 
   // Implement onDownload: If onDownload is provided as a prop, call it.
   // Otherwise, attempt to download using the pdf_file property.
