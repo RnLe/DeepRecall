@@ -1,11 +1,17 @@
 // literatureForm.tsx
 import React, { useState, useEffect, useRef } from "react";
-import { LiteratureType, Literature, TextbookMetadata, PaperMetadata, ScriptMetadata, ThesisMetadata, Author } from "../helpers/literatureTypes";
+import {
+  LiteratureType,
+  Literature,
+  Author,
+  LITERATURE_FORM_FIELDS,
+  LiteratureFormField,
+} from "../helpers/literatureTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLiterature } from "../api/literatureService";
 import { createAuthor, searchAuthors } from "../api/authors";
 
-// Local type to keep track of selected authors and whether they’re new
+// Local type to track selected authors and whether they’re new
 interface SelectedAuthor {
   author: Author;
   isNew: boolean;
@@ -22,17 +28,8 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
 
-  // Textbook-specific fields
-  const [description, setDescription] = useState("");
-  const [isbn, setIsbn] = useState("");
-  const [doi, setDoi] = useState("");
-
-  // Paper-specific fields
-  const [journal, setJournal] = useState("");
-
-  // Thesis-specific fields
-  const [institution, setInstitution] = useState("");
-  const [advisor, setAdvisor] = useState("");
+  // We'll remove the separate state for each type‐specific field and manage them in one object.
+  const [typeFields, setTypeFields] = useState<Record<string, string>>({});
 
   // Error and loading states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -42,13 +39,21 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
   const [selectedAuthors, setSelectedAuthors] = useState<SelectedAuthor[]>([]);
   const [authorQuery, setAuthorQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Author[]>([]);
-  // Ref for debouncing
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Get react-query's queryClient instance
   const queryClient = useQueryClient();
 
-  // Use a unified mutation hook for creating literature
+  // Initialize type-specific field state whenever mediaType changes.
+  useEffect(() => {
+    const initialValues: Record<string, string> = {};
+    const fields = LITERATURE_FORM_FIELDS[mediaType] || [];
+    fields.forEach((field: LiteratureFormField) => {
+      initialValues[field.name] = "";
+    });
+    setTypeFields(initialValues);
+  }, [mediaType]);
+
+  // Mutation hook for creating literature
   const createLiteratureMutation = useMutation<
     Literature,
     Error,
@@ -61,27 +66,21 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
     },
   });
 
-  // Debounce the author query and fetch suggestions from the API
+  // Debounce author query and fetch suggestions
   useEffect(() => {
     if (authorQuery.trim() === "") {
       setSuggestions([]);
       return;
     }
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-    }
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
       searchAuthors(authorQuery.trim())
-        .then((res) => {
-          setSuggestions(res);
-        })
-        .catch((err) => {
-          console.error("Error fetching author suggestions", err);
-        });
+        .then((res) => setSuggestions(res))
+        .catch((err) => console.error("Error fetching author suggestions", err));
     }, 300);
   }, [authorQuery]);
 
-  // Add author to the selected list if not already added
+  // Add author if not already added
   const addAuthor = (author: Author, isNew = false) => {
     const alreadyAdded = selectedAuthors.some((sa) =>
       !isNew
@@ -92,32 +91,26 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
     setSelectedAuthors([...selectedAuthors, { author, isNew }]);
   };
 
-  // Remove author from the selected list
+  // Remove author
   const removeAuthor = (index: number) => {
     const newAuthors = [...selectedAuthors];
     newAuthors.splice(index, 1);
     setSelectedAuthors(newAuthors);
   };
 
-  // Handle Enter key in the author input to add a new author if needed
+  // Handle Enter key in the author input
   const handleAuthorKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (authorQuery.trim() !== "") {
-        // Parse the input: all words except the last form first_name; last word is last_name
         const parts = authorQuery.trim().split(" ");
         if (parts.length < 2) {
-          // Enforce rule: require at least two words (first and last name)
           alert("Please enter at least first and last name.");
           return;
         }
         const last_name = parts.pop()!;
         const first_name = parts.join(" ");
-        // Create a temporary author object (id is undefined for new entries)
-        const newAuthor: Author = {
-          first_name,
-          last_name,
-        };
+        const newAuthor: Author = { first_name, last_name };
         addAuthor(newAuthor, true);
         setAuthorQuery("");
         setSuggestions([]);
@@ -125,90 +118,49 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
     }
   };
 
-  // Handle form submission including processing new authors
+  // Handle type-specific field changes
+  const handleFieldChange = (fieldName: string, value: string) => {
+    setTypeFields((prev) => ({ ...prev, [fieldName]: value }));
+  };
+
+  // Handle form submission: process authors and create literature
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
     setIsSubmitting(true);
 
     try {
-      // Process new authors: create them in the database if needed
+      // Process new authors if needed
       const processedAuthors = await Promise.all(
-        selectedAuthors.map(async (sa) => {
-          if (sa.isNew) {
-            const created = await createAuthor(sa.author);
-            return created;
-          }
-          return sa.author;
-        })
+        selectedAuthors.map(async (sa) => (sa.isNew ? await createAuthor(sa.author) : sa.author))
       );
 
-      // Build the literature payload using unified types.
-      // Authors will be stored in the metadata.
-      let payload: Omit<Literature, "documentId"> = {
-        title,
-        type: mediaType,
-        type_metadata: {} as TextbookMetadata | PaperMetadata | ScriptMetadata | ThesisMetadata,
+      // Build metadata by merging common subtitle, processed typeFields, authors, and an empty versions array.
+      const metadata = {
+        subtitle,
+        ...typeFields,
+        authors: processedAuthors,
+        versions: [],
       };
 
-      // Build type-specific metadata:
-      if (mediaType === "Textbook") {
-        const meta: TextbookMetadata = {
-          subtitle,
-          description,
-          isbn,
-          doi,
-          authors: processedAuthors,
-          versions: [] // Start with no versions.
-        };
-        payload.type_metadata = meta;
-      } else if (mediaType === "Paper") {
-        const meta: PaperMetadata = {
-          subtitle,
-          journal,
-          doi,
-          authors: processedAuthors,
-          versions: []
-        };
-        payload.type_metadata = meta;
-      } else if (mediaType === "Script") {
-        const meta: ScriptMetadata = {
-          subtitle,
-          authors: processedAuthors,
-          versions: []
-        };
-        payload.type_metadata = meta;
-      } else if (mediaType === "Thesis") {
-        const meta: ThesisMetadata = {
-          subtitle,
-          institution,
-          advisor,
-          authors: processedAuthors,
-          versions: []
-        };
-        payload.type_metadata = meta;
-      } else {
-        throw new Error("Unsupported media type");
-      }
+      const payload: Omit<Literature, "documentId"> = {
+        title,
+        type: mediaType,
+        type_metadata: metadata,
+      };
 
       const created = await createLiteratureMutation.mutateAsync(payload);
       console.log("Created entry:", created);
-      // Reset form fields on success
+
+      // Reset fields on success
       setTitle("");
       setSubtitle("");
-      setDescription("");
-      setIsbn("");
-      setDoi("");
-      setJournal("");
-      setInstitution("");
-      setAdvisor("");
+      setTypeFields({});
       setSelectedAuthors([]);
       setAuthorQuery("");
       setSuggestions([]);
 
-      if (onSuccess) {
-        onSuccess();
-      }
+      if (onSuccess) onSuccess();
     } catch (error: any) {
       console.error(error);
       setErrorMsg(error.message || "An unexpected error occurred");
@@ -221,7 +173,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
     <div className={`p-4 border rounded shadow mt-4 ${className}`}>
       <h3 className="text-lg font-semibold mb-2">Create new {mediaType}</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Title input */}
+        {/* Title */}
         <div>
           <label className="block text-sm font-medium">Title</label>
           <input
@@ -233,7 +185,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
           />
         </div>
 
-        {/* Subtitle input */}
+        {/* Subtitle (common) */}
         <div>
           <label className="block text-sm font-medium">Subtitle (optional)</label>
           <input
@@ -245,7 +197,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
           />
         </div>
 
-        {/* Authors input */}
+        {/* Authors */}
         <div>
           <label className="block text-sm font-medium">Authors</label>
           <input
@@ -268,28 +220,26 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
                   }}
                   className="p-2 hover:bg-gray-100 cursor-pointer"
                 >
-                  <span className="underline">{suggestion.first_name}</span>
-                  <span className="font-bold"> {suggestion.last_name}</span>
+                  <span className="underline">{suggestion.first_name}</span>{" "}
+                  <span className="font-bold">{suggestion.last_name}</span>
                 </li>
               ))}
             </ul>
           )}
-          {/* Display selected authors as cards */}
+          {/* Display selected authors */}
           <div className="mt-2 flex flex-wrap gap-2">
             {selectedAuthors.map((sa, index) => (
               <div
                 key={index}
-                className={`flex items-center border border-gray-300 p-2 rounded ${sa.isNew ? "bg-green-100" : "bg-white"}`}
+                className={`flex items-center border border-gray-300 p-2 rounded ${
+                  sa.isNew ? "bg-green-100" : "bg-white"
+                }`}
               >
                 <div>
-                  <span className="underline">{sa.author.first_name}</span>
-                  <span className="font-bold"> {sa.author.last_name}</span>
+                  <span className="underline">{sa.author.first_name}</span>{" "}
+                  <span className="font-bold">{sa.author.last_name}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeAuthor(index)}
-                  className="ml-2"
-                >
+                <button type="button" onClick={() => removeAuthor(index)} className="ml-2">
                   x
                 </button>
               </div>
@@ -297,91 +247,40 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
           </div>
         </div>
 
-        {/* Type-specific inputs */}
-        {mediaType === "Textbook" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium">Description (optional)</label>
+        {/* Render type-specific fields dynamically */}
+        {LITERATURE_FORM_FIELDS[mediaType]?.map((field) => (
+          <div key={field.name}>
+            <label className="block text-sm font-medium">
+              {field.label}
+              {field.required && " *"}
+            </label>
+            {field.type === "textarea" ? (
               <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                value={typeFields[field.name] || ""}
+                onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                placeholder={field.placeholder}
                 className="mt-1 block w-full border border-gray-300 p-2"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">ISBN (optional)</label>
+            ) : (
               <input
-                type="text"
-                value={isbn}
-                onChange={(e) => setIsbn(e.target.value)}
+                type={field.type}
+                value={typeFields[field.name] || ""}
+                onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                placeholder={field.placeholder}
                 className="mt-1 block w-full border border-gray-300 p-2"
+                required={field.required}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">DOI (optional)</label>
-              <input
-                type="text"
-                value={doi}
-                onChange={(e) => setDoi(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-          </>
-        )}
-
-        {mediaType === "Paper" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium">Journal (optional)</label>
-              <input
-                type="text"
-                value={journal}
-                onChange={(e) => setJournal(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">DOI (optional)</label>
-              <input
-                type="text"
-                value={doi}
-                onChange={(e) => setDoi(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-          </>
-        )}
-
-        {mediaType === "Thesis" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium">Institution</label>
-              <input
-                type="text"
-                value={institution}
-                onChange={(e) => setInstitution(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Advisor</label>
-              <input
-                type="text"
-                value={advisor}
-                onChange={(e) => setAdvisor(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 p-2"
-              />
-            </div>
-          </>
-        )}
-
-        {/* No additional fields required for Script */}
+            )}
+          </div>
+        ))}
 
         {errorMsg && <p className="text-red-500">{errorMsg}</p>}
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`bg-green-500 text-white px-4 py-2 rounded ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`bg-green-500 text-white px-4 py-2 rounded ${
+            isSubmitting ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
           {isSubmitting ? "Creating…" : "Submit"}
         </button>

@@ -58,7 +58,7 @@ export const LITERATURE_TYPES = [
      * A JSON object containing all type-specific metadata.
      * This must exist (even if empty) to simplify processing.
      */
-    type_metadata: TextbookMetadata | PaperMetadata | ScriptMetadata | ThesisMetadata;
+    type_metadata: TextbookMetadata | PaperMetadata | ScriptMetadata | ThesisMetadata | ManualMetadata;
   }
   
   /**
@@ -149,11 +149,20 @@ export const LITERATURE_TYPES = [
   }
 
   export const LITERATURE_TYPE_MAP: Record<LiteratureType, { dataKey: string; defaultTitle: string }> = {
-    Textbook: { dataKey: "textbooks", defaultTitle: "Untitled Textbook" },
-    Paper: { dataKey: "papers", defaultTitle: "Untitled Paper" },
-    Script: { dataKey: "scripts", defaultTitle: "Untitled Script" },
-    Thesis: { dataKey: "theses", defaultTitle: "Untitled Thesis" },
-    Manual: { dataKey: "manuals", defaultTitle: "Untitled Manual" },
+    Textbook: { dataKey: "Textbook", defaultTitle: "Untitled Textbook" },
+    Paper: { dataKey: "Paper", defaultTitle: "Untitled Paper" },
+    Script: { dataKey: "Script", defaultTitle: "Untitled Script" },
+    Thesis: { dataKey: "Thesis", defaultTitle: "Untitled Thesis" },
+    Manual: { dataKey: "Manual", defaultTitle: "Untitled Manual" },
+  };  
+
+// Strings for the plural of each literature type
+export const LITERATURE_TYPE_STRING_PLURAL: Record<LiteratureType, string> = {
+    Textbook: "Textbooks",
+    Paper: "Papers",
+    Script: "Scripts",
+    Thesis: "Theses",
+    Manual: "Manuals",
 };
 
 export interface LiteratureItem {
@@ -181,4 +190,66 @@ export const mapLiteratureItems = (data: any, selectedType: LiteratureType): Lit
         metadata: item.type_metadata,
         authors: item.authors,
     }));
+};
+
+// This is the form field configuration for each literature type.
+export interface LiteratureFormField {
+  name: string; // key in the metadata object
+  label: string;
+  type: "text" | "textarea" | "number";
+  placeholder?: string;
+  required?: boolean;
+}
+
+export const LITERATURE_FORM_FIELDS: Record<LiteratureType, LiteratureFormField[]> = {
+  Textbook: [
+    // subtitle is common so we don’t include it here
+    { name: "description", label: "Description (optional)", type: "textarea" },
+    { name: "isbn", label: "ISBN (optional)", type: "text" },
+    { name: "doi", label: "DOI (optional)", type: "text" },
+  ],
+  Paper: [
+    { name: "journal", label: "Journal (optional)", type: "text" },
+    { name: "doi", label: "DOI (optional)", type: "text" },
+  ],
+  Script: [
+    // No extra fields beyond the common subtitle
+  ],
+  Thesis: [
+    { name: "institution", label: "Institution", type: "text", required: true },
+    { name: "advisor", label: "Advisor", type: "text", required: true },
+  ],
+  Manual: [
+    // For example, no extra fields
+  ],
+};
+
+// This is the form field configuration for each version of the literature type.
+export interface VersionFormField {
+  name: string; // key in the version object (e.g. "edition_number")
+  label: string;
+  type: "text" | "number";
+  placeholder?: string;
+  required?: boolean;
+}
+
+export const LITERATURE_VERSION_FORM_FIELDS: Record<LiteratureType, VersionFormField[]> = {
+  Textbook: [
+    { name: "edition_number", label: "Edition Number", type: "number", required: true },
+    { name: "tasks_pdf", label: "Tasks PDF (optional)", type: "text" },
+  ],
+  Paper: [
+    { name: "version_number", label: "Version Number (optional)", type: "text" },
+    { name: "volume", label: "Volume (optional)", type: "text" },
+    { name: "pages", label: "Pages (optional)", type: "text" },
+  ],
+  Script: [
+    { name: "version", label: "Version (optional)", type: "text" },
+  ],
+  Thesis: [
+    // No extra fields
+  ],
+  Manual: [
+    // No extra fields (or add as needed)
+  ],
 };

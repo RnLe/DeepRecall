@@ -1,3 +1,4 @@
+// useLiterature.ts
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiteratures } from '../api/literatureService';
 import { LiteratureType, LITERATURE_TYPES } from '../helpers/literatureTypes';
