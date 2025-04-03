@@ -20,7 +20,7 @@ export default function TopNav({isLoggedIn} : TopNavProps) {
     // Prepare navigation items based on login status
     const loginNav = (
         <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">
-            <Link className="flex justify-center items-center w-full h-full" href="/uploads">Uploads</Link>
+            <Link className="flex justify-center items-center w-full h-full" href="/uploads">Literature</Link>
         </li>
     )
     const profileNav = (
@@ -32,12 +32,12 @@ export default function TopNav({isLoggedIn} : TopNavProps) {
     )
 
     const pathname = usePathname();
-    console.debug('TopNav; pathname: %s', pathname);
+    // console.debug('TopNav; pathname: %s', pathname);
     // Strip locale from pathname
     let pathnameWithoutLocale = pathname.replace(/^\/[a-z]{2}/, '');
     // If empty string, set it to '/'
     if (pathnameWithoutLocale === '') pathnameWithoutLocale = '/';
-    console.debug('TopNav; pathnameWithoutLocale: %s', pathnameWithoutLocale);
+    // console.debug('TopNav; pathnameWithoutLocale: %s', pathnameWithoutLocale);
     // Language options
     const localesForDropdown = ['en', 'de'];
     const u = useTranslations('General');
@@ -48,6 +48,9 @@ export default function TopNav({isLoggedIn} : TopNavProps) {
                 <ul className="flex justify-between items-center h-full">
                     <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">
                         <Link className="flex justify-center items-center w-full h-full" href="/">Home</Link>
+                    </li>
+                    <li className="flex justify-center items-center p-2 hover:bg-slate-400 w-full h-full">
+                        <Link className="flex justify-center items-center w-full h-full" href="/diarization">Transcription & Diarization</Link>
                     </li>
                     {isLoggedIn ? profileNav : loginNav}
                     {/* <li className="relative flex justify-center items-center p-1 max-w-12 max-h-full">

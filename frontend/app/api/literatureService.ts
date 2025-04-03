@@ -32,8 +32,6 @@ export const fetchLiteratures = async (type?: LiteratureType): Promise<Literatur
 
   // In Strapi 5, nested relations are returned directly.
   const json = await response.json();
-  console.log("Fetched literature:");
-  console.log(json);
   return json.data;
 };
 
@@ -49,9 +47,6 @@ export const createLiterature = async (
   literatureData: Omit<Literature, "id">
 ): Promise<Literature> => {
   const payload = literatureData;
-
-  console.log("Payload for creating:");
-  console.log(payload);
   
   const response = await fetch(BASE_URL, {
     method: "POST",
@@ -83,10 +78,6 @@ export const updateLiterature = async (
     literatureData: Partial<Literature>
   ): Promise<Literature> => {
     const payload = literatureData;
-
-    // Log the payload for debugging
-    console.log("Payload for updating:");
-    console.log(payload);
   
     const response = await fetch(`${BASE_URL}/${documentId}`, {
       method: "PUT",
