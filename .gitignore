@@ -5,3 +5,6 @@ trace
 **/.next/
 **/node_modules/
 **/playground/
+
+*.wav
+*.mp3

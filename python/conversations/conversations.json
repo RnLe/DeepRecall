@@ -1,0 +1,16 @@
+[
+  {
+    "id": "23edfc50855565ee518494aaef48e78a",
+    "name": "Interview on The View with Bill Gates",
+    "description": "",
+    "speakers": [],
+    "length": "0",
+    "states": {
+      "diarization": true,
+      "transcription": true,
+      "speakerAssignment": false,
+      "report": false,
+      "stats": false
+    }
+  }
+]

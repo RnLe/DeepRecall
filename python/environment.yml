@@ -1,0 +1,22 @@
+name: python-api
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12
+  - fastapi
+  - uvicorn
+  - python-multipart
+  - pydub
+  - ffmpeg
+  - pip
+  - pip:
+      - openai-whisper
+      - pyannote.audio
+      - torch
+      - torchvision
+      - torchaudio
+      - librosa
+      - soundfile
+      - transformers
+      - ipywidgets

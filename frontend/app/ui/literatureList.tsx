@@ -22,7 +22,7 @@ export default function LiteratureList({ className }: LiteratureListProps) {
     );
   }
 
-  console.log('Literature data:', data);
+  // console.log('Literature data:', data);
 
   return (
     <div className={`p-4 bg-slate-100 overflow-auto ${className}`}>
