@@ -1,16 +1,16 @@
 [
   {
-    "id": "e7861559aabb1e9780cd86500551b39d",
-    "name": "fgdgds",
+    "id": "6095a7ab9994bd81b0dc1ab834f464f1",
+    "name": "hjklhjk",
     "description": "",
-    "dateCreated": 1744036214.1200218,
+    "dateCreated": 1744062749.6808956,
     "dateOfConversation": null,
     "speakers": [],
     "speakerCount": 0,
     "length": 522.565,
     "states": {
       "audioAvailable": true,
-      "diarization": true,
+      "diarization": false,
       "transcript": false,
       "speakerAudioSegments": false,
       "speakerAssignment": false,
@@ -18,31 +18,10 @@
       "stats": false
     },
     "diarizationProcess": {
-      "timeStarted": 1744036367.1535363,
-      "timeCompleted": 1744036380.0469322,
-      "logs": [
-        {
-          "status": "info",
-          "message": "Device check complete. Using NVIDIA GeForce RTX 4070 Ti."
-        },
-        {
-          "status": "info",
-          "message": "Setting up the pyannote pipeline..."
-        },
-        {
-          "status": "info",
-          "message": "Starting diarization..."
-        },
-        {
-          "status": "success",
-          "message": "Diarization completed in 12.89 seconds."
-        },
-        {
-          "status": "success",
-          "message": "Files saved to conversation."
-        }
-      ],
-      "device": "NVIDIA GeForce RTX 4070 Ti"
+      "timeStarted": null,
+      "timeCompleted": null,
+      "logs": [],
+      "device": null
     },
     "transcriptionProcess": {
       "timeStarted": null,

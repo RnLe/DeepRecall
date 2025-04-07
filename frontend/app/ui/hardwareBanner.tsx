@@ -14,7 +14,8 @@ export const HardwareBanner: React.FC = () => {
   }, []);
 
   return (
-    <div>
+    <div className="p-4 border rounded shadow-lg bg-gray-800">
+      <h3 className="text-lg font-bold mb-4 text-white">System Hardware</h3>
       <div className="flex w-full mb-4 space-x-4">
         {/* CPU Card */}
         <div
@@ -34,7 +35,12 @@ export const HardwareBanner: React.FC = () => {
               <p className="text-xs">Freq: {hardware.cpu.frequencyCurrentMHz} MHz</p>
             </>
           ) : (
-            <p className="text-center">Loading CPU info...</p>
+            <>
+              <p className="text-center">Loading CPU info...</p>
+              <p className="text-sm">&nbsp;</p>
+              <p className="text-xs">&nbsp;</p>
+              <p className="text-xs">&nbsp;</p>
+            </>
           )}
         </div>
         {/* GPU Card */}
@@ -53,13 +59,14 @@ export const HardwareBanner: React.FC = () => {
               <p className="text-xs">Multiprocessors: {hardware.gpu.multiProcessorCount}</p>
             </>
           ) : (
-            <p className="text-center">GPU not available</p>
+            <>
+              <p className="text-center">GPU not available</p>
+              <p className="text-sm">&nbsp;</p>
+              <p className="text-xs">&nbsp;</p>
+              <p className="text-xs">&nbsp;</p>
+            </>
           )}
         </div>
-      </div>
-      {/* Processing Device Indicator */}
-      <div className="text-center text-xl mt-2">
-        {hardware && hardware.gpu.available ? "Processing Device: GPU" : "Processing Device: CPU"}
       </div>
     </div>
   );

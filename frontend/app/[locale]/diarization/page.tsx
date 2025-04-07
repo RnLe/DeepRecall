@@ -9,11 +9,11 @@ import { ActiveConversationProvider } from '@/app/context/activeConversationCont
 const App: React.FC = () => {
   return (
     <ActiveConversationProvider>
-      <div className="flex h-screen bg-gray-900">
-        <div className="w-1/4">
+      <div className="flex h-screen overflow-hidden">
+        <div className="w-1/4 border-r border-gray-300">
           <DiarizationSidebar />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 overflow-auto">
           <DiarizationWidget />
         </div>
       </div>

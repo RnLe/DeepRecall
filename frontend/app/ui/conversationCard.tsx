@@ -1,8 +1,9 @@
 // conversationCard.tsx
 import React, { useEffect, useState } from 'react';
 import SpeakerCard from './speakerCard';
-import { Conversation } from '../helpers/diarizationTypes';
+import { Conversation, Speaker } from '../helpers/diarizationTypes';
 import { agoTimeToString, secondsToString } from '../helpers/timesToString';
+import { classNames } from 'react-easy-crop/helpers';
 
 interface ConversationCardProps {
   conversation: Conversation;
@@ -11,6 +12,24 @@ interface ConversationCardProps {
   perRow?: number;
   onClick?: () => void;
 }
+
+// New component to fetch speaker data via the API and render SpeakerCard.
+const SpeakerData: React.FC<{ speakerId: string }> = ({ speakerId }) => {
+  const [speaker, setSpeaker] = useState<Speaker | null>(null);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/speakers/${speakerId}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => setSpeaker(data.speaker))
+      .catch(err => console.error("Error fetching speaker", err));
+  }, [speakerId]);
+
+  if (!speaker) return <div>Loading...</div>;
+  return <SpeakerCard speaker={speaker} showName={false} onSelect={() => {}} className={"w-12"} />;
+};
 
 // New TimeAgo component
 const TimeAgo: React.FC<{ timestamp: number }> = ({ timestamp }) => {
@@ -46,11 +65,7 @@ const ConversationCard: React.FC<ConversationCardProps> = ({ conversation, activ
         <p className="text-gray-300">Created <TimeAgo timestamp={conversation.dateCreated} /></p>
         <div className="mt-2 flex space-x-2">
           {conversation.speakers.map((speakerId) => (
-            <SpeakerCard key={speakerId} 
-              speaker={{ id: speakerId, name: `Speaker ${speakerId}`, croppedImageUrl: '', color: '' }} // Placeholder for speaker data
-              showName={false}
-              onSelect={() => {}}
-            />
+            <SpeakerData key={speakerId} speakerId={speakerId} />
           ))}
         </div>
       </div>

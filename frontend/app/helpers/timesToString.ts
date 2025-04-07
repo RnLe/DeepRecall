@@ -27,10 +27,11 @@ export const agoTimeToString = (timestamp: number): string => {
 
 // Helper method to convert seconds to a string
 // Format: "Xh Ym Zs" (e.g. "1h 2m 3s")
-export const secondsToString = (seconds: number): string => {
+// If showDecimal is true, seconds are shown with one decimal point; otherwise, as an integer.
+export const secondsToString = (seconds: number, showDecimal: boolean = false): string => {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
+  const secs = seconds % 60;
 
   let result = '';
   if (hours > 0) {
@@ -39,9 +40,9 @@ export const secondsToString = (seconds: number): string => {
   if (minutes > 0) {
     result += `${minutes}m `;
   }
-  if (secs > 0) {
-    result += `${secs}s`;
-  }
   
+  const secsStr = showDecimal ? secs.toFixed(1) : `${Math.floor(secs)}`;
+  result += `${secsStr}s`;
+
   return result.trim();
 }

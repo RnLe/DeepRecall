@@ -51,8 +51,9 @@ if not os.path.exists(GLOBAL_CONVERSATIONS_FILE):
     with open(GLOBAL_CONVERSATIONS_FILE, "w") as f:
         json.dump([], f)
 
-# Mount the avatars folder for static file access.
+# Mount folders for static file access.
 app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
+app.mount("/conversations", StaticFiles(directory="conversations"), name="conversations")
 
 # ----------------- Helper Functions -----------------
 # --- File Parsing and Processing Helpers ---
@@ -169,56 +170,39 @@ def process_transcription(audio_path: str, model_string: str, device: str):
 
 def create_speaker_audio_segments(conv_id: str, conversation: dict, conv_folder: str):
     """
-    Create speaker audio segments based on the merged transcript and speaker assignment.
-    Uses conversation["speakers"] for mapping if provided; otherwise, falls back to the generic speaker labels.
-    Saves the segments in a subfolder "speakerAudioSegments" within conv_folder.
+    Create speaker audio segments based on the RTTM file.
+    The RTTM file is expected to have lines like:
+    SPEAKER <file_id> 1 <start> <duration> <NA> <NA> <speaker_label> <NA> <NA>
+    Groups segments by speaker and saves the combined audio for each speaker
+    in a subfolder "speakerAudioSegments" within conv_folder.
     Returns a list of dictionaries with keys: speaker, audio_file, and duration.
     """
-    import re
+
     # Define the subfolder to store speaker audio segments.
     segments_folder = os.path.join(conv_folder, "speakerAudioSegments")
     os.makedirs(segments_folder, exist_ok=True)
 
-    # Load merged transcript file.
-    merged_file = os.path.join(conv_folder, "merged_transcript.txt")
-    if not os.path.exists(merged_file):
-        raise Exception("Merged transcript file not found.")
+    # Locate the RTTM file.
+    rttm_file = os.path.join(conv_folder, f"{conv_id}.rttm")
+    if not os.path.exists(rttm_file):
+        raise Exception("RTTM file not found.")
 
-    merged_segments = []
-    with open(merged_file, "r") as f:
+    # Parse RTTM file and group segments by speaker.
+    speaker_segments = {}
+    with open(rttm_file, "r") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            # Expected line format: "[start-end] speaker: text"
-            match = re.match(r"\[(\d+\.\d+)-(\d+\.\d+)\]\s+([^:]+):\s+(.*)", line)
-            if match:
-                start = float(match.group(1))
-                end = float(match.group(2))
-                generic_speaker = match.group(3).strip()
-                merged_segments.append({
-                    "start": start,
-                    "end": end,
-                    "generic_speaker": generic_speaker
-                })
-
-
-    # Build mapping: use the conversation's speakers list (order sensitive) if available.
-    unique_generic = []
-    for seg in merged_segments:
-        if seg["generic_speaker"] not in unique_generic:
-            unique_generic.append(seg["generic_speaker"])
-    assigned_speakers = conversation.get("speakers", [])
-    mapping = {}
-    for i, gen in enumerate(unique_generic):
-        # If an assignment is provided, use it; otherwise, fallback to the generic label.
-        mapping[gen] = assigned_speakers[i] if i < len(assigned_speakers) and assigned_speakers[i] else gen
-
-    # Group segments by assigned speaker.
-    speaker_segments = {}
-    for seg in merged_segments:
-        assigned = mapping.get(seg["generic_speaker"], seg["generic_speaker"])
-        speaker_segments.setdefault(assigned, []).append((seg["start"], seg["end"]))
+            parts = line.split()
+            try:
+                start = float(parts[3])
+                duration = float(parts[4])
+                end = start + duration
+            except Exception:
+                continue
+            generic_speaker = parts[7]
+            speaker_segments.setdefault(generic_speaker, []).append((start, end))
 
     # Locate the original audio file.
     audio_path_wav = os.path.join(conv_folder, f"{conv_id}.wav")
@@ -233,19 +217,19 @@ def create_speaker_audio_segments(conv_id: str, conversation: dict, conv_folder:
     # Load the original audio using pydub.
     audio = AudioSegment.from_file(audio_path)
 
-    # Process each speaker's segments and export combined audio.
+    # Process each speaker's segments, combine them, and export the audio.
     speaker_audios = []
-    for sp, segments in speaker_segments.items():
+    for idx, (generic_sp, segments) in enumerate(speaker_segments.items()):
         combined_audio = AudioSegment.empty()
-        for start, end in segments:
+        for start, end in sorted(segments, key=lambda x: x[0]):
             start_ms = int(start * 1000)
             end_ms = int(end * 1000)
             combined_audio += audio[start_ms:end_ms]
-        speaker_audio_file = os.path.join(segments_folder, f"speaker_{sanitize_filename(sp)}.mp3")
+        speaker_audio_file = os.path.join(segments_folder, f"SPEAKER_{idx:02d}_{conv_id}.mp3")
         combined_audio.export(speaker_audio_file, format="mp3")
         duration_sec = len(combined_audio) / 1000.0
         speaker_audios.append({
-            "speaker": sp,
+            "speaker": f"SPEAKER_{idx:02d}",
             "audio_file": speaker_audio_file,
             "duration": duration_sec
         })
@@ -539,6 +523,14 @@ async def get_speakers():
     speakers = load_speakers()
     return {"speakers": speakers}
 
+@app.get("/speakers/{speaker_id}")
+async def get_speaker(speaker_id: str):
+    speakers = load_speakers()
+    speaker = next((s for s in speakers if s["id"] == speaker_id), None)
+    if not speaker:
+        raise HTTPException(status_code=404, detail="Speaker not found.")
+    return {"speaker": speaker}
+
 @app.put("/speakers/{speaker_id}")
 async def update_speaker(
     speaker_id: str,
@@ -751,6 +743,7 @@ async def get_conversations():
     conversations = load_conversations()
     return {"conversations": conversations}
 
+
 @app.post("/conversations")
 async def create_conversation(
     id: str = Form(...),
@@ -782,6 +775,35 @@ async def create_conversation(
     conv_folder = os.path.join(CONVERSATIONS_DIR, folder_name)
     os.makedirs(conv_folder, exist_ok=True)
     return {"message": "Conversation created successfully.", "conversation": conv}
+
+@app.put("/conversation/{conv_id}/update-speakers")
+async def update_conversation_speakers(conv_id: str, speakers: str = Form(...)):
+    """
+    Update the speakers list for a conversation.
+    Only speaker IDs will be saved and duplicates are removed.
+    If speaker audio segments already exist, the folder is removed so that
+    the naming convention is re-applied during regeneration.
+    """
+    conversations = load_conversations()
+    conversation = next((c for c in conversations if c["id"] == conv_id), None)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+
+    # Process the provided speakers string: remove duplicates and empty entries.
+    speakers_list = list(dict.fromkeys(s.strip() for s in speakers.split(",") if s.strip()))
+    conversation["speakers"] = speakers_list
+    conversation.setdefault("states", {})["speakerAssignment"] = bool(speakers_list)
+    save_conversations(conversations)
+
+    # Remove existing speaker audio segments to re-sync naming convention.
+    # Commented out to prevent deletion of audio segments.
+    # folder_name = f"{conv_id}_{sanitize_filename(conversation['name'])}"
+    # conv_folder = os.path.join(CONVERSATIONS_DIR, folder_name)
+    # segments_folder = os.path.join(conv_folder, "speakerAudioSegments")
+    # if os.path.exists(segments_folder):
+    #     shutil.rmtree(segments_folder)
+
+    return {"message": "Conversation speakers updated successfully.", "speakers": speakers_list}
 
 @app.get("/conversations/health/{conv_id}")
 async def conversation_health(conv_id: str):
@@ -872,6 +894,7 @@ async def conversation_diarize(
             log_entry = {"status": status, "message": msg}
             conversation["diarizationProcess"]["logs"].append(log_entry)
             save_conversations(conversations)
+            # Force flush output by appending a newline and flushing
             return json.dumps({"status": status, "message": msg}) + "\n"
 
         yield log_and_yield("info", f"Device check complete. Using {device_name}.")
@@ -895,7 +918,7 @@ async def conversation_diarize(
         except Exception as e:
             yield log_and_yield("error", str(e))
     
-    return StreamingResponse(diarize_generator(), media_type="text/plain")
+    return StreamingResponse(diarize_generator(), media_type="text/event-stream")
 
 @app.post("/conversation/upload_audio")
 async def upload_audio(
@@ -928,12 +951,21 @@ async def upload_audio(
     file_size_mb = len(contents) / (1024 * 1024)
     try:
         audio = AudioSegment.from_file(audio_path)
-        duration_sec = len(audio) / 1000.0
+        duration_sec = len(audio) / 1000.0  # duration in seconds
     except Exception:
         duration_sec = 0
     message = f"Audio uploaded: {file_size_mb:.2f} MB, duration: {seconds_to_string(duration_sec)}"
     if previous_audio:
         message += " Warning: previous audio file was replaced."
+    # Convert WAV to MP3 if a WAV file is uploaded
+    if ext == ".wav":
+        mp3_path = os.path.join(conv_folder, f"{conv_id}.mp3")
+        try:
+            audio = AudioSegment.from_file(audio_path)
+            audio.export(mp3_path, format="mp3")
+            message += f" MP3 file also created at {mp3_path}."
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error converting WAV to MP3: {str(e)}")
     # Set state
     conversation_prev_state = conversation.get("states", {}).get("audioAvailable", False)
     conversation["states"]["audioAvailable"] = True
@@ -1357,3 +1389,41 @@ async def audio_metadata(conv_id: str):
         "duration_sec": duration,
         "file_type": file_type
     }
+
+from pydub import AudioSegment
+import os
+from fastapi.responses import JSONResponse
+
+@app.get("/audio/{conv_id}")
+async def get_audio_file(conv_id: str):
+    """
+    Fetch the audio file for a conversation. If an MP3 file is not present but a WAV file is,
+    convert the WAV file to MP3. Return the relative URL of the MP3 file.
+    """
+    conversations = load_conversations()
+    conversation = next((c for c in conversations if c["id"] == conv_id), None)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+
+    folder_name = f"{conv_id}_{sanitize_filename(conversation['name'])}"
+    conv_folder = os.path.join(CONVERSATIONS_DIR, folder_name)
+
+    # Check for audio files
+    audio_path_mp3 = os.path.join(conv_folder, f"{conv_id}.mp3")
+    audio_path_wav = os.path.join(conv_folder, f"{conv_id}.wav")
+
+    if not os.path.exists(audio_path_mp3):
+        if os.path.exists(audio_path_wav):
+            # Convert WAV to MP3
+            try:
+                audio = AudioSegment.from_file(audio_path_wav)
+                audio.export(audio_path_mp3, format="mp3")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error converting WAV to MP3: {str(e)}")
+        else:
+            raise HTTPException(status_code=404, detail="No audio file found.")
+
+    # Return the relative URL of the MP3 file
+    relative_url = f"/conversations/{folder_name}/{conv_id}.mp3"
+    absolute_url = f"http://localhost:8000{relative_url}"
+    return JSONResponse(content={"relative_url": relative_url, "absolute_url": absolute_url})
