@@ -1,21 +1,24 @@
+// page.tsx
 'use client';
 
 import React from 'react';
 import DiarizationSidebar from '@/app/ui/diarizationSidebar';
 import DiarizationWidget from '@/app/ui/diarizationWidget';
+import { ActiveConversationProvider } from '@/app/context/activeConversationContext';
 
-export default function DiarizationPage() {
+const App: React.FC = () => {
   return (
-    <div className="w-full h-full flex">
-      {/* Sidebar container (e.g., 25% width) */}
-      <div className="w-1/4 overflow-y-auto border-r">
-        <DiarizationSidebar />
+    <ActiveConversationProvider>
+      <div className="flex h-screen bg-gray-900">
+        <div className="w-1/4">
+          <DiarizationSidebar />
+        </div>
+        <div className="flex-1">
+          <DiarizationWidget />
+        </div>
       </div>
-      
-      {/* Main widget container */}
-      <div className="flex-1 overflow-y-auto bg-slate-800">
-        <DiarizationWidget />
-      </div>
-    </div>
+    </ActiveConversationProvider>
   );
-}
+};
+
+export default App;

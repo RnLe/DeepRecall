@@ -1,25 +1,8 @@
+// chat.tsx
+
 import React from 'react';
 import SpeakerCard from './speakerCard';
 
-/**
- * Chat component displays a chronological conversation.
- * It groups consecutive transcript entries from the same speaker.
- *
- * Props:
- *  - conversation (array, required): Array of transcript entries.
- *
- * Each entry should have the following structure:
- *   {
- *     start: number,
- *     end: number,
- *     speaker: string,
- *     speakerId: string,   // Unique identifier (e.g., an MD5 hash of the name)
- *     text: string,
- *     // Optional:
- *     image: string,       // URL for the speaker's image
- *     color: string        // Border color for the speaker's avatar
- *   }
- */
 const Chat = ({ conversation }) => {
   // Group consecutive messages from the same speaker.
   const groupedMessages = [];
@@ -49,7 +32,7 @@ const Chat = ({ conversation }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-white dark:bg-gray-900 p-4">
       {groupedMessages.map((group, index) => (
         <div key={index} className="flex space-x-3">
           <div>
@@ -58,14 +41,14 @@ const Chat = ({ conversation }) => {
               name={group.speakerName}
               image={group.speakerImage}
               color={group.speakerColor}
-              showName={false}
+              showName={true}
             />
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
               {group.start.toFixed(2)} - {group.end.toFixed(2)}
             </div>
-            <div className="bg-gray-200 p-3 rounded-lg">
+            <div className="bg-gray-200 dark:bg-gray-800 p-3 rounded-lg">
               {group.messages.join(' ')}
             </div>
           </div>

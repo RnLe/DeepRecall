@@ -1,0 +1,23 @@
+[
+  {
+    "id": "62f44994b7b6f2c329b75f511b646731",
+    "name": "Rene",
+    "color": "#5697dc",
+    "originalImageUrl": "avatars/Rene_62f44994b7b6f2c329b75f511b646731_original.png",
+    "croppedImageUrl": "avatars/Rene_62f44994b7b6f2c329b75f511b646731_cropped.png"
+  },
+  {
+    "id": "be9173589a7471a7179e928adc1a86f7",
+    "name": "Bill Gates",
+    "color": "#964ce1",
+    "originalImageUrl": "avatars/BillGates_be9173589a7471a7179e928adc1a86f7_original.png",
+    "croppedImageUrl": "avatars/BillGates_be9173589a7471a7179e928adc1a86f7_cropped.png"
+  },
+  {
+    "id": "8079e7c75189bd696c19b528116d5f37",
+    "name": "Whoopie Goldberg",
+    "color": "#ec5151",
+    "originalImageUrl": "avatars/WhoopieGoldberg_8079e7c75189bd696c19b528116d5f37_original.png",
+    "croppedImageUrl": "avatars/WhoopieGoldberg_8079e7c75189bd696c19b528116d5f37_cropped.png"
+  }
+]

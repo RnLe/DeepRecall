@@ -4,7 +4,8 @@ interface StateStatusRowClickableProps {
   convId: string;
   states: {
     diarization: boolean;
-    transcription: boolean;
+    transcript: boolean;
+    speakerAudioSegments: boolean;
     speakerAssignment: boolean;
     report: boolean;
     stats: boolean;
@@ -58,10 +59,10 @@ const StateStatusRowClickable: React.FC<StateStatusRowClickableProps> = ({ convI
         </div>
         {/* Transcription Card */}
         <div 
-          className={`p-2 rounded border cursor-pointer ${states.transcription ? 'bg-green-600' : 'bg-gray-600'}`}
-          onClick={() => { if(states.transcription) fetchDetails("transcription") }}
+          className={`p-2 rounded border cursor-pointer ${states.transcript ? 'bg-green-600' : 'bg-gray-600'}`}
+          onClick={() => { if(states.transcript) fetchDetails("transcription") }}
         >
-          <span>Transcription: {states.transcription ? "Done" : "Pending"}</span>
+          <span>Transcription: {states.transcript ? "Done" : "Pending"}</span>
         </div>
         {/* You can add more cards for other states if needed */}
       </div>
