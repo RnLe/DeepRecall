@@ -6,7 +6,7 @@ import { Conversation } from '../helpers/diarizationTypes';
 
 const DiarizationSidebar: React.FC = () => {
   return (
-    <div className="p-4 bg-gray-900 h-full overflow-auto">
+    <div className="p-4 bg-gray-900 h-full">
       <div className="mb-8">
         <SpeakerList />
       </div>

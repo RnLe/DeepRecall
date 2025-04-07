@@ -1,17 +1,21 @@
 // activeConversationContext.tsx
 import React, { createContext, useContext, useState } from 'react';
 import { Conversation } from '../helpers/diarizationTypes';
+import { hardwareResponse } from '../helpers/diarizationTypes';
 
 // Update the interface to accept either a Conversation or a nested object
 interface ActiveConversationContextType {
   activeConversation: Conversation | null;
   setActiveConversation: (conv: Conversation | { conversation: Conversation } | null) => void;
+  hardwareInfo: hardwareResponse | null; // New state for hardware info
+  setHardwareInfo: (info: hardwareResponse | null) => void; // Setter for hardware info
 }
 
 const ActiveConversationContext = createContext<ActiveConversationContextType | undefined>(undefined);
 
 export const ActiveConversationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeConversation, setActiveConversationState] = useState<Conversation | null>(null);
+  const [hardwareInfo, setHardwareInfo] = useState<hardwareResponse | null>(null); // New state for hardware info
 
   // A helper type guard that checks if the provided object is nested.
   const isNestedConversation = (conv: any): conv is { conversation: Conversation } =>
@@ -27,7 +31,7 @@ export const ActiveConversationProvider: React.FC<{ children: React.ReactNode }>
   };
 
   return (
-    <ActiveConversationContext.Provider value={{ activeConversation, setActiveConversation }}>
+    <ActiveConversationContext.Provider value={{ activeConversation, setActiveConversation, hardwareInfo, setHardwareInfo }}>
       {children}
     </ActiveConversationContext.Provider>
   );
