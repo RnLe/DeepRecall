@@ -6,5 +6,8 @@ trace
 **/node_modules/
 **/playground/
 
+**/avatars/
+**/conversations/
+
 *.wav
 *.mp3
