@@ -18,8 +18,16 @@ dependencies:
       - torchaudio
       - librosa
       - soundfile
-      - transformers
       - ipywidgets
       - py-cpuinfo
       - psutil
       - dotenv
+      - transformers            # for huggingface transformers
+      - sentence-transformers   # for huggingface sentence-transformers
+      - hf_xet                  # for huggingface xet (better download speed)
+      - pymupdf                 # (imported as fitz): extracts text from PDF files.
+      - ebooklib                # fparses EPUB files and extracts HTML content.
+      - beautifulsoup4          # processes and cleans up HTML inside EPUBs.
+      - html2text               # converts HTML to Markdown.
+      - nltk                    # for text processing and tokenization.
+      - langchain               # for chaining together LLMs and other components.

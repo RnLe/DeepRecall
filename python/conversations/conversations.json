@@ -1,33 +1,81 @@
 [
   {
-    "id": "6095a7ab9994bd81b0dc1ab834f464f1",
-    "name": "hjklhjk",
+    "id": "6a62a19053471031ac3c3b2048848da2",
+    "name": "Interview with Bill Gates on The View",
     "description": "",
-    "dateCreated": 1744062749.6808956,
+    "dateCreated": 1744119111.1583624,
     "dateOfConversation": null,
-    "speakers": [],
+    "speakers": [
+      "8079e7c75189bd696c19b528116d5f37",
+      "be9173589a7471a7179e928adc1a86f7",
+      "7ab7a024cca6eaa41d1f95083f52bc95",
+      "228efb4268c9955eb20c81106d7fd928",
+      "6974f621b00b6bae37bf8abf90d682ee"
+    ],
     "speakerCount": 0,
     "length": 522.565,
     "states": {
       "audioAvailable": true,
-      "diarization": false,
-      "transcript": false,
-      "speakerAudioSegments": false,
-      "speakerAssignment": false,
+      "diarization": true,
+      "transcript": true,
+      "speakerAudioSegments": true,
+      "speakerAssignment": true,
       "report": false,
       "stats": false
     },
     "diarizationProcess": {
-      "timeStarted": null,
-      "timeCompleted": null,
-      "logs": [],
-      "device": null
+      "timeStarted": 1744119128.7833228,
+      "timeCompleted": 1744119142.2367651,
+      "logs": [
+        {
+          "status": "info",
+          "message": "Hugging Face token obtained from environment."
+        },
+        {
+          "status": "info",
+          "message": "Device check complete. Using NVIDIA GeForce RTX 4070 Ti."
+        },
+        {
+          "status": "info",
+          "message": "Setting up the pyannote pipeline..."
+        },
+        {
+          "status": "info",
+          "message": "Starting diarization..."
+        },
+        {
+          "status": "success",
+          "message": "Diarization completed in 13.45 seconds."
+        },
+        {
+          "status": "success",
+          "message": "Files saved to conversation."
+        }
+      ],
+      "device": "NVIDIA GeForce RTX 4070 Ti"
     },
     "transcriptionProcess": {
-      "timeStarted": null,
-      "timeCompleted": null,
-      "logs": [],
-      "device": null
+      "timeStarted": 1744120175.5356154,
+      "timeCompleted": 1744120194.7253819,
+      "logs": [
+        {
+          "status": "info",
+          "message": "Device check complete. Using NVIDIA GeForce RTX 4070 Ti."
+        },
+        {
+          "status": "info",
+          "message": "Starting transcription..."
+        },
+        {
+          "status": "success",
+          "message": "Transcription completed in 19.19 seconds."
+        },
+        {
+          "status": "success",
+          "message": "Transcript saved to conversation."
+        }
+      ],
+      "device": "NVIDIA GeForce RTX 4070 Ti"
     },
     "backgroundImage": null
   }

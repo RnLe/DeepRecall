@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export type StatusType = 'media' | 'diarization' | 'transcription' | 'speakerAssignment' | 'chat';
+export type StatusType = 'media' | 'diarization' | 'transcription' | 'chat' | 'analysis';
 
 export interface StatusBarProps {
   selectedStatus: StatusType;
@@ -95,20 +95,20 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         onClick={() => transcriptionClickable && setSelectedStatus('transcription')}
       />
       <StatusCard
-        status="speakerAssignment"
-        label="Speaker Assignment"
-        message={states?.speakerAssignment ? 'Speakers assigned' : 'Not assigned'}
-        clickable={speakerAssignmentClickable}
-        selected={selectedStatus === 'speakerAssignment'}
-        onClick={() => speakerAssignmentClickable && setSelectedStatus('speakerAssignment')}
-      />
-      <StatusCard
         status="chat"
         label="Chat"
         message={chatClickable ? 'Chat available' : 'Unavailable'}
         clickable={chatClickable}
         selected={selectedStatus === 'chat'}
         onClick={() => chatClickable && setSelectedStatus('chat')}
+      />
+      <StatusCard
+        status="analysis"
+        label="Analysis"
+        message="Analysis tools"
+        clickable={true}
+        selected={selectedStatus === 'analysis'}
+        onClick={() => setSelectedStatus('analysis')}
       />
     </div>
   );

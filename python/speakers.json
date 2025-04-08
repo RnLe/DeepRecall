@@ -19,5 +19,45 @@
     "color": "#ec5151",
     "originalImageUrl": "avatars/WhoopieGoldberg_8079e7c75189bd696c19b528116d5f37_original.png",
     "croppedImageUrl": "avatars/WhoopieGoldberg_8079e7c75189bd696c19b528116d5f37_cropped.png"
+  },
+  {
+    "id": "228efb4268c9955eb20c81106d7fd928",
+    "name": "Alyssa Farah",
+    "color": "#523624",
+    "originalImageUrl": "avatars/AlyssaFarah_228efb4268c9955eb20c81106d7fd928_original.png",
+    "croppedImageUrl": "avatars/AlyssaFarah_228efb4268c9955eb20c81106d7fd928_cropped.png",
+    "presetAvatar": ""
+  },
+  {
+    "id": "7ab7a024cca6eaa41d1f95083f52bc95",
+    "name": "Sara Haines",
+    "color": "#777f00",
+    "originalImageUrl": "avatars/SaraHaines_7ab7a024cca6eaa41d1f95083f52bc95_original.png",
+    "croppedImageUrl": "avatars/SaraHaines_7ab7a024cca6eaa41d1f95083f52bc95_cropped.png",
+    "presetAvatar": ""
+  },
+  {
+    "id": "6974f621b00b6bae37bf8abf90d682ee",
+    "name": "Sunny Hostin",
+    "color": "#f2e0d4",
+    "originalImageUrl": "avatars/SunnyHostin_6974f621b00b6bae37bf8abf90d682ee_original.png",
+    "croppedImageUrl": "avatars/SunnyHostin_6974f621b00b6bae37bf8abf90d682ee_cropped.png",
+    "presetAvatar": ""
+  },
+  {
+    "id": "da4fd8a50d64f47b1bac8b9a28e787cc",
+    "name": "Lara",
+    "color": "#a0182c",
+    "presetAvatar": "",
+    "originalImageUrl": "avatars/Lara_da4fd8a50d64f47b1bac8b9a28e787cc_original.png",
+    "croppedImageUrl": "avatars/Lara_da4fd8a50d64f47b1bac8b9a28e787cc_cropped.png"
+  },
+  {
+    "id": "db6e6b3a69dbef15306cc2d87bb9828d",
+    "name": "Doris Reiter",
+    "color": "#1e9f3e",
+    "presetAvatar": "",
+    "originalImageUrl": "avatars/DorisReiter_db6e6b3a69dbef15306cc2d87bb9828d_original.png",
+    "croppedImageUrl": "avatars/DorisReiter_db6e6b3a69dbef15306cc2d87bb9828d_cropped.png"
   }
 ]

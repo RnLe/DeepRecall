@@ -4,18 +4,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { secondsToString } from '../helpers/timesToString';
 import { Conversation } from '../helpers/diarizationTypes';
 import { useActiveConversation } from '../context/activeConversationContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fetchConversationDetails } from '../api/conversationApi';
 import { StatusBar, StatusType } from './statusBar';
-import { HardwareBanner } from './hardwareBanner';
 import { TokenModal } from './tokenModal';
 import { formatLogMessage, formatReadableDateTime } from '../helpers/logHelpers';
-import { DiarizationResult, parseRTTM } from '../helpers/diarizationHelpers';
+import { DiarizationResult, parseRTTM, extractSpeakerCount, getSpeakerAudioFilename } from '../helpers/diarizationHelpers';
 import { SpeakerTimeline } from './speakerTimeline';
-import SpeakerCard from './speakerCard';
+import { SpeakerCard } from './speakerCard';
 import { Speaker } from '../helpers/diarizationTypes';
 import ReactModal from 'react-modal'; // added for modal support
+import { getBlockTranscription, getLineTranscription } from '../helpers/transcriptionHelpers';
+import { parseChatContent, formatChatContentForClipboard } from '../helpers/chatHelpers';
+import { ChatContent } from '../helpers/diarizationTypes';
+import Chat from './chat';
 
 
 const ConversationPipeline: React.FC = () => {
@@ -44,6 +47,7 @@ const ConversationPipeline: React.FC = () => {
 
   // New: Diarization results from RTTM file.
   const [diarizationResults, setDiarizationResults] = useState<DiarizationResult[]>([]);
+  const [speakerCount, setSpeakerCount] = useState<number>(0);
 
   const [hfToken, setHfToken] = useState<string | null>(null);
   const [showTokenModal, setShowTokenModal] = useState(false);
@@ -71,7 +75,7 @@ const ConversationPipeline: React.FC = () => {
     {}
   );
   useEffect(() => {
-    if (activeConversation?.id && activeConversation.states?.speakerAudioSegments) {
+    if (activeConversation?.id && activeConversation.states?.diarization) {
       fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/speaker-audios/${activeConversation.id}`)
         .then(res => res.json())
         .then((data) => {
@@ -90,34 +94,39 @@ const ConversationPipeline: React.FC = () => {
   }, [activeConversation]);
   // Initialize assigned speakers from conversationDetails if available
   useEffect(() => {
-    if (conversationDetails && conversationDetails.speakers && diarizationResults.length) {
-      const distinct = Array.from(new Set(diarizationResults.map(d => d.speaker)));
+    if (conversationDetails && conversationDetails.speakers) { // removed dependency on diarizationResults
+      const fixedLabels = Array.from({ length: conversationDetails.speakerCount }, (_, i) => `SPEAKER_${i < 10 ? `0${i}` : i}`);
       const mapping: { [key: string]: string } = {};
-      distinct.forEach((ds, idx) => {
-        mapping[ds] = conversationDetails.speakers[idx] || "";
+      fixedLabels.forEach((label, idx) => {
+        mapping[label] = conversationDetails.speakers[idx] || "";
       });
       setAssignedSpeakers(mapping);
     }
-  }, [conversationDetails, diarizationResults]);
+  }, [conversationDetails]);
   
   // Handler when a speaker is selected from modal
   const handleSpeakerSelect = (selected: Speaker) => {
-    // Prevent assigning the same speaker twice to different diarization labels
+    // Use the speaker label key (e.g., "SPEAKER_00")
+    const label = currentDiarSpeaker;  
     const isAlreadyAssigned = Object.entries(assignedSpeakers).some(
-      ([diar, speakerId]) => speakerId === selected.id && diar !== currentDiarSpeaker
+      ([lbl, speakerId]) => speakerId === selected.id && lbl !== label
     );
     if (isAlreadyAssigned) {
       alert("This speaker is already assigned. Please choose a different speaker.");
       return;
     }
-    const newMapping = { ...assignedSpeakers, [currentDiarSpeaker]: selected.id };
+    const newMapping = { ...assignedSpeakers, [label]: selected.id };
     setAssignedSpeakers(newMapping);
     setShowSpeakerSelectModal(false);
-    
-    // Immediately update the server with new assignment (comma separated ordered by distinct diar speakers)
+  };
+
+  const queryClient = useQueryClient(); // <-- add queryClient
+
+  // New function to update the speaker assignment via API.
+  const handleUpdateSpeakerAssignment = () => {
     if (activeConversation) {
-      const distinct = Array.from(new Set(diarizationResults.map(d => d.speaker)));
-      const speakersList = distinct.map(ds => newMapping[ds] || "").join(",");
+      const fixedLabels = Array.from({ length: speakerCount }, (_, i) => `SPEAKER_${i < 10 ? `0${i}` : i}`);
+      const speakersList = fixedLabels.map(lbl => assignedSpeakers[lbl] || "").join(",");
       const formData = new FormData();
       formData.append('speakers', speakersList);
       formData.append('conv_id', activeConversation.id);
@@ -126,7 +135,11 @@ const ConversationPipeline: React.FC = () => {
         body: formData,
       })
       .then(res => res.json())
-      .then(data => console.log("Updated assignment:", data))
+      .then(data => {
+        console.log("Updated assignment:", data);
+        refetch(); // Refresh active conversation details
+        queryClient.invalidateQueries({ queryKey: ['conversations'] }); // Invalidate parent conversation list cache
+      })
       .catch(err => console.error("Failed to update speakers", err));
     }
   };
@@ -229,7 +242,7 @@ const ConversationPipeline: React.FC = () => {
     setIsDiarizationProcessing(true);
     diarizationProcessingRef.current = true;
     const startTime = Date.now();
-    setDiarizationLogs([]);
+    setDiarizationLogs([]); 
     
     // Update timer using requestAnimationFrame for fast refresh.
     const updateTimer = () => {
@@ -241,49 +254,56 @@ const ConversationPipeline: React.FC = () => {
     };
     // Start the timer.
     diarizationTimerRef.current = requestAnimationFrame(updateTimer);
-    
+  
     try {
+      // Prepare the form data with necessary fields.
       const formData = new FormData();
-      formData.append('conv_id', activeConversation!.id);
+      formData.append('conv_id', activeConversation.id);
       formData.append('media_type', 'audio');
+  
+      // Send the POST request.
       const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/diarize`, {
         method: 'POST',
         body: formData,
       });
+  
       if (!res.body) throw new Error("ReadableStream not supported.");
+      
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
-      let done = false;
-      // START OF CHANGES: Use a logBuffer and flush every 500ms.
-      let logBuffer: string[] = [];
-      let lastUpdate = Date.now();
-      while (!done) {
-        const { value, done: doneReading } = await reader.read();
-        done = doneReading;
-        const chunk = decoder.decode(value);
-        const messages = chunk.split("\n").filter(line => line.trim() !== "");
-        logBuffer.push(...messages.map(formatLogMessage));
-        if (Date.now() - lastUpdate > 500) {
-          setDiarizationLogs(prev => [...prev, ...logBuffer]);
-          logBuffer = [];
-          lastUpdate = Date.now();
-        }
+  
+      // Continuously read chunks from the stream.
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // Decode the current chunk and split into lines.
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(line => line.trim() !== "");
+
+        // For each line, parse the JSON then pass the object to your format function.
+        const formattedMessages = lines.map(line => {
+          try {
+            const messageObj = JSON.parse(line);
+            return formatLogMessage(messageObj);
+          } catch (e) {
+            console.error("JSON parse error:", e, "Line:", line);
+            return line; // Fallback: return the raw line if JSON.parse fails.
+          }
+        });
+
+      // Append the formatted messages to the logs state.
+      setDiarizationLogs(prev => [...prev, ...formattedMessages]);
       }
-      if (logBuffer.length > 0) {
-        setDiarizationLogs(prev => [...prev, ...logBuffer]);
-      }
-      // END OF CHANGES
-    } catch (error: any) {
+    } catch (error) {
       setDiarizationLogs(prev => [...prev, `❌ Error: ${error.message}`]);
     } finally {
+      // Update the processing flag and refresh conversation status.
       setIsDiarizationProcessing(false);
-      diarizationProcessingRef.current = false;
-      if (diarizationTimerRef.current)
-        cancelAnimationFrame(diarizationTimerRef.current);
-      // Trigger refetch to update conversation status after diarization.
       refetch();
     }
   };
+  
 
   // New: Fetch and format diarization results from the RTTM file.
   const handleFetchResults = async () => {
@@ -301,7 +321,8 @@ const ConversationPipeline: React.FC = () => {
       const rawText = await res.text();
       const results = parseRTTM(rawText);
       setDiarizationResults(results);
-      setShowResults(true); // Mark that results have been fetched.
+      setSpeakerCount(extractSpeakerCount(rawText));
+      setShowResults(true);
     } catch (error: any) {
       console.error("Error fetching diarization results:", error.message);
     }
@@ -316,6 +337,13 @@ const ConversationPipeline: React.FC = () => {
         ? activeConversation.diarizationProcess.logs
         : []);
 
+  // Analogous for the transcription process, but by using a effect
+  useEffect(() => {
+    if (activeConversation && activeConversation?.states?.transcript) {
+      setTranscriptionLogs(activeConversation.transcriptionProcess.logs);
+    }
+  }, [activeConversation?.states?.transcript]);
+
   // Determine button label based on whether a valid diarization has been done.
   const diarizationButtonLabel =
     activeConversation?.states?.diarization
@@ -327,6 +355,135 @@ const ConversationPipeline: React.FC = () => {
   const totalDuration = audioDuration > computedDuration ? audioDuration : computedDuration;
 
   const [showResults, setShowResults] = useState(false);
+
+  // New: Transcription process state (similar to diarization)
+  const [isTranscriptionProcessing, setIsTranscriptionProcessing] = useState(false);
+  const [transcriptionElapsed, setTranscriptionElapsed] = useState<number>(0);
+  const [transcriptionLogs, setTranscriptionLogs] = useState<string[]>([]);
+  const transcriptionTimerRef = useRef<number | null>(null);
+  const transcriptionProcessingRef = useRef(false);
+
+  // New: Handler to initiate transcription process
+  const handleStartTranscription = async () => {
+    setIsTranscriptionProcessing(true);
+    transcriptionProcessingRef.current = true;
+    const startTime = Date.now();
+    setTranscriptionLogs([]);
+
+    // Update timer using requestAnimationFrame for fast refresh.
+    const updateTimer = () => {
+      const newElapsed = (Date.now() - startTime) / 1000;
+      setTranscriptionElapsed(newElapsed);
+      if (transcriptionProcessingRef.current) {
+        transcriptionTimerRef.current = requestAnimationFrame(updateTimer);
+      }
+    };
+    transcriptionTimerRef.current = requestAnimationFrame(updateTimer);
+
+    try {
+      // Prepare the form data.
+      const formData = new FormData();
+      formData.append('conv_id', activeConversation.id);
+      formData.append('model_string', 'large-v3-turbo'); // change as needed
+
+      // Send the POST request.
+      const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/transcribe`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.body) throw new Error("ReadableStream not supported.");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      // Process the stream.
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // Decode the current chunk and split by newlines.
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(line => line.trim() !== "");
+
+        // For each line, parse the JSON and format the message.
+        const formattedMessages = lines.map(line => {
+          try {
+            const messageObj = JSON.parse(line);
+            return formatLogMessage(messageObj);
+          } catch (e) {
+            console.error("JSON parse error:", e, "Line:", line);
+            return line; // Fallback returns the raw line.
+          }
+        });
+
+        // Append the formatted messages to the transcription logs.
+        setTranscriptionLogs(prev => [...prev, ...formattedMessages]);
+      }
+    } catch (error) {
+      setTranscriptionLogs(prev => [...prev, `❌ Error: ${error.message}`]);
+    } finally {
+      setIsTranscriptionProcessing(false);
+      transcriptionProcessingRef.current = false;
+      if (transcriptionTimerRef.current)
+        cancelAnimationFrame(transcriptionTimerRef.current);
+      refetch();
+    }
+  };
+
+
+  // New: Handler to fetch and show transcription modal
+  const handleShowTranscription = async () => {
+    if (!activeConversation) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/transcription-details/${activeConversation.id}`);
+      const data = await res.json();
+      setTranscriptionData(data);
+      setShowTranscriptionModal(true);
+    } catch (error) {
+      console.error("Failed to fetch transcription", error);
+    }
+  };
+
+  const [showTranscriptionModal, setShowTranscriptionModal] = useState(false);
+  const [transcriptionData, setTranscriptionData] = useState<any>(null);
+  const [transcriptionViewMode, setTranscriptionViewMode] = useState<'block' | 'line'>('block');
+
+  const [chatContent, setChatContent] = useState<ChatContent | null>(null);
+  const canCreateChat = activeConversation?.states?.diarization && activeConversation?.states?.transcript && activeConversation?.states?.speakerAssignment;
+
+  // New handler to fetch diarization and transcription details and merge them.
+  const handleFetchChat = async () => {
+    if (!activeConversation) return;
+    try {
+      const [diagRes, transRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/diarization-details/${activeConversation.id}`).then(res => res.text()),
+        fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/transcription-details/${activeConversation.id}`).then(res => res.json())
+      ]);
+      // Parse diarization data using the existing helper from diarizationHelpers.ts
+      const diagResults = parseRTTM(diagRes);
+      // transRes assumed to be a valid WhisperTranscription
+      const chat = parseChatContent(diagResults, transRes, activeConversation.speakers);
+      setChatContent(chat);
+    } catch (error: any) {
+      console.error("Error fetching chat data:", error.message);
+    }
+  };
+
+  const handleCopyChat = () => {
+    if (chatContent) {
+      const formatted = formatChatContentForClipboard(chatContent);
+      navigator.clipboard.writeText(formatted);
+      alert('Chat copied to clipboard!');
+    }
+  };
+
+  useEffect(() => {
+    if (activeConversation?.states?.diarization && !showResults) {
+      handleFetchResults();
+    }
+  }, [activeConversation?.states?.diarization, showResults]);
+
+  const [showDiarizationModal, setShowDiarizationModal] = useState(false);
 
   return (
     <div className="p-4 bg-gray-800 rounded text-white space-y-4">
@@ -439,15 +596,6 @@ const ConversationPipeline: React.FC = () => {
                   >
                     {diarizationButtonLabel}
                   </button>
-                  {activeConversation?.states.diarization && (
-                    <button
-                      onClick={handleFetchResults}
-                      disabled={!activeConversation}
-                      className="w-full p-2 bg-purple-500 hover:bg-purple-600 rounded"
-                    >
-                      Fetch Results
-                    </button>
-                  )}
                 </div>
                 {/* Show results only when fetch has been clicked */}
                 {activeConversation?.states.diarization && showResults && (
@@ -460,69 +608,41 @@ const ConversationPipeline: React.FC = () => {
                         assignedMapping={assignedSpeakers}
                         availableSpeakers={availableSpeakers || []}
                         audioSrc={serverMetadata ? `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/${activeConversation?.id}.mp3` : ''}
+                        fixedSpeakerCount={speakerCount}  // <-- added fixedSpeakerCount prop
                       />
                       <div className="bg-gray-700 p-4 rounded">
                         <h4 className="text-xl font-bold mb-2">Speaker Selection</h4>
-                        {(() => {
-                          const distinctDiarSpeakers = Array.from(new Set(diarizationResults.map(r => r.speaker)));
-                          return distinctDiarSpeakers.map((speakerLabel, index) => {
-                            const audioKey = Object.keys(speakerAudios)[index];
-                            const audioData = speakerAudios[audioKey];
-                            const computedSrc = audioData ? `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/${audioData.audio_file}` : "";
-                            return (
-                              <div key={`${speakerLabel}-${index}`} className="flex items-center justify-between bg-gray-800 p-2 rounded mb-2">
-                                <div className="flex items-center cursor-pointer" onClick={() => {
-                                  setCurrentDiarSpeaker(speakerLabel);
-                                  setShowSpeakerSelectModal(true);
-                                }}>
-                                  <SpeakerCard
-                                    speaker={{ id: speakerLabel, name: `Speaker ${index + 1}` }}
-                                    showName={true}
-                                    className="w-40"
-                                  />
-                                </div>
-                                <div className="flex-1 ml-4">
-                                  {audioData ? (
-                                    <audio controls className="w-full" src={computedSrc} />
-                                  ) : (
-                                    <span className="text-sm text-gray-400 block">No audio available</span>
-                                  )}
-                                </div>
+                        {Array.from({ length: speakerCount }, (_, i) => {
+                          const label = `SPEAKER_${i < 10 ? `0${i}` : i}`;
+                          const assignedSpeaker = assignedSpeakers[label]
+                            ? availableSpeakers?.find(s => s.id === assignedSpeakers[label])
+                            : null;
+                            const computedSrc = `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversations/${activeConversation.id}_${activeConversation.name.replace(/\s/g, '')}/speakerAudioSegments/${getSpeakerAudioFilename(i, activeConversation.id)}`;
+                          return (
+                            <div key={label} className="flex items-center justify-between bg-gray-800 p-2 rounded mb-2">
+                              <div className="flex items-center cursor-pointer" onClick={() => {
+                                setCurrentDiarSpeaker(label);
+                                setShowSpeakerSelectModal(true);
+                              }}>
+                                <SpeakerCard
+                                  speaker={assignedSpeaker || { id: label, name: `Speaker ${i + 1}` }}
+                                  showName={true}
+                                  className="w-40"
+                                />
                               </div>
-                            );
-                          });
-                        })()}
+                              <div className="flex-1 ml-4">
+                                <audio controls className="w-full" src={computedSrc} />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
-                    {/* Details Table */}
-                    <div className="mt-2">
-                      {showTable && (
-                        <div className="mt-2 max-h-60 overflow-auto border border-gray-700 rounded">
-                          <table className="min-w-full divide-y divide-gray-700">
-                            <thead>
-                              <tr>
-                                <th className="px-4 py-2 text-left">Start Time</th>
-                                <th className="px-4 py-2 text-left">Duration</th>
-                                <th className="px-4 py-2 text-left">Speaker</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {diarizationResults.map((result, idx) => (
-                                <tr key={idx}>
-                                  <td className="px-4 py-2">{secondsToString(result.startTime)}</td>
-                                  <td className="px-4 py-2">{secondsToString(result.duration, true)}</td>
-                                  <td className="px-4 py-2">{result.speaker}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                      {/* New: Update Speakers button */}
                       <button
-                        onClick={() => setShowTable(prev => !prev)}
-                        className="mt-4 w-full p-2 bg-indigo-500 hover:bg-indigo-600 rounded"
+                        onClick={handleUpdateSpeakerAssignment}
+                        className="mt-4 w-full p-2 bg-teal-500 hover:bg-teal-600 rounded"
                       >
-                        {showTable ? 'Hide Details Table' : 'Show Details Table'}
+                        Update Speaker Assignment
                       </button>
                     </div>
                   </>
@@ -537,73 +657,101 @@ const ConversationPipeline: React.FC = () => {
         {selectedStatus === 'transcription' && (
           <div>
             <h3 className="text-2xl font-bold mb-2">Transcription</h3>
-            {activeConversation?.states.transcript ? (
-              <p>Transcription already completed.</p>
-            ) : (
-              <p>Transcription process placeholder.</p>
-            )}
-          </div>
-        )}
-
-        {selectedStatus === 'speakerAssignment' && (
-          <div>
-            <h3 className="text-2xl font-bold mb-2">Speaker Assignment</h3>
-            {activeConversation?.states.speakerAudioSegments ? (
-              <div className="bg-gray-700 p-4 rounded">
-                <h4 className="text-xl font-bold mb-2">Speaker Selection</h4>
-                {(() => {
-                  // Compute distinct diarization speakers
-                  const distinctDiarSpeakers = Array.from(new Set(diarizationResults.map(r => r.speaker)));
-                  return distinctDiarSpeakers.map((speakerLabel, index) => {
-                    const audioKey = Object.keys(speakerAudios)[index]; // Fetch audio by order
-                    const audioData = speakerAudios[audioKey];
-                    const computedSrc = audioData ? `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/${audioData.audio_file}` : "";
-                    return (
-                      <div key={`${speakerLabel}-${index}`} className="flex items-center justify-between bg-gray-800 p-2 rounded mb-2">
-                        <div
-                          className="flex items-center cursor-pointer"
-                          onClick={() => {
-                            setCurrentDiarSpeaker(speakerLabel);
-                            setShowSpeakerSelectModal(true);
-                          }}
-                        >
-                          <SpeakerCard
-                            speaker={{ id: speakerLabel, name: `Speaker ${index + 1}` }}
-                            showName={true}
-                            className="w-40"
-                          />
-                        </div>
-                        <div className="flex-1 ml-4">
-                          {audioData ? (
-                            <audio
-                              controls
-                              className="w-full"
-                              // Using absolute URL for audio source
-                              src={computedSrc}
-                            />
-                          ) : (
-                            <span className="text-sm text-gray-400 block">No audio available</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            ) : (
-              <p className="text-yellow-400">Speaker audio segments are not available yet.</p>
-            )}
+            <div className="p-4 bg-gray-700 rounded mb-2">
+              <p>
+                <strong>Processing Device:</strong> {activeConversation?.transcriptionProcess?.device || 'N/A'}
+              </p>
+              <p>
+                <strong>Started:</strong> {activeConversation?.transcriptionProcess 
+                  ? formatReadableDateTime(activeConversation.transcriptionProcess.timeStarted)
+                  : "N/A"}
+              </p>
+              <p>
+                {isTranscriptionProcessing
+                  ? `Elapsed Time: ${transcriptionElapsed.toFixed(3)} seconds`
+                  : activeConversation?.transcriptionProcess?.timeCompleted
+                    ? `Duration: ${secondsToString(activeConversation.transcriptionProcess.timeCompleted - activeConversation.transcriptionProcess.timeStarted)}`
+                    : ''}
+              </p>
+            </div>
+            <div className="mt-2 p-2 bg-gray-900 rounded h-40 overflow-y-auto font-mono text-xs">
+              {transcriptionLogs.map((log, index) => (
+                <p key={index}>{formatLogMessage(log)}</p>
+              ))}
+            </div>
+            <div className="mt-4 space-y-2">
+              {!isTranscriptionProcessing && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (activeConversation?.transcriptionProcess?.timeCompleted) {
+                        if (window.confirm("Warning: restarting transcription will overwrite existing data. Continue?")) {
+                          setTranscriptionLogs([]);
+                          handleStartTranscription();
+                        }
+                      } else {
+                        setTranscriptionLogs([]);
+                        handleStartTranscription();
+                      }
+                    }}
+                    disabled={!activeConversation?.states?.audioAvailable}
+                    className={`w-full p-2 rounded ${activeConversation?.transcriptionProcess?.timeCompleted ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-600 hover:bg-green-700'}`}
+                  >
+                    {activeConversation?.transcriptionProcess?.timeCompleted ? 'Restart Transcription' : 'Start Transcription'}
+                  </button>
+                  {activeConversation?.transcriptionProcess?.timeCompleted && (
+                    <button
+                      onClick={handleShowTranscription}
+                      className="w-full p-2 bg-purple-500 hover:bg-purple-600 rounded mt-2"
+                    >
+                      Show Transcription
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
 
         {selectedStatus === 'chat' && (
           <div>
-            <h3 className="text-2xl font-bold mb-2">Chat</h3>
-            <p>
-              {activeConversation?.states.diarization && activeConversation?.states.transcript
-                ? 'Chat available. (It is suggested to complete speaker assignment first.)'
-                : 'Chat not available yet.'}
-            </p>
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold mb-2">Chat</h3>
+              {chatContent && (
+                <button
+                  onClick={handleCopyChat}
+                  className="p-2 bg-indigo-500 hover:bg-indigo-600 rounded text-sm"
+                >
+                  Copy Chat
+                </button>
+              )}
+            </div>
+            {canCreateChat ? (
+              <>
+                <button
+                  onClick={handleFetchChat}
+                  className="mb-4 p-2 bg-green-600 hover:bg-green-700 rounded"
+                >
+                  Create Chat
+                </button>
+                {chatContent ? (
+                  <Chat chatContent={chatContent} />
+                ) : (
+                  <p>No chat available yet.</p>
+                )}
+              </>
+            ) : (
+              <p>
+                Chat is not available. Please ensure diarization, transcript and speaker assignment are complete.
+              </p>
+            )}
+          </div>
+        )}
+
+        {selectedStatus === 'analysis' && (
+          <div>
+            <h3 className="text-2xl font-bold mb-2">Analysis</h3>
+            <p>Analysis content will go here.</p>
           </div>
         )}
       </div>
@@ -647,6 +795,72 @@ const ConversationPipeline: React.FC = () => {
             </button>
           </div>
         </ReactModal>
+      )}
+
+      {/* Floating Transcription Modal */}
+      {showTranscriptionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="relative bg-gray-800 text-white rounded-lg p-6 w-11/12 md:w-3/4 lg:w-3/4 max-h-[80vh]">
+            {/* Top buttons (fixed) */}
+            <div className="flex justify-between items-center mb-4">
+              <button 
+                onClick={() => setShowTranscriptionModal(false)}
+                className="px-2 py-1 bg-red-600 rounded"
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => setTranscriptionViewMode(prev => prev === 'block' ? 'line' : 'block')}
+                className="px-2 py-1 bg-blue-600 rounded"
+              >
+                {transcriptionViewMode === 'block' ? 'Line View' : 'Block View'}
+              </button>
+            </div>
+            {/* Scrollable content */}
+            <div className="overflow-y-auto max-h-[65vh] whitespace-pre-wrap">
+              {transcriptionData 
+                ? transcriptionViewMode === 'block'
+                  ? getBlockTranscription(transcriptionData)
+                  : getLineTranscription(transcriptionData)
+                : "Loading transcription..."}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Diarization Modal */}
+      {showDiarizationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="relative bg-gray-800 text-white rounded-lg p-6 w-11/12 md:w-3/4 lg:w-3/4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Diarization Details</h3>
+              <button 
+                onClick={() => setShowDiarizationModal(false)}
+                className="px-2 py-1 bg-red-600 rounded"
+              >
+                Close
+              </button>
+            </div>
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left">Start Time</th>
+                  <th className="px-4 py-2 text-left">Duration</th>
+                  <th className="px-4 py-2 text-left">Speaker</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diarizationResults.map((result, idx) => (
+                  <tr key={idx}>
+                    <td className="px-4 py-2">{secondsToString(result.startTime)}</td>
+                    <td className="px-4 py-2">{secondsToString(result.duration, true)}</td>
+                    <td className="px-4 py-2">{result.speaker}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );

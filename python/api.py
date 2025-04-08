@@ -163,10 +163,7 @@ def process_transcription(audio_path: str, model_string: str, device: str):
     """Run the Whisper transcription on the given audio file."""
     model = whisper.load_model(model_string, device=device)
     result = model.transcribe(audio_path, language="en", task="transcribe")
-    transcript_json = f"transcript_{model_string}_detailed.json"
-    with open(transcript_json, "w") as f:
-        json.dump(result, f, indent=2)
-    return transcript_json, result
+    return result
 
 def create_speaker_audio_segments(conv_id: str, conversation: dict, conv_folder: str):
     """
@@ -385,7 +382,7 @@ async def process_audio(
             
             # Start transcription
             yield json.dumps({"status": "info", "message": "Starting transcription..."}) + "\n"
-            transcript_file, transcript_result = process_transcription(audio_path, model_string, device)
+            transcript_result = process_transcription(audio_path, model_string, device)
             yield json.dumps({"status": "success", "message": "Transcription complete."}) + "\n"
             
             # Combine diarization and transcription
@@ -445,20 +442,28 @@ async def add_speaker(
     id: str = Form(...),
     name: str = Form(...),
     color: str = Form(...),
+    presetAvatar: str = Form(default=""),
     image: UploadFile = File(None),
     croppedArea: str = Form(default="")  # Expected format: "width,height,x,y"
 ):
     """
-    Add a new speaker. The form-data should include:
-      - id: Unique identifier (e.g., MD5 hash of the name)
-      - name: Speaker's name
-      - color: Ring color for the speaker avatar
-      - image: Optional avatar image file
-      - croppedArea: Optional crop area in the format "width,height,x,y"
-    The avatar image is saved in the avatars folder.
-    All speaker data is stored in speakers/speakers.json.
+    Add a new speaker. If presetAvatar is provided, the image upload and cropping are ignored.
     """
     speakers = load_speakers()
+
+    if presetAvatar:
+        new_speaker = {
+            "id": id,
+            "name": name,
+            "color": color,
+            "presetAvatar": presetAvatar,
+            "originalImageUrl": None,
+            "croppedImageUrl": None
+        }
+        speakers.append(new_speaker)
+        save_speakers(speakers)
+        return {"message": "Speaker added successfully.", "speakers": speakers}
+
     original_image_path = None
     cropped_image_path = None
 
@@ -479,7 +484,6 @@ async def add_speaker(
         with Image.open(original_image_path) as img:
             width, height = img.size
             if croppedArea:
-                # Parse the comma-separated crop area: width,height,x,y
                 parts = croppedArea.split(",")
                 if len(parts) != 4:
                     raise HTTPException(status_code=400, detail="Invalid croppedArea format; expected 4 comma-separated numbers.")
@@ -487,13 +491,11 @@ async def add_speaker(
                     crop_width, crop_height, crop_x, crop_y = map(float, parts)
                 except Exception:
                     raise HTTPException(status_code=400, detail="Invalid croppedArea values; expected numbers.")
-                # Define crop box from provided coordinates
                 left = crop_x
                 top = crop_y
                 right = crop_x + crop_width
                 bottom = crop_y + crop_height
             else:
-                # Default: crop a centered square
                 min_dim = min(width, height)
                 left = (width - min_dim) / 2
                 top = (height - min_dim) / 2
@@ -501,13 +503,14 @@ async def add_speaker(
                 bottom = (height + min_dim) / 2
 
             cropped_img = img.crop((left, top, right, bottom))
-            cropped_img = cropped_img.resize((256, 256))  # Resize to 256x256
+            cropped_img = cropped_img.resize((256, 256))
             cropped_img.save(cropped_image_path)
 
     new_speaker = {
         "id": id,
         "name": name,
         "color": color,
+        "presetAvatar": "",  # no preset when image is uploaded
         "originalImageUrl": original_image_path,
         "croppedImageUrl": cropped_image_path
     }
@@ -536,6 +539,7 @@ async def update_speaker(
     speaker_id: str,
     name: str = Form(...),
     color: str = Form(...),
+    presetAvatar: str = Form(default=""),
     image: UploadFile = File(None),
     croppedArea: str = Form(default="")  # Expected format: "width,height,x,y"
 ):
@@ -544,86 +548,85 @@ async def update_speaker(
     if not speaker:
         raise HTTPException(status_code=404, detail="Speaker not found.")
 
-    # Compute the new sanitized name
     new_sanitized = sanitize_filename(name)
     original_image_path = speaker.get("originalImageUrl")
     cropped_image_path = speaker.get("croppedImageUrl")
 
-    if image:
-        # Save new images with new filenames.
-        original_filename = f"{new_sanitized}_{speaker_id}_original.png"
-        cropped_filename = f"{new_sanitized}_{speaker_id}_cropped.png"
-        original_image_path = os.path.join(AVATARS_DIR, original_filename)
-        cropped_image_path = os.path.join(AVATARS_DIR, cropped_filename)
-
-        # Save the original image
-        with open(original_image_path, "wb") as f:
-            content = await image.read()
-            f.write(content)
-
-        # Open the image and perform cropping
-        with Image.open(original_image_path) as img:
-            width, height = img.size
-            if croppedArea:
-                parts = croppedArea.split(",")
-                if len(parts) != 4:
-                    raise HTTPException(status_code=400, detail="Invalid croppedArea format; expected 4 comma-separated numbers.")
-                try:
-                    crop_width, crop_height, crop_x, crop_y = map(float, parts)
-                except Exception:
-                    raise HTTPException(status_code=400, detail="Invalid croppedArea values; expected numbers.")
-                left = crop_x
-                top = crop_y
-                right = crop_x + crop_width
-                bottom = crop_y + crop_height
-            else:
-                min_dim = min(width, height)
-                left = (width - min_dim) / 2
-                top = (height - min_dim) / 2
-                right = (width + min_dim) / 2
-                bottom = (height + min_dim) / 2
-            cropped_img = img.crop((left, top, right, bottom))
-            cropped_img = cropped_img.resize((256, 256))
-            cropped_img.save(cropped_image_path)
+    if presetAvatar:
+        # If a preset is chosen, ignore image updates.
+        speaker["presetAvatar"] = presetAvatar
+        speaker["originalImageUrl"] = None
+        speaker["croppedImageUrl"] = None
     else:
-        # No new image uploaded.
-        # If croppedArea is provided, use the existing original image to create a new cropped image.
-        if croppedArea and original_image_path and os.path.exists(original_image_path):
+        # Clear any existing preset
+        speaker["presetAvatar"] = ""
+        if image:
+            original_filename = f"{new_sanitized}_{speaker_id}_original.png"
+            cropped_filename = f"{new_sanitized}_{speaker_id}_cropped.png"
+            original_image_path = os.path.join(AVATARS_DIR, original_filename)
+            cropped_image_path = os.path.join(AVATARS_DIR, cropped_filename)
+            with open(original_image_path, "wb") as f:
+                content = await image.read()
+                f.write(content)
             with Image.open(original_image_path) as img:
                 width, height = img.size
-                parts = croppedArea.split(",")
-                if len(parts) != 4:
-                    raise HTTPException(status_code=400, detail="Invalid croppedArea format; expected 4 comma-separated numbers.")
-                try:
-                    crop_width, crop_height, crop_x, crop_y = map(float, parts)
-                except Exception:
-                    raise HTTPException(status_code=400, detail="Invalid croppedArea values; expected numbers.")
-                left = crop_x
-                top = crop_y
-                right = crop_x + crop_width
-                bottom = crop_y + crop_height
+                if croppedArea:
+                    parts = croppedArea.split(",")
+                    if len(parts) != 4:
+                        raise HTTPException(status_code=400, detail="Invalid croppedArea format; expected 4 comma-separated numbers.")
+                    try:
+                        crop_width, crop_height, crop_x, crop_y = map(float, parts)
+                    except Exception:
+                        raise HTTPException(status_code=400, detail="Invalid croppedArea values; expected numbers.")
+                    left = crop_x
+                    top = crop_y
+                    right = crop_x + crop_width
+                    bottom = crop_y + crop_height
+                else:
+                    min_dim = min(width, height)
+                    left = (width - min_dim) / 2
+                    top = (height - min_dim) / 2
+                    right = (width + min_dim) / 2
+                    bottom = (height + min_dim) / 2
                 cropped_img = img.crop((left, top, right, bottom))
                 cropped_img = cropped_img.resize((256, 256))
+                cropped_img.save(cropped_image_path)
+        else:
+            if croppedArea and original_image_path and os.path.exists(original_image_path):
+                with Image.open(original_image_path) as img:
+                    width, height = img.size
+                    parts = croppedArea.split(",")
+                    if len(parts) != 4:
+                        raise HTTPException(status_code=400, detail="Invalid croppedArea format; expected 4 comma-separated numbers.")
+                    try:
+                        crop_width, crop_height, crop_x, crop_y = map(float, parts)
+                    except Exception:
+                        raise HTTPException(status_code=400, detail="Invalid croppedArea values; expected numbers.")
+                    left = crop_x
+                    top = crop_y
+                    right = crop_x + crop_width
+                    bottom = crop_y + crop_height
+                    cropped_img = img.crop((left, top, right, bottom))
+                    cropped_img = cropped_img.resize((256, 256))
+                    new_cropped_path = os.path.join(AVATARS_DIR, f"{new_sanitized}_{speaker_id}_cropped.png")
+                    cropped_img.save(new_cropped_path)
+                    cropped_image_path = new_cropped_path
+            if original_image_path:
+                new_original_path = os.path.join(AVATARS_DIR, f"{new_sanitized}_{speaker_id}_original.png")
+                if os.path.exists(original_image_path) and original_image_path != new_original_path:
+                    os.rename(original_image_path, new_original_path)
+                    original_image_path = new_original_path
+            if cropped_image_path:
                 new_cropped_path = os.path.join(AVATARS_DIR, f"{new_sanitized}_{speaker_id}_cropped.png")
-                cropped_img.save(new_cropped_path)
-                cropped_image_path = new_cropped_path
+                if os.path.exists(cropped_image_path) and cropped_image_path != new_cropped_path:
+                    os.rename(cropped_image_path, new_cropped_path)
+                    cropped_image_path = new_cropped_path
 
-        # Rename existing images if the name has changed.
-        if original_image_path:
-            new_original_path = os.path.join(AVATARS_DIR, f"{new_sanitized}_{speaker_id}_original.png")
-            if os.path.exists(original_image_path) and original_image_path != new_original_path:
-                os.rename(original_image_path, new_original_path)
-                original_image_path = new_original_path
-        if cropped_image_path:
-            new_cropped_path = os.path.join(AVATARS_DIR, f"{new_sanitized}_{speaker_id}_cropped.png")
-            if os.path.exists(cropped_image_path) and cropped_image_path != new_cropped_path:
-                os.rename(cropped_image_path, new_cropped_path)
-                cropped_image_path = new_cropped_path
+        speaker["originalImageUrl"] = original_image_path
+        speaker["croppedImageUrl"] = cropped_image_path
 
     speaker["name"] = name
     speaker["color"] = color
-    speaker["originalImageUrl"] = original_image_path
-    speaker["croppedImageUrl"] = cropped_image_path
     save_speakers(speakers)
     return {"message": "Speaker updated successfully.", "speaker": speaker}
 
@@ -781,8 +784,6 @@ async def update_conversation_speakers(conv_id: str, speakers: str = Form(...)):
     """
     Update the speakers list for a conversation.
     Only speaker IDs will be saved and duplicates are removed.
-    If speaker audio segments already exist, the folder is removed so that
-    the naming convention is re-applied during regeneration.
     """
     conversations = load_conversations()
     conversation = next((c for c in conversations if c["id"] == conv_id), None)
@@ -794,14 +795,6 @@ async def update_conversation_speakers(conv_id: str, speakers: str = Form(...)):
     conversation["speakers"] = speakers_list
     conversation.setdefault("states", {})["speakerAssignment"] = bool(speakers_list)
     save_conversations(conversations)
-
-    # Remove existing speaker audio segments to re-sync naming convention.
-    # Commented out to prevent deletion of audio segments.
-    # folder_name = f"{conv_id}_{sanitize_filename(conversation['name'])}"
-    # conv_folder = os.path.join(CONVERSATIONS_DIR, folder_name)
-    # segments_folder = os.path.join(conv_folder, "speakerAudioSegments")
-    # if os.path.exists(segments_folder):
-    #     shutil.rmtree(segments_folder)
 
     return {"message": "Conversation speakers updated successfully.", "speakers": speakers_list}
 
@@ -843,24 +836,38 @@ async def conversation_diarize(
     hf_auth_token: str = Form(None)  # Optional Hugging Face auth token
 ):
     async def diarize_generator():
+        # Load conversations first.
+        conversations = load_conversations()
+        conversation = next((c for c in conversations if c["id"] == conv_id), None)
+        if not conversation:
+            yield json.dumps({"status": "error", "message": "Conversation not initialized."}) + "\n"
+            return
+        # Set conv_obj to the loaded conversation.
+        conv_obj = conversation
+        # Reset the diarization process logs to avoid confusion.
+        conversation.setdefault("diarizationProcess", {})
+        conversation["diarizationProcess"]["logs"] = []
+
+        # Helper for logging and yielding messages.
+        def log_and_yield(status, msg):
+            conv_obj.setdefault("diarizationProcess", {}).setdefault("logs", []).append({
+                "status": status,
+                "message": msg
+            })
+            save_conversations(conversations)
+            return json.dumps({"status": status, "message": msg}) + "\n"
+
         # Token selection logic.
         provided_token = hf_auth_token.strip() if hf_auth_token else ""
         env_token = os.getenv("HUGGINGFACE_TOKEN")
         if provided_token:
             token_to_use = provided_token
-            yield json.dumps({"status": "info", "message": "Hugging Face token provided; using overridden token."}) + "\n"
-            # Optionally, save token for future use if needed.
+            yield log_and_yield("info", "Hugging Face token provided; using overridden token.")
         elif env_token:
             token_to_use = env_token
-            yield json.dumps({"status": "info", "message": "Hugging Face token obtained from environment."}) + "\n"
+            yield log_and_yield("info", "Hugging Face token obtained from environment.")
         else:
-            yield json.dumps({"status": "error", "message": "No Hugging Face token provided or found in environment."}) + "\n"
-            return
-
-        conversations = load_conversations()
-        conversation = next((c for c in conversations if c["id"] == conv_id), None)
-        if not conversation:
-            yield json.dumps({"status": "error", "message": "Conversation not initialized."}) + "\n"
+            yield log_and_yield("error", "No Hugging Face token provided or found in environment.")
             return
 
         folder_name = f"{conv_id}_{sanitize_filename(conversation['name'])}"
@@ -874,13 +881,11 @@ async def conversation_diarize(
         elif os.path.exists(audio_path_mp3):
             audio_path = audio_path_mp3
         else:
-            yield json.dumps({"status": "error", "message": "Audio file not found. Please upload it first."}) + "\n"
+            yield log_and_yield("error", "Audio file not found. Please upload it first.")
             return
 
-        # Initialize process stats for diarization.
-        conversation.setdefault("diarizationProcess", {})
+        # Initialize process stats for diarization without resetting logs.
         conversation["diarizationProcess"]["timeStarted"] = time.time()
-        conversation["diarizationProcess"]["logs"] = []
         if torch.cuda.is_available():
             device_name = torch.cuda.get_device_name(0)
         else:
@@ -888,14 +893,6 @@ async def conversation_diarize(
             device_name = f"{info.get('brand_raw', 'Unknown')} ({info.get('arch', 'Unknown')})"
         conversation["diarizationProcess"]["device"] = device_name
         save_conversations(conversations)
-
-        # Helper for logging and yielding messages without timestamps.
-        def log_and_yield(status, msg):
-            log_entry = {"status": status, "message": msg}
-            conversation["diarizationProcess"]["logs"].append(log_entry)
-            save_conversations(conversations)
-            # Force flush output by appending a newline and flushing
-            return json.dumps({"status": status, "message": msg}) + "\n"
 
         yield log_and_yield("info", f"Device check complete. Using {device_name}.")
         yield log_and_yield("info", "Setting up the pyannote pipeline...")
@@ -917,7 +914,6 @@ async def conversation_diarize(
             update_conversation_state(conv_id, "diarization", True)
         except Exception as e:
             yield log_and_yield("error", str(e))
-    
     return StreamingResponse(diarize_generator(), media_type="text/event-stream")
 
 @app.post("/conversation/upload_audio")
@@ -993,60 +989,77 @@ async def conversation_transcribe(
     Returns streaming JSON messages with progress updates.
     """
     async def transcribe_generator():
-        from time import time
-        try:
-            conversations = load_conversations()
-            conversation = next((c for c in conversations if c["id"] == conv_id), None)
-            if not conversation:
-                yield json.dumps({"status": "error", "message": "Conversation not initialized."}) + "\n"
-                return
+        # Load conversations first.
+        conversations = load_conversations()
+        conversation = next((c for c in conversations if c["id"] == conv_id), None)
+        if not conversation:
+            yield json.dumps({"status": "error", "message": "Conversation not initialized."}) + "\n"
+            return
 
-            folder_name = f"{conv_id}_{sanitize_filename(conversation['name'])}"
-            conv_folder = os.path.join(CONVERSATIONS_DIR, folder_name)
-            os.makedirs(conv_folder, exist_ok=True)
-            # Look for the uploaded audio file (either .wav or .mp3).
-            audio_path_wav = os.path.join(conv_folder, f"{conv_id}.wav")
-            audio_path_mp3 = os.path.join(conv_folder, f"{conv_id}.mp3")
-            if os.path.exists(audio_path_wav):
-                audio_path = audio_path_wav
-            elif os.path.exists(audio_path_mp3):
-                audio_path = audio_path_mp3
-            else:
-                yield json.dumps({"status": "error", "message": "Audio file not found. Please upload it first."}) + "\n"
-                return
+        # Use conv_obj for consistency.
+        conv_obj = conversation
 
-            # Initialize process stats for transcription.
-            conversation.setdefault("transcriptionProcess", {})
-            conversation["transcriptionProcess"]["timeStarted"] = time()
-            conversation["transcriptionProcess"]["logs"] = []
-            if torch.cuda.is_available():
-                device_name = torch.cuda.get_device_name(0)
-            else:
-                info = cpuinfo.get_cpu_info()
-                device_name = f"{info.get('brand_raw', 'Unknown')} ({info.get('arch', 'Unknown')})"
-            conversation["transcriptionProcess"]["device"] = device_name
+        # Reset the transcription process logs to avoid confusion.
+        conv_obj.setdefault("transcriptionProcess", {})
+        conv_obj["transcriptionProcess"]["logs"] = []
+
+        # Helper for logging and yielding messages.
+        def log_and_yield(status, msg):
+            conv_obj.setdefault("transcriptionProcess", {}).setdefault("logs", []).append({
+                "status": status,
+                "message": msg
+            })
             save_conversations(conversations)
+            return json.dumps({"status": status, "message": msg}) + "\n"
 
-            def log_and_yield(status, msg):
-                log_entry = f"[{time()}] {msg}"
-                conversation["transcriptionProcess"]["logs"].append(log_entry)
-                save_conversations(conversations)
-                return json.dumps({"status": status, "message": msg}) + "\n"
+        # Prepare conversation folder.
+        folder_name = f"{conv_id}_{sanitize_filename(conv_obj['name'])}"
+        conv_folder = os.path.join(CONVERSATIONS_DIR, folder_name)
+        os.makedirs(conv_folder, exist_ok=True)
+        
+        # Check for the uploaded audio file (either .wav or .mp3).
+        audio_path_wav = os.path.join(conv_folder, f"{conv_id}.wav")
+        audio_path_mp3 = os.path.join(conv_folder, f"{conv_id}.mp3")
+        if os.path.exists(audio_path_wav):
+            audio_path = audio_path_wav
+        elif os.path.exists(audio_path_mp3):
+            audio_path = audio_path_mp3
+        else:
+            yield log_and_yield("error", "Audio file not found. Please upload it first.")
+            return
 
-            yield log_and_yield("info", "Starting transcription...")
+        # Initialize process stats for transcription.
+        conv_obj["transcriptionProcess"]["timeStarted"] = time.time()
+        if torch.cuda.is_available():
+            device_name = torch.cuda.get_device_name(0)
+        else:
+            info = cpuinfo.get_cpu_info()
+            device_name = f"{info.get('brand_raw', 'Unknown')} ({info.get('arch', 'Unknown')})"
+        conv_obj["transcriptionProcess"]["device"] = device_name
+        save_conversations(conversations)
+
+        yield log_and_yield("info", f"Device check complete. Using {device_name}.")
+        yield log_and_yield("info", "Starting transcription...")
+        start_time = time.time()
+
+        try:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            transcript_file, transcript_result = process_transcription(audio_path, model_string, device)
+            # Process transcription using your custom function.
+            transcript_result = process_transcription(audio_path, model_string, device)
             destination_file = os.path.join(conv_folder, f"rawTranscript_{conv_id}.json")
             with open(destination_file, "w") as f:
                 json.dump(transcript_result, f, indent=2)
-            yield log_and_yield("success", f"Transcription complete. Transcript file: {destination_file}")
-            conversation["transcriptionProcess"]["timeCompleted"] = time()
+            elapsed = time.time() - start_time
+            yield log_and_yield("success", f"Transcription completed in {elapsed:.2f} seconds.")
+            yield log_and_yield("success", f"Transcript saved to conversation.")
+            conv_obj["transcriptionProcess"]["timeCompleted"] = time.time()
             save_conversations(conversations)
-            update_conversation_state(conv_id, "transcription", True)
+            update_conversation_state(conv_id, "transcript", True)
         except Exception as e:
             yield log_and_yield("error", str(e))
-    
-    return StreamingResponse(transcribe_generator(), media_type="text/plain")
+
+    return StreamingResponse(transcribe_generator(), media_type="text/event-stream")
+
 
 @app.get("/conversation/diarization-details/{conv_id}")
 async def get_diarization_details(conv_id: str):
@@ -1072,8 +1085,7 @@ async def get_diarization_details(conv_id: str):
 @app.get("/conversation/transcription-details/{conv_id}")
 async def get_transcription_details(conv_id: str):
     """
-    Fetch the raw transcription JSON file, beautify it,
-    and generate a text output where each line shows the segment timestamp and text.
+    Fetch and return the raw transcription JSON file.
     """
     conversations = load_conversations()
     conversation = next((c for c in conversations if c["id"] == conv_id), None)
@@ -1082,7 +1094,6 @@ async def get_transcription_details(conv_id: str):
     
     folder_name = f"{conv_id}_{sanitize_filename(conversation['name'])}"
     conv_folder = os.path.join(CONVERSATIONS_DIR, folder_name)
-    # We assume the transcription JSON file is saved as rawTranscript_{conv_id}.json in the conversation folder.
     transcription_file = os.path.join(conv_folder, f"rawTranscript_{conv_id}.json")
     
     if not os.path.exists(transcription_file):
@@ -1091,18 +1102,7 @@ async def get_transcription_details(conv_id: str):
     with open(transcription_file, "r") as f:
         transcript_data = json.load(f)
     
-    # Create a beautified version of the JSON.
-    beautified_json = json.dumps(transcript_data, indent=2)
-    
-    # Generate timestamp lines (each line with the segment start-end and text).
-    timestamp_lines = ""
-    for seg in transcript_data.get("segments", []):
-        start = seg.get("start", 0)
-        end = seg.get("end", 0)
-        text = seg.get("text", "").strip()
-        timestamp_lines += f"[{start:.2f}-{end:.2f}] {text}\n"
-    
-    return {"beautified_json": beautified_json, "timestamp_lines": timestamp_lines}
+    return transcript_data
 
 @app.post("/conversation/merge")
 async def conversation_merge(
@@ -1179,7 +1179,7 @@ async def get_speaker_audios(conv_id: str):
             # Create segments if they don't exist.
             speaker_audios = create_speaker_audio_segments(conv_id, conversation, conv_folder)
             # Update the conversation state.
-            conversation["states"]["speakerAudio"] = True
+            conversation["states"]["speakerAudioSegments"] = True
             save_conversations(conversations)
         else:
             # Rebuild the speaker_audios list by reading files from the segments folder.
