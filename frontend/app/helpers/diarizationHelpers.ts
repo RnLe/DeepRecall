@@ -31,3 +31,13 @@ export interface DiarizationResult {
       };
     });
   };
+
+export const extractSpeakerCount = (raw: string): number => {
+  const results = parseRTTM(raw);
+  return new Set(results.map(r => r.speaker)).size;
+};
+
+export const getSpeakerAudioFilename = (speakerIndex: number, convId: string): string => {
+  const speakerStr = speakerIndex < 10 ? `0${speakerIndex}` : `${speakerIndex}`;
+  return `SPEAKER_${speakerStr}_${convId}.mp3`;
+};

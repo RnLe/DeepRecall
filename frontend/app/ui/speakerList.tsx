@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import SpeakerCard from './speakerCard';
+import { SpeakerCard } from './speakerCard';
 import SpeakerCreationForm from './speakerCreationForm';
 import { Speaker } from '../helpers/diarizationTypes';
 
@@ -65,7 +65,8 @@ const SpeakerList: React.FC = () => {
         ))}
         {/* Plus card for creating a new speaker */}
         <div 
-          className="flex flex-col items-center justify-center border-2 border-dashed border-gray-600 rounded-full w-20 h-20 cursor-pointer hover:border-blue-400 mx-auto"
+          className="flex flex-col items-center justify-center rounded-full w-20 h-20 cursor-pointer mx-auto"
+          style={{ borderWidth: 2, borderStyle: 'solid', borderColor: '#4B5563' }}  // using a default solid color
           onClick={() => {
             setEditingSpeaker(null);
             setShowForm(true);

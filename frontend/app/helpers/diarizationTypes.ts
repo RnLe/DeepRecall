@@ -40,6 +40,7 @@ export interface Speaker {
   color?: string;
   originalImageUrl?: string;
   croppedImageUrl?: string;
+  presetAvatar?: string;
   dateCreated?: string;       // ISO date string
 }
 
@@ -82,3 +83,30 @@ export const apiTokenNames = [
   "Hugging Face",
   "OpenAI"
 ];
+
+// Type format for the whisper transcription
+export interface WhisperTranscription {
+  text: string;     // This is the full transcription text in a single line.
+  segments: {
+    id: number;
+    seek: number;
+    start: number;
+    end: number;
+    text: string;
+    tokens: number[];
+    temperature: number;
+    avg_logprob: number;
+    compression_ratio: number;
+    no_speech_prob: number;
+  }[];
+}
+
+// Type format for the chat content
+export interface ChatContent {
+  segments: {
+    speakerId: string;
+    start: number;
+    end: number;
+    text: string;
+  }[];
+}

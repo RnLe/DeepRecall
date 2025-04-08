@@ -1,55 +1,29 @@
-// chat.tsx
-
 import React from 'react';
-import SpeakerCard from './speakerCard';
+import { SpeakerData } from './speakerCard';
+import { ChatContent } from '../helpers/diarizationTypes';
+import { secondsToString } from '../helpers/timesToString';
+import { groupChatMessages } from '../helpers/chatHelpers';
 
-const Chat = ({ conversation }) => {
-  // Group consecutive messages from the same speaker.
-  const groupedMessages = [];
-  let currentGroup = null;
+interface ChatProps {
+  chatContent: ChatContent;
+}
 
-  conversation.forEach((entry) => {
-    if (!currentGroup || currentGroup.speakerId !== entry.speakerId) {
-      if (currentGroup) {
-        groupedMessages.push(currentGroup);
-      }
-      currentGroup = {
-        speakerId: entry.speakerId,
-        speakerName: entry.speaker,
-        speakerImage: entry.image || null,
-        speakerColor: entry.color || null,
-        messages: [entry.text],
-        start: entry.start,
-        end: entry.end,
-      };
-    } else {
-      currentGroup.messages.push(entry.text);
-      currentGroup.end = entry.end;
-    }
-  });
-  if (currentGroup) {
-    groupedMessages.push(currentGroup);
-  }
+const Chat: React.FC<ChatProps> = ({ chatContent }) => {
+  const groupedMessages = groupChatMessages(chatContent);
 
   return (
     <div className="space-y-4 bg-white dark:bg-gray-900 p-4">
       {groupedMessages.map((group, index) => (
-        <div key={index} className="flex space-x-3">
+        <div key={index} className="flex items-center space-x-3">
           <div>
-            <SpeakerCard
-              id={group.speakerId}
-              name={group.speakerName}
-              image={group.speakerImage}
-              color={group.speakerColor}
-              showName={true}
-            />
+            <SpeakerData speakerId={group.speakerId} showName={true} className="w-20" />
           </div>
           <div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-              {group.start.toFixed(2)} - {group.end.toFixed(2)}
+              {secondsToString(group.start)} — {secondsToString(group.end)}
             </div>
             <div className="bg-gray-200 dark:bg-gray-800 p-3 rounded-lg">
-              {group.messages.join(' ')}
+              {group.text}
             </div>
           </div>
         </div>

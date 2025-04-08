@@ -30,6 +30,8 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [showPresetSelection, setShowPresetSelection] = useState(false);
 
   // Cleanup and reset form fields when 'speaker' changes.
   useEffect(() => {
@@ -65,7 +67,9 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
 
   // Generate a preview URL when a file is selected.
   useEffect(() => {
-    if (imageFile) {
+    if (selectedPreset) {
+      setPreviewUrl(`/icons/avatarPlaceholders/${selectedPreset}`);
+    } else if (imageFile) {
       const url = URL.createObjectURL(imageFile);
       setPreviewUrl(url);
       return () => URL.revokeObjectURL(url);
@@ -74,7 +78,7 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
     } else {
       setPreviewUrl(null);
     }
-  }, [imageFile, isEdit, speaker]);
+  }, [imageFile, selectedPreset, isEdit, speaker]);
 
   // Check for duplicate speaker (ignore self in edit mode).
   useEffect(() => {
@@ -105,6 +109,7 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['speakers'] });
+      queryClient.invalidateQueries({ queryKey: ['speaker', md5Hash] });
       onSuccess();
     },
   });
@@ -123,6 +128,7 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['speakers'] });
+      queryClient.invalidateQueries({ queryKey: ['speaker', md5Hash] });
       onSuccess();
     },
   });
@@ -147,6 +153,7 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setimageFile(e.target.files[0]);
+      setSelectedPreset(null);
     }
   };
 
@@ -156,6 +163,7 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
   };
 
   const handleCropSave = async () => {
+    if (selectedPreset) return;
     const imageToCrop = imageFile ? URL.createObjectURL(imageFile) : (speaker?.originalImageUrl ? `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/${speaker.originalImageUrl}` : '');
     if (croppedAreaPixels && imageToCrop) {
       // Get the cropped image file using your helper.
@@ -179,13 +187,17 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
     formData.append('id', md5Hash);
     formData.append('name', name);
     formData.append('color', color);
-    if (imageFile) {
-      formData.append('image', imageFile);
-    }
-    if (croppedAreaPixels) {
-      const { width, height, x, y } = croppedAreaPixels;
-      const croppedAreaString = `${width},${height},${x},${y}`; // Format as "width,height,x,y"
-      formData.append('croppedArea', croppedAreaString);
+    if (selectedPreset) {
+      formData.append('presetAvatar', selectedPreset);
+    } else {
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+      if (croppedAreaPixels) {
+        const { width, height, x, y } = croppedAreaPixels;
+        const croppedAreaString = `${width},${height},${x},${y}`; // Format as "width,height,x,y"
+        formData.append('croppedArea', croppedAreaString);
+      }
     }
     if (isEdit) {
       updateSpeakerMutation.mutate(formData);
@@ -241,7 +253,7 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
             onChange={handleFileChange}
             className="mt-1 block w-full bg-gray-700 border border-gray-600 p-2 rounded text-white"
           />
-          {previewUrl && (
+          {previewUrl && !selectedPreset && (
             <div className="mt-2">
               <img
                 src={previewUrl}
@@ -252,7 +264,50 @@ const SpeakerCreationForm: React.FC<SpeakerCreationFormProps> = ({ onSuccess, on
             </div>
           )}
         </div>
-        {isCropping && (
+        <div>
+          <button 
+            type="button"
+            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+            onClick={() => setShowPresetSelection(!showPresetSelection)}
+          >
+            {showPresetSelection ? 'Hide Presets' : 'Choose Preset Avatar'}
+          </button>
+        </div>
+        {showPresetSelection && (
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {[
+              'avatar_placeholder_feminine_01.png',
+              'avatar_placeholder_feminine_02.png',
+              'avatar_placeholder_feminine_03.png',
+              'avatar_placeholder_masculine_01.png',
+              'avatar_placeholder_masculine_02.png',
+              'avatar_placeholder_masculine_03.png'
+            ].map((preset) => (
+              <img
+                key={preset}
+                src={`/icons/avatarPlaceholders/${preset}`}
+                alt={preset}
+                className={`w-16 h-16 rounded-full object-cover cursor-pointer border-2 ${selectedPreset === preset ? 'border-blue-500' : 'border-transparent'}`}
+                onClick={() => {
+                  setSelectedPreset(preset);
+                  setimageFile(null);
+                  setIsCropping(false);
+                  setShowPresetSelection(false);
+                }}
+              />
+            ))}
+          </div>
+        )}
+        {previewUrl && selectedPreset && (
+          <div className="mt-2">
+            <img
+              src={previewUrl}
+              alt="Preset Avatar Preview"
+              className="w-16 h-16 rounded-full object-cover"
+            />
+          </div>
+        )}
+        {isCropping && !selectedPreset && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
             <div className="relative w-96 h-96 bg-gray-900 p-4 rounded">
               <Cropper

@@ -1,9 +1,8 @@
 // conversationCard.tsx
 import React, { useEffect, useState } from 'react';
-import SpeakerCard from './speakerCard';
+import { SpeakerData } from './speakerCard';
 import { Conversation, Speaker } from '../helpers/diarizationTypes';
 import { agoTimeToString, secondsToString } from '../helpers/timesToString';
-import { classNames } from 'react-easy-crop/helpers';
 
 interface ConversationCardProps {
   conversation: Conversation;
@@ -12,24 +11,6 @@ interface ConversationCardProps {
   perRow?: number;
   onClick?: () => void;
 }
-
-// New component to fetch speaker data via the API and render SpeakerCard.
-const SpeakerData: React.FC<{ speakerId: string }> = ({ speakerId }) => {
-  const [speaker, setSpeaker] = useState<Speaker | null>(null);
-
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/speakers/${speakerId}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        return res.json();
-      })
-      .then(data => setSpeaker(data.speaker))
-      .catch(err => console.error("Error fetching speaker", err));
-  }, [speakerId]);
-
-  if (!speaker) return <div>Loading...</div>;
-  return <SpeakerCard speaker={speaker} showName={false} onSelect={() => {}} className={"w-12"} />;
-};
 
 // New TimeAgo component
 const TimeAgo: React.FC<{ timestamp: number }> = ({ timestamp }) => {
