@@ -1,6 +1,6 @@
 // SpeakerAudios.tsx
 import React, { useState, useEffect } from 'react';
-import SpeakerCard from './speakerCard';
+import { SpeakerCard } from './speakerCard';
 
 interface SpeakerAudio {
   speaker: string;

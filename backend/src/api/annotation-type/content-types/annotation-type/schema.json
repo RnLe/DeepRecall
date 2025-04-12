@@ -1,0 +1,23 @@
+{
+  "kind": "collectionType",
+  "collectionName": "annotation_types",
+  "info": {
+    "singularName": "annotation-type",
+    "pluralName": "annotation-types",
+    "displayName": "AnnotationType"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "typeMetadata": {
+      "type": "json",
+      "required": true
+    }
+  }
+}

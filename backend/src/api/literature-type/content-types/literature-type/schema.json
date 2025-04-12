@@ -1,10 +1,10 @@
 {
   "kind": "collectionType",
-  "collectionName": "literatures",
+  "collectionName": "literature_types",
   "info": {
-    "singularName": "literature",
-    "pluralName": "literatures",
-    "displayName": "Literature",
+    "singularName": "literature-type",
+    "pluralName": "literature-types",
+    "displayName": "LiteratureType",
     "description": ""
   },
   "options": {
@@ -12,15 +12,11 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "title": {
+    "name": {
       "type": "string",
       "required": true
     },
-    "type": {
-      "type": "string",
-      "required": true
-    },
-    "type_metadata": {
+    "typeMetadata": {
       "type": "json",
       "required": true
     }

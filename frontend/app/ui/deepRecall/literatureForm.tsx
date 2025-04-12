@@ -170,46 +170,46 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
   };
 
   return (
-    <div className={`p-4 border rounded shadow mt-4 ${className}`}>
+    <div className={`p-4 border rounded shadow mt-4 bg-gray-800 text-white ${className}`}>
       <h3 className="text-lg font-semibold mb-2">Create new {mediaType}</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Title */}
         <div>
-          <label className="block text-sm font-medium">Title</label>
+          <label className="block text-sm font-medium text-gray-300">Title</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="mt-1 block w-full border border-gray-300 p-2"
+            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
           />
         </div>
 
         {/* Subtitle (common) */}
         <div>
-          <label className="block text-sm font-medium">Subtitle (optional)</label>
+          <label className="block text-sm font-medium text-gray-300">Subtitle (optional)</label>
           <input
             type="text"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Enter subtitle..."
-            className="mt-1 block w-full border border-gray-300 p-2"
+            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
           />
         </div>
 
         {/* Authors */}
         <div>
-          <label className="block text-sm font-medium">Authors</label>
+          <label className="block text-sm font-medium text-gray-300">Authors</label>
           <input
             type="text"
             value={authorQuery}
             onChange={(e) => setAuthorQuery(e.target.value)}
             onKeyDown={handleAuthorKeyDown}
             placeholder="Type to search or add new author..."
-            className="mt-1 block w-full border border-gray-300 p-2"
+            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
           />
           {suggestions.length > 0 && (
-            <ul className="border border-gray-300 mt-1 max-h-40 overflow-y-auto">
+            <ul className="border border-gray-600 mt-1 max-h-40 overflow-y-auto bg-gray-700 text-white">
               {suggestions.map((suggestion) => (
                 <li
                   key={suggestion.id}
@@ -218,7 +218,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
                     setAuthorQuery("");
                     setSuggestions([]);
                   }}
-                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  className="p-2 hover:bg-gray-600 cursor-pointer"
                 >
                   <span className="underline">{suggestion.first_name}</span>{" "}
                   <span className="font-bold">{suggestion.last_name}</span>
@@ -231,15 +231,15 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
             {selectedAuthors.map((sa, index) => (
               <div
                 key={index}
-                className={`flex items-center border border-gray-300 p-2 rounded ${
-                  sa.isNew ? "bg-green-100" : "bg-white"
+                className={`flex items-center border border-gray-600 p-2 rounded ${
+                  sa.isNew ? "bg-green-700" : "bg-gray-700"
                 }`}
               >
                 <div>
                   <span className="underline">{sa.author.first_name}</span>{" "}
                   <span className="font-bold">{sa.author.last_name}</span>
                 </div>
-                <button type="button" onClick={() => removeAuthor(index)} className="ml-2">
+                <button type="button" onClick={() => removeAuthor(index)} className="ml-2 text-red-500">
                   x
                 </button>
               </div>
@@ -250,7 +250,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
         {/* Render type-specific fields dynamically */}
         {LITERATURE_FORM_FIELDS[mediaType]?.map((field) => (
           <div key={field.name}>
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium text-gray-300">
               {field.label}
               {field.required && " *"}
             </label>
@@ -259,7 +259,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
                 value={typeFields[field.name] || ""}
                 onChange={(e) => handleFieldChange(field.name, e.target.value)}
                 placeholder={field.placeholder}
-                className="mt-1 block w-full border border-gray-300 p-2"
+                className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
               />
             ) : (
               <input
@@ -267,7 +267,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({ mediaType, className, o
                 value={typeFields[field.name] || ""}
                 onChange={(e) => handleFieldChange(field.name, e.target.value)}
                 placeholder={field.placeholder}
-                className="mt-1 block w-full border border-gray-300 p-2"
+                className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
                 required={field.required}
               />
             )}

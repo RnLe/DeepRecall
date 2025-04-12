@@ -65,7 +65,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
   };
 
   return (
-    <div className={`p-4 ${className}`}>
+    <div className={`p-4 bg-gray-800 text-white ${className}`}>
       {/* Grid of simple type cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         {LITERATURE_TYPES.map((type) => (
@@ -73,7 +73,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
             key={type}
             className={`cursor-pointer border rounded-lg p-4 text-center hover:shadow-md transition-shadow ${
               selectedType === type ? 'ring-4 ring-blue-500' : ''
-            }`}
+            } bg-gray-700 text-white`}
             onClick={() => {
               setSelectedType(type);
               setFormVisibility(false);
@@ -90,7 +90,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
       {selectedType && (
         <div className="flex gap-4 mt-4">
           {/* Left side: List of existing entries and "Create New" button */}
-          <div className="w-1/2 border-r border-gray-300 pr-2">
+          <div className="w-1/2 border-r border-gray-600 pr-2">
             <h3 className="text-lg font-semibold mb-2">Existing {selectedType}s</h3>
             {isLoading ? (
               <p>Loading...</p>
@@ -107,12 +107,12 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
                     >
                       <LiteratureCardL
                         {...entry}
-                        className={selectedEntry?.documentId === entry.documentId ? 'bg-gray-300' : ''}
+                        className={selectedEntry?.documentId === entry.documentId ? 'bg-gray-700' : ''}
                       />
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500">No entries available.</p>
+                  <p className="text-gray-400">No entries available.</p>
                 )}
                 <button
                   onClick={handleCreateNewClick}

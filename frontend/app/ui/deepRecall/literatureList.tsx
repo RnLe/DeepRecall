@@ -25,7 +25,7 @@ export default function LiteratureList({ className }: LiteratureListProps) {
   // console.log('Literature data:', data);
 
   return (
-    <div className={`p-4 bg-slate-100 overflow-auto ${className}`}>
+    <div className={`p-4 bg-gray-800 text-white overflow-auto ${className}`}>
       <h1 className="text-xl font-bold mb-4">Literature List</h1>
       {LITERATURE_TYPES.map((type: LiteratureType) => {
         // Map the raw data into LiteratureItem objects for the current type
@@ -47,7 +47,7 @@ export default function LiteratureList({ className }: LiteratureListProps) {
                   />
                 ))
               ) : (
-                <p className="text-gray-500">No {LITERATURE_TYPE_STRING_PLURAL[type]} available.</p>
+                <p className="text-gray-400">No {LITERATURE_TYPE_STRING_PLURAL[type]} available.</p>
               )}
             </div>
           </section>

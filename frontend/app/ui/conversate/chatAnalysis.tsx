@@ -3,12 +3,6 @@ import React, { useState } from 'react';
 import { ChatCompact, Speaker } from '../../helpers/diarizationTypes';
 import { SpeakerData, SpeakerCard } from './speakerCard';
 
-interface ChatLine {
-  speaker: string;
-  timing: string;
-  text: string;
-}
-
 interface AnalysisResponse {
   summary: string;
   keynotes: { [speaker: string]: string[] };
