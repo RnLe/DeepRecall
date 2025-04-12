@@ -1,26 +1,21 @@
 {
   "kind": "collectionType",
-  "collectionName": "literatures",
+  "collectionName": "annotations",
   "info": {
-    "singularName": "literature",
-    "pluralName": "literatures",
-    "displayName": "Literature",
-    "description": ""
+    "singularName": "annotation",
+    "pluralName": "annotations",
+    "displayName": "Annotation"
   },
   "options": {
     "draftAndPublish": true
   },
   "pluginOptions": {},
   "attributes": {
-    "title": {
-      "type": "string",
-      "required": true
-    },
     "type": {
       "type": "string",
       "required": true
     },
-    "type_metadata": {
+    "metadata": {
       "type": "json",
       "required": true
     }

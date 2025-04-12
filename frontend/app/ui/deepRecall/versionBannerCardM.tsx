@@ -70,21 +70,21 @@ const VersionBannerCardM: React.FC<VersionBannerCardMProps> = ({ version, classN
   return (
     <div
       onClick={onClick}
-      className={`flex items-center p-4 border rounded-lg bg-white hover:shadow-lg transition-shadow cursor-pointer ${className}`}
+      className={`flex items-center p-4 border rounded-lg bg-gray-800 hover:shadow-lg transition-shadow cursor-pointer text-white ${className}`}
     >
       {/* Left side: 2x2 grid */}
       <div className="grid grid-cols-2 grid-rows-2 gap-2 flex-1">
         <div className="font-bold text-lg">{editionLabel}</div>
         <div className="text-right font-semibold">{fileSizeLabel}</div>
-        <div className="text-sm text-gray-600">{yearLabel}</div>
-        <div className="text-right text-sm text-gray-600">{pagesLabel}</div>
+        <div className="text-sm text-gray-400">{yearLabel}</div>
+        <div className="text-right text-sm text-gray-400">{pagesLabel}</div>
       </div>
 
       {/* Middle reserved space for buttons */}
       <div className="mx-4 flex-shrink-0">
         <button 
           onClick={handleDownload}
-          className="p-2 border rounded hover:bg-gray-100"
+          className="p-2 border rounded hover:bg-gray-700"
           title="Download"
         >
           {/* Download icon using an inline SVG */}
@@ -103,7 +103,7 @@ const VersionBannerCardM: React.FC<VersionBannerCardMProps> = ({ version, classN
             className="w-full h-full object-cover rounded-md"
           />
         ) : (
-          <div className="w-full h-full bg-gray-200 rounded-md flex items-center justify-center text-gray-500">
+          <div className="w-full h-full bg-gray-700 rounded-md flex items-center justify-center text-gray-400">
             No Thumbnail
           </div>
         )}

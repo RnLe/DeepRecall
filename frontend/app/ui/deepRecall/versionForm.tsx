@@ -217,18 +217,18 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
   };
 
   return (
-    <div className={`p-4 border rounded shadow mt-4 ${className}`}>
+    <div className={`p-4 border rounded shadow mt-4 bg-gray-800 text-white ${className}`}>
       <h3 className="text-lg font-semibold mb-2">Create new version for: {entry.title}</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* File Upload Field */}
         <div>
-          <label className="block text-sm font-medium">Upload PDF</label>
+          <label className="block text-sm font-medium text-gray-300">Upload PDF</label>
           <input
             type="file"
             accept=".pdf"
             ref={fileInputRef}
             onChange={handleFileInputChange}
-            className="mt-1 block w-full border border-gray-300 p-2"
+            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
           />
           {fileError && <p className="text-red-500 text-sm">{fileError}</p>}
         </div>
@@ -236,13 +236,13 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
         {/* File Hash Field (read-only) */}
         <div>
           <label className="block text-sm font-medium">File Hash</label>
-          <input type="text" value={fileHash} disabled className="mt-1 block w-full bg-gray-200 border-gray-300 p-2" />
+          <input type="text" value={fileHash} disabled className="mt-1 block w-full bg-gray-700 border-gray-600 p-2 text-white" />
         </div>
 
         {/* Relation Field (read-only) */}
         <div>
           <label className="block text-sm font-medium">{mediaType} ID</label>
-          <input type="text" value={entry.documentId} disabled className="mt-1 block w-full bg-gray-200 border-gray-300 p-2" />
+          <input type="text" value={entry.documentId} disabled className="mt-1 block w-full bg-gray-700 border-gray-600 p-2 text-white" />
         </div>
 
         {/* Common Field: Year */}
@@ -253,7 +253,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
             value={year}
             onChange={(e) => setYear(e.target.value)}
             required
-            className="mt-1 block w-full border border-gray-300 p-2"
+            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
           />
         </div>
 
@@ -268,7 +268,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
               value={extraFields[field.name] || ""}
               onChange={(e) => handleExtraFieldChange(field.name, e.target.value)}
               placeholder={field.placeholder}
-              className="mt-1 block w-full border border-gray-300 p-2"
+              className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
               required={field.required}
             />
           </div>

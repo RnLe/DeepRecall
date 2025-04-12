@@ -30,7 +30,7 @@ const LiteratureBannerCard: React.FC<LiteratureBannerCardProps> = ({ type, class
       }}
     >
       {/* Optional overlay for children (e.g., title/text) */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 text-white">
         {children}
       </div>
     </div>

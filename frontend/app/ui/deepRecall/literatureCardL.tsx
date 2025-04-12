@@ -96,11 +96,11 @@ const LiteratureCardL: React.FC<literatureCardLProps> = ({
   const yearsRange = getYearsRange(versions);
 
   return (
-    <div className={`flex items-center bg-gray-200 rounded-lg shadow-sm p-4 space-x-4 hover:shadow-lg ${className}`}>
+    <div className={`flex items-center bg-gray-800 rounded-lg shadow-sm p-4 space-x-4 hover:shadow-lg ${className}`}>
       <div className="flex-1">
-        <h3 className="text-lg font-semibold truncate">{title}</h3>
+        <h3 className="text-lg font-semibold truncate text-white">{title}</h3>
         {subtitle && (
-          <h4 className="text-sm text-gray-500 truncate">{subtitle}</h4>
+          <h4 className="text-sm text-gray-400 truncate">{subtitle}</h4>
         )}
         <div className="flex flex-wrap gap-2 mt-1">
           {authors.length > 0 ? (
@@ -130,7 +130,7 @@ const LiteratureCardL: React.FC<literatureCardLProps> = ({
       </div>
 
       {/* Thumbnail reserved space */}
-      <div className="w-32 h-full flex-shrink-0 flex items-center justify-center bg-gray-200 rounded-lg">
+      <div className="w-32 h-full flex-shrink-0 flex items-center justify-center bg-gray-700 rounded-lg">
         {latestThumbnail ? (
           <img
             src={latestThumbnail}
@@ -138,7 +138,7 @@ const LiteratureCardL: React.FC<literatureCardLProps> = ({
             className="object-cover w-full h-full rounded-lg"
           />
         ) : (
-          <span className="text-black">No Thumbnail</span>
+          <span className="text-gray-400">No Thumbnail</span>
         )}
       </div>
     </div>

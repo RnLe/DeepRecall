@@ -62,13 +62,15 @@ const MergeTranscript: React.FC<MergeTranscriptProps> = ({ convId, onMergeComple
       {chatVisible && mergedSegments.length > 0 && (
         <div className="mt-4">
           <h3 className="text-lg font-semibold">Chat</h3>
-          <Chat conversation={mergedSegments.map(seg => ({
-            start: seg.start,
-            end: seg.end,
-            speaker: seg.speaker,
-            speakerId: seg.speaker, // using speaker name as placeholder ID
-            text: seg.text
-          }))} />
+          <Chat chatContent={{
+            segments: mergedSegments.map(seg => ({
+              start: seg.start,
+              end: seg.end,
+              speaker: seg.speaker,
+              speakerId: seg.speaker, // using speaker name as placeholder ID
+              text: seg.text
+            }))
+          }} />
         </div>
       )}
     </div>

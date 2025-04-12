@@ -45,8 +45,11 @@ export default async function LocaleLayout({
   // Return the layout
   return (
     <Providers locale={locale} messages={messages} isLoggedIn={isLoggedIn}>
-        <div className="h-screen w-screen flex flex-col bg-gray-900">
-          {children}
+        <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
+            <TopNav isLoggedIn={isLoggedIn} />
+            <div className="flex-1 overflow-hidden">
+                {children}
+            </div>
         </div>
     </Providers>
   )

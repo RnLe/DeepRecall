@@ -2,8 +2,8 @@
 'use client';
 
 import React from 'react';
-import DiarizationSidebar from '@/app/ui/diarization/diarizationSidebar';
-import DiarizationWidget from '@/app/ui/diarization/diarizationWidget';
+import DiarizationSidebar from '@/app/ui/conversate/diarizationSidebar';
+import DiarizationWidget from '@/app/ui/conversate/diarizationWidget';
 import { ActiveConversationProvider } from '@/app/context/activeConversationContext';
 
 const App: React.FC = () => {

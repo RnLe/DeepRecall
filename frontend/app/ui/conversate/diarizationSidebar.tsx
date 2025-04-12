@@ -2,7 +2,6 @@
 import React from 'react';
 import SpeakerList from './speakerList';
 import ConversationList from './conversationList';
-import { Conversation } from '../../helpers/diarizationTypes';
 
 const DiarizationSidebar: React.FC = () => {
   return (
