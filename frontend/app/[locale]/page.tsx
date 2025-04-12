@@ -8,7 +8,7 @@ import React from 'react';
 // Import logger
 import logger from '@/src/logger';
 // Import Custom Components
-import PaperList from '../ui/literatureList';
+import PaperList from '../ui/deepRecall/literatureList';
  
 export default async function HomePage() {
   // Logging

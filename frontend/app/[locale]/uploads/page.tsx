@@ -2,8 +2,8 @@
 'use client';
 
 import React from 'react';
-import LiteratureList from '@/app/ui/literatureList';
-import UploadWidget from '@/app/ui/uploadWidget';
+import LiteratureList from '@/app/ui/deepRecall/literatureList';
+import UploadWidget from '@/app/ui/deepRecall/uploadWidget';
 
 export default function UploadsPage() {
   return (

@@ -110,3 +110,11 @@ export interface ChatContent {
     text: string;
   }[];
 }
+
+// Type for easier formatting of the chat content for the LLM
+export interface ChatCompact {
+  segments: {
+    speakerName: string;    // This is the name of the speaker, not the ID.
+    text: string;
+  }[];
+}

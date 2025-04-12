@@ -1,5 +1,5 @@
 // chatHelpers.ts
-import { ChatContent } from './diarizationTypes';
+import { ChatContent, ChatCompact, Speaker } from './diarizationTypes';
 import { secondsToString } from './timesToString';
 import { DiarizationResult } from './diarizationHelpers';
 import { WhisperTranscription } from './diarizationTypes';
@@ -37,6 +37,18 @@ export const formatChatContentForClipboard = (chatContent: ChatContent): string 
   return groups
     .map(g => `[${g.speakerId}] (${secondsToString(g.start)} - ${secondsToString(g.end)}): ${g.text}`)
     .join('\n\n');
+};
+
+// New helper to create a compact version of ChatContent by mapping speaker ids to speaker names
+export const createChatCompact = (chatContent: ChatContent, speakers: Speaker[]): ChatCompact => {
+  const segments = chatContent.segments.map(segment => {
+    const speaker = speakers.find(s => s.id === segment.speakerId);
+    return {
+      speakerName: speaker ? speaker.name : "Unknown",
+      text: segment.text,
+    };
+  });
+  return { segments };
 };
 
 export const parseChatContent = (
