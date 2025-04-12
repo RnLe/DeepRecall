@@ -31,3 +31,4 @@ dependencies:
       - html2text               # converts HTML to Markdown.
       - nltk                    # for text processing and tokenization.
       - langchain               # for chaining together LLMs and other components.
+      - openai                  # for OpenAI API access.

@@ -2,12 +2,13 @@
 trace
 
 # Ignore installation folders in all directories
-**/.next/
-**/node_modules/
-**/playground/
+.next/
+node_modules/
+playground/
+assets/
 
-**/avatars/
-**/conversations/
+avatars/
+conversations/
 
 *.wav
 *.mp3

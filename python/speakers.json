@@ -59,5 +59,61 @@
     "presetAvatar": "",
     "originalImageUrl": "avatars/DorisReiter_db6e6b3a69dbef15306cc2d87bb9828d_original.png",
     "croppedImageUrl": "avatars/DorisReiter_db6e6b3a69dbef15306cc2d87bb9828d_cropped.png"
+  },
+  {
+    "id": "22ef38cff2fb9e174ab4ea0c192daa4f",
+    "name": "Ngoc",
+    "color": "#FF0000",
+    "presetAvatar": "avatar_placeholder_feminine_03.png",
+    "originalImageUrl": null,
+    "croppedImageUrl": null
+  },
+  {
+    "id": "e232baabf13fa4b5812c837c7cfb9026",
+    "name": "Quentin",
+    "color": "#5900ff",
+    "presetAvatar": "avatar_placeholder_masculine_02.png",
+    "originalImageUrl": null,
+    "croppedImageUrl": null
+  },
+  {
+    "id": "2042101ac1f6e7741bfe43f3672e6d7c",
+    "name": "Thomas",
+    "color": "#36a643",
+    "presetAvatar": "avatar_placeholder_masculine_01.png",
+    "originalImageUrl": null,
+    "croppedImageUrl": null
+  },
+  {
+    "id": "e68564f23e0e939acea76dc3d2bc01bf",
+    "name": "Jan",
+    "color": "#737373",
+    "presetAvatar": "",
+    "originalImageUrl": null,
+    "croppedImageUrl": null
+  },
+  {
+    "id": "9888cd5c082b9e015300afd756fc7f13",
+    "name": "Anita",
+    "color": "#9e4ca9",
+    "presetAvatar": "avatar_placeholder_feminine_03.png",
+    "originalImageUrl": null,
+    "croppedImageUrl": null
+  },
+  {
+    "id": "3c25f89d5d1cd320ac8f27efb31e1438",
+    "name": "Zahra",
+    "color": "#f4a4cb",
+    "presetAvatar": "avatar_placeholder_feminine_02.png",
+    "originalImageUrl": null,
+    "croppedImageUrl": null
+  },
+  {
+    "id": "6a061313d22e51e0f25b7cd4dc065233",
+    "name": "Max",
+    "color": "#20aeb1",
+    "presetAvatar": "",
+    "originalImageUrl": null,
+    "croppedImageUrl": null
   }
 ]

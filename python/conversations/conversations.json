@@ -78,5 +78,89 @@
       "device": "NVIDIA GeForce RTX 4070 Ti"
     },
     "backgroundImage": null
+  },
+  {
+    "id": "a08d347931099e5edaedd3564cf7ca41",
+    "name": "Zoom Meeting",
+    "description": "",
+    "dateCreated": 1744235611.3588138,
+    "dateOfConversation": null,
+    "speakers": [
+      "db6e6b3a69dbef15306cc2d87bb9828d",
+      "22ef38cff2fb9e174ab4ea0c192daa4f",
+      "2042101ac1f6e7741bfe43f3672e6d7c",
+      "e68564f23e0e939acea76dc3d2bc01bf",
+      "9888cd5c082b9e015300afd756fc7f13",
+      "3c25f89d5d1cd320ac8f27efb31e1438",
+      "e232baabf13fa4b5812c837c7cfb9026",
+      "62f44994b7b6f2c329b75f511b646731",
+      "6a061313d22e51e0f25b7cd4dc065233"
+    ],
+    "speakerCount": 0,
+    "length": 3954.496,
+    "states": {
+      "audioAvailable": true,
+      "diarization": true,
+      "transcript": true,
+      "speakerAudioSegments": true,
+      "speakerAssignment": true,
+      "report": false,
+      "stats": false
+    },
+    "diarizationProcess": {
+      "timeStarted": 1744236524.5902517,
+      "timeCompleted": 1744236617.9678395,
+      "logs": [
+        {
+          "status": "info",
+          "message": "Hugging Face token obtained from environment."
+        },
+        {
+          "status": "info",
+          "message": "Device check complete. Using NVIDIA GeForce RTX 4070 Ti."
+        },
+        {
+          "status": "info",
+          "message": "Setting up the pyannote pipeline..."
+        },
+        {
+          "status": "info",
+          "message": "Starting diarization..."
+        },
+        {
+          "status": "success",
+          "message": "Diarization completed in 93.35 seconds."
+        },
+        {
+          "status": "success",
+          "message": "Files saved to conversation."
+        }
+      ],
+      "device": "NVIDIA GeForce RTX 4070 Ti"
+    },
+    "transcriptionProcess": {
+      "timeStarted": 1744237119.0877905,
+      "timeCompleted": 1744237283.7582955,
+      "logs": [
+        {
+          "status": "info",
+          "message": "Device check complete. Using NVIDIA GeForce RTX 4070 Ti."
+        },
+        {
+          "status": "info",
+          "message": "Starting transcription..."
+        },
+        {
+          "status": "success",
+          "message": "Transcription completed in 164.67 seconds."
+        },
+        {
+          "status": "success",
+          "message": "Transcript saved to conversation."
+        }
+      ],
+      "device": "NVIDIA GeForce RTX 4070 Ti"
+    },
+    "backgroundImage": null
   }
 ]
