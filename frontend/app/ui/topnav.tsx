@@ -24,6 +24,9 @@ export default function TopNav({ isLoggedIn }: TopNavProps) {
             <nav className="h-full">
                 <ul className="flex justify-between items-center h-full">
                     <li className="flex justify-center items-center p-2 hover:bg-gray-700 w-full h-full">
+                        <Link className="flex justify-center items-center w-full h-full text-white" href="/planner">Planner</Link>
+                    </li>
+                    <li className="flex justify-center items-center p-2 hover:bg-gray-700 w-full h-full">
                         <Link className="flex justify-center items-center w-full h-full text-white" href="/diarization">Conversate</Link>
                     </li>
                     <li className="relative flex justify-center items-center p-2 hover:bg-gray-700 w-full h-full cursor-pointer" onClick={() => setShowDropdown(!showDropdown)}>
