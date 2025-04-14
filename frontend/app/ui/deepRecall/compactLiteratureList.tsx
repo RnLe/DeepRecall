@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LiteratureItem } from "../../helpers/literatureTypes";
+import { LiteratureItem } from "../../helpers/literatureTypesLegacy";
 import LiteratureCardS from "./literatureCardS";
 
 interface CompactLiteratureListProps {

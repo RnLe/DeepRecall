@@ -1,102 +1,115 @@
 // literatureCardL.tsx
-import React from 'react';
-import { LiteratureType, LiteratureMetadata, Author } from '../../helpers/literatureTypes';
-import { prefixStrapiUrl } from '../../helpers/getStrapiMedia';
 
-// Helper function: compute difference in days (rounded down)
+import React from "react";
+import { LiteratureExtended, LiteratureVersionExtended } from "../../helpers/literatureTypes";
+import { prefixStrapiUrl } from "../../helpers/getStrapiMedia";
+
+/**
+ * Helper: Compute the difference in whole days between the supplied date and now.
+ */
 const daysAgo = (dateStr: string): number => {
   const now = new Date();
   const then = new Date(dateStr);
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 3600 * 24));
 };
 
-// Helper: get latest updatedAt among literature and its versions
-// Since our version objects no longer carry updatedAt, we'll only use literatureUpdatedAt.
-const getLatestUpdatedAt = (literatureUpdatedAt: string | undefined): string | undefined => {
-  return literatureUpdatedAt;
-};
-
-// Helper: get thumbnail URL from the version with highest year
-const getLatestThumbnail = (versions?: any[]): string | null => {
+/**
+ * Helper: Returns the thumbnail URL from the version with the most recent publishingDate.
+ */
+const getLatestThumbnail = (versions?: LiteratureVersionExtended[]): string | null => {
   if (!versions || versions.length === 0) return null;
-  const sorted = versions.slice().sort((a, b) => b.year - a.year);
-  // Now using the new thumbnail_url field from BaseVersion
-  return sorted[0].thumbnail_url ? prefixStrapiUrl(sorted[0].thumbnail_url) : null;
+  const sorted = versions.slice().sort((a, b) => {
+    const timeA = a.publishingDate ? new Date(a.publishingDate).getTime() : 0;
+    const timeB = b.publishingDate ? new Date(b.publishingDate).getTime() : 0;
+    return timeB - timeA;
+  });
+  return sorted[0].thumbnailUrl ? prefixStrapiUrl(sorted[0].thumbnailUrl) : null;
 };
 
-// Helper: get editions display
-const getEditionsDisplay = (type: LiteratureType, versions?: any[]): string => {
-  if (!versions || versions.length === 0) return 'Unknown';
-  if (type === 'Textbook') {
+/**
+ * Helper: Build a display string for the edition/version information.
+ * It checks whether each version has an editionNumber or versionNumber and
+ * computes the range (or a single value) accordingly.
+ */
+const getEditionsDisplay = (versions?: LiteratureVersionExtended[]): string => {
+  if (!versions || versions.length === 0) return "Unknown";
+
+  // Check if any version has an editionNumber; otherwise, try versionNumber.
+  if (versions[0].editionNumber !== undefined) {
     const editionNumbers = versions
-      .map(v => v.edition_number)
-      .filter((num: number | undefined) => num !== undefined);
-    if (editionNumbers.length === 0) return 'Unknown';
+      .map(v => v.editionNumber)
+      .filter((num): num is number => num !== undefined);
+    if (editionNumbers.length === 0) return "Unknown";
     const min = Math.min(...editionNumbers);
     const max = Math.max(...editionNumbers);
     return min === max ? String(min) : `${min} - ${max}`;
-  } else if (type === 'Paper') {
-    const versionsArr = versions
-      .map(v => v.version_number)
-      .filter((v: string | null | undefined) => !!v);
-    return versionsArr.length > 0 ? versionsArr.join(', ') : 'Unknown';
-  } else if (type === 'Script') {
-    const versionsArr = versions
-      .map(v => v.version)
-      .filter((v: string | null | undefined) => !!v);
-    return versionsArr.length > 0 ? versionsArr.join(', ') : 'Unknown';
+  } else if (versions[0].versionNumber !== undefined) {
+    const versionNumbers = versions
+      .map(v => v.versionNumber)
+      .filter((num): num is number => num !== undefined);
+    if (versionNumbers.length === 0) return "Unknown";
+    const min = Math.min(...versionNumbers);
+    const max = Math.max(...versionNumbers);
+    return min === max ? String(min) : `${min} - ${max}`;
   }
-  return 'Unknown';
+  return "Unknown";
 };
 
-// Helper: get years range from versions
-const getYearsRange = (versions?: any[]): string => {
-  if (!versions || versions.length === 0) return 'Unknown';
-  const years = versions.map(v => v.year);
+/**
+ * Helper: Extracts a range of years from the versions, based on publishingDate.
+ */
+const getYearsRange = (versions?: LiteratureVersionExtended[]): string => {
+  if (!versions || versions.length === 0) return "Unknown";
+  const years = versions
+    .map(v => v.publishingDate ? new Date(v.publishingDate).getFullYear() : undefined)
+    .filter((y): y is number => y !== undefined);
+  if (years.length === 0) return "Unknown";
   const min = Math.min(...years);
   const max = Math.max(...years);
   return min === max ? String(min) : `${min} - ${max}`;
 };
 
-// Placeholder for author click
-const handleAuthorClick = (author: Author) => {
-  console.log('Author clicked:', author);
+/**
+ * Placeholder for handling an author click.
+ */
+const handleAuthorClick = (author: any) => {
+  console.log("Author clicked:", author);
 };
 
-interface literatureCardLProps {
-  documentId: string;
-  title: string;
-  subtitle?: string;
-  type: LiteratureType;
-  metadata: LiteratureMetadata; // Contains version info, etc.
-  authors?: Author[];
+interface LiteratureCardLProps {
+  literature: LiteratureExtended;
   className?: string;
 }
 
-const LiteratureCardL: React.FC<literatureCardLProps> = ({
-  documentId,
-  title,
-  subtitle,
-  type,
-  metadata,
-  authors = [],
-  className = '',
+/**
+ * The LiteratureCardL component shows key literature details,
+ * including title, subtitle, authors, creation/update dates,
+ * edition/version display, and the thumbnail.
+ */
+const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
+  literature,
+  className = "",
 }) => {
-  // Extract versions from metadata (our new structure)
-  const versions = metadata.versions ?? [];
+  const {
+    documentId,
+    title,
+    subtitle,
+    authors = [],
+    createdAt,
+    updatedAt,
+    versions,
+  } = literature;
 
   const latestThumbnail = getLatestThumbnail(versions);
-  // For created/updated dates, use literature's own dates instead of metadata fields.
-  // Adjust these if your data model differs.
-  const createdDays = documentId ? daysAgo(documentId) : null; // (Example usage; likely you'd use createdAt)
-  const latestUpdatedAt = getLatestUpdatedAt(undefined);
-  const updatedDays = latestUpdatedAt ? daysAgo(latestUpdatedAt) : null;
-
-  const editionsDisplay = getEditionsDisplay(type, versions);
+  const createdDays = createdAt ? daysAgo(createdAt) : null;
+  const updatedDays = updatedAt ? daysAgo(updatedAt) : null;
+  const editionsDisplay = getEditionsDisplay(versions);
   const yearsRange = getYearsRange(versions);
 
   return (
-    <div className={`flex items-center bg-gray-800 rounded-lg shadow-sm p-4 space-x-4 hover:shadow-lg ${className}`}>
+    <div
+      className={`flex items-center bg-gray-800 rounded-lg shadow-sm p-4 space-x-4 hover:shadow-lg ${className}`}
+    >
       <div className="flex-1">
         <h3 className="text-lg font-semibold truncate text-white">{title}</h3>
         {subtitle && (
@@ -104,7 +117,7 @@ const LiteratureCardL: React.FC<literatureCardLProps> = ({
         )}
         <div className="flex flex-wrap gap-2 mt-1">
           {authors.length > 0 ? (
-            authors.map(author => (
+            authors.map((author: any) => (
               <span
                 key={author.id}
                 className="px-2 py-1 bg-gray-400 rounded cursor-pointer hover:shadow-lg"
@@ -119,12 +132,22 @@ const LiteratureCardL: React.FC<literatureCardLProps> = ({
         </div>
         <div className="mt-2 text-sm text-gray-500">
           <p>
-            Created: {createdDays !== null ? (createdDays < 1 ? "less than 1 day ago" : `created ${createdDays} days ago`) : 'Unknown'}
+            Created:{" "}
+            {createdDays !== null
+              ? createdDays < 1
+                ? "less than 1 day ago"
+                : `created ${createdDays} days ago`
+              : "Unknown"}
           </p>
           <p>
-            Updated: {updatedDays !== null ? (updatedDays < 1 ? "less than 1 day ago" : `updated ${updatedDays} days ago`) : 'Unknown'}
+            Updated:{" "}
+            {updatedDays !== null
+              ? updatedDays < 1
+                ? "less than 1 day ago"
+                : `updated ${updatedDays} days ago`
+              : "Unknown"}
           </p>
-          <p>Edition(s): {editionsDisplay}</p>
+          <p>Edition/Version: {editionsDisplay}</p>
           <p>Year(s): {yearsRange}</p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 // versionBannerCardM.tsx
 import React from 'react';
-import { LiteratureVersion } from '../../helpers/literatureTypes';
+import { LiteratureVersion } from '../../helpers/literatureTypesLegacy';
 import { getStrapiMedia, prefixStrapiUrl } from "../../helpers/getStrapiMedia";
 
 export interface VersionBannerCardMProps {

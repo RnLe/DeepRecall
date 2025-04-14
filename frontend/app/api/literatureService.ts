@@ -1,24 +1,24 @@
 // literatureService.ts
 
-import { Literature, LiteratureType, MediaFile } from "../helpers/literatureTypes";
+import {
+  Literature,
+  LiteratureType,
+  transformLiterature,
+  LiteratureExtended,
+} from "../helpers/literatureTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/literatures";
 
 /**
- * Fetches literature entries. Optionally, a type filter can be applied.
- * The function populates all nested relations (including authors, metadata, etc.).
+ * Fetches literature entries.
+ * The function populates all nested relations (including authors, metadata, versions, etc.).
  *
- * @param type Optional LiteratureType to filter the results.
- * @returns An array of Literature objects.
+ * @returns An array of extended Literature objects.
  */
-export const fetchLiteratures = async (type?: LiteratureType): Promise<Literature[]> => {
+export const fetchLiteratures = async (): Promise<LiteratureExtended[]> => {
   const params = new URLSearchParams();
-  if (type) {
-    params.append('filters[type][$eq]', type);
-  }
-  // Use a wildcard populate to load all relations.
-  params.append('populate', '*');
+  params.append("populate", "*");
 
   const response = await fetch(`${BASE_URL}?${params.toString()}`, {
     headers: { Authorization: `Bearer ${API_TOKEN}` },
@@ -27,27 +27,28 @@ export const fetchLiteratures = async (type?: LiteratureType): Promise<Literatur
   if (!response.ok) {
     const errorBody = await response.json();
     console.error("API Error", response.status, errorBody);
-    throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorBody)}`);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
   }
 
-  // In Strapi 5, nested relations are returned directly.
   const json = await response.json();
-  return json.data;
+  // Transform each entry using our transformer function.
+  return json.data.map((lit: Literature) => transformLiterature(lit));
 };
 
 /**
  * Creates a new literature entry.
- * This function accepts a Literature object (without an id) and converts any MediaFile
- * references in files to their corresponding ids before sending the payload.
  *
- * @param literatureData The literature data to create.
+ * @param literatureData An object of type Omit<Literature, "id"> containing the new literature's data.
  * @returns The created Literature entry.
  */
 export const createLiterature = async (
-  literatureData: Omit<Literature, "id">
+  literatureData: Omit<Literature, "documentId">
 ): Promise<Literature> => {
+  // Build the payload (using the new model: title, type, metadata, and versions)
   const payload = literatureData;
-  
+
   const response = await fetch(BASE_URL, {
     method: "POST",
     headers: {
@@ -60,7 +61,9 @@ export const createLiterature = async (
   if (!response.ok) {
     const errorBody = await response.json();
     console.error("API Error", response.status, errorBody);
-    throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorBody)}`);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
   }
 
   const json = await response.json();
@@ -69,31 +72,129 @@ export const createLiterature = async (
 
 /**
  * Updates an existing literature entry.
- * @param documentId - The id of the literature entry to update.
- * @param literatureData - A partial Literature object (without id) containing updated fields.
+ *
+ * @param id - The id of the literature entry to update.
+ * @param literatureData - A partial Literature object (without id) with updated fields.
  * @returns The updated Literature entry.
  */
 export const updateLiterature = async (
-  documentId: string,
-    literatureData: Partial<Literature>
-  ): Promise<Literature> => {
-    const payload = literatureData;
-  
-    const response = await fetch(`${BASE_URL}/${documentId}`, {
+  id: string,
+  literatureData: Partial<Literature>
+): Promise<Literature> => {
+  const payload = literatureData;
+
+  const response = await fetch(`${BASE_URL}/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${API_TOKEN}`,
+    },
+    body: JSON.stringify({ data: payload }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+
+  const json = await response.json();
+  return json;
+};
+
+/**
+ * Fetches literature types.
+ *
+ * @returns An array of LiteratureType objects.
+ */
+export const fetchLiteratureTypes = async (): Promise<LiteratureType[]> => {
+  const response = await fetch(
+    "http://localhost:1337/api/literature-types?populate=*",
+    {
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+
+  const json = await response.json();
+  return json.data;
+};
+
+/**
+ * Creates a new literature type.
+ *
+ * @param literatureTypeData - An object of type Omit<LiteratureType, "id"> with the new literature type's data.
+ * @returns The created LiteratureType object.
+ */
+export const createLiteratureType = async (
+  literatureTypeData: Omit<LiteratureType, "documentId">
+): Promise<LiteratureType> => {
+  const payload = literatureTypeData;
+
+  const response = await fetch("http://localhost:1337/api/literature-types", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${API_TOKEN}`,
+    },
+    body: JSON.stringify({ data: payload }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+
+  const json = await response.json();
+  return json.data; // Return json.data so that the caller gets an object of type LiteratureType.
+};
+
+
+/**
+ * Updates an existing literature type.
+ *
+ * @param id - The id of the literature type to update.
+ * @param literatureTypeData - A partial LiteratureType object with updated fields.
+ * @returns The updated LiteratureType object.
+ */
+export const updateLiteratureType = async (
+  id: string,
+  literatureTypeData: Partial<LiteratureType>
+): Promise<LiteratureType> => {
+  const payload = literatureTypeData;
+
+  const response = await fetch(
+    `http://localhost:1337/api/literature-types/${id}`,
+    {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${API_TOKEN}`,
       },
       body: JSON.stringify({ data: payload }),
-    });
-  
-    if (!response.ok) {
-      const errorBody = await response.json();
-      console.error("API Error", response.status, errorBody);
-      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorBody)}`);
     }
-  
-    const json = await response.json();
-    return json;
-  };
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+
+  const json = await response.json();
+  return json;
+};

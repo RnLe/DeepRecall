@@ -12,16 +12,16 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "title": {
-      "type": "string",
-      "required": true
-    },
     "type": {
       "type": "string",
       "required": true
     },
-    "type_metadata": {
+    "metadata": {
       "type": "json",
+      "required": true
+    },
+    "title": {
+      "type": "string",
       "required": true
     }
   }
