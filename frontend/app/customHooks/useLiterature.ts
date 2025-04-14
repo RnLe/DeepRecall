@@ -1,19 +1,24 @@
 // useLiterature.ts
 import { useQuery } from '@tanstack/react-query';
-import { fetchLiteratures } from '../api/literatureService';
-import { LiteratureType, LITERATURE_TYPES } from '../helpers/literatureTypes';
+import { fetchLiteratures, fetchLiteratureTypes } from '../api/literatureService';
 
 export const useLiterature = () => {
   return useQuery({
     queryKey: ['literature'],
-    queryFn: async () => {
-      const literatures = await Promise.all(
-        LITERATURE_TYPES.map((type: LiteratureType) => fetchLiteratures(type))
-      );
+    queryFn: fetchLiteratures,
+    select: (data) => {
+      return data;
+    }
+  });
+};
 
-      return literatures.reduce((acc, items, index) => {
-        return { ...acc, [LITERATURE_TYPES[index]]: items };
-      }, {} as Record<string, any>);
-    },
+// New hook to fetch literature types
+export const useLiteratureTypes = () => {
+  return useQuery({
+    queryKey: ['literatureTypes'],
+    queryFn: fetchLiteratureTypes,
+    select: (data) => {
+      return data;
+    }
   });
 };

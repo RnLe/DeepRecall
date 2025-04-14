@@ -5,7 +5,7 @@ import AnnotationToolbar, { AnnotationMode } from './annotationToolbar';
 import PdfViewerWithAnnotations from './pdfViewerWithAnnotations';
 import AnnotationProperties from './annotationProperties';
 import { Annotation } from '../../helpers/annotationTypes';
-import { LiteratureItem } from '../../helpers/literatureTypes';
+import { LiteratureItem } from '../../helpers/literatureTypesLegacy';
 
 interface PdfAnnotationContainerProps {
   activeLiterature: LiteratureItem;

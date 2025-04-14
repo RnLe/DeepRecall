@@ -1,26 +1,13 @@
 // versionForm.tsx
+
 import React, { useState, useEffect, useRef } from "react";
 import SparkMD5 from "spark-md5";
-import {
-  LiteratureType,
-  Literature,
-  LiteratureVersion,
-  BaseVersion,
-  LITERATURE_VERSION_FORM_FIELDS,
-} from "../../helpers/literatureTypes";
-import { LiteratureItem } from "./uploadWidget";
+import { Literature, LiteratureType, LiteratureVersion } from "../../helpers/literatureTypes";
+import { LiteratureItem } from "@/app/helpers/literatureTypesLegacy";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateLiterature } from "../../api/literatureService";
 import { uploadFile, UploadedFileInfo } from "../../api/uploadFile";
-import * as pdfjsLib from "pdfjs-dist/webpack.mjs";
 import { renderPdfPageToImage, dataURLtoFile } from "../../helpers/pdfThumbnail";
-
-// Compute PDF page count
-const getPDFPageCount = async (file: File): Promise<number> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  return pdf.numPages;
-};
 
 // Compute MD5 hash of a file
 function computeMD5(file: File): Promise<string> {
@@ -50,44 +37,78 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
   const [fileError, setFileError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Compute file hash
+  // Compute file hash and display as text
   const [fileHash, setFileHash] = useState("");
   useEffect(() => {
     if (file) {
       computeMD5(file).then((hash) => setFileHash(hash));
+    } else {
+      setFileHash("");
     }
   }, [file]);
 
-  // Common field: Year
-  const [year, setYear] = useState("");
-
-  // Extra version-specific fields (state is keyed by field names)
-  const [extraFields, setExtraFields] = useState<Record<string, string>>({});
+  // Dynamic extra version fields are assumed to be defined in the literature type's versionMetadata.
+  // This simulates a LiteratureVersionType structure.
+  const [versionAdditionalFields, setVersionAdditionalFields] = useState<Record<string, any>>({});
   useEffect(() => {
-    const fields = LITERATURE_VERSION_FORM_FIELDS[mediaType] || [];
-    const initial: Record<string, string> = {};
-    fields.forEach((field) => {
-      initial[field.name] = "";
-    });
-    setExtraFields(initial);
+    try {
+      let template;
+      // Assume mediaType.versionMetadata exists and is a JSON string.
+      if (mediaType.versionMetadata && typeof mediaType.versionMetadata === "string") {
+        template = mediaType.versionMetadata ? JSON.parse(mediaType.versionMetadata) : {};
+      } else {
+        template = mediaType.versionMetadata || {};
+      }
+      setVersionAdditionalFields(template);
+    } catch (err) {
+      setVersionAdditionalFields({});
+      console.error("Error parsing version metadata:", err);
+    }
   }, [mediaType]);
 
-  // Error and submitting states
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const queryClient = useQueryClient();
-
-  const updateLiteratureMutation = useMutation<
-    Literature,
-    Error,
-    { documentId: string; data: Partial<Literature> }
-  >({
-    mutationFn: ({ documentId, data }) => updateLiterature(documentId, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
-    onError: (error: Error) => {
-      console.error("Failed to update literature:", error);
-    },
-  });
+  // Render an input for a dynamic version field based on the field's default type.
+  const renderVersionField = (key: string, value: any) => {
+    if (Array.isArray(value)) {
+      return (
+        <select
+          value={versionAdditionalFields[key]}
+          onChange={(e) =>
+            setVersionAdditionalFields((prev) => ({ ...prev, [key]: e.target.value }))
+          }
+          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+        >
+          <option value="">Select an option</option>
+          {value.map((option: string | number, idx: number) => (
+            <option key={idx} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      );
+    } else if (typeof value === "number") {
+      return (
+        <input
+          type="number"
+          value={versionAdditionalFields[key]}
+          onChange={(e) =>
+            setVersionAdditionalFields((prev) => ({ ...prev, [key]: Number(e.target.value) }))
+          }
+          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+        />
+      );
+    } else {
+      return (
+        <input
+          type="text"
+          value={versionAdditionalFields[key]}
+          onChange={(e) =>
+            setVersionAdditionalFields((prev) => ({ ...prev, [key]: e.target.value }))
+          }
+          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+        />
+      );
+    }
+  };
 
   // File input change handler
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,26 +124,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     }
   };
 
-  // Get PDF page count when file changes
-  const [pageCount, setPageCount] = useState<number | null>(null);
-  useEffect(() => {
-    if (file) {
-      const getCount = async () => {
-        try {
-          const count = await getPDFPageCount(file);
-          setPageCount(count);
-        } catch (err) {
-          console.error("Error getting page count", err);
-          setPageCount(null);
-        }
-      };
-      getCount();
-    } else {
-      setPageCount(null);
-    }
-  }, [file]);
-
-  // Generate thumbnail when file changes
+  // Generate thumbnail from the uploaded PDF
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   useEffect(() => {
     if (file) {
@@ -143,12 +145,23 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     }
   }, [file]);
 
-  // Handle extra field changes dynamically
-  const handleExtraFieldChange = (fieldName: string, value: string) => {
-    setExtraFields((prev) => ({ ...prev, [fieldName]: value }));
-  };
+  // Error and submitting states
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Handle form submission
+  const updateLiteratureMutation = useMutation<
+    Literature,
+    Error,
+    { documentId: string; data: Partial<Literature> }
+  >({
+    mutationFn: ({ documentId, data }) => updateLiterature(documentId, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
+    onError: (error: Error) => {
+      console.error("Failed to update literature:", error);
+    },
+  });
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -161,52 +174,37 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     }
 
     try {
-      // Upload file and thumbnail
+      // Upload file and thumbnail.
       const uploadedFile: UploadedFileInfo = await uploadFile(file);
-      const uploadedThumbnail: UploadedFileInfo = await uploadFile(thumbnail);
-      const pageCountValue = await getPDFPageCount(file);
-      const fileSize = file.size;
+      const uploadedThumbnail: UploadedFileInfo = thumbnail ? await uploadFile(thumbnail) : { id: 0, url: "" };
 
-      // Create common base version
-      const baseVersion: BaseVersion = {
-        year: Number(year),
+      // Create a new version object using the new structure.
+      const newVersion: LiteratureVersion = {
+        fileUrl: uploadedFile.url,
+        thumbnailUrl: uploadedThumbnail.url,
+        metadata: JSON.stringify(versionAdditionalFields),
         file_hash: fileHash,
-        file_id: uploadedFile.id,
-        file_url: uploadedFile.url,
-        thumbnail_media_id: uploadedThumbnail.id,
-        thumbnail_url: uploadedThumbnail.url,
-        page_count: pageCountValue,
-        file_size: fileSize,
       };
 
-      // Convert extra fields from string to proper types
-      const fieldsConfig = LITERATURE_VERSION_FORM_FIELDS[mediaType] || [];
-      const extraVersionFields: Record<string, any> = {};
-      fieldsConfig.forEach((field) => {
-        if (extraFields[field.name] !== "") {
-          extraVersionFields[field.name] =
-            field.type === "number" ? Number(extraFields[field.name]) : extraFields[field.name];
-        }
-      });
+      // Parse current metadata from the literature entry and add the new version.
+      const currentMetadata = entry.metadata ? JSON.parse(entry.metadata) : {};
+      const currentVersions = currentMetadata.versions || [];
+      currentMetadata.versions = [...currentVersions, newVersion];
 
-      // Combine into new version
-      const newVersion: LiteratureVersion = { ...baseVersion, ...extraVersionFields };
-
-      const currentVersions = entry.metadata.versions || [];
-      const newMetadata = { ...entry.metadata, versions: [...currentVersions, newVersion] };
-
+      // Update the literature entry.
       await updateLiteratureMutation.mutateAsync({
         documentId: entry.documentId,
-        data: { type_metadata: newMetadata },
+        data: { metadata: JSON.stringify(currentMetadata) },
       });
 
       console.log("Updated literature with new version.");
 
-      // Reset fields on success
-      setYear("");
-      setExtraFields({});
+      // Reset fields on success.
       setFile(null);
       setThumbnail(null);
+      setThumbnailUrl(null);
+      setVersionAdditionalFields({});
+      setFileHash("");
       if (onSuccess) onSuccess();
     } catch (error: any) {
       console.error(error);
@@ -231,48 +229,37 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
             className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
           />
           {fileError && <p className="text-red-500 text-sm">{fileError}</p>}
+          {file && (
+            <p className="mt-1 text-sm text-gray-300">
+              File Hash: {fileHash}
+            </p>
+          )}
         </div>
 
-        {/* File Hash Field (read-only) */}
+        {/* Document ID Field (read-only) */}
         <div>
-          <label className="block text-sm font-medium">File Hash</label>
-          <input type="text" value={fileHash} disabled className="mt-1 block w-full bg-gray-700 border-gray-600 p-2 text-white" />
-        </div>
-
-        {/* Relation Field (read-only) */}
-        <div>
-          <label className="block text-sm font-medium">{mediaType} ID</label>
-          <input type="text" value={entry.documentId} disabled className="mt-1 block w-full bg-gray-700 border-gray-600 p-2 text-white" />
-        </div>
-
-        {/* Common Field: Year */}
-        <div>
-          <label className="block text-sm font-medium">Year</label>
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            required
-            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
-          />
+          <label className="block text-sm font-medium text-gray-300">Document ID</label>
+          <div className="mt-1 block w-full bg-gray-700 border border-gray-600 p-2 text-white">
+            {entry.documentId}
+          </div>
         </div>
 
         {/* Dynamically Render Version-Specific Extra Fields */}
-        {LITERATURE_VERSION_FORM_FIELDS[mediaType]?.map((field) => (
-          <div key={field.name}>
-            <label className="block text-sm font-medium">
-              {field.label}{field.required ? " *" : ""}
-            </label>
-            <input
-              type={field.type}
-              value={extraFields[field.name] || ""}
-              onChange={(e) => handleExtraFieldChange(field.name, e.target.value)}
-              placeholder={field.placeholder}
-              className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
-              required={field.required}
-            />
-          </div>
-        ))}
+        <div className="p-4 border border-gray-600 rounded">
+          <h4 className="text-md font-semibold mb-2">Additional version-specific attributes</h4>
+          {Object.keys(versionAdditionalFields).length === 0 ? (
+            <p className="text-gray-400">No additional attributes defined</p>
+          ) : (
+            Object.entries(versionAdditionalFields).map(([key, value]) => (
+              <div key={key} className="mb-4">
+                <label className="block text-sm font-medium text-gray-300 capitalize">
+                  {key}
+                </label>
+                {renderVersionField(key, value)}
+              </div>
+            ))
+          )}
+        </div>
 
         {errorMsg && <p className="text-red-500">{errorMsg}</p>}
         <button
