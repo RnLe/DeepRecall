@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { secondsToString } from '../../helpers/timesToString';
-import { Conversation } from '../../helpers/diarizationTypes';
+import { Conversation } from '../../types/diarizationTypes';
 import { useActiveConversation } from '../../context/activeConversationContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -13,11 +13,11 @@ import { formatLogMessage, formatReadableDateTime } from '../../helpers/logHelpe
 import { DiarizationResult, parseRTTM, extractSpeakerCount, getSpeakerAudioFilename } from '../../helpers/diarizationHelpers';
 import { SpeakerTimeline } from './speakerTimeline';
 import { SpeakerCard } from './speakerCard';
-import { Speaker } from '../../helpers/diarizationTypes';
+import { Speaker } from '../../types/diarizationTypes';
 import ReactModal from 'react-modal'; // added for modal support
 import { getBlockTranscription, getLineTranscription } from '../../helpers/transcriptionHelpers';
 import { parseChatContent, formatChatContentForClipboard, createChatCompact } from '../../helpers/chatHelpers';
-import { ChatContent } from '../../helpers/diarizationTypes';
+import { ChatContent } from '../../types/diarizationTypes';
 import Chat from './chat';
 import ChatAnalysis from './chatAnalysis';
 
@@ -259,13 +259,12 @@ const ConversationPipeline: React.FC = () => {
     try {
       // Prepare the form data with necessary fields.
       const formData = new FormData();
-      formData.append('conv_id', activeConversation.id);
       formData.append('media_type', 'audio');
       // Append num_speakers field: if user knows number & entered > 0, send that; otherwise send 0.
       formData.append('num_speakers', (!isNumSpeakerUnknown && numSpeakers > 0) ? numSpeakers.toString() : '0');
   
       // Send the POST request.
-      const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/diarize`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/diarize/${activeConversation.id}`, {
         method: 'POST',
         body: formData,
       });
@@ -386,11 +385,10 @@ const ConversationPipeline: React.FC = () => {
     try {
       // Prepare the form data.
       const formData = new FormData();
-      formData.append('conv_id', activeConversation.id);
       formData.append('model_string', 'large-v3-turbo'); // change as needed
 
       // Send the POST request.
-      const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/transcribe`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/transcribe/${activeConversation.id}`, {
         method: 'POST',
         body: formData,
       });

@@ -4,10 +4,10 @@ import React, { useState } from "react";
 import { pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
-import { LITERATURE_TYPES } from "../../helpers/literatureTypesLegacy";
+import { LITERATURE_TYPES } from "../../types/literatureTypesLegacy";
 import CompactLiteratureList from "./compactLiteratureList";
 import { useLiterature } from "../../customHooks/useLiterature";
-import { LiteratureItem, mapLiteratureItems } from "../../helpers/literatureTypesLegacy";
+import { LiteratureItem, mapLiteratureItems } from "../../types/literatureTypesLegacy";
 import PdfAnnotationContainer from "./pdfAnnotationContainer";
 
 // Configure the PDF.js worker.

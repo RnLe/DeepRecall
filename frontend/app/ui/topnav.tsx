@@ -31,7 +31,7 @@ export default function TopNav({ isLoggedIn }: TopNavProps) {
                     </li>
                     <li className="relative flex justify-center items-center p-2 hover:bg-gray-700 w-full h-full cursor-pointer" onClick={() => setShowDropdown(!showDropdown)}>
                         <span>DeepRecall</span>
-                        <ul className={`absolute top-full left-0 w-full bg-gray-700 text-white flex justify-center transition-all duration-300 ease-out ${showDropdown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                        <ul className={`absolute top-full left-0 w-full bg-gray-700 text-white flex justify-center transition-all duration-300 ease-out z-50 pointer-events-auto ${showDropdown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                             <li className="p-2 hover:bg-gray-600 w-1/2 text-center">
                                 <Link className="block" href="/pdfviewer">PDF Viewer</Link>
                             </li>

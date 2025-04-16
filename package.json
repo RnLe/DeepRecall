@@ -3,6 +3,12 @@
     "@types/node": "^22.10.5"
   },
   "dependencies": {
-    "pdfjs-dist": "^4.8.69"
+    "@google-cloud/local-auth": "^2.1.0",
+    "googleapis": "^105.0.0",
+    "html-to-image": "^1.11.13",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
+    "pdfjs-dist": "^4.8.69",
+    "reactflow": "^11.11.4"
   }
 }

@@ -18,7 +18,7 @@ RUN conda install -n base -c conda-forge mamba
 RUN mamba env create -f environment.yml && mamba clean -a
 
 # Activate the environment for subsequent commands
-ENV PATH /opt/conda/envs/python-api/bin:$PATH
+ENV PATH=/opt/conda/envs/python-api/bin:$PATH
 
 # Copy your application code into the container
 COPY . /app

@@ -1,6 +1,6 @@
 // literatureBannerCard.tsx
 import React from 'react';
-import { LiteratureType } from '../../helpers/literatureTypesLegacy';
+import { LiteratureType } from '../../types/literatureTypesLegacy';
 
 export interface LiteratureBannerCardProps {
   type: LiteratureType;

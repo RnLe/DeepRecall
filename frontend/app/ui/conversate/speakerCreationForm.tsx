@@ -4,7 +4,7 @@ import SparkMD5 from 'spark-md5';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../../helpers/cropImage';
-import { Speaker } from '../../helpers/diarizationTypes';
+import { Speaker } from '../../types/diarizationTypes';
 
 interface SpeakerCreationFormProps {
   onSuccess: () => void;

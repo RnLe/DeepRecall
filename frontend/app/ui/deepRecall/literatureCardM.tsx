@@ -1,6 +1,6 @@
 // literatureCardM.tsx
 import React from 'react';
-import { LiteratureExtended } from '../../helpers/literatureTypes';
+import { LiteratureExtended } from '../../types/literatureTypes';
 import VersionBannerCardM from './versionBannerCardM';
 
 interface LiteratureCardProps {

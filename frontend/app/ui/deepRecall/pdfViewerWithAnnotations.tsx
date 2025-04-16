@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { Document, Page } from 'react-pdf';
 import AnnotationOverlay from './annotationOverlay';
-import { Annotation } from '@/app/helpers/annotationTypes';
+import { Annotation } from '@/app/types/annotationTypes';
 import { LiteratureItem } from './uploadWidget';
 import { prefixStrapiUrl } from '@/app/helpers/getStrapiMedia';
 

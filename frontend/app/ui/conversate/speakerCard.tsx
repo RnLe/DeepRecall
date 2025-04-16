@@ -1,6 +1,6 @@
 // speakerCard.tsx
 import React from 'react';
-import { Speaker } from '../../helpers/diarizationTypes';
+import { Speaker } from '../../types/diarizationTypes';
 import { useQuery } from '@tanstack/react-query';
 
 interface SpeakerCardProps {

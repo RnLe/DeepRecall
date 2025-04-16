@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import VersionForm from "./versionForm";
 import LiteratureForm from "./literatureForm";
 import LiteratureTypeCreationForm from "./literatureTypeCreationForm";
-import { LiteratureExtended, LiteratureType } from "../../helpers/literatureTypes";
+import { LiteratureExtended, LiteratureType } from "../../types/literatureTypes";
 import { useLiterature, useLiteratureTypes } from "../../customHooks/useLiterature";
 import LiteratureCardL from "./literatureCardL";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

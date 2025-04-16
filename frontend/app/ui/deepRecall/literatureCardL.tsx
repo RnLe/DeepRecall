@@ -1,7 +1,7 @@
 // literatureCardL.tsx
 
 import React from "react";
-import { LiteratureExtended, LiteratureVersionExtended } from "../../helpers/literatureTypes";
+import { LiteratureExtended, LiteratureVersionExtended } from "../../types/literatureTypes";
 import { prefixStrapiUrl } from "../../helpers/getStrapiMedia";
 
 /**

@@ -1,7 +1,7 @@
 // annotationOverlay.tsx
 
 import React from 'react';
-import { Annotation } from '@/app/helpers/annotationTypes';
+import { Annotation } from '@/app/types/annotationTypes';
 
 interface AnnotationOverlayProps {
   annotations: Annotation[];
