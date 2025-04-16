@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import SparkMD5 from "spark-md5";
-import { Literature, LiteratureType, LiteratureVersion } from "../../helpers/literatureTypes";
-import { LiteratureItem } from "@/app/helpers/literatureTypesLegacy";
+import { Literature, LiteratureType, LiteratureVersion } from "../../types/literatureTypes";
+import { LiteratureItem } from "@/app/types/literatureTypesLegacy";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateLiterature } from "../../api/literatureService";
 import { uploadFile, UploadedFileInfo } from "../../api/uploadFile";

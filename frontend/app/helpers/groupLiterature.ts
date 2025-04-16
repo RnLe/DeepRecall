@@ -1,6 +1,6 @@
 // helpers/groupLiteratures.ts
 
-import { LiteratureExtended } from './literatureTypes';
+import { LiteratureExtended } from '../types/literatureTypes';
 
 export const groupLiteraturesByType = (literatures: LiteratureExtended[]) => {
   return literatures.reduce((acc: { [key: string]: LiteratureExtended[] }, lit) => {

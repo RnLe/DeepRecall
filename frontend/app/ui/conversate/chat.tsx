@@ -1,6 +1,6 @@
 import React from 'react';
 import { SpeakerData } from './speakerCard';
-import { ChatContent } from '../../helpers/diarizationTypes';
+import { ChatContent } from '../../types/diarizationTypes';
 import { secondsToString } from '../../helpers/timesToString';
 import { groupChatMessages } from '../../helpers/chatHelpers';
 

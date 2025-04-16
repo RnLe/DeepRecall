@@ -1,6 +1,6 @@
 // conversationApi.ts
 
-import { Conversation } from '../helpers/diarizationTypes';
+import { Conversation } from '../types/diarizationTypes';
 
 export const fetchConversationDetails = async (id: string): Promise<Conversation> => {
   const res = await fetch(`${process.env.NEXT_PUBLIC_PYTHON_API_URL}/conversation/${id}`);

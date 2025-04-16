@@ -1,5 +1,5 @@
 import React from "react";
-import { LiteratureItem } from "../../helpers/literatureTypesLegacy";
+import { LiteratureItem } from "../../types/literatureTypesLegacy";
 
 interface LiteratureCardSProps {
   item: LiteratureItem;

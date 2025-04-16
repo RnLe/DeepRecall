@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 import AnnotationToolbar, { AnnotationMode } from './annotationToolbar';
 import PdfViewerWithAnnotations from './pdfViewerWithAnnotations';
 import AnnotationProperties from './annotationProperties';
-import { Annotation } from '../../helpers/annotationTypes';
-import { LiteratureItem } from '../../helpers/literatureTypesLegacy';
+import { Annotation } from '../../types/annotationTypes';
+import { LiteratureItem } from '../../types/literatureTypesLegacy';
 
 interface PdfAnnotationContainerProps {
   activeLiterature: LiteratureItem;

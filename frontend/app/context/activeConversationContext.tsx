@@ -1,7 +1,7 @@
 // activeConversationContext.tsx
 import React, { createContext, useContext, useState } from 'react';
-import { Conversation } from '../helpers/diarizationTypes';
-import { hardwareResponse } from '../helpers/diarizationTypes';
+import { Conversation } from '../types/diarizationTypes';
+import { hardwareResponse } from '../types/diarizationTypes';
 
 // Update the interface to accept either a Conversation or a nested object
 interface ActiveConversationContextType {

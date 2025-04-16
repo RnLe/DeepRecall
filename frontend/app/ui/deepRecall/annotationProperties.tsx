@@ -1,7 +1,7 @@
 // annotationProperties.tsx
 
 import React from 'react';
-import { Annotation } from '@/app/helpers/annotationTypes';
+import { Annotation } from '@/app/types/annotationTypes';
 
 interface AnnotationPropertiesProps {
   annotation: Annotation | null;

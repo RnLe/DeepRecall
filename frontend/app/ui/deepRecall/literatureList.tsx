@@ -3,7 +3,7 @@
 import React from 'react';
 import { useLiterature, useLiteratureTypes } from '../../customHooks/useLiterature';
 import LiteratureCardM from './literatureCardM';
-import { LiteratureType } from '../../helpers/literatureTypes';
+import { LiteratureType } from '../../types/literatureTypes';
 import { groupLiteraturesByType } from '@/app/helpers/groupLiterature';
 
 interface LiteratureListProps {
