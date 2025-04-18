@@ -6,7 +6,11 @@ export const useLiterature = () => {
   return useQuery({
     queryKey: ['literature'],
     queryFn: fetchLiteratures,
-    select: (data) => data,
+    select: (data) => {
+      // console.log("Fetched literature data:", data);
+      return data;
+    },
+    
   });
 };
 
@@ -15,7 +19,10 @@ export const useLiteratureTypes = () => {
   return useQuery({
     queryKey: ['literatureTypes'],
     queryFn: fetchLiteratureTypes,
-    select: (data) => data,
+    select: (data) => {
+      // console.log("Fetched literature types data:", data);
+      return data;
+    }
   });
 };
 
@@ -24,6 +31,9 @@ export const useVersionTypes = () => {
   return useQuery({
     queryKey: ['versionTypes'],
     queryFn: fetchVersionTypes,
-    select: (data) => data,
+    select: (data) => {
+      // console.log("Fetched version types data:", data);
+      return data;
+    }
   });
 };

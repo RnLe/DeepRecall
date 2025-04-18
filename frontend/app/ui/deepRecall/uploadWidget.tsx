@@ -10,6 +10,7 @@ import { useLiterature, useLiteratureTypes, useVersionTypes } from "../../custom
 import LiteratureCardL from "./literatureCardL";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLiteratureType, createVersionType, updateLiteratureType } from "../../api/literatureService";
+import VersionTypeList from "./versionTypeList";
 
 interface UploadWidgetProps {
   className?: string;
@@ -142,7 +143,7 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
             return (
               <div
                 key={type.documentId}
-                className={`cursor-pointer border rounded-lg p-4 text-center hover:shadow-md transition-shadow bg-gray-700 text-white ${
+                className={`cursor-pointer border text-3xl rounded-lg p-4 text-center hover:shadow-md transition-shadow bg-gray-700 text-white ${
                   selectedType?.documentId === type.documentId ? "ring-4 ring-blue-500" : ""
                 }`}
                 onClick={() => {
@@ -208,8 +209,10 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
             {formsVisible &&
               (selectedEntry ? (
                 <VersionForm
-                  literatureType={selectedType}
-                  entry={selectedEntry}
+                  versionType={
+                    versionTypes?.find(vt => vt.name === selectedType.name)!
+                  }
+                  entry={selectedEntry!}
                   onSuccess={() => setFormsVisible(false)}
                 />
               ) : (
