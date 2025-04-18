@@ -4,7 +4,8 @@
   "info": {
     "singularName": "annotation",
     "pluralName": "annotations",
-    "displayName": "Annotation"
+    "displayName": "Annotation",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -17,6 +18,14 @@
     },
     "metadata": {
       "type": "json",
+      "required": true
+    },
+    "literatureId": {
+      "type": "string",
+      "required": true
+    },
+    "pdfId": {
+      "type": "string",
       "required": true
     }
   }

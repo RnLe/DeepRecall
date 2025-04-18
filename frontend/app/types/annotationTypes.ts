@@ -1,49 +1,175 @@
-// annotationTypes.ts
+/**
+ * Central annotation model + helpers
+ * ‑ Converts between the lean Strapi DB shape
+ *   { type, literatureId, pdfId, metadata: string }
+ *   and the rich union used in the frontend.
+ */
 
-// Base interface for shared properties.
-export interface AnnotationStrapi {
-    // The type of annotation
-    type: string;
-    // The metadata for the annotation in JSON format (basically everything else)
-    metadata: string;
-    
+import { StrapiResponse } from "./strapiTypes";
+
+/* ------------------------------------------------------------------ */
+/* --------------------------  FRONTEND ----------------------------- */
+/* ------------------------------------------------------------------ */
+
+export type AnnotationKind =
+  | "Equation"
+  | "Plot"
+  | "Illustration"
+  | "Theorem"
+  | "Statement"
+  | "Definition"
+  | "Figure"
+  | "Table";
+
+interface BaseCoords {
+  page: number;          // 1‑based page index
+  x: number;             // normalised 0‑1
+  y: number;             // normalised 0‑1
+  width: number;         // normalised 0‑1
+  height: number;        // normalised 0‑1
 }
 
-export interface AnnotationBase extends AnnotationStrapi {
-  // The page number of the PDF where the annotation appears.
-  page: number;
-  // The literature document ID to which the annotation belongs.
-  literatureId: number;
-  // The pdf document ID to which the annotation belongs.
-  pdfId: number;
-  // Normalized position and size relative to the page dimensions (values between 0 and 1).
-  // This normalization helps maintain correctness regardless of zoom level or page size.
-  x: number; // relative left (0 to 1)
-  y: number; // relative top (0 to 1)
-  width: number;  // relative width
-  height: number; // relative height
-  // Common metadata for annotations.
+export interface BaseAnnotation extends BaseCoords {
+  /** Undefined until the record is persisted */
+  documentId?: string;
+  /** FK to the literature entity (Strapi's ID) */
+  literatureId: string;
+  /** Hash of the PDF file that the annotation belongs to */
+  pdfId: string;
   title?: string;
   description?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Arbitrary, type‑specific extra data */
+  extra?: Record<string, unknown>;
 }
 
-// Specific annotation type for text highlights.
-export interface TextAnnotation extends AnnotationBase {
-  type: 'text';
-  // The highlighted text content.
+export interface RectangleAnnotation extends BaseAnnotation {
+  type: "rectangle";
+  annotationKind: AnnotationKind;
+}
+
+export interface TextAnnotation extends BaseAnnotation {
+  type: "text";
   highlightedText: string;
 }
 
-// Specific annotation type for rectangle regions.
-// The `annotationKind` field lets you assign semantic types later (e.g., Equation, Plot, etc.)
-export interface RectangleAnnotation extends AnnotationBase {
-  type: 'rectangle';
-  annotationKind: 'Equation' | 'Plot' | 'Illustration' | 'Theorem' | 'Statement';
+export type Annotation = RectangleAnnotation | TextAnnotation;
+
+/* ------------------------------------------------------------------ */
+/* ---------------------------  STRAPI  ----------------------------- */
+/* ------------------------------------------------------------------ */
+
+export interface AnnotationStrapi extends StrapiResponse {
+  type: Annotation["type"];
+  /** New top‑level columns for fast querying */
+  literatureId: string;
+  pdfId: string;
+  /** JSON string holding the geometry & misc. info */
+  metadata: string;
 }
 
-// If you plan to extend with more annotation types, create additional interfaces.
-// Then you can create a union type of all annotations:
-export type Annotation = TextAnnotation | RectangleAnnotation;
-  
+/* ------------------------------------------------------------------ */
+/* ---------------------  SERIALISE / DESERIALISE ------------------- */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Convert Strapi record → rich frontend object
+ */
+export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
+  // tolerate missing or null metadata coming from Strapi
+  const raw = rec.metadata ?? {};
+  const meta =
+    typeof raw === "string"
+      ? (raw ? JSON.parse(raw) : {})   // empty string → {}
+      : raw;
+
+  const common = {
+    documentId: rec.documentId,
+    createdAt: rec.createdAt,
+    updatedAt: rec.updatedAt,
+    /** geometry */
+    page: meta.page,
+    x: meta.x,
+    y: meta.y,
+    width: meta.width,
+    height: meta.height,
+    /** foreign keys – take from top level, fall back to old metadata */
+    literatureId: String(rec.literatureId ?? meta.literatureId),
+    pdfId:         rec.pdfId         ?? meta.pdfId,
+    /** misc. */
+    title: meta.title,
+    description: meta.description,
+    extra: meta.extra ?? {},
+  } as const;
+
+  if (rec.type === "text") {
+    return {
+      ...common,
+      type: "text",
+      highlightedText: meta.highlightedText ?? "",
+    };
+  }
+
+  return {
+    ...common,
+    type: "rectangle",
+    annotationKind: meta.annotationKind as AnnotationKind,
+  };
+}
+
+/**
+ * Convert rich frontend object → payload for Strapi
+ */
+/* ------------------------------------------------------------------ */
+/* ---------------------  SERIALISE / DESERIALISE ------------------- */
+/* ------------------------------------------------------------------ */
+
+export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
+  const {
+    /* NEVER send these → Strapi would reject them */
+    /* documentId, createdAt, updatedAt, */
+    type,
+    literatureId,
+    pdfId,
+    page,
+    x,
+    y,
+    width,
+    height,
+    title,
+    description,
+    extra = {},
+  } = ann;
+
+  const meta: Record<string, unknown> = {
+    page,
+    x,
+    y,
+    width,
+    height,
+    title,
+    description,
+    ...extra,
+  };
+
+  if (type === "text") {
+    meta.highlightedText = (ann as TextAnnotation).highlightedText;
+  } else {
+    meta.annotationKind = (ann as RectangleAnnotation).annotationKind;
+  }
+
+  /* ONLY the fields declared in the Strapi content‑type */
+  return {
+    type,
+    literatureId,
+    pdfId,
+    metadata: JSON.stringify(meta),
+  } as unknown as AnnotationStrapi;
+}
+
+/* ------------------------------------------------------------------ */
+/* -------- Legacy aliases (for existing components) ---------------- */
+/* ------------------------------------------------------------------ */
+export const transformAnnotation = deserializeAnnotation;
+export const wrapAnnotationForSave = serializeAnnotation;

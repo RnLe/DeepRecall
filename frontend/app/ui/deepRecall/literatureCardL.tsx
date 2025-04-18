@@ -110,7 +110,7 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
     metadata,
     title,
     subtitle,
-    authors = [],
+    authors = "",
     createdAt,
     updatedAt,
     versions,
@@ -167,7 +167,9 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
   return (
     <div className={`bg-gray-700 rounded-lg shadow-sm p-4 hover:bg-gray-600 hover:shadow-lg transition-colors ${className}`}>
       <div className="flex justify-between items-start">
-        <h3 className="text-lg font-semibold text-white truncate">{title}</h3>
+        <h3 className="text-lg font-semibold text-white whitespace-normal break-words">
+          {title}
+        </h3>
         <button
           className="text-red-500 hover:text-red-700 text-sm"
           onClick={handleRemoveLiterature}
@@ -176,17 +178,10 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
         </button>
       </div>
       {subtitle && <h4 className="text-sm text-gray-400 truncate">{subtitle}</h4>}
-      <div className="flex flex-wrap gap-2 mt-1">
-        {authors.length > 0 && authors.map((author: any) => (
-          <span
-            key={author.id}
-            className="px-2 py-1 bg-gray-400 rounded cursor-pointer hover:shadow-lg"
-            onClick={() => handleAuthorClick(author)}
-          >
-            {author.first_name} {author.last_name}
-          </span>
-        ))}
-      </div>
+      {/* single-string authors */}
+      {authors && (
+        <p className="mt-1 text-sm text-gray-400 truncate">{authors}</p>
+      )}
       <div className="mt-2 text-sm text-gray-500">
         <p>
           Created:{" "}

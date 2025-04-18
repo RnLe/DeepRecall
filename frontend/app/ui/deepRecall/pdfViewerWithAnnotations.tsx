@@ -1,142 +1,300 @@
-// pdfViewerWithAnnotations.tsx
+// pdfViewerWithAnnotations.tsx – virtualised (v2‑compatible)
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { Document, Page, pdfjs } from "react-pdf";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
-import React, { useState, useRef } from 'react';
-import { Document, Page } from 'react-pdf';
-import AnnotationOverlay from './annotationOverlay';
-import { Annotation } from '@/app/types/annotationTypes';
-import { LiteratureItem } from './uploadWidget';
-import { prefixStrapiUrl } from '@/app/helpers/getStrapiMedia';
+import AnnotationOverlay from "./annotationOverlay";
+import { Annotation } from "../../types/annotationTypes";
+import { AnnotationMode } from "./annotationToolbar";
+import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
-interface PdfViewerWithAnnotationsProps {
-  activeLiterature: LiteratureItem;
-  annotationMode: 'none' | 'text' | 'rectangle';
+/* ------------------------------------------------------------- */
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+/* ------------------------------------------------------------- */
+
+interface Props {
+  pdfUrl: string;
+  zoom: number;
+  pageNumber: number;
+  onLoadSuccess: (info: { numPages: number }) => void;
+  annotationMode: AnnotationMode;
   annotations: Annotation[];
-  onCreateAnnotation: (annotation: Annotation) => void;
-  onSelectAnnotation: (annotation: Annotation) => void;
+  selectedId: string | null;
+  onCreateAnnotation: (a: Annotation) => void;
+  onSelectAnnotation: (a: Annotation) => void;
 }
 
-const PdfViewerWithAnnotations: React.FC<PdfViewerWithAnnotationsProps> = ({
-  activeLiterature,
-  annotationMode,
-  annotations,
-  onCreateAnnotation,
-  onSelectAnnotation
-}) => {
-  const [numPages, setNumPages] = useState(0);
-  // For rectangle drawing, keep state for whether the user is currently drawing.
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawStart, setDrawStart] = useState({ x: 0, y: 0 });
-  const [drawEnd, setDrawEnd] = useState({ x: 0, y: 0 });
-  
-  // Store page container references to calculate dimensions.
-  const pageRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
+export interface PdfViewerHandle {
+  scrollToPage(page: number): void;
+  getPageSize(page?: number): { width: number; height: number } | null;
+}
 
-  // When the document loads, get the number of pages.
-  const handleDocumentLoadSuccess = ({ numPages: nextNumPages }: { numPages: number }) => {
-    setNumPages(nextNumPages);
-  };
+const DEFAULT_PAGE_HEIGHT = 842;  // fallback for A4 if we have no measurements yet
 
-  // Mouse event handlers for rectangle annotation (demo only on page 1).
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (annotationMode !== 'rectangle') return;
-    setIsDrawing(true);
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setDrawStart({ x, y });
-    setDrawEnd({ x, y });
-  };
+const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
+  (
+    {
+      pdfUrl,
+      zoom,
+      pageNumber,
+      onLoadSuccess,
+      annotationMode,
+      annotations,
+      selectedId,
+      onCreateAnnotation,
+      onSelectAnnotation,
+    },
+    ref
+  ) => {
+    /* ---------------- refs & state ------------------------------ */
+    const scrollParentRef = useRef<HTMLDivElement>(null);
+    const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+    const [numPages, setNumPages] = useState(0);
+    const [pageSizes, setPageSizes] = useState(
+      new Map<number, { w: number; h: number }>(),
+    );
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDrawing) return;
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setDrawEnd({ x, y });
-  };
+    /* ---------------- virtualiser (v2 API) ---------------------- */
+    const rowVirtualizer = useVirtualizer({
+      count: numPages,
+      overscan: 3,
+      getScrollElement: () => scrollParentRef.current!,
+      estimateSize: (index) => {
+        // page index is zero‑based; our map is 1‑based
+        const pg = index + 1;
+        // use measured height if we have it
+        const measured = pageSizes.get(pg)?.h;
+        const baseHeight = measured ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
+        // dynamic, very small gap: 0.2% of page height, minimum 1px
+        const dynamicGap = Math.max(1, Math.round(baseHeight * 0.002));
+        return baseHeight + dynamicGap;
+      },
+    });
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>, pageWidth: number, pageHeight: number, pageNumber: number) => {
-    if (!isDrawing) return;
-    setIsDrawing(false);
-    // Calculate normalized coordinates.
-    const x = Math.min(drawStart.x, drawEnd.x) / pageWidth;
-    const y = Math.min(drawStart.y, drawEnd.y) / pageHeight;
-    const width = Math.abs(drawEnd.x - drawStart.x) / pageWidth;
-    const height = Math.abs(drawEnd.y - drawStart.y) / pageHeight;
-    
-    // Create a new annotation – using a simple id generation.
-    const newAnnotation: Annotation = {
-      id: `ann-${Date.now()}`,
-      page: pageNumber,
-      x,
-      y,
-      width,
-      height,
-      type: 'rectangle',
-      annotationKind: 'Illustration', // Default kind; can be updated later.
-      title: '',
-      description: ''
+    /* whenever zoom or pageSizes change, re‑measure everything */
+    useEffect(() => {
+      rowVirtualizer.measure();
+    }, [zoom, pageSizes, rowVirtualizer]);
+
+    /* ---------------- expose handle ---------------------------- */
+    useImperativeHandle(ref, () => ({
+      scrollToPage: (p: number) =>
+        rowVirtualizer.scrollToIndex(p - 1, {
+          align: "start",
+          behavior: "smooth",
+        }),
+      getPageSize: (p = 1) => {
+        const size = pageSizes.get(p);
+        return size ? { width: size.w, height: size.h } : null;
+      },
+    }));
+
+    /* auto‑scroll when external pageNumber prop changes */
+    useEffect(() => {
+      if (numPages) {
+        rowVirtualizer.scrollToIndex(pageNumber - 1, { align: "start" });
+      }
+    }, [pageNumber, numPages, rowVirtualizer]);
+
+    /* ---------------- draft state for rectangle draw ----------- */
+    const [draft, setDraft] = useState<null | {
+      page: number;
+      x0: number;
+      y0: number;
+      x1: number;
+      y1: number;
+    }>(null);
+    const clearDraft = () => setDraft(null);
+
+    /* ---------------- mouse handlers (unchanged) --------------- */
+    const mouseDown = (e: React.MouseEvent, pg: number) => {
+      if (annotationMode !== "rectangle") return;
+      const node = pageRefs.current.get(pg);
+      if (!node) return;
+      const r = node.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      setDraft({ page: pg, x0: x, y0: y, x1: x, y1: y });
+      e.preventDefault();
     };
-    onCreateAnnotation(newAnnotation);
-  };
+    const mouseMove = (e: React.MouseEvent) => {
+      if (!draft) return;
+      const node = pageRefs.current.get(draft.page);
+      if (!node) return;
+      const r = node.getBoundingClientRect();
+      setDraft({ ...draft, x1: e.clientX - r.left, y1: e.clientY - r.top });
+    };
+    const mouseUp = () => {
+      if (!draft) return;
+      const { w, h } = pageSizes.get(draft.page)!;
+      const xMin = Math.min(draft.x0, draft.x1);
+      const yMin = Math.min(draft.y0, draft.y1);
+      const xMax = Math.max(draft.x0, draft.x1);
+      const yMax = Math.max(draft.y0, draft.y1);
 
-  return (
-    <Document
-      file={prefixStrapiUrl(activeLiterature.metadata.versions[0].file_url)}
-      onLoadSuccess={handleDocumentLoadSuccess}
-      className="relative"
-    >
-      {Array.from(new Array(numPages), (_, index) => {
-        const pageNumber = index + 1;
-        return (
+      onCreateAnnotation({
+        type: "rectangle",
+        annotationKind: "Figure",
+        page: draft.page,
+        x: xMin / w,
+        y: yMin / h,
+        width: (xMax - xMin) / w,
+        height: (yMax - yMin) / h,
+        literatureId: "",
+        pdfId: "",
+      });
+      clearDraft();
+    };
+
+    /* ---------------- text highlight (unchanged) -------------- */
+    const handleTextSelect = useCallback(() => {
+      if (annotationMode !== "text") return;
+      const sel = document.getSelection();
+      if (!sel || sel.isCollapsed) return;
+
+      const range = sel.getRangeAt(0);
+      const pgDiv = range.startContainer.parentElement?.closest(
+        "[data-page-number]",
+      );
+      if (!pgDiv) return;
+      const pg = Number(pgDiv.getAttribute("data-page-number"));
+      const { w, h } = pageSizes.get(pg)!;
+      const rect = range.getBoundingClientRect();
+      const pr = pgDiv.getBoundingClientRect();
+
+      onCreateAnnotation({
+        type: "text",
+        highlightedText: sel.toString(),
+        page: pg,
+        x: (rect.left - pr.left) / w,
+        y: (rect.top - pr.top) / h,
+        width: rect.width / w,
+        height: rect.height / h,
+        literatureId: "",
+        pdfId: "",
+      });
+      sel.removeAllRanges();
+    }, [annotationMode, onCreateAnnotation, pageSizes]);
+
+    useEffect(() => {
+      document.addEventListener("mouseup", handleTextSelect);
+      return () =>
+        document.removeEventListener("mouseup", handleTextSelect);
+    }, [handleTextSelect]);
+
+    /* ---------------- render a single virtual row -------------- */
+    const renderRow = (vRow: ReturnType<
+      typeof rowVirtualizer.getVirtualItems
+    >[number]) => {
+      const pg = vRow.index + 1;
+      return (
+        <div
+          key={vRow.key}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            transform: `translateY(${vRow.start}px)`,
+            textAlign: "center",
+          }}
+        >
           <div
-            key={`page-container-${pageNumber}`}
-            ref={ref => { pageRefs.current[pageNumber] = ref; }}
-            className="relative mb-4"
-            // For demonstration, allow drawing only on the first page.
-            onMouseDown={pageNumber === 1 ? handleMouseDown : undefined}
-            onMouseMove={pageNumber === 1 ? handleMouseMove : undefined}
-            onMouseUp={pageNumber === 1 ? (e) => {
-              const container = pageRefs.current[pageNumber];
-              if (container) {
-                const { width, height } = container.getBoundingClientRect();
-                handleMouseUp(e, width, height, pageNumber);
+            data-page-number={pg}
+            ref={(el) => {
+              if (el) {
+                pageRefs.current.set(pg, el);
+                rowVirtualizer.measureElement(el);
+              } else {
+                pageRefs.current.delete(pg);
               }
-            } : undefined}
+            }}
+            style={{ display: "inline-block", position: "relative" }}
+            onMouseDown={(e) => mouseDown(e, pg)}
+            onMouseMove={mouseMove}
+            onMouseUp={mouseUp}
           >
             <Page
-              pageNumber={pageNumber}
-              renderAnnotationLayer={true}
-              renderTextLayer={true}
-              width={600} // Set your desired width.
+              pageNumber={pg}
+              scale={zoom}
+              onRenderSuccess={({ width, height }) => {
+                setPageSizes((m) => {
+                  const copy = new Map(m);
+                  copy.set(pg, { w: width!, h: height! });
+                  return copy;
+                });
+                // re‑measure now that height is known
+                const node = pageRefs.current.get(pg);
+                if (node) rowVirtualizer.measureElement(node);
+              }}
             />
-            {pageRefs.current[pageNumber] && (
-              <AnnotationOverlay
-                annotations={annotations.filter(ann => ann.page === pageNumber)}
-                pageWidth={pageRefs.current[pageNumber]?.getBoundingClientRect().width || 600}
-                pageHeight={pageRefs.current[pageNumber]?.getBoundingClientRect().height || 800}
-                onSelectAnnotation={onSelectAnnotation}
-              />
-            )}
-            {/* Render the drawing rectangle if the user is drawing on page 1 */}
-            {isDrawing && pageNumber === 1 && (
+            <AnnotationOverlay
+              annotations={annotations.filter((a) => a.page === pg)}
+              selectedId={selectedId}
+              pageWidth={pageSizes.get(pg)?.w ?? 0}
+              pageHeight={pageSizes.get(pg)?.h ?? 0}
+              onSelectAnnotation={onSelectAnnotation}
+            />
+            {draft?.page === pg && (
               <div
                 style={{
-                  position: 'absolute',
-                  left: Math.min(drawStart.x, drawEnd.x),
-                  top: Math.min(drawStart.y, drawEnd.y),
-                  width: Math.abs(drawEnd.x - drawStart.x),
-                  height: Math.abs(drawEnd.y - drawStart.y),
-                  border: '2px dashed yellow',
-                  pointerEvents: 'none'
+                  position: "absolute",
+                  left: Math.min(draft.x0, draft.x1),
+                  top: Math.min(draft.y0, draft.y1),
+                  width: Math.abs(draft.x1 - draft.x0),
+                  height: Math.abs(draft.y1 - draft.y0),
+                  border: "2px dashed red",
+                  pointerEvents: "none",
                 }}
               />
             )}
           </div>
-        );
-      })}
-    </Document>
-  );
-};
+        </div>
+      );
+    };
+
+    /* ---------------- render container -------------------------- */
+    return (
+      <div
+        ref={scrollParentRef}
+        className="h-full overflow-y-auto"
+        style={{ cursor: annotationMode === "none" ? "grab" : undefined }}
+      >
+        <Document
+          file={prefixStrapiUrl(pdfUrl)}
+          onLoadSuccess={({ numPages }) => {
+            setNumPages(numPages);
+            onLoadSuccess({ numPages });
+          }}
+          // ← FIX #1: handle internal links
+          onItemClick={({ pageNumber }) =>
+            rowVirtualizer.scrollToIndex(pageNumber - 1, {
+              align: "start",
+              behavior: "smooth",
+            })
+          }
+          loading={<div className="p-4">Loading PDF…</div>}
+          error={<div className="p-4 text-red-600">Failed to load PDF.</div>}
+        >
+          <div
+            style={{
+              height: rowVirtualizer.getTotalSize(),
+              position: "relative",
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map(renderRow)}
+          </div>
+        </Document>
+      </div>
+    );
+  },
+);
 
 export default PdfViewerWithAnnotations;

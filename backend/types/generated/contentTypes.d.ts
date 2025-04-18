@@ -402,6 +402,7 @@ export interface ApiAnnotationTypeAnnotationType
 export interface ApiAnnotationAnnotation extends Struct.CollectionTypeSchema {
   collectionName: 'annotations';
   info: {
+    description: '';
     displayName: 'Annotation';
     pluralName: 'annotations';
     singularName: 'annotation';
@@ -413,6 +414,7 @@ export interface ApiAnnotationAnnotation extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    literatureId: Schema.Attribute.String & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -420,6 +422,7 @@ export interface ApiAnnotationAnnotation extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     metadata: Schema.Attribute.JSON & Schema.Attribute.Required;
+    pdfId: Schema.Attribute.String & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     type: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
