@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import SparkMD5 from "spark-md5";
-import { Literature, LiteratureType, LiteratureVersion } from "../../types/literatureTypes";
-import { LiteratureItem } from "@/app/types/literatureTypesLegacy";
+import { Literature, LiteratureType, LiteratureExtended } from "../../types/literatureTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateLiterature } from "../../api/literatureService";
 import { uploadFile, UploadedFileInfo } from "../../api/uploadFile";
 import { renderPdfPageToImage, dataURLtoFile } from "../../helpers/pdfThumbnail";
+import { VersionExtended } from "../../types/versionTypes";
 
 // Compute MD5 hash of a file
 function computeMD5(file: File): Promise<string> {
@@ -24,13 +24,13 @@ function computeMD5(file: File): Promise<string> {
 }
 
 interface VersionFormProps {
-  mediaType: LiteratureType;
-  entry: LiteratureItem;
+  literatureType: LiteratureType;
+  entry: LiteratureExtended;
   className?: string;
   onSuccess?: () => void;
 }
 
-const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, onSuccess }) => {
+const VersionForm: React.FC<VersionFormProps> = ({ literatureType, entry, className, onSuccess }) => {
   // File upload state
   const [file, setFile] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
@@ -47,67 +47,49 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     }
   }, [file]);
 
-  // Dynamic extra version fields are assumed to be defined in the literature type's versionMetadata.
-  // This simulates a LiteratureVersionType structure.
-  const [versionAdditionalFields, setVersionAdditionalFields] = useState<Record<string, any>>({});
-  useEffect(() => {
-    try {
-      let template;
-      // Assume mediaType.versionMetadata exists and is a JSON string.
-      if (mediaType.versionMetadata && typeof mediaType.versionMetadata === "string") {
-        template = mediaType.versionMetadata ? JSON.parse(mediaType.versionMetadata) : {};
-      } else {
-        template = mediaType.versionMetadata || {};
-      }
-      setVersionAdditionalFields(template);
-    } catch (err) {
-      setVersionAdditionalFields({});
-      console.error("Error parsing version metadata:", err);
-    }
-  }, [mediaType]);
+  // parse versionType template
+  const [versionTpl, setVersionTpl] = useState<Record<string, any>>({});  // new
+  const [versionFields, setVersionFields] = useState<Record<string, any>>({});
 
-  // Render an input for a dynamic version field based on the field's default type.
-  const renderVersionField = (key: string, value: any) => {
-    if (Array.isArray(value)) {
-      return (
-        <select
-          value={versionAdditionalFields[key]}
-          onChange={(e) =>
-            setVersionAdditionalFields((prev) => ({ ...prev, [key]: e.target.value }))
-          }
-          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
-        >
-          <option value="">Select an option</option>
-          {value.map((option: string | number, idx: number) => (
-            <option key={idx} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      );
-    } else if (typeof value === "number") {
-      return (
-        <input
-          type="number"
-          value={versionAdditionalFields[key]}
-          onChange={(e) =>
-            setVersionAdditionalFields((prev) => ({ ...prev, [key]: Number(e.target.value) }))
-          }
-          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
-        />
-      );
-    } else {
-      return (
-        <input
-          type="text"
-          value={versionAdditionalFields[key]}
-          onChange={(e) =>
-            setVersionAdditionalFields((prev) => ({ ...prev, [key]: e.target.value }))
-          }
-          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
-        />
-      );
+  useEffect(() => {
+    // try relation.versionType first, else fallback to raw typeMetadata
+    const raw = (literatureType as any).versionType?.versionMetadata
+                ?? (literatureType as any).typeMetadata
+                ?? "{}";
+    let tpl: Record<string, any> = {};
+    try { tpl = JSON.parse(raw); } catch { tpl = {}; }
+    setVersionTpl(tpl);
+    setVersionFields({ ...tpl });
+  }, [literatureType]);
+
+  // recommended keys
+  const recommended = ["publishingDate","versionTitle","editionNumber","versionNumber"];
+  const recKeys = recommended.filter(k => k in versionTpl);
+  const customKeys = Object.keys(versionTpl).filter(k => !recommended.includes(k));
+
+  // render per‐field input
+  const renderField = (key: string, value: any) => {
+    if (key === "publishingDate") {
+      return <input type="date" value={versionFields[key]||""}
+        onChange={e=>setVersionFields(f=>({...f,[key]:e.target.value}))}
+        className="mt-1 w-full border border-gray-600 bg-gray-700 p-2 text-white"/>;
     }
+    if (typeof value === "number") {
+      return <input type="number" value={versionFields[key]||0}
+        onChange={e=>setVersionFields(f=>({...f,[key]:Number(e.target.value)}))}
+        className="mt-1 w-full border border-gray-600 bg-gray-700 p-2 text-white"/>;
+    }
+    if (Array.isArray(value)) {
+      return <select value={versionFields[key]||""}
+        onChange={e=>setVersionFields(f=>({...f,[key]:e.target.value}))}
+        className="mt-1 w-full border border-gray-600 bg-gray-700 p-2 text-white">
+        <option value="">—</option>
+        {value.map((opt:any,i)=> <option key={i} value={opt}>{opt}</option>)}
+      </select>;
+    }
+    return <input type="text" value={versionFields[key]||""}
+      onChange={e=>setVersionFields(f=>({...f,[key]:e.target.value}))}
+      className="mt-1 w-full border border-gray-600 bg-gray-700 p-2 text-white"/>;
   };
 
   // File input change handler
@@ -174,26 +156,37 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     }
 
     try {
-      // Upload file and thumbnail.
-      const uploadedFile: UploadedFileInfo = await uploadFile(file);
-      const uploadedThumbnail: UploadedFileInfo = thumbnail ? await uploadFile(thumbnail) : { id: 0, url: "" };
+      const uploadedFile    = await uploadFile(file);
+      const uploadedThumb   = thumbnail ? await uploadFile(thumbnail) : { url: "" };
 
-      // Create a new version object using the new structure.
-      const newVersion: LiteratureVersion = {
-        fileUrl: uploadedFile.url,
-        thumbnailUrl: uploadedThumbnail.url,
-        metadata: JSON.stringify(versionAdditionalFields),
-        file_hash: fileHash,
+      // bundle all version data into a single JSON field
+      const newVersion = {
+        versionMetadata: JSON.stringify({
+          ...versionFields,
+          name: entry.type,
+          fileUrl: uploadedFile.url,
+          thumbnailUrl: uploadedThumb.url,
+        })
       };
 
-      // Parse current metadata from the literature entry and add the new version.
-      const currentMetadata = entry.metadata ? JSON.parse(entry.metadata) : {};
-      const currentVersions = currentMetadata.versions || [];
-      currentMetadata.versions = [...currentVersions, newVersion];
+      // parse existing metadata safely
+      let currentMetadata: any = {};
+      if (entry.metadata) {
+        if (typeof entry.metadata === "string") {
+          try {
+            currentMetadata = JSON.parse(entry.metadata);
+          } catch {
+            currentMetadata = {};
+          }
+        } else if (typeof entry.metadata === "object") {
+          currentMetadata = entry.metadata;
+        }
+      }
 
-      // Update the literature entry.
+      currentMetadata.versions = [...(currentMetadata.versions||[]), newVersion];
+
       await updateLiteratureMutation.mutateAsync({
-        documentId: entry.documentId,
+        documentId: entry.documentId!,
         data: { metadata: JSON.stringify(currentMetadata) },
       });
 
@@ -203,7 +196,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
       setFile(null);
       setThumbnail(null);
       setThumbnailUrl(null);
-      setVersionAdditionalFields({});
+      setVersionFields({});
       setFileHash("");
       if (onSuccess) onSuccess();
     } catch (error: any) {
@@ -218,55 +211,69 @@ const VersionForm: React.FC<VersionFormProps> = ({ mediaType, entry, className, 
     <div className={`p-4 border rounded shadow mt-4 bg-gray-800 text-white ${className}`}>
       <h3 className="text-lg font-semibold mb-2">Create new version for: {entry.title}</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* File Upload Field */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300">Upload PDF</label>
-          <input
-            type="file"
-            accept=".pdf"
-            ref={fileInputRef}
-            onChange={handleFileInputChange}
-            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
-          />
-          {fileError && <p className="text-red-500 text-sm">{fileError}</p>}
-          {file && (
-            <p className="mt-1 text-sm text-gray-300">
-              File Hash: {fileHash}
-            </p>
-          )}
-        </div>
-
-        {/* Document ID Field (read-only) */}
+        {/* Document ID at top */}
         <div>
           <label className="block text-sm font-medium text-gray-300">Document ID</label>
-          <div className="mt-1 block w-full bg-gray-700 border border-gray-600 p-2 text-white">
+          <div className="mt-1 block bg-gray-700 border border-gray-600 p-2 text-white">
             {entry.documentId}
           </div>
         </div>
-
-        {/* Dynamically Render Version-Specific Extra Fields */}
-        <div className="p-4 border border-gray-600 rounded">
-          <h4 className="text-md font-semibold mb-2">Additional version-specific attributes</h4>
-          {Object.keys(versionAdditionalFields).length === 0 ? (
-            <p className="text-gray-400">No additional attributes defined</p>
-          ) : (
-            Object.entries(versionAdditionalFields).map(([key, value]) => (
-              <div key={key} className="mb-4">
-                <label className="block text-sm font-medium text-gray-300 capitalize">
-                  {key}
-                </label>
-                {renderVersionField(key, value)}
-              </div>
-            ))
-          )}
+        {/* Upload and thumbnail side-by-side */}
+        <div className="flex gap-4">
+          <div className="w-1/2">
+            <label className="block text-sm font-medium text-gray-300">Upload PDF</label>
+            <input
+              type="file"
+              accept=".pdf"
+              ref={fileInputRef}
+              onChange={handleFileInputChange}
+              className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+            />
+            {fileError && <p className="text-red-500 text-sm mt-1">{fileError}</p>}
+            {file && (
+              <p className="mt-1 text-sm text-gray-300">File Hash: {fileHash}</p>
+            )}
+          </div>
+          <div className="w-1/2 flex items-center justify-center border border-gray-600 bg-gray-700 h-48">
+            {thumbnailUrl ? (
+              <img src={thumbnailUrl} alt="Thumbnail" className="max-h-full" />
+            ) : (
+              <span className="text-gray-400">Thumbnail Preview</span>
+            )}
+          </div>
         </div>
+
+        {/* Core Fields Section */}
+        {recKeys.length > 0 && (
+          <div className="border p-4 rounded">
+            <h4 className="text-md font-semibold mb-2">Core Fields</h4>
+            {recKeys.map(key => (
+               <div key={key} className="mb-4">
+                 <label className="block text-sm font-medium text-gray-300">{key}</label>
+                 {renderField(key, versionTpl[key])}
+               </div>
+            ))}
+          </div>
+        )}
+
+        {/* Additional Fields Section */}
+        {customKeys.length > 0 && (
+          <div className="border p-4 rounded mt-4">
+            <h4 className="text-md font-semibold mb-2">Additional Fields</h4>
+            {customKeys.map(key => (
+              <div key={key} className="mb-4">
+                <label className="block text-sm font-medium text-gray-300">{key}</label>
+                {renderField(key, versionTpl[key])}
+              </div>
+            ))}
+          </div>
+        )}
 
         {errorMsg && <p className="text-red-500">{errorMsg}</p>}
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`bg-green-500 text-white px-4 py-2 rounded ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
+          className={`bg-green-500 text-white px-4 py-2 rounded ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}>
           {isSubmitting ? "Creating…" : "Submit"}
         </button>
       </form>

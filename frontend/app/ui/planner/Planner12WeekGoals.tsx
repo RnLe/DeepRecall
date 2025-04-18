@@ -125,6 +125,36 @@ const Planner12WeekGoals: React.FC = () => {
     }
   };
 
+  // Handler to remove a goal and update dependent states.
+  const handleRemoveGoal = (goalIndex: number) => {
+    setGoals(prev => prev.filter((_, i) => i !== goalIndex));
+    setTacticTables(prev => {
+      const newTables = Object.keys(prev)
+        .filter(key => Number(key) !== goalIndex)
+        .map(key => prev[Number(key)]);
+      const updated: { [index: number]: any } = {};
+      newTables.forEach((table, i) => { updated[i] = table; });
+      return updated;
+    });
+    setNewTacticInputs(prev => {
+      const newInputs = Object.keys(prev)
+        .filter(key => Number(key) !== goalIndex)
+        .map(key => prev[Number(key)]);
+      const updated: { [index: number]: any } = {};
+      newInputs.forEach((input, i) => { updated[i] = input; });
+      return updated;
+    });
+    setGoalColors(prev => {
+      const updated: { [index: number]: string } = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const idx = Number(key);
+        if (idx < goalIndex) updated[idx] = value;
+        else if (idx > goalIndex) updated[idx - 1] = value;
+      });
+      return updated;
+    });
+  };
+
   // ==============================
   // Section 2: Add a Tactic Row
   // ==============================
@@ -146,6 +176,15 @@ const Planner12WeekGoals: React.FC = () => {
     setNewTacticInputs((prev) => ({ ...prev, [goalIndex]: { tactic: "", due: "" } }));
   };
 
+  // Handler to remove a tactic row from a specific goal.
+  const handleRemoveTactic = (goalIndex: number, rowIndex: number) => {
+    setTacticTables(prev => {
+      const newRows = [...(prev[goalIndex] || [])];
+      newRows.splice(rowIndex, 1);
+      return { ...prev, [goalIndex]: newRows };
+    });
+  };
+
   // ================================
   // Section 3: Add Reflection / Struggle Rows
   // ================================
@@ -165,6 +204,14 @@ const Planner12WeekGoals: React.FC = () => {
     }
   };
 
+  const handleRemoveStruggleAction = (index: number) => {
+    setStruggleActions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveOvercomeAction = (index: number) => {
+    setOvercomeActions(prev => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div
         id="export-planner12week"
@@ -178,7 +225,7 @@ const Planner12WeekGoals: React.FC = () => {
           <h2 className="text-2xl font-semibold mb-4">12 Week Goals</h2>
           <ul className="space-y-2">
             {goals.map((goal, index) => (
-              <div key={index} className="relative">
+              <div key={index} className="relative flex items-center">
                 <li
                   onClick={() =>
                     setEditingColorGoal(editingColorGoal === index ? null : index)
@@ -191,7 +238,7 @@ const Planner12WeekGoals: React.FC = () => {
                       : "#e5e7eb",
                     transition: "background 0.2s",
                   }}
-                  className="p-2 border rounded text-gray-900 cursor-pointer flex items-center"
+                  className="p-2 border rounded text-gray-900 cursor-pointer flex-1"
                 >
                   <span className="flex-1">{goal}</span>
                   <span
@@ -202,6 +249,13 @@ const Planner12WeekGoals: React.FC = () => {
                     }}
                   ></span>
                 </li>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleRemoveGoal(index); }}
+                  className="ml-2 text-red-600 font-bold"
+                  aria-label="Remove goal"
+                >
+                  &times;
+                </button>
                 {editingColorGoal === index && (
                   <div
                     ref={colorMenuRef}
@@ -295,6 +349,7 @@ const Planner12WeekGoals: React.FC = () => {
                   <tr>
                     <th className="w-3/4 text-left pb-2 border-b">Tactics</th>
                     <th className="w-1/4 text-left pb-2 border-b">Due</th>
+                    <th className="pb-2 border-b">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -302,10 +357,19 @@ const Planner12WeekGoals: React.FC = () => {
                     <tr key={rowIndex}>
                       <td className="p-2 border">{row.tactic}</td>
                       <td className="p-2 border">{row.due}</td>
+                      <td className="p-2 border">
+                        <button
+                          onClick={() => handleRemoveTactic(goalIndex, rowIndex)}
+                          className="text-red-600"
+                          aria-label="Remove tactic"
+                        >
+                          &times;
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   <tr>
-                    <td colSpan={2} className="p-2">
+                    <td colSpan={3} className="p-2">
                       {newTacticInputs[goalIndex] ? (
                         <div
                           ref={(el) => {
@@ -386,9 +450,16 @@ const Planner12WeekGoals: React.FC = () => {
                 {struggleActions.map((action, idx) => (
                   <li
                     key={idx}
-                    className="p-2 border rounded bg-gray-200 text-gray-900"
+                    className="p-2 border rounded bg-gray-200 text-gray-900 flex justify-between items-center"
                   >
-                    {action}
+                    <span>{action}</span>
+                    <button
+                      onClick={() => handleRemoveStruggleAction(idx)}
+                      className="text-red-600"
+                      aria-label="Remove struggle"
+                    >
+                      &times;
+                    </button>
                   </li>
                 ))}
                 {isAddingStruggleAction ? (
@@ -437,9 +508,16 @@ const Planner12WeekGoals: React.FC = () => {
                 {overcomeActions.map((action, idx) => (
                   <li
                     key={idx}
-                    className="p-2 border rounded bg-gray-200 text-gray-900"
+                    className="p-2 border rounded bg-gray-200 text-gray-900 flex justify-between items-center"
                   >
-                    {action}
+                    <span>{action}</span>
+                    <button
+                      onClick={() => handleRemoveOvercomeAction(idx)}
+                      className="text-red-600"
+                      aria-label="Remove solution"
+                    >
+                      &times;
+                    </button>
                   </li>
                 ))}
                 {isAddingOvercomeAction ? (
