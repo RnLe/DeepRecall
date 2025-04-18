@@ -1,38 +1,77 @@
 // annotationToolbar.tsx
+import React, { useEffect } from "react";
+import { Paintbrush, Square, XCircle } from "lucide-react";
 
-import React from 'react';
+export type AnnotationMode = "none" | "text" | "rectangle";
 
-export type AnnotationMode = 'none' | 'text' | 'rectangle';
-
-interface AnnotationToolbarProps {
+interface Props {
   mode: AnnotationMode;
-  setMode: (mode: AnnotationMode) => void;
+  setMode: (m: AnnotationMode) => void;
 }
 
-const AnnotationToolbar: React.FC<AnnotationToolbarProps> = ({ mode, setMode }) => {
+/* ------------------------------------------------------------------ */
+/* ----------------------------  Cursor  ---------------------------- */
+
+const cursorForMode: Record<AnnotationMode, string> = {
+  none: "default",
+  text: "text",
+  rectangle: "crosshair",
+};
+
+const useGlobalCursor = (mode: AnnotationMode) => {
+  useEffect(() => {
+    const old = document.body.style.cursor;
+    document.body.style.cursor = cursorForMode[mode];
+    return () => {
+      document.body.style.cursor = old;
+    };
+  }, [mode]);
+};
+
+/* ------------------------------------------------------------------ */
+
+const ToolBtn: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center space-x-2 p-2 rounded text-sm ${
+      active
+        ? "bg-blue-600"
+        : "bg-gray-700 hover:bg-gray-600 active:bg-gray-500"
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const AnnotationToolbar: React.FC<Props> = ({ mode, setMode }) => {
+  useGlobalCursor(mode);
+
+  /** Click → toggle: deactivate when already active */
+  const toggle = (m: AnnotationMode) =>
+    setMode(mode === m ? "none" : m);
+
   return (
-    <div className="p-4 border-r border-gray-700">
-      <h3 className="text-lg font-semibold mb-2">Annotation Tools</h3>
-      <div className="flex flex-col space-y-2">
-        <button
-          className={`p-2 rounded ${mode === 'text' ? 'bg-blue-500' : 'bg-gray-600'}`}
-          onClick={() => setMode('text')}
-        >
-          Text Annotation
-        </button>
-        <button
-          className={`p-2 rounded ${mode === 'rectangle' ? 'bg-blue-500' : 'bg-gray-600'}`}
-          onClick={() => setMode('rectangle')}
-        >
-          Rectangle Annotation
-        </button>
-        <button
-          className="p-2 rounded bg-gray-600"
-          onClick={() => setMode('none')}
-        >
-          Cancel Annotation
-        </button>
-      </div>
+    <div className="w-48 p-4 border-r border-gray-700 flex flex-col space-y-2">
+      <h3 className="text-lg font-semibold mb-1">Tools</h3>
+
+      <ToolBtn active={mode === "text"} onClick={() => toggle("text")}>
+        <Paintbrush size={16} /> <span>Highlight</span>
+      </ToolBtn>
+
+      <ToolBtn active={mode === "rectangle"} onClick={() => toggle("rectangle")}>
+        <Square size={16} /> <span>Rectangle</span>
+      </ToolBtn>
+
+      {/* Visually distinct but subtle “clear” button  */}
+      <div className="pt-4 border-t border-gray-700" />
+
+      <ToolBtn active={mode === "none"} onClick={() => setMode("none")}>
+        <XCircle size={16} /> <span>Deselect</span>
+      </ToolBtn>
     </div>
   );
 };

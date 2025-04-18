@@ -13,7 +13,7 @@ export default function PDFViewer() {
   // Return the JSX
   return (
     <div className="w-full h-full flex">
-      <PdfViewerPage classNames='w-full h-full'/>
+      <PdfViewerPage className="w-full h-full"/>
     </div>
   );
 }
