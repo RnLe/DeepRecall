@@ -39,7 +39,8 @@ const IntegrationCard: React.FC<{ type: IntegrationType }> = ({ type }) => {
 // List of exportable components on the canvas.
 // In a real app, you might derive this list dynamically.
 const availableComponents = [
-  { id: "planner12week", name: "12 Week Goals" }
+  { id: "planner12week", name: "12 Week Goals" },
+  { id: "plannerVisions", name: "Visions" },
 ];
 
 // ----- Export helper functions -----

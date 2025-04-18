@@ -14,6 +14,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 // Import the new Planner12WeekGoals component
 import Planner12WeekGoals from "./Planner12WeekGoals";
+import PlannerVisions from "./PlannerVisions";
 
 interface CanvasViewProps {
   selectedCard: string | null;
@@ -22,18 +23,25 @@ interface CanvasViewProps {
   clearCardToCenter: () => void;
 }
 
-// Define our node types with the new Planner12WeekGoals node.
+// Define our node types with the new PlannerVisions node.
 const nodeTypes = {
   planner12week: Planner12WeekGoals,
+  plannerVisions: PlannerVisions,
 };
 
-// Only a single node is used, placing it in the middle of the canvas.
+// Add a new node for PlannerVisions to the canvas.
 const nodesInitial: Node[] = [
   {
     id: "planner12week",
     type: "planner12week",
     data: {},
     position: { x: 300, y: 200 },
+  },
+  {
+    id: "plannerVisions",
+    type: "plannerVisions",
+    data: {},
+    position: { x: -700, y: 200 }, // Position it to the left of the 12-week node
   },
 ];
 

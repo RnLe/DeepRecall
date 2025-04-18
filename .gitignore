@@ -10,5 +10,7 @@ assets/
 avatars/
 conversations/
 
+backend/public/uploads/
+
 *.wav
 *.mp3

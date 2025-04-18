@@ -4,18 +4,19 @@ import React, { useState, useMemo } from "react";
 import VersionForm from "./versionForm";
 import LiteratureForm from "./literatureForm";
 import LiteratureTypeCreationForm from "./literatureTypeCreationForm";
+import VersionTypeCreationForm from "./versionTypeCreationForm";
 import { LiteratureExtended, LiteratureType } from "../../types/literatureTypes";
-import { useLiterature, useLiteratureTypes } from "../../customHooks/useLiterature";
+import { useLiterature, useLiteratureTypes, useVersionTypes } from "../../customHooks/useLiterature";
 import LiteratureCardL from "./literatureCardL";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createLiteratureType } from "../../api/literatureService";
+import { createLiteratureType, createVersionType, updateLiteratureType } from "../../api/literatureService";
 
 interface UploadWidgetProps {
   className?: string;
 }
 
 const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
-  // Fetch literature types and literature items from API.
+  // Fetch literature types, literature and version types items from API.
   const {
     data: literatureTypes,
     isLoading: typesLoading,
@@ -28,14 +29,19 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
     error: litError,
   } = useLiterature();
 
+  const {
+    data: versionTypes,
+    isLoading: versionLoading,
+    error: versionError,
+  } = useVersionTypes();
+
   const queryClient = useQueryClient();
 
   // Mutation for creating a new literature type.
   const createTypeMutation = useMutation<
-  LiteratureType,                   // The type returned on success.
-  Error,                            // The error type.
-  Omit<LiteratureType, "documentId">, // The variables (payload) type.
-  unknown                           // Optional context type.
+    LiteratureType,
+    Error,
+    Omit<LiteratureType, "documentId">
   >({
     mutationFn: createLiteratureType,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literatureTypes"] }),
@@ -44,34 +50,41 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
     },
   });
 
-  
+  // Mutation for creating a new version type.
+  const createVersionTypeMutation = useMutation<
+    any,
+    Error,
+    Omit<any, "documentId">
+  >({
+    mutationFn: createVersionType,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["versionTypes"] }),
+    onError: (error: Error) => {
+      console.error("Failed to create version type:", error);
+    },
+  });
 
-  // Selected literature type (from dynamic API data).
   const [selectedType, setSelectedType] = useState<LiteratureType | null>(null);
-  // Selected literature entry (when a user wants to add a new version).
+  const [pendingVersionType, setPendingVersionType] = useState<LiteratureType | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<LiteratureExtended | null>(null);
-  // Flag for new literature creation (no entry selected in that case).
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
-  // Toggle for showing/hiding the form area.
   const [formsVisible, setFormsVisible] = useState<boolean>(false);
-  // Local error state (if needed).
   const [error, setError] = useState<string>("");
-
-  // State for showing the literature type creation modal.
+  
   const [showTypeCreationModal, setShowTypeCreationModal] = useState<boolean>(false);
+  // New state for version type creation modal.
+  const [showVersionTypeCreationModal, setShowVersionTypeCreationModal] = useState<boolean>(false);
 
-  // Helper functions to show or hide the main form area.
-  const handleFormVisibility = () => setFormsVisible(true);
-  const handleFormInvisibility = () => setFormsVisible(false);
-
-  // When a literature type card is clicked, update the selected type and clear any previous selection.
+  // When a literature type card is clicked, select if it has versionType
   const handleTypeClick = (type: LiteratureType) => {
+    // Iterate through versionTypes to check if the type has a versionType
+    const hasVersion = versionTypes?.some((vt) => vt.name === type.name);
+    if (!hasVersion) return;
     setSelectedType(type);
     setFormsVisible(false);
     setSelectedEntry(null);
   };
 
-  // Filter literature entries by comparing their "type" property to the selected type's name.
+  // Filter literature entries by selected literature type.
   const entries = useMemo(() => {
     if (!literatureData || !selectedType) return [];
     return literatureData.filter(
@@ -79,28 +92,41 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
     );
   }, [literatureData, selectedType]);
 
-  // When a literature entry is clicked, set it for creating a new version and show the VersionForm.
   const handleEntryClick = (entry: LiteratureExtended) => {
     setSelectedEntry(entry);
     setIsCreatingNew(false);
     setFormsVisible(true);
   };
 
-  // When "Create New" is clicked, clear selection and show the LiteratureForm.
   const handleCreateNewClick = () => {
     setSelectedEntry(null);
     setIsCreatingNew(true);
     setFormsVisible(true);
   };
 
-  // Handler for creating a new literature type from the modal form.
   const handleCreateType = (payload: { name: string; typeMetadata: string }) => {
     createTypeMutation.mutate(payload, {
       onSuccess: () => {
         setShowTypeCreationModal(false);
       },
     });
-  };  
+  };
+
+  // Handler for creating a new version type.
+  const handleCreateVersionType = (payload: { versionMetadata: string }) => {
+    if (!pendingVersionType) return;
+    createVersionTypeMutation.mutate(
+      { name: pendingVersionType.name, versionMetadata: payload.versionMetadata },
+      {
+        onSuccess: async () => {
+          // Select this type and clear pending
+          setSelectedType(pendingVersionType);
+          setPendingVersionType(null);
+          setShowVersionTypeCreationModal(false);
+        },
+      }
+    );
+  };
 
   return (
     <div className={`p-4 bg-gray-800 text-white ${className}`}>
@@ -111,17 +137,30 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
         <p className="text-red-500">Error loading literature types.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          {literatureTypes?.map((type: LiteratureType) => (
-            <div
-              key={type.documentId}
-              className={`cursor-pointer border rounded-lg p-4 text-center hover:shadow-md transition-shadow ${
-                selectedType && selectedType.documentId === type.documentId ? "ring-4 ring-blue-500" : ""
-              } bg-gray-700 text-white`}
-              onClick={() => handleTypeClick(type)}
-            >
-              {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
-            </div>
-          ))}
+          {literatureTypes?.map((type: LiteratureType) => {
+            const hasVersion = versionTypes?.some(vt => vt.name === type.name);
+            return (
+              <div
+                key={type.documentId}
+                className={`cursor-pointer border rounded-lg p-4 text-center hover:shadow-md transition-shadow bg-gray-700 text-white ${
+                  selectedType?.documentId === type.documentId ? "ring-4 ring-blue-500" : ""
+                }`}
+                onClick={() => {
+                  if (!hasVersion) {
+                    setPendingVersionType(type);
+                    setShowVersionTypeCreationModal(true);
+                  } else {
+                    handleTypeClick(type);
+                  }
+                }}
+              >
+                {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                {!hasVersion && (
+                  <p className="text-orange-300 mt-2 text-sm">Version type missing. Click to add.</p>
+                )}
+              </div>
+            );
+          })}
           {/* Extra card: Plus sign for creating new literature type */}
           <div
             className="cursor-pointer border-2 border-dashed border-gray-400 rounded-lg p-4 text-center hover:shadow-md transition-shadow bg-gray-700 text-white flex items-center justify-center"
@@ -134,16 +173,12 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
 
       {error && <p className="text-red-500">{error}</p>}
 
-      {/* Show literature entries and corresponding forms when a type is selected */}
       {selectedType && (
         <div className="flex gap-4 mt-4">
-          {/* Left: List of existing literature entries and a "Create New" button */}
           <div className="w-1/2 border-r border-gray-600 pr-2">
             <h3 className="text-lg font-semibold mb-2">
               Existing{" "}
-              {selectedType.name.charAt(0).toUpperCase() +
-                selectedType.name.slice(1) +
-                ` (${entries.length})`}
+              {selectedType.name.charAt(0).toUpperCase() + selectedType.name.slice(1) + ` (${entries.length})`}
             </h3>
             {litLoading ? (
               <p>Loading entries...</p>
@@ -153,48 +188,32 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
               <div className="space-y-4">
                 {entries.length > 0 ? (
                   entries.map((entry: LiteratureExtended) => (
-                    <div
-                      key={entry.documentId}
-                      onClick={() => handleEntryClick(entry)}
-                      className="cursor-pointer"
-                    >
+                    <div key={entry.documentId} onClick={() => handleEntryClick(entry)} className="cursor-pointer">
                       <LiteratureCardL
                         literature={entry}
-                        className={
-                          selectedEntry && selectedEntry.documentId === entry.documentId
-                            ? "bg-gray-700"
-                            : ""
-                        }
+                        className={selectedEntry && selectedEntry.documentId === entry.documentId ? "bg-gray-700" : ""}
                       />
                     </div>
                   ))
                 ) : (
                   <p className="text-gray-400">No entries available.</p>
                 )}
-                <button
-                  onClick={handleCreateNewClick}
-                  className="mt-4 w-full bg-blue-500 text-white py-2 rounded"
-                >
+                <button onClick={handleCreateNewClick} className="mt-4 w-full bg-blue-500 text-white py-2 rounded">
                   Create New {selectedType.name}
                 </button>
               </div>
             )}
           </div>
-
-          {/* Right: Form area; either for new literature or new version */}
           <div className="w-1/2 pl-2">
             {formsVisible &&
               (selectedEntry ? (
                 <VersionForm
                   literatureType={selectedType}
                   entry={selectedEntry}
-                  onSuccess={handleFormInvisibility}
+                  onSuccess={() => setFormsVisible(false)}
                 />
               ) : (
-                <LiteratureForm
-                  literatureType={selectedType}
-                  onSuccess={handleFormInvisibility}
-                />
+                <LiteratureForm literatureType={selectedType} onSuccess={() => setFormsVisible(false)} />
               ))}
           </div>
         </div>
@@ -206,18 +225,24 @@ const UploadWidget: React.FC<UploadWidgetProps> = ({ className }) => {
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowTypeCreationModal(false)}
         >
-          <div
-            className="bg-gray-800 p-6 rounded shadow-lg max-w-lg w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <LiteratureTypeCreationForm
-              onSubmit={handleCreateType}
-              className="mb-4"
-            />
-            <button
-              onClick={() => setShowTypeCreationModal(false)}
-              className="mt-4 bg-red-500 text-white px-4 py-2 rounded w-full"
-            >
+          <div className="bg-gray-800 p-6 rounded shadow-lg max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <LiteratureTypeCreationForm onSubmit={handleCreateType} className="mb-4" />
+            <button onClick={() => setShowTypeCreationModal(false)} className="mt-4 bg-red-500 text-white px-4 py-2 rounded w-full">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for creating a new version type */}
+      {showVersionTypeCreationModal && pendingVersionType && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowVersionTypeCreationModal(false)}
+        >
+          <div className="bg-gray-800 p-6 rounded shadow-lg max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <VersionTypeCreationForm literatureTypeName={pendingVersionType.name} onSubmit={handleCreateVersionType} className="mb-4" />
+            <button onClick={() => setShowVersionTypeCreationModal(false)} className="mt-4 bg-red-500 text-white px-4 py-2 rounded w-full">
               Cancel
             </button>
           </div>

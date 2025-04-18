@@ -6,6 +6,7 @@ import {
   transformLiterature,
   LiteratureExtended,
 } from "../types/literatureTypes";
+import { VersionType } from "../types/versionTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/literatures";
@@ -67,7 +68,7 @@ export const createLiterature = async (
   }
 
   const json = await response.json();
-  return json;
+  return json.data;
 };
 
 /**
@@ -101,7 +102,7 @@ export const updateLiterature = async (
   }
 
   const json = await response.json();
-  return json;
+  return json.data;
 };
 
 /**
@@ -196,5 +197,74 @@ export const updateLiteratureType = async (
   }
 
   const json = await response.json();
-  return json;
+  return json.data;
+};
+
+/**
+ * Fetch version types.
+ */
+export const fetchVersionTypes = async (): Promise<VersionType[]> => {
+  const response = await fetch("http://localhost:1337/api/version-types?populate=*", {
+    headers: { Authorization: `Bearer ${API_TOKEN}` },
+  });
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+  const json = await response.json();
+  return json.data;
+};
+
+/**
+ * Creates a new version type.
+ */
+export const createVersionType = async (
+  versionTypeData: Omit<VersionType, "documentId">
+): Promise<VersionType> => {
+  const response = await fetch("http://localhost:1337/api/version-types", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${API_TOKEN}`,
+    },
+    body: JSON.stringify({ data: versionTypeData }),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+  const json = await response.json();
+  return json.data;
+};
+
+/**
+ * Updates an existing version type.
+ */
+export const updateVersionType = async (
+  id: string,
+  versionTypeData: Partial<VersionType>
+): Promise<VersionType> => {
+  const response = await fetch(`http://localhost:1337/api/version-types/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${API_TOKEN}`,
+    },
+    body: JSON.stringify({ data: versionTypeData }),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+  const json = await response.json();
+  return json.data;
 };
