@@ -1,7 +1,10 @@
 // literatureCardL.tsx
 
 import React from "react";
-import { LiteratureExtended, LiteratureVersionExtended } from "../../types/literatureTypes";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { deleteLiterature, updateLiterature } from "../../api/literatureService";
+import { LiteratureExtended, Literature } from "../../types/literatureTypes";
+import { VersionExtended } from "../../types/versionTypes";
 import { prefixStrapiUrl } from "../../helpers/getStrapiMedia";
 
 /**
@@ -16,7 +19,7 @@ const daysAgo = (dateStr: string): number => {
 /**
  * Helper: Returns the thumbnail URL from the version with the most recent publishingDate.
  */
-const getLatestThumbnail = (versions?: LiteratureVersionExtended[]): string | null => {
+const getLatestThumbnail = (versions?: VersionExtended[]): string | null => {
   if (!versions || versions.length === 0) return null;
   const sorted = versions.slice().sort((a, b) => {
     const timeA = a.publishingDate ? new Date(a.publishingDate).getTime() : 0;
@@ -31,7 +34,7 @@ const getLatestThumbnail = (versions?: LiteratureVersionExtended[]): string | nu
  * It checks whether each version has an editionNumber or versionNumber and
  * computes the range (or a single value) accordingly.
  */
-const getEditionsDisplay = (versions?: LiteratureVersionExtended[]): string => {
+const getEditionsDisplay = (versions?: VersionExtended[]): string => {
   if (!versions || versions.length === 0) return "Unknown";
 
   // Check if any version has an editionNumber; otherwise, try versionNumber.
@@ -58,7 +61,7 @@ const getEditionsDisplay = (versions?: LiteratureVersionExtended[]): string => {
 /**
  * Helper: Extracts a range of years from the versions, based on publishingDate.
  */
-const getYearsRange = (versions?: LiteratureVersionExtended[]): string => {
+const getYearsRange = (versions?: VersionExtended[]): string => {
   if (!versions || versions.length === 0) return "Unknown";
   const years = versions
     .map(v => v.publishingDate ? new Date(v.publishingDate).getFullYear() : undefined)
@@ -90,70 +93,127 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
   literature,
   className = "",
 }) => {
+  const queryClient = useQueryClient();
+
+  const delLitMutation = useMutation<void, Error, string>({
+    mutationFn: deleteLiterature,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
+  });
+
+  const updateLitMutation = useMutation<Literature, Error, { documentId: string; data: Partial<Literature> }>({
+    mutationFn: ({ documentId, data }) => updateLiterature(documentId, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
+  });
+
   const {
     documentId,
+    metadata,
     title,
     subtitle,
     authors = [],
     createdAt,
     updatedAt,
     versions,
+    publisher,
+    journal,
+    doi,
   } = literature;
-
   const latestThumbnail = getLatestThumbnail(versions);
   const createdDays = createdAt ? daysAgo(createdAt) : null;
   const updatedDays = updatedAt ? daysAgo(updatedAt) : null;
   const editionsDisplay = getEditionsDisplay(versions);
   const yearsRange = getYearsRange(versions);
 
+  const handleRemoveLiterature = () => {
+    if (documentId && confirm(`Delete literature "${title}"? This cannot be undone.`)) {
+      delLitMutation.mutate(documentId);
+    }
+  };
+
+  const handleRemoveVersion = (toRemove: VersionExtended) => {
+    if (!documentId) return;
+    if (!confirm(`Remove version from "${title}"?`)) return;
+    // parse existing metadata
+    let current: any = {};
+    try {
+      current = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+    } catch {
+      current = {};
+    }
+    const raw = Array.isArray(current.versions) ? current.versions : [];
+    // The current metadata has an array with versionMetadata objects which need to be stringified first
+    const rawParsed = raw.map((v: any) => {
+        const parsed = { ...v };
+        if (parsed.versionMetadata) {
+          try {
+            parsed.versionMetadata = JSON.parse(parsed.versionMetadata);
+          } catch {
+            parsed.versionMetadata = {};
+          }
+        }
+        return parsed;
+      }
+    );
+    console.log("rawParsed", rawParsed);
+    // keep all except the one with matching fileHash
+    const filtered = rawParsed.filter((v: any) => v.versionMetadata.fileHash !== toRemove.fileHash);
+    const updatedMeta = { ...current, versions: filtered };
+    updateLitMutation.mutate({
+      documentId,
+      data: { metadata: JSON.stringify(updatedMeta) },
+    });
+  };
+
   return (
-    <div
-      className={`flex items-center bg-gray-800 rounded-lg shadow-sm p-4 space-x-4 hover:shadow-lg ${className}`}
-    >
-      <div className="flex-1">
-        <h3 className="text-lg font-semibold truncate text-white">{title}</h3>
-        {subtitle && (
-          <h4 className="text-sm text-gray-400 truncate">{subtitle}</h4>
-        )}
-        <div className="flex flex-wrap gap-2 mt-1">
-          {authors.length > 0 ? (
-            authors.map((author: any) => (
-              <span
-                key={author.id}
-                className="px-2 py-1 bg-gray-400 rounded cursor-pointer hover:shadow-lg"
-                onClick={() => handleAuthorClick(author)}
-              >
-                {author.first_name} {author.last_name}
-              </span>
-            ))
-          ) : (
-            <span className="text-gray-500">Unknown Authors</span>
-          )}
-        </div>
-        <div className="mt-2 text-sm text-gray-500">
-          <p>
-            Created:{" "}
-            {createdDays !== null
-              ? createdDays < 1
-                ? "less than 1 day ago"
-                : `created ${createdDays} days ago`
-              : "Unknown"}
-          </p>
-          <p>
-            Updated:{" "}
-            {updatedDays !== null
-              ? updatedDays < 1
-                ? "less than 1 day ago"
-                : `updated ${updatedDays} days ago`
-              : "Unknown"}
-          </p>
+    <div className={`bg-gray-700 rounded-lg shadow-sm p-4 hover:bg-gray-600 hover:shadow-lg transition-colors ${className}`}>
+      <div className="flex justify-between items-start">
+        <h3 className="text-lg font-semibold text-white truncate">{title}</h3>
+        <button
+          className="text-red-500 hover:text-red-700 text-sm"
+          onClick={handleRemoveLiterature}
+        >
+          Remove Literature
+        </button>
+      </div>
+      {subtitle && <h4 className="text-sm text-gray-400 truncate">{subtitle}</h4>}
+      <div className="flex flex-wrap gap-2 mt-1">
+        {authors.length > 0 && authors.map((author: any) => (
+          <span
+            key={author.id}
+            className="px-2 py-1 bg-gray-400 rounded cursor-pointer hover:shadow-lg"
+            onClick={() => handleAuthorClick(author)}
+          >
+            {author.first_name} {author.last_name}
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 text-sm text-gray-500">
+        <p>
+          Created:{" "}
+          {createdDays !== null
+            ? createdDays < 1
+              ? "less than 1 day ago"
+              : `created ${createdDays} days ago`
+            : "Unknown"}
+        </p>
+        <p>
+          Updated:{" "}
+          {updatedDays !== null
+            ? updatedDays < 1
+              ? "less than 1 day ago"
+              : `updated ${updatedDays} days ago`
+            : "Unknown"}
+        </p>
+        {editionsDisplay !== "Unknown" && (
           <p>Edition/Version: {editionsDisplay}</p>
-          <p>Year(s): {yearsRange}</p>
-        </div>
+        )}
+        <p>Year(s): {yearsRange}</p>
+        {publisher && <p>Publisher: {publisher}</p>}
+        {journal && <p>Journal: {journal}</p>}
+        {doi && <p>DOI: {doi}</p>}
       </div>
 
-      {/* Thumbnail reserved space */}
-      <div className="w-32 h-full flex-shrink-0 flex items-center justify-center bg-gray-700 rounded-lg">
+      <div className="w-32 h-full flex-shrink-0 flex items-center justify-center bg-gray-600 rounded-lg">
         {latestThumbnail ? (
           <img
             src={latestThumbnail}
@@ -161,8 +221,37 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
             className="object-cover w-full h-full rounded-lg"
           />
         ) : (
-          <span className="text-gray-400">No Thumbnail</span>
+          <span className="text-gray-300">No Thumbnail</span>
         )}
+      </div>
+
+      <div className="mt-4">
+        <h4 className="text-sm font-semibold text-gray-300">
+          Versions ({versions.length})
+        </h4>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {versions.map((v, idx) => (
+            <div
+              key={idx}
+              className="relative px-2 py-1 bg-gray-600 rounded cursor-pointer hover:bg-gray-500"
+            >
+              <span>
+                {v.publishingDate
+                  ? new Date(v.publishingDate).toLocaleDateString()
+                  : "Unknown"}
+              </span>
+              <span
+                className="absolute top-0 right-0 mt-[-4px] mr-[-4px] text-red-400 hover:text-red-600 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveVersion(v);
+                }}
+              >
+                ×
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

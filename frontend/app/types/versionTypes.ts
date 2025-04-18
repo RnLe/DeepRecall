@@ -20,6 +20,7 @@ export interface VersionExtended extends VersionType, SupportedVersionFields {
   fileUrl: string;
   thumbnailUrl: string;
   customMetadata: DynamicMetadata;
+  fileHash: string;
 }
 
 /**
@@ -51,7 +52,7 @@ export const transformVersion = (version: VersionType): VersionExtended => {
     }
   }
   
-  const { fileUrl, thumbnailUrl, publishingDate, versionTitle, editionNumber, versionNumber, ...customMetadata } = metadataObj;
+  const { fileUrl, thumbnailUrl, publishingDate, versionTitle, editionNumber, versionNumber, fileHash, ...customMetadata } = metadataObj;
   return {
     ...version,
     fileUrl,
@@ -60,6 +61,7 @@ export const transformVersion = (version: VersionType): VersionExtended => {
     versionTitle,
     editionNumber,
     versionNumber,
+    fileHash,
     customMetadata,
   };
 };

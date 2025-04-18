@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import SparkMD5 from "spark-md5";
-import { Literature, LiteratureType, LiteratureExtended } from "../../types/literatureTypes";
+import { Literature, LiteratureExtended } from "../../types/literatureTypes";
+import { VersionType } from "../../types/versionTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateLiterature } from "../../api/literatureService";
-import { uploadFile, UploadedFileInfo } from "../../api/uploadFile";
+import { uploadFile } from "../../api/uploadFile";
 import { renderPdfPageToImage, dataURLtoFile } from "../../helpers/pdfThumbnail";
-import { VersionExtended } from "../../types/versionTypes";
 
 // Compute MD5 hash of a file
 function computeMD5(file: File): Promise<string> {
@@ -24,13 +24,13 @@ function computeMD5(file: File): Promise<string> {
 }
 
 interface VersionFormProps {
-  literatureType: LiteratureType;
+  versionType: VersionType;
   entry: LiteratureExtended;
   className?: string;
   onSuccess?: () => void;
 }
 
-const VersionForm: React.FC<VersionFormProps> = ({ literatureType, entry, className, onSuccess }) => {
+const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className, onSuccess }) => {
   // File upload state
   const [file, setFile] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
@@ -48,19 +48,24 @@ const VersionForm: React.FC<VersionFormProps> = ({ literatureType, entry, classN
   }, [file]);
 
   // parse versionType template
-  const [versionTpl, setVersionTpl] = useState<Record<string, any>>({});  // new
+  const [versionTpl, setVersionTpl] = useState<Record<string, any>>({});
   const [versionFields, setVersionFields] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    // try relation.versionType first, else fallback to raw typeMetadata
-    const raw = (literatureType as any).versionType?.versionMetadata
-                ?? (literatureType as any).typeMetadata
-                ?? "{}";
     let tpl: Record<string, any> = {};
-    try { tpl = JSON.parse(raw); } catch { tpl = {}; }
+    const metadata = versionType.versionMetadata;
+    if (typeof metadata === "string") {
+      try {
+        tpl = JSON.parse(metadata);
+      } catch {
+        tpl = {};
+      }
+    } else if (typeof metadata === "object" && metadata !== null) {
+      tpl = metadata;
+    }
     setVersionTpl(tpl);
     setVersionFields({ ...tpl });
-  }, [literatureType]);
+  }, [versionType]);
 
   // recommended keys
   const recommended = ["publishingDate","versionTitle","editionNumber","versionNumber"];
@@ -155,6 +160,33 @@ const VersionForm: React.FC<VersionFormProps> = ({ literatureType, entry, classN
       return;
     }
 
+    // Prevent duplicate version by hash
+    let currentMetadata: any = {};
+    const metadata = entry.metadata;
+    if (typeof metadata === "string") {
+      try {
+        currentMetadata = JSON.parse(metadata);
+      } catch {
+        currentMetadata = {};
+      }
+    } else if (typeof metadata === "object" && metadata !== null) {
+      currentMetadata = metadata;
+    }
+    const existing = Array.isArray(currentMetadata.versions) ? currentMetadata.versions : [];
+    // The versionMetadata field is a JSON string, so we need to parse it
+    const existingParsed = existing.map((v: any) => {
+      try {
+        return JSON.parse(v.versionMetadata);
+      } catch {
+        return {};
+      }
+    });
+    if (existingParsed.some((v: any) => v.fileHash === fileHash)) {
+      setErrorMsg("This file/window already uploaded as a version.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const uploadedFile    = await uploadFile(file);
       const uploadedThumb   = thumbnail ? await uploadFile(thumbnail) : { url: "" };
@@ -166,22 +198,9 @@ const VersionForm: React.FC<VersionFormProps> = ({ literatureType, entry, classN
           name: entry.type,
           fileUrl: uploadedFile.url,
           thumbnailUrl: uploadedThumb.url,
+          fileHash,
         })
       };
-
-      // parse existing metadata safely
-      let currentMetadata: any = {};
-      if (entry.metadata) {
-        if (typeof entry.metadata === "string") {
-          try {
-            currentMetadata = JSON.parse(entry.metadata);
-          } catch {
-            currentMetadata = {};
-          }
-        } else if (typeof entry.metadata === "object") {
-          currentMetadata = entry.metadata;
-        }
-      }
 
       currentMetadata.versions = [...(currentMetadata.versions||[]), newVersion];
 
@@ -213,10 +232,10 @@ const VersionForm: React.FC<VersionFormProps> = ({ literatureType, entry, classN
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Document ID at top */}
         <div>
-          <label className="block text-sm font-medium text-gray-300">Document ID</label>
-          <div className="mt-1 block bg-gray-700 border border-gray-600 p-2 text-white">
+          <label className="block text-sm font-medium text-gray-300">Document ID:</label>
+          <div className="mt-1 text-sm text-gray-400">
             {entry.documentId}
-          </div>
+          </div>  
         </div>
         {/* Upload and thumbnail side-by-side */}
         <div className="flex gap-4">

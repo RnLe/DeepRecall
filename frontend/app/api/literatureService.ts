@@ -106,6 +106,26 @@ export const updateLiterature = async (
 };
 
 /**
+ * Deletes an existing literature entry.
+ */
+export const deleteLiterature = async (id: string): Promise<void> => {
+  const response = await fetch(`${BASE_URL}/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${API_TOKEN}`,
+    },
+  });
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+};
+
+/**
  * Fetches literature types.
  *
  * @returns An array of LiteratureType objects.
@@ -267,4 +287,24 @@ export const updateVersionType = async (
   }
   const json = await response.json();
   return json.data;
+};
+
+/**
+ * Deletes an existing version type.
+ */
+export const deleteVersionType = async (id: string): Promise<void> => {
+  const response = await fetch(`http://localhost:1337/api/version-types/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${API_TOKEN}`,
+    },
+  });
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
 };

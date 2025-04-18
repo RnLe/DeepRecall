@@ -1,17 +1,27 @@
-// frontend/app/uploads/page.jsx
+// frontend/app/[locale]/uploads/page.tsx
 'use client';
 
 import React from 'react';
 import LiteratureList from '@/app/ui/deepRecall/literatureList';
 import UploadWidget from '@/app/ui/deepRecall/uploadWidget';
+import VersionTypeList from '@/app/ui/deepRecall/versionTypeList';
 
 export default function UploadsPage() {
   return (
     <div className="w-full h-full flex">
-      {/* Left column: LiteratureList takes 1/3 of the width */}
-      <LiteratureList className="w-1/3 border-r border-gray-300" />
-      
-      {/* Right column: UploadWidget takes 2/3 of the width */}
+      {/* Left sidebar: 1/3 width, stacked */}
+      <div className="w-1/3 flex flex-col border-r border-gray-300">
+        {/* Version Types on top */}
+        <VersionTypeList
+          itemsPerRow={3}
+          className="my-6"
+          cardClassName="bg-gray-700 text-white"
+        />
+        {/* Literature list fills remaining */}
+        <LiteratureList className="flex-grow" />
+      </div>
+
+      {/* Right pane: 2/3 width */}
       <div className="w-2/3">
         <UploadWidget />
       </div>

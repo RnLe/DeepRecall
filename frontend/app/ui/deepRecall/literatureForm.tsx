@@ -38,7 +38,12 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
       if (template.versions !== undefined) {
         delete template.versions;
       }
-      setAdditionalFields(template);
+      // initialize array fields with empty string to ensure <select> gets a scalar value
+      const initFields: Record<string, any> = {};
+      Object.entries(template).forEach(([k, v]) => {
+        initFields[k] = Array.isArray(v) ? "" : v;
+      });
+      setAdditionalFields(initFields);
     } catch (err) {
       setAdditionalFields({});
       console.error("Error parsing literature type metadata:", err);
