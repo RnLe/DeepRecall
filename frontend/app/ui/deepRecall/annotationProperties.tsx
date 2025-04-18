@@ -11,6 +11,7 @@ interface Props {
   annotation: Annotation | null;
   updateAnnotation: (a: Annotation) => Promise<void>;
   deleteAnnotation: (id: string) => Promise<void>;
+  onCancel: () => void;
 }
 
 const kinds: AnnotationKind[] = [
@@ -28,12 +29,11 @@ const AnnotationProperties: React.FC<Props> = ({
   annotation,
   updateAnnotation,
   deleteAnnotation,
+  onCancel,
 }) => {
-  /* Draft copy so changes are not committed until Save */
   const [draft, setDraft] = useState<Annotation | null>(annotation);
   const [dirty, setDirty] = useState(false);
 
-  /* reset draft when selection changes */
   useEffect(() => {
     setDraft(annotation);
     setDirty(false);
@@ -49,7 +49,6 @@ const AnnotationProperties: React.FC<Props> = ({
     setDirty(true);
   };
 
-  /* rectangle‑specific */
   const kindChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const kind = e.target.value as AnnotationKind;
     setDraft({
@@ -59,7 +58,6 @@ const AnnotationProperties: React.FC<Props> = ({
     setDirty(true);
   };
 
-  /* text highlight‑specific */
   const textChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setDraft({
       ...(draft as TextAnnotation),
@@ -68,17 +66,18 @@ const AnnotationProperties: React.FC<Props> = ({
     setDirty(true);
   };
 
-  const onSave = async () => {
+  const handleSave = async () => {
     if (draft) await updateAnnotation(draft);
     setDirty(false);
   };
 
-  const onCancel = () => {
+  const handleCancel = () => {
+    onCancel();
     setDraft(annotation);
     setDirty(false);
   };
 
-  const onDelete = async () => {
+  const handleDelete = async () => {
     if (draft?.documentId && confirm("Delete this annotation?")) {
       await deleteAnnotation(draft.documentId);
     }
@@ -132,10 +131,9 @@ const AnnotationProperties: React.FC<Props> = ({
         </>
       )}
 
-      {/* ACTIONS */}
       <div className="mt-auto flex space-x-2">
         <button
-          onClick={onSave}
+          onClick={handleSave}
           disabled={!dirty}
           className={`flex-1 p-2 rounded ${
             dirty ? "bg-blue-600" : "bg-gray-700 cursor-not-allowed"
@@ -144,15 +142,14 @@ const AnnotationProperties: React.FC<Props> = ({
           Save
         </button>
         <button
-          onClick={onCancel}
-          disabled={!dirty}
+          onClick={handleCancel}
           className="flex-1 p-2 rounded bg-gray-600"
         >
           Cancel
         </button>
-        {draft?.documentId && (
+        {draft.documentId && (
           <button
-            onClick={onDelete}
+            onClick={handleDelete}
             className="flex-1 p-2 rounded bg-red-700 hover:bg-red-600"
           >
             Delete

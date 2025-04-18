@@ -1,4 +1,4 @@
-// pdfViewerWithAnnotations.tsx – virtualised (v2‑compatible)
+// pdfViewerWithAnnotations.tsx
 import React, {
   forwardRef,
   useCallback,
@@ -15,9 +15,14 @@ import { Annotation } from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
-/* ------------------------------------------------------------- */
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-/* ------------------------------------------------------------- */
+
+export interface PdfViewerHandle {
+  scrollToPage(page: number): void;
+  getPageSize(page?: number): { width: number; height: number } | null;
+  /** New: smoothly center a given annotation in view */
+  scrollToAnnotation(annotation: Annotation): void;
+}
 
 interface Props {
   pdfUrl: string;
@@ -29,14 +34,12 @@ interface Props {
   selectedId: string | null;
   onCreateAnnotation: (a: Annotation) => void;
   onSelectAnnotation: (a: Annotation) => void;
+  onHoverAnnotation?: (a: Annotation | null) => void;
+  /** Optional: render any React node as the hover‑tooltip */
+  renderTooltip?: (annotation: Annotation) => React.ReactNode;
 }
 
-export interface PdfViewerHandle {
-  scrollToPage(page: number): void;
-  getPageSize(page?: number): { width: number; height: number } | null;
-}
-
-const DEFAULT_PAGE_HEIGHT = 842;  // fallback for A4 if we have no measurements yet
+const DEFAULT_PAGE_HEIGHT = 842;
 
 const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
   (
@@ -50,40 +53,36 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       selectedId,
       onCreateAnnotation,
       onSelectAnnotation,
+      onHoverAnnotation,
+      renderTooltip,
     },
     ref
   ) => {
-    /* ---------------- refs & state ------------------------------ */
     const scrollParentRef = useRef<HTMLDivElement>(null);
     const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
     const [numPages, setNumPages] = useState(0);
     const [pageSizes, setPageSizes] = useState(
-      new Map<number, { w: number; h: number }>(),
+      new Map<number, { w: number; h: number }>()
     );
 
-    /* ---------------- virtualiser (v2 API) ---------------------- */
     const rowVirtualizer = useVirtualizer({
       count: numPages,
       overscan: 3,
       getScrollElement: () => scrollParentRef.current!,
       estimateSize: (index) => {
-        // page index is zero‑based; our map is 1‑based
         const pg = index + 1;
-        // use measured height if we have it
         const measured = pageSizes.get(pg)?.h;
-        const baseHeight = measured ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
-        // dynamic, very small gap: 0.2% of page height, minimum 1px
-        const dynamicGap = Math.max(1, Math.round(baseHeight * 0.002));
-        return baseHeight + dynamicGap;
+        const baseHeight =
+          measured ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
+        const gap = Math.max(1, Math.round(baseHeight * 0.002));
+        return baseHeight + gap;
       },
     });
 
-    /* whenever zoom or pageSizes change, re‑measure everything */
     useEffect(() => {
       rowVirtualizer.measure();
     }, [zoom, pageSizes, rowVirtualizer]);
 
-    /* ---------------- expose handle ---------------------------- */
     useImperativeHandle(ref, () => ({
       scrollToPage: (p: number) =>
         rowVirtualizer.scrollToIndex(p - 1, {
@@ -94,16 +93,31 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         const size = pageSizes.get(p);
         return size ? { width: size.w, height: size.h } : null;
       },
+      scrollToAnnotation: (a: Annotation) => {
+        const pg = a.page;
+        const sizes = pageSizes.get(pg);
+        if (!sizes) return;
+        const items = rowVirtualizer.getVirtualItems();
+        const item = items.find((v) => v.index === pg - 1);
+        if (!item) return;
+        const pageStart = item.start;
+        const annOffset = a.y * sizes.h;
+        const annCenter = annOffset + (a.height * sizes.h) / 2;
+        const container = scrollParentRef.current;
+        if (!container) return;
+        const containerH = container.clientHeight;
+        const target = pageStart + annCenter - containerH / 2;
+        container.scrollTo({ top: target, behavior: "smooth" });
+      },
     }));
 
-    /* auto‑scroll when external pageNumber prop changes */
     useEffect(() => {
       if (numPages) {
         rowVirtualizer.scrollToIndex(pageNumber - 1, { align: "start" });
       }
     }, [pageNumber, numPages, rowVirtualizer]);
 
-    /* ---------------- draft state for rectangle draw ----------- */
+    // rectangle‐drawing draft
     const [draft, setDraft] = useState<null | {
       page: number;
       x0: number;
@@ -113,15 +127,18 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     }>(null);
     const clearDraft = () => setDraft(null);
 
-    /* ---------------- mouse handlers (unchanged) --------------- */
     const mouseDown = (e: React.MouseEvent, pg: number) => {
       if (annotationMode !== "rectangle") return;
       const node = pageRefs.current.get(pg);
       if (!node) return;
       const r = node.getBoundingClientRect();
-      const x = e.clientX - r.left;
-      const y = e.clientY - r.top;
-      setDraft({ page: pg, x0: x, y0: y, x1: x, y1: y });
+      setDraft({
+        page: pg,
+        x0: e.clientX - r.left,
+        y0: e.clientY - r.top,
+        x1: e.clientX - r.left,
+        y1: e.clientY - r.top,
+      });
       e.preventDefault();
     };
     const mouseMove = (e: React.MouseEvent) => {
@@ -129,7 +146,11 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       const node = pageRefs.current.get(draft.page);
       if (!node) return;
       const r = node.getBoundingClientRect();
-      setDraft({ ...draft, x1: e.clientX - r.left, y1: e.clientY - r.top });
+      setDraft({
+        ...draft,
+        x1: e.clientX - r.left,
+        y1: e.clientY - r.top,
+      });
     };
     const mouseUp = () => {
       if (!draft) return;
@@ -153,15 +174,14 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       clearDraft();
     };
 
-    /* ---------------- text highlight (unchanged) -------------- */
+    // text‐highlight
     const handleTextSelect = useCallback(() => {
       if (annotationMode !== "text") return;
       const sel = document.getSelection();
       if (!sel || sel.isCollapsed) return;
-
       const range = sel.getRangeAt(0);
       const pgDiv = range.startContainer.parentElement?.closest(
-        "[data-page-number]",
+        "[data-page-number]"
       );
       if (!pgDiv) return;
       const pg = Number(pgDiv.getAttribute("data-page-number"));
@@ -185,14 +205,14 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
 
     useEffect(() => {
       document.addEventListener("mouseup", handleTextSelect);
-      return () =>
+      return () => {
         document.removeEventListener("mouseup", handleTextSelect);
+      };
     }, [handleTextSelect]);
 
-    /* ---------------- render a single virtual row -------------- */
-    const renderRow = (vRow: ReturnType<
-      typeof rowVirtualizer.getVirtualItems
-    >[number]) => {
+    const renderRow = (
+      vRow: ReturnType<typeof rowVirtualizer.getVirtualItems>[number]
+    ) => {
       const pg = vRow.index + 1;
       return (
         <div
@@ -230,18 +250,21 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
                   copy.set(pg, { w: width!, h: height! });
                   return copy;
                 });
-                // re‑measure now that height is known
                 const node = pageRefs.current.get(pg);
                 if (node) rowVirtualizer.measureElement(node);
               }}
             />
+
             <AnnotationOverlay
               annotations={annotations.filter((a) => a.page === pg)}
               selectedId={selectedId}
               pageWidth={pageSizes.get(pg)?.w ?? 0}
               pageHeight={pageSizes.get(pg)?.h ?? 0}
               onSelectAnnotation={onSelectAnnotation}
+              onHoverAnnotation={onHoverAnnotation}
+              renderTooltip={renderTooltip}
             />
+
             {draft?.page === pg && (
               <div
                 style={{
@@ -260,7 +283,6 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       );
     };
 
-    /* ---------------- render container -------------------------- */
     return (
       <div
         ref={scrollParentRef}
@@ -273,15 +295,12 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
             setNumPages(numPages);
             onLoadSuccess({ numPages });
           }}
-          // ← FIX #1: handle internal links
           onItemClick={({ pageNumber }) =>
             rowVirtualizer.scrollToIndex(pageNumber - 1, {
               align: "start",
               behavior: "smooth",
             })
           }
-          loading={<div className="p-4">Loading PDF…</div>}
-          error={<div className="p-4 text-red-600">Failed to load PDF.</div>}
         >
           <div
             style={{
@@ -294,7 +313,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         </Document>
       </div>
     );
-  },
+  }
 );
 
 export default PdfViewerWithAnnotations;
