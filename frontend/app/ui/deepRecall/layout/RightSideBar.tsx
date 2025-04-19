@@ -23,6 +23,7 @@ interface Props {
   saveImage: (a: RectangleAnnotation) => Promise<void>;
   selected: Annotation | null;
   onCancelSelect: () => void;
+  colorMap?: Record<string, string>;
 }
 
 const RightSideBar: React.FC<Props> = ({
@@ -44,6 +45,7 @@ const RightSideBar: React.FC<Props> = ({
   saveImage,
   selected,
   onCancelSelect,
+  colorMap = {},
 }) => {
   // collapsed if width=0; but we always show a stripe to open
   const [open, setOpen] = useState(true);
@@ -130,6 +132,7 @@ const RightSideBar: React.FC<Props> = ({
             onItemClick={onItemClick}
             onToggleMulti={onToggleMulti}
             onHover={onHover}
+            colorMap={colorMap}
           />
 
           {/* Properties */}

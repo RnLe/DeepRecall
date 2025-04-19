@@ -46,7 +46,7 @@ const AnnotationToolbar: React.FC<Props> = ({ mode, setMode }) => {
   const toggle = (m: AnnotationMode) => setMode(mode === m ? "none" : m);
 
   return (
-    <div className="w-48 p-4 border-r border-gray-700 flex flex-col space-y-2">
+    <div className="w-full p-4 flex flex-col space-y-2">
       <h3 className="text-lg font-semibold mb-1">Tools</h3>
 
       <ToolBtn active={mode === "text"} onClick={() => toggle("text")}>
