@@ -1,10 +1,20 @@
-// annotationTypes.ts
+// src/types/annotationTypes.ts
 import { StrapiResponse } from "./strapiTypes";
 
-/* ------------------------------------------------------------------ */
-/* --------------------------  FRONTEND ----------------------------- */
-/* ------------------------------------------------------------------ */
+/**
+ * A user‐uploaded solution file, with metadata for display & deletion.
+ */
+export interface Solution {
+  fileUrl: string;
+  fileId: number;
+  date: string;  // ISO date string
+  notes: string;
+}
 
+/**
+ * All supported rectangle‑annotation “kinds,”
+ * now including both Exercise & Problem.
+ */
 export type AnnotationKind =
   | "Equation"
   | "Plot"
@@ -13,7 +23,9 @@ export type AnnotationKind =
   | "Statement"
   | "Definition"
   | "Figure"
-  | "Table";
+  | "Table"
+  | "Exercise"
+  | "Problem";
 
 interface BaseCoords {
   page: number;
@@ -23,19 +35,22 @@ interface BaseCoords {
   height: number;
 }
 
+/**
+ * Common fields for every annotation.
+ * - tags, color, selectedColor, solutions are new.
+ */
 export interface BaseAnnotation extends BaseCoords {
   documentId?: string;
   literatureId: string;
   pdfId: string;
   title?: string;
   description?: string;
+  tags?: string[];
+  color?: string;
+  selectedColor?: string;
+  solutions?: Solution[];
   createdAt?: string;
   updatedAt?: string;
-  /**
-   * May include:
-   *  - imageUrl?: string
-   *  - imageFileId?: number
-   */
   extra?: Record<string, unknown> & {
     imageUrl?: string;
     imageFileId?: number;
@@ -54,10 +69,9 @@ export interface TextAnnotation extends BaseAnnotation {
 
 export type Annotation = RectangleAnnotation | TextAnnotation;
 
-/* ------------------------------------------------------------------ */
-/* ---------------------------  STRAPI  ----------------------------- */
-/* ------------------------------------------------------------------ */
-
+/**
+ * Strapi v5 response shape for annotations.
+ */
 export interface AnnotationStrapi extends StrapiResponse {
   type: Annotation["type"];
   literatureId: string;
@@ -65,10 +79,9 @@ export interface AnnotationStrapi extends StrapiResponse {
   metadata: string;
 }
 
-/* ------------------------------------------------------------------ */
-/* ---------------------  SERIALISE / DESERIALISE ------------------- */
-/* ------------------------------------------------------------------ */
-
+/**
+ * Turn Strapi payload → our Annotation, extracting all new fields.
+ */
 export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
   const raw = rec.metadata ?? {};
   const meta =
@@ -78,15 +91,25 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
         : {}
       : raw;
 
-  // **Collect any imageUrl / imageFileId fields into extra**
+  // Pull any imageUrl / imageFileId into extra
   const extraFields: Record<string, unknown> = {
     ...(meta.extra ?? {}),
-    // Pull these top‑level props into extra
     ...(meta.imageUrl !== undefined ? { imageUrl: meta.imageUrl } : {}),
     ...(meta.imageFileId !== undefined
       ? { imageFileId: meta.imageFileId }
       : {}),
   };
+
+  // Extract our new fields
+  const tags: string[] = meta.tags ?? [];
+  const color: string | undefined = meta.color;
+  const selectedColor: string | undefined = meta.selectedColor;
+  const solutions: Solution[] = (meta.solutions ?? []).map((s: any) => ({
+    fileUrl: s.fileUrl,
+    fileId: s.fileId,
+    date: s.date,
+    notes: s.notes,
+  }));
 
   const common = {
     documentId: rec.documentId,
@@ -101,6 +124,10 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
     pdfId: rec.pdfId ?? meta.pdfId,
     title: meta.title,
     description: meta.description,
+    tags,
+    color,
+    selectedColor,
+    solutions,
     extra: extraFields,
   } as const;
 
@@ -119,6 +146,9 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
   }
 }
 
+/**
+ * Turn our Annotation → Strapi payload, serializing all new fields.
+ */
 export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
   const {
     type,
@@ -131,10 +161,13 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     height,
     title,
     description,
+    tags,
+    color,
+    selectedColor,
+    solutions,
     extra = {},
   } = ann;
 
-  // We still flatten extra back into metadata JSON
   const meta: Record<string, unknown> = {
     page,
     x,
@@ -145,6 +178,18 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     description,
     ...extra,
   };
+
+  if (tags) meta.tags = tags;
+  if (color) meta.color = color;
+  if (selectedColor) meta.selectedColor = selectedColor;
+  if (solutions) {
+    meta.solutions = solutions.map((s) => ({
+      fileUrl: s.fileUrl,
+      fileId: s.fileId,
+      date: s.date,
+      notes: s.notes,
+    }));
+  }
 
   if (type === "text") {
     meta.highlightedText = (ann as TextAnnotation).highlightedText;

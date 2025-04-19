@@ -1,6 +1,9 @@
-// annotationOverlay.tsx
+// src/components/pdfViewer/annotationOverlay.tsx
 import React, { useState } from "react";
-import { Annotation } from "../../types/annotationTypes";
+import { Annotation, AnnotationKind } from "../../types/annotationTypes";
+
+const DEFAULT_COLOR = "#000000";
+const DEFAULT_SELECTED = "#800080";
 
 interface Props {
   annotations: Annotation[];
@@ -10,12 +13,9 @@ interface Props {
   onSelectAnnotation: (a: Annotation) => void;
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
+  defaultColors: Record<AnnotationKind, { color: string; selectedColor: string }>;
 }
 
-/**
- * Overlay on top of each PDF page.
- * Shows rectangles/highlights and a tooltip that persists when selected.
- */
 const AnnotationOverlay: React.FC<Props> = ({
   annotations,
   selectedId,
@@ -24,6 +24,7 @@ const AnnotationOverlay: React.FC<Props> = ({
   onSelectAnnotation,
   onHoverAnnotation,
   renderTooltip,
+  defaultColors,
 }) => {
   const [hovered, setHovered] = useState<Annotation | null>(null);
 
@@ -36,7 +37,6 @@ const AnnotationOverlay: React.FC<Props> = ({
     onHoverAnnotation?.(null);
   };
 
-  // show tooltip for whatever is hovered, or if none hovered, the selected one
   const active =
     hovered ||
     annotations.find((a) => a.documentId === selectedId) ||
@@ -55,37 +55,63 @@ const AnnotationOverlay: React.FC<Props> = ({
       }}
     >
       {annotations.map((a) => {
-        const isSelected = selectedId === a.documentId;
-        const style: React.CSSProperties = {
-          position: "absolute",
-          left: a.x * pageWidth,
-          top: a.y * pageHeight,
-          width: a.width * pageWidth,
-          height: a.height * pageHeight,
-          pointerEvents: "auto",
-          boxSizing: "border-box",
-          border:
-            a.type === "rectangle"
-              ? `${isSelected ? 3 : 2}px solid ${
-                  isSelected ? "purple" : "black"
-                }`
-              : undefined,
-          backgroundColor:
-            a.type === "text"
-              ? isSelected
-                ? "rgba(255,255,0,0.6)"
-                : "rgba(255,255,0,0.35)"
-              : "transparent",
+        const isSelected = a.documentId === selectedId;
+        const normal = a.color ?? DEFAULT_COLOR;
+        const selected = a.selectedColor ?? DEFAULT_SELECTED;
+
+        // rectangle style
+        if (a.type === "rectangle") {
+          return (
+            <div
+              key={a.documentId}
+              onClick={() => onSelectAnnotation(a)}
+              onMouseEnter={() => enter(a)}
+              onMouseLeave={leave}
+              style={{
+                position: "absolute",
+                left: a.x * pageWidth,
+                top: a.y * pageHeight,
+                width: a.width * pageWidth,
+                height: a.height * pageHeight,
+                pointerEvents: "auto",
+                boxSizing: "border-box",
+                border: `${
+                  isSelected ? 3 : 2
+                }px solid ${isSelected ? selected : normal}`,
+              }}
+              className="duration-150 ease-in-out hover:shadow-lg cursor-pointer"
+            />
+          );
+        }
+
+        // text highlight style
+        const alphaHex = (col: string, a: number) => {
+          // append hex alpha; a between 0–1 → 00–FF
+          const hex = Math.round(a * 255)
+            .toString(16)
+            .padStart(2, "0");
+          return `${col}${hex}`;
         };
+        const bg = isSelected
+          ? alphaHex(selected, 0.6)
+          : alphaHex(normal, 0.35);
 
         return (
           <div
             key={a.documentId}
-            style={style}
-            className="duration-150 ease-in-out cursor-pointer hover:scale-105 hover:shadow-lg"
             onClick={() => onSelectAnnotation(a)}
             onMouseEnter={() => enter(a)}
             onMouseLeave={leave}
+            style={{
+              position: "absolute",
+              left: a.x * pageWidth,
+              top: a.y * pageHeight,
+              width: a.width * pageWidth,
+              height: a.height * pageHeight,
+              pointerEvents: "auto",
+              backgroundColor: bg,
+            }}
+            className="duration-150 ease-in-out cursor-pointer hover:shadow-lg"
           />
         );
       })}
