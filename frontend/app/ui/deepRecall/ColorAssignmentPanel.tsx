@@ -1,6 +1,6 @@
 // src/components/pdfViewer/ColorAssignmentPanel.tsx
 import React from "react";
-import { AnnotationType } from "../../types/annotationTypes";
+import { AnnotationType, annotationTypes } from "../../types/annotationTypes";
 
 interface Props {
   /** Mapping from type → its hex color */
@@ -8,11 +8,6 @@ interface Props {
   setColorMap: (m: Record<AnnotationType, string>) => void;
   onClose: () => void;
 }
-
-const types: AnnotationType[] = [
-  "Equation","Plot","Illustration","Theorem","Statement",
-  "Definition","Figure","Table","Exercise","Problem",
-];
 
 const ColorAssignmentPanel: React.FC<Props> = ({
   colorMap,
@@ -42,7 +37,7 @@ const ColorAssignmentPanel: React.FC<Props> = ({
           </tr>
         </thead>
         <tbody>
-          {types.map((t) => (
+          {annotationTypes.map((t) => (
             <tr key={t} className="hover:bg-gray-700">
               <td className="px-2 py-1">{t}</td>
               <td className="px-2 py-1">
