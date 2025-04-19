@@ -1,4 +1,3 @@
-// frontend/app/[locale]/uploads/page.tsx
 'use client';
 
 import React from 'react';
@@ -6,7 +5,7 @@ import LiteratureList from '@/app/ui/deepRecall/literatureList';
 import UploadWidget from '@/app/ui/deepRecall/uploadWidget';
 import VersionTypeList from '@/app/ui/deepRecall/versionTypeList';
 
-export default function UploadsPage() {
+export default function LiteraturePage() {
   return (
     <div className="w-full h-full flex">
       {/* Left sidebar: 1/3 width, stacked */}

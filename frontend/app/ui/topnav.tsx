@@ -19,7 +19,7 @@ export default function TopNav({ isLoggedIn }: TopNavProps) {
                         <Link href="/planner" className="hover:underline">Planner</Link>
                     </li>
                     <li>
-                        <Link href="/diarization" className="hover:underline">Conversate</Link>
+                        <Link href="/conversate" className="hover:underline">Conversate</Link>
                     </li>
                     <li className="relative group">
                         <button className="flex items-center hover:underline focus:outline-none">
@@ -28,13 +28,18 @@ export default function TopNav({ isLoggedIn }: TopNavProps) {
                         <div className="absolute top-full left-0 w-40 bg-gray-800 rounded shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
                             <ul>
                                 <li>
-                                    <Link href="/pdfviewer" className="block px-4 py-2 hover:bg-gray-700">
+                                    <Link href="/deeprecall/pdfviewer" className="block px-4 py-2 hover:bg-gray-700">
                                         PDF Viewer
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="/uploads" className="block px-4 py-2 hover:bg-gray-700">
+                                    <Link href="/deeprecall/literature" className="block px-4 py-2 hover:bg-gray-700">
                                         Literature
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/deeprecall/pdfcanvas" className="block px-4 py-2 hover:bg-gray-700">
+                                        PDF Canvas
                                     </Link>
                                 </li>
                             </ul>

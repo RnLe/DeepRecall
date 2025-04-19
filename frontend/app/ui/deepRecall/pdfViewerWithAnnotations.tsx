@@ -14,7 +14,11 @@ import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Tell react‑pdf where to find the worker bundle
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
 export interface PdfViewerHandle {
   scrollToPage(page: number): void;
