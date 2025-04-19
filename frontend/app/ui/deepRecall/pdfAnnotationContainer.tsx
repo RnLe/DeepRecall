@@ -1,4 +1,3 @@
-// src/components/pdfViewer/pdfAnnotationContainer.tsx
 import React, { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -7,32 +6,34 @@ import {
   ChevronsRight,
   Plus,
   Minus,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
-import AnnotationToolbar, { AnnotationMode } from "./annotationToolbar";
 import PdfViewerWithAnnotations, { PdfViewerHandle } from "./pdfViewerWithAnnotations";
-import AnnotationProperties from "./annotationProperties";
-import AnnotationList from "./annotationList";
+import RightSidebar from "./layout/RightSideBar";
 import AnnotationHoverTooltip from "./annotationHoverTooltip";
 
 import { LiteratureExtended } from "../../types/literatureTypes";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 import { useAnnotations } from "../../customHooks/useAnnotations";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
+import { AnnotationMode } from "./annotationToolbar";
 import { AnnotationType } from "../../types/annotationTypes";
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
-// now a map from AnnotationType → color string
 type ColorMap = Record<AnnotationType, string>;
 
 interface Props {
   activeLiterature: LiteratureExtended;
+  annotationMode: AnnotationMode;
   colorMap: ColorMap;
 }
 
 const PdfAnnotationContainer: React.FC<Props> = ({
   activeLiterature,
+  annotationMode,
   colorMap,
 }) => {
   const litId = activeLiterature.documentId!;
@@ -40,21 +41,16 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   const pdfId = version.fileHash ?? "";
   const pdfUrl = version.fileUrl ?? "";
 
+  // viewer state
   const [zoom, setZoom] = useState(1);
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
-  const [mode, setMode] = useState<AnnotationMode>("none");
-  const [selId, setSelId] = useState<string | null>(null);
-  const [multi, setMulti] = useState(false);
-  const [multiSet, setMultiSet] = useState<Set<string>>(new Set());
-  const [hovered, setHovered] = useState<string | null>(null);
-  const [show, setShow] = useState(true);
+  const [showAnnotations, setShowAnnotations] = useState(true);
 
   const viewerRef = useRef<PdfViewerHandle>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const resolution = 4;
-
+  // annotation state
   const {
     annotations,
     isLoading,
@@ -68,32 +64,28 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     [annotations, pdfId]
   );
 
+  const [selId, setSelId] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [multi, setMulti] = useState(false);
+  const [multiSet, setMultiSet] = useState<Set<string>>(new Set());
+
   const selected = useMemo(
     () => display.find((a) => a.documentId === selId) ?? null,
     [display, selId]
   );
 
-  // create + auto‑deselect
-  const handleAdd = async (ann: Annotation): Promise<void> => {
+  // --- annotation actions ---
+  const handleAdd = async (ann: Annotation) => {
     await createAnnotation({ ...ann, literatureId: litId, pdfId });
-    setMode("none");
   };
-
-  // update
-  const handleUpdate = async (ann: Annotation): Promise<void> => {
+  const handleUpdate = async (ann: Annotation) => {
     if (!ann.documentId) return;
     await mutateUpdate({ id: ann.documentId, ann: { ...ann, literatureId: litId, pdfId } });
   };
-
-  // delete one
-  const handleDelete = async (id: string): Promise<void> => {
+  const handleDelete = async (id: string) => {
     const ann = display.find((x) => x.documentId === id);
     if (ann?.extra?.imageFileId) {
-      try {
-        await deleteFile(ann.extra.imageFileId);
-      } catch {
-        /* ignore */
-      }
+      try { await deleteFile(ann.extra.imageFileId); } catch {}
     }
     await mutateDelete(id);
     setSelId(null);
@@ -103,58 +95,60 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       return n;
     });
   };
-
-  // delete many
-  const handleMassDelete = async (): Promise<void> => {
+  const handleMassDelete = async () => {
     for (const id of Array.from(multiSet)) {
       const ann = display.find((x) => x.documentId === id);
       if (ann?.extra?.imageFileId) {
-        try {
-          await deleteFile(ann.extra.imageFileId);
-        } catch {
-          /* ignore */
-        }
+        try { await deleteFile(ann.extra.imageFileId); } catch {}
       }
       await mutateDelete(id);
     }
     setMultiSet(new Set());
   };
-
-  // crop, upload, then update annotation metadata
-  const handleSaveImage = async (a: RectangleAnnotation): Promise<void> => {
+  const handleSaveImage = async (a: RectangleAnnotation) => {
     try {
       const blob = await viewerRef.current!.getCroppedImage(a);
-
       const file = new File([blob], `ann-${a.documentId}.png`, {
         type: "image/png",
       });
       const { id: fid, url } = await uploadFile(file);
-
       await handleUpdate({
         ...a,
         extra: { ...(a.extra || {}), imageUrl: url, imageFileId: fid },
       });
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   };
 
-  // navigation & zoom
+  // --- multi‑select helpers ---
+  const toggleMultiMode = () => setMulti((m) => !m);
+  const selectAll = () =>
+    setMultiSet(new Set(display.map((a) => a.documentId!)));
+
+  // --- navigation & zoom ---
   const changePage = (delta: number) =>
     setPage((p) => clamp(p + delta, 1, numPages));
   const goToPage = (n: number) => setPage(clamp(n, 1, numPages));
   const zoomIn = () => setZoom((z) => z + 0.1);
   const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.1));
+
   const fitWidth = () => {
     if (viewerRef.current && wrapRef.current) {
       const size = viewerRef.current.getPageSize(page);
-      if (size) setZoom(wrapRef.current.clientWidth / size.width);
+      if (size) {
+        setZoom(wrapRef.current.clientWidth / size.width);
+        // ensure the canvas stays on the same page
+        viewerRef.current?.scrollToPage(page);
+      }
     }
   };
   const fitHeight = () => {
     if (viewerRef.current && wrapRef.current) {
       const size = viewerRef.current.getPageSize(page);
-      if (size) setZoom(wrapRef.current.clientHeight / size.height);
+      if (size) {
+        setZoom(wrapRef.current.clientHeight / size.height);
+        // ensure the canvas stays on the same page
+        viewerRef.current?.scrollToPage(page);
+      }
     }
   };
 
@@ -162,43 +156,53 @@ const PdfAnnotationContainer: React.FC<Props> = ({
 
   return (
     <div className="flex h-full overflow-hidden">
-      <AnnotationToolbar mode={mode} setMode={setMode} />
-
+      {/* PDF + nav */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Pagination & Zoom */}
         <div className="flex items-center space-x-2 p-2 bg-gray-800 border-b border-gray-700 select-none">
-          {/* ... navigation buttons (unchanged) ... */}
-          <button onClick={() => goToPage(1)} disabled={page === 1} /* ... */>
-            <ChevronsLeft size={16} />
-          </button>
-          <button onClick={() => changePage(-1)} disabled={page === 1} /* ... */>
-            <ArrowLeft size={16} />
-          </button>
-          <input
-            type="number"
-            value={page}
-            min={1}
-            max={numPages}
-            onChange={(e) => goToPage(Number(e.target.value))}
-            className="w-16 text-center bg-gray-900 border border-gray-600 rounded"
-          />
-          <span>/ {numPages || "-"}</span>
-          <button onClick={() => changePage(1)} disabled={page === numPages} /* ... */>
-            <ArrowRight size={16} />
-          </button>
-          <button onClick={() => goToPage(numPages)} disabled={page === numPages} /* ... */>
-            <ChevronsRight size={16} />
-          </button>
+          {[{ type: "button", Icon: ChevronsLeft, onClick: () => goToPage(1), disabled: page===1 },
+            { type: "button", Icon: ArrowLeft, onClick: () => changePage(-1), disabled: page===1 },
+            { type: "input" },
+            { type: "button", Icon: ArrowRight, onClick: () => changePage(1), disabled: page===numPages },
+            { type: "button", Icon: ChevronsRight, onClick: () => goToPage(numPages), disabled: page===numPages },
+          ].map((btn, i) =>
+            btn.type === "input" ? (
+              <React.Fragment key="page-input">
+                <input
+                  type="number"
+                  value={page}
+                  min={1}
+                  max={numPages}
+                  onChange={(e) => goToPage(Number(e.target.value))}
+                  className="w-16 text-center bg-gray-900 border border-gray-600 rounded"
+                />
+                <span>/ {numPages || "-"}</span>
+              </React.Fragment>
+            ) : (
+              <button
+                key={i}
+                onClick={btn.onClick}
+                disabled={btn.disabled}
+                className="p-1"
+              >
+                {btn.Icon &&
+                  React.createElement(btn.Icon, {
+                    size: 16,
+                    className: "text-gray-400 hover:text-white transition-colors",
+                  })}
+              </button>
+            )
+          )}
 
           <div className="ml-auto flex items-center space-x-1">
-            <button onClick={zoomOut} /* ... */>
-              <Minus size={16} />
+            <button onClick={zoomOut}>
+              <Minus size={16} className="text-gray-400 hover:text-white transition-colors" />
             </button>
             <span className="px-2 text-sm w-14 text-center">
               {(zoom * 100).toFixed(0)}%
             </span>
-            <button onClick={zoomIn} /* ... */>
-              <Plus size={16} />
+            <button onClick={zoomIn}>
+              <Plus size={16} className="text-gray-400 hover:text-white transition-colors" />
             </button>
             <div className="w-px h-5 mx-2 bg-gray-700" />
             <button
@@ -227,82 +231,58 @@ const PdfAnnotationContainer: React.FC<Props> = ({
               setNumPages(numPages);
               setPage((p) => clamp(p, 1, numPages));
             }}
-            annotationMode={mode}
-            annotations={show ? display : []}
+            annotationMode={annotationMode}
+            annotations={showAnnotations ? display : []}
             selectedId={selId}
-            onCreateAnnotation={(a) => handleAdd(a)}
+            onCreateAnnotation={handleAdd}
             onSelectAnnotation={(a) => {
               setSelId(a.documentId!);
               setPage(a.page);
               setTimeout(() => viewerRef.current?.scrollToPage(a.page), 0);
             }}
             onHoverAnnotation={(a) => setHovered(a?.documentId || null)}
-            renderTooltip={(a) => <AnnotationHoverTooltip annotation={a} />}
-            resolution={resolution}
+            renderTooltip={(a) => (
+              <AnnotationHoverTooltip annotation={a} />
+            )}
+            resolution={4}
             defaultColors={colorMap}
           />
         </div>
       </div>
 
-      {/* Sidebar */}
-      <div className="w-1/4 flex flex-col border-l border-gray-700 overflow-hidden">
-        {/* Controls (Select multiple, hide/show) */}
-        {/* ... */}
-        <div className="p-3 flex items-center space-x-2 border-b border-gray-800">
-          <button
-            onClick={() => setMulti((m) => !m)}
-            className={`px-2 py-1 rounded text-sm ${
-              multi ? "bg-blue-600" : "bg-gray-700 hover:bg-gray-600"
-            }`}
-          >
-            {multi ? "Single Select" : "Select Multiple"}
-          </button>
-          {multi && multiSet.size > 0 && (
-            <button onClick={handleMassDelete} className="px-2 py-1 rounded text-sm bg-red-700 hover:bg-red-600">
-              Delete All ({multiSet.size})
-            </button>
-          )}
-          <button
-            onClick={() => setShow((s) => !s)}
-            className="ml-auto px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm"
-          >
-            {show ? "Hide Annotations" : "Show Annotations"}
-          </button>
-        </div>
-
-        {/* Annotation list */}
-        <AnnotationList
-          annotations={display}
-          selectedId={selId}
-          hoveredId={hovered}
-          multi={multi}
-          multiSet={multiSet}
-          onItemClick={(a) => {
-            setSelId(a.documentId!);
-            setPage(a.page);
-            setTimeout(() => viewerRef.current?.scrollToPage(a.page), 0);
-          }}
-          onToggleMulti={(a) =>
-            setMultiSet((s) => {
-              const n = new Set(s);
-              n.has(a.documentId!) ? n.delete(a.documentId!) : n.add(a.documentId!);
-              return n;
-            })
-          }
-          onHover={(id) => setHovered(id)}
-        />
-
-        {/* Properties */}
-        {!multi && selected && (
-          <AnnotationProperties
-            annotation={selected}
-            updateAnnotation={handleUpdate}
-            deleteAnnotation={handleDelete}
-            saveImage={handleSaveImage}
-            onCancel={() => setSelId(null)}
-          />
-        )} 
-      </div>
+      {/* right sidebar */}
+      <RightSidebar
+        annotations={display}
+        selectedId={selId}
+        hoveredId={hovered}
+        multi={multi}
+        multiSet={multiSet}
+        onItemClick={(a) => {
+          setSelId(a.documentId!);
+          setPage(a.page);
+          setTimeout(() => viewerRef.current?.scrollToPage(a.page), 0);
+        }}
+        onToggleMulti={(a) =>
+          setMultiSet((s) => {
+            const n = new Set(s);
+            n.has(a.documentId!)
+              ? n.delete(a.documentId!)
+              : n.add(a.documentId!);
+            return n;
+          })
+        }
+        onHover={(id) => setHovered(id)}
+        onMassDelete={handleMassDelete}
+        show={showAnnotations}
+        onToggleShow={() => setShowAnnotations((s) => !s)}
+        onToggleMultiMode={toggleMultiMode}
+        onSelectAll={selectAll}
+        updateAnnotation={handleUpdate}
+        deleteAnnotation={handleDelete}
+        saveImage={handleSaveImage}
+        selected={selected}
+        onCancelSelect={() => setSelId(null)}
+      />
     </div>
   );
 };
