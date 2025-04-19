@@ -1,19 +1,15 @@
 // src/components/pdfViewer/ColorAssignmentPanel.tsx
 import React from "react";
-import { AnnotationKind } from "../../types/annotationTypes";
-
-interface ColorPair {
-  color: string;
-  selectedColor: string;
-}
+import { AnnotationType } from "../../types/annotationTypes";
 
 interface Props {
-  colorMap: Record<AnnotationKind, ColorPair>;
-  setColorMap: (m: Record<AnnotationKind, ColorPair>) => void;
+  /** Mapping from type → its hex color */
+  colorMap: Record<AnnotationType, string>;
+  setColorMap: (m: Record<AnnotationType, string>) => void;
   onClose: () => void;
 }
 
-const kinds: AnnotationKind[] = [
+const types: AnnotationType[] = [
   "Equation","Plot","Illustration","Theorem","Statement",
   "Definition","Figure","Table","Exercise","Problem",
 ];
@@ -23,19 +19,17 @@ const ColorAssignmentPanel: React.FC<Props> = ({
   setColorMap,
   onClose,
 }) => {
-  const handleChange =
-    (kind: AnnotationKind, field: "color" | "selectedColor") =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setColorMap({
-        ...colorMap,
-        [kind]: { ...colorMap[kind], [field]: e.target.value },
-      });
-    };
+  const handleChange = (t: AnnotationType) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setColorMap({
+      ...colorMap,
+      [t]: e.target.value,
+    });
+  };
 
   return (
-    <div className="absolute top-16 left-4 z-50 w-80 bg-gray-800 border border-gray-600 p-4 rounded shadow-lg">
+    <div className="absolute top-16 left-4 z-50 w-64 bg-gray-800 border border-gray-600 p-4 rounded shadow-lg">
       <div className="flex justify-between items-center mb-2">
-        <h4 className="text-lg font-semibold">Color Mapping</h4>
+        <h4 className="text-lg font-semibold">Annotation Colors</h4>
         <button onClick={onClose} className="text-white text-xl leading-none">
           ×
         </button>
@@ -45,25 +39,17 @@ const ColorAssignmentPanel: React.FC<Props> = ({
           <tr>
             <th className="px-2 text-left">Type</th>
             <th className="px-2">Color</th>
-            <th className="px-2">Selected</th>
           </tr>
         </thead>
         <tbody>
-          {kinds.map((k) => (
-            <tr key={k} className="hover:bg-gray-700">
-              <td className="px-2 py-1">{k}</td>
+          {types.map((t) => (
+            <tr key={t} className="hover:bg-gray-700">
+              <td className="px-2 py-1">{t}</td>
               <td className="px-2 py-1">
                 <input
                   type="color"
-                  value={colorMap[k].color}
-                  onChange={handleChange(k, "color")}
-                />
-              </td>
-              <td className="px-2 py-1">
-                <input
-                  type="color"
-                  value={colorMap[k].selectedColor}
-                  onChange={handleChange(k, "selectedColor")}
+                  value={colorMap[t]}
+                  onChange={handleChange(t)}
                 />
               </td>
             </tr>

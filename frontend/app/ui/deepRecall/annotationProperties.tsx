@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Annotation,
-  AnnotationKind,
+  AnnotationType,
   RectangleAnnotation,
   TextAnnotation,
   Solution,
@@ -17,7 +17,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const kinds: AnnotationKind[] = [
+const types: AnnotationType[] = [
   "Equation",
   "Plot",
   "Illustration",
@@ -40,10 +40,10 @@ const AnnotationProperties: React.FC<Props> = ({
   const [draft, setDraft] = useState<Annotation | null>(annotation);
   const [dirty, setDirty] = useState(false);
 
-  // For new solution upload
+  // For solutions upload
   const [newFile, setNewFile] = useState<File | null>(null);
-  const [newDate, setNewDate] = useState<string>("");
-  const [newNotes, setNewNotes] = useState<string>("");
+  const [newDate, setNewDate] = useState("");
+  const [newNotes, setNewNotes] = useState("");
 
   useEffect(() => {
     setDraft(annotation);
@@ -53,9 +53,7 @@ const AnnotationProperties: React.FC<Props> = ({
     setNewNotes("");
   }, [annotation]);
 
-  if (!draft) {
-    return <div className="p-4">No annotation selected.</div>;
-  }
+  if (!draft) return <div className="p-4">No annotation selected.</div>;
 
   const isRect = draft.type === "rectangle";
 
@@ -76,17 +74,17 @@ const AnnotationProperties: React.FC<Props> = ({
     setDirty(true);
   };
 
-  const kindChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const typeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setDraft({
       ...(draft as RectangleAnnotation),
-      annotationKind: e.target.value as AnnotationKind,
+      annotationType: e.target.value as AnnotationType,
     });
     setDirty(true);
   };
 
   const colorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setDraft({ ...draft, [name]: value } as Annotation);
+    const { value } = e.target;
+    setDraft({ ...draft, color: value });
     setDirty(true);
   };
 
@@ -98,7 +96,7 @@ const AnnotationProperties: React.FC<Props> = ({
   };
 
   const handleDelete = async () => {
-    if (draft?.documentId && confirm("Delete this annotation?")) {
+    if (draft.documentId && confirm("Delete this annotation?")) {
       await deleteAnnotation(draft.documentId);
     }
   };
@@ -107,7 +105,7 @@ const AnnotationProperties: React.FC<Props> = ({
   const hasSolutions =
     isRect &&
     ["Exercise", "Problem"].includes(
-      (draft as RectangleAnnotation).annotationKind
+      (draft as RectangleAnnotation).annotationType
     );
   const sols: Solution[] = draft.solutions ?? [];
 
@@ -188,42 +186,29 @@ const AnnotationProperties: React.FC<Props> = ({
         className="w-full p-1 rounded bg-gray-800 border border-gray-600"
       />
 
-      {/* Colors */}
-      <div className="flex space-x-4">
-        <div>
-          <label className="text-sm block">Color</label>
-          <input
-            type="color"
-            name="color"
-            value={draft.color ?? "#000000"}
-            onChange={colorChange}
-            className="h-8 w-12 p-0 border-0"
-          />
-        </div>
-        <div>
-          <label className="text-sm block">Selected</label>
-          <input
-            type="color"
-            name="selectedColor"
-            value={draft.selectedColor ?? "#800080"}
-            onChange={colorChange}
-            className="h-8 w-12 p-0 border-0"
-          />
-        </div>
+      {/* Color (single) */}
+      <div>
+        <label className="text-sm block">Color</label>
+        <input
+          type="color"
+          value={draft.color ?? "#000000"}
+          onChange={colorChange}
+          className="h-8 w-12 p-0 border-0"
+        />
       </div>
 
-      {/* Rectangle‑only fields */}
+      {/* Annotation Type */}
       {isRect && (
         <>
-          <label className="text-sm">Kind</label>
+          <label className="text-sm">Annotation Type</label>
           <select
-            value={(draft as RectangleAnnotation).annotationKind}
-            onChange={kindChange}
+            value={(draft as RectangleAnnotation).annotationType}
+            onChange={typeChange}
             className="w-full p-1 rounded bg-gray-800 border border-gray-600"
           >
-            {kinds.map((k) => (
-              <option key={k} value={k}>
-                {k}
+            {types.map((t) => (
+              <option key={t} value={t}>
+                {t}
               </option>
             ))}
           </select>
@@ -329,10 +314,7 @@ const AnnotationProperties: React.FC<Props> = ({
         >
           Save
         </button>
-        <button
-          onClick={onCancel}
-          className="flex-1 p-2 rounded bg-gray-600"
-        >
+        <button onClick={onCancel} className="flex-1 p-2 rounded bg-gray-600">
           Cancel
         </button>
         {draft.documentId && (

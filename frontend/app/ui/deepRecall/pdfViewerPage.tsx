@@ -1,3 +1,4 @@
+// src/components/pdfViewer/pdfViewerPage.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -8,55 +9,64 @@ import { useLiterature } from "../../customHooks/useLiterature";
 import { LiteratureExtended } from "../../types/literatureTypes";
 import CompactLiteratureList from "./compactLiteratureList";
 import PdfAnnotationContainer from "./pdfAnnotationContainer";
-import ColorAssignmentPanel from "./ColorAssignmentPanel";
-import { AnnotationKind } from "../../types/annotationTypes";
+import { useColors } from "../../customHooks/useColors";
+import { AnnotationType } from "../../types/annotationTypes";
 
-// Initialize all kinds to black/purple by default
-const initialColorMap: Record<AnnotationKind, { color: string; selectedColor: string }> =
-  ([
-    "Equation","Plot","Illustration","Theorem","Statement",
-    "Definition","Figure","Table","Exercise","Problem",
-  ] as AnnotationKind[]).reduce((acc, k) => {
-    acc[k] = { color: "#000000", selectedColor: "#800080" };
-    return acc;
-  }, {} as Record<AnnotationKind, { color: string; selectedColor: string }>);
+const types: AnnotationType[] = [
+  "Equation","Plot","Illustration","Theorem","Statement",
+  "Definition","Figure","Table","Exercise","Problem"
+];
 
 const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
-  const { data: items = [], isLoading, error } = useLiterature();
+  const { data: items = [], isLoading: litLoading, error: litError } = useLiterature();
   const [activeLit, setActiveLit] = useState<LiteratureExtended | null>(null);
 
-  const [showColorPanel, setShowColorPanel] = useState(false);
-  const [colorMap, setColorMap] = useState(initialColorMap);
+  const { schemes, isLoading: schemesLoading, error: schemesError } = useColors();
+  const [selectedSchemeId, setSelectedSchemeId] = useState<string | null>(
+    () => schemes[0]?.documentId ?? null
+  );
 
-  if (isLoading) return <div>Loading literature…</div>;
-  if (error) return <div>Error: {(error as Error).message}</div>;
+  const selectedScheme = schemes.find((s) => s.documentId === selectedSchemeId);
+
+  const annotationColors: Record<AnnotationType, string> = types.reduce(
+    (acc, t) => {
+      acc[t] = selectedScheme?.scheme.annotationColors[t] ?? "#000000";
+      return acc;
+    },
+    {} as Record<AnnotationType, string>
+  );
+
+  if (litLoading || schemesLoading) return <div>Loading…</div>;
+  if (litError) return <div>Error: {(litError as Error).message}</div>;
+  if (schemesError) return <div>Error loading color schemes</div>;
 
   return (
-    <div className={`flex h-full w-full bg-gray-900 text-white ${className || ""}`}>
-      <aside className="w-1/4 p-4 bg-gray-800 relative">
-        <button
-          onClick={() => setShowColorPanel(true)}
-          className="mb-4 px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm"
-        >
-          Manage Colors
-        </button>
+    <div className={`flex h-full w-full bg-gray-900 text-white ${className||""}`}>
+      <aside className="w-1/4 p-4 bg-gray-800">
+        <div className="mb-4">
+          <label className="block text-sm mb-1">Color Scheme</label>
+          <select
+            value={selectedSchemeId ?? ""}
+            onChange={(e) => setSelectedSchemeId(e.target.value)}
+            className="w-full p-1 rounded bg-gray-700 border border-gray-600"
+          >
+            {schemes.map((s) => (
+              <option key={s.documentId} value={s.documentId}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <h2 className="text-xl font-semibold mb-4">Literature</h2>
         <CompactLiteratureList items={items} onSelect={setActiveLit} />
-
-        {showColorPanel && (
-          <ColorAssignmentPanel
-            colorMap={colorMap}
-            setColorMap={setColorMap}
-            onClose={() => setShowColorPanel(false)}
-          />
-        )}
       </aside>
 
       <main className="flex-1 overflow-hidden p-4">
         {activeLit ? (
           <PdfAnnotationContainer
             activeLiterature={activeLit}
-            colorMap={colorMap}
+            colorMap={annotationColors}
           />
         ) : (
           <div className="h-full flex items-center justify-center">

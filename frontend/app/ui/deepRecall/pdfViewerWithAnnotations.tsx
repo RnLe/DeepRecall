@@ -1,4 +1,3 @@
-// pdfViewerWithAnnotations.tsx
 import React, {
   forwardRef,
   useCallback,
@@ -10,7 +9,7 @@ import React, {
 import { Document, Page, pdfjs } from "react-pdf";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import AnnotationOverlay from "./annotationOverlay";
-import { Annotation, RectangleAnnotation, AnnotationKind } from "../../types/annotationTypes";
+import { Annotation, RectangleAnnotation, AnnotationType } from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
@@ -38,7 +37,7 @@ interface Props {
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
   resolution: number;
-  defaultColors: Record<AnnotationKind, { color: string; selectedColor: string }>;
+  defaultColors: Record<AnnotationType, string>;
 }
 
 const DEFAULT_PAGE_HEIGHT = 842;
@@ -82,9 +81,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       },
     });
 
-    useEffect(() => {
-      rowVirtualizer.measure();
-    }, [zoom, pageSizes, rowVirtualizer]);
+    useEffect(() => rowVirtualizer.measure(), [zoom, pageSizes, rowVirtualizer]);
 
     useImperativeHandle(ref, () => ({
       scrollToPage: (p) =>
@@ -127,7 +124,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       }
     }, [pageNumber, numPages, rowVirtualizer]);
 
-    // draft handling (unchanged)…
+    // draft handling (unchanged) …
     const [draft, setDraft] = useState<null | {
       page: number;
       x0: number;
@@ -175,7 +172,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
 
       onCreateAnnotation({
         type: "rectangle",
-        annotationKind: "Figure",
+        annotationType: "Figure",
         page: draft.page,
         x: xMin / displayedW,
         y: yMin / displayedH,
@@ -288,7 +285,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
 
               onCreateAnnotation({
                 type: "rectangle",
-                annotationKind: "Figure",
+                annotationType: "Figure",
                 page: draft.page,
                 x: xMin / displayedW,
                 y: yMin / displayedH,

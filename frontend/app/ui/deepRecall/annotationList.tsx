@@ -1,7 +1,7 @@
-// annotationList.tsx
+// src/components/pdfViewer/annotationList.tsx
 import React from "react";
 import { Check, Type, Square, Image as ImageIcon } from "lucide-react";
-import { Annotation } from "../../types/annotationTypes";
+import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 
 interface Props {
   annotations: Annotation[];
@@ -57,7 +57,7 @@ const AnnotationList: React.FC<Props> = ({
                   ) : (
                     <>
                       <Square size={20} />
-                      <span>{a.annotationKind}</span>
+                      <span>{(a as RectangleAnnotation).annotationType}</span>
                     </>
                   )}
                 </td>
