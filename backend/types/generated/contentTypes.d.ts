@@ -461,6 +461,35 @@ export interface ApiAuthorAuthor extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiColorSchemeColorScheme extends Struct.CollectionTypeSchema {
+  collectionName: 'color_schemes';
+  info: {
+    displayName: 'ColorScheme';
+    pluralName: 'color-schemes';
+    singularName: 'color-scheme';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::color-scheme.color-scheme'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    scheme: Schema.Attribute.JSON;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiLiteratureTypeLiteratureType
   extends Struct.CollectionTypeSchema {
   collectionName: 'literature_types';
@@ -912,6 +941,7 @@ declare module '@strapi/strapi' {
       'api::annotation-type.annotation-type': ApiAnnotationTypeAnnotationType;
       'api::annotation.annotation': ApiAnnotationAnnotation;
       'api::author.author': ApiAuthorAuthor;
+      'api::color-scheme.color-scheme': ApiColorSchemeColorScheme;
       'api::literature-type.literature-type': ApiLiteratureTypeLiteratureType;
       'api::literature.literature': ApiLiteratureLiterature;
       'api::version-type.version-type': ApiVersionTypeVersionType;

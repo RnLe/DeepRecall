@@ -1,9 +1,10 @@
 // src/components/pdfViewer/annotationOverlay.tsx
 import React, { useState } from "react";
-import { Annotation, AnnotationKind } from "../../types/annotationTypes";
-
-const DEFAULT_COLOR = "#000000";
-const DEFAULT_SELECTED = "#800080";
+import {
+  Annotation,
+  RectangleAnnotation,
+  AnnotationType,
+} from "../../types/annotationTypes";
 
 interface Props {
   annotations: Annotation[];
@@ -13,8 +14,10 @@ interface Props {
   onSelectAnnotation: (a: Annotation) => void;
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
-  defaultColors: Record<AnnotationKind, { color: string; selectedColor: string }>;
+  defaultColors?: Record<AnnotationType, string>;
 }
+
+const DEFAULT_COLOR = "#000000";
 
 const AnnotationOverlay: React.FC<Props> = ({
   annotations,
@@ -24,7 +27,7 @@ const AnnotationOverlay: React.FC<Props> = ({
   onSelectAnnotation,
   onHoverAnnotation,
   renderTooltip,
-  defaultColors,
+  defaultColors = {},
 }) => {
   const [hovered, setHovered] = useState<Annotation | null>(null);
 
@@ -38,9 +41,7 @@ const AnnotationOverlay: React.FC<Props> = ({
   };
 
   const active =
-    hovered ||
-    annotations.find((a) => a.documentId === selectedId) ||
-    null;
+    hovered || annotations.find((a) => a.documentId === selectedId) || null;
 
   return (
     <div
@@ -56,10 +57,14 @@ const AnnotationOverlay: React.FC<Props> = ({
     >
       {annotations.map((a) => {
         const isSelected = a.documentId === selectedId;
-        const normal = a.color ?? DEFAULT_COLOR;
-        const selected = a.selectedColor ?? DEFAULT_SELECTED;
+        const color =
+          a.color ??
+          (a.type === "rectangle"
+            ? defaultColors[(a as RectangleAnnotation).annotationType]
+            : defaultColors["text" as AnnotationType]) ??
+          DEFAULT_COLOR;
 
-        // rectangle style
+        // Rectangle border
         if (a.type === "rectangle") {
           return (
             <div
@@ -75,26 +80,21 @@ const AnnotationOverlay: React.FC<Props> = ({
                 height: a.height * pageHeight,
                 pointerEvents: "auto",
                 boxSizing: "border-box",
-                border: `${
-                  isSelected ? 3 : 2
-                }px solid ${isSelected ? selected : normal}`,
+                border: `${isSelected ? 3 : 2}px solid ${color}`,
               }}
-              className="duration-150 ease-in-out hover:shadow-lg cursor-pointer"
+              className="cursor-pointer duration-150 ease-in-out hover:shadow-lg"
             />
           );
         }
 
-        // text highlight style
+        // Text highlight
         const alphaHex = (col: string, a: number) => {
-          // append hex alpha; a between 0–1 → 00–FF
           const hex = Math.round(a * 255)
             .toString(16)
             .padStart(2, "0");
           return `${col}${hex}`;
         };
-        const bg = isSelected
-          ? alphaHex(selected, 0.6)
-          : alphaHex(normal, 0.35);
+        const bg = alphaHex(color, isSelected ? 0.6 : 0.35);
 
         return (
           <div
@@ -111,7 +111,7 @@ const AnnotationOverlay: React.FC<Props> = ({
               pointerEvents: "auto",
               backgroundColor: bg,
             }}
-            className="duration-150 ease-in-out cursor-pointer hover:shadow-lg"
+            className="cursor-pointer duration-150 ease-in-out hover:shadow-lg"
           />
         );
       })}

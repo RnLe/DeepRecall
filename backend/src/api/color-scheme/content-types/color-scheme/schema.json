@@ -1,0 +1,22 @@
+{
+  "kind": "collectionType",
+  "collectionName": "color_schemes",
+  "info": {
+    "singularName": "color-scheme",
+    "pluralName": "color-schemes",
+    "displayName": "ColorScheme"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "scheme": {
+      "type": "json"
+    }
+  }
+}

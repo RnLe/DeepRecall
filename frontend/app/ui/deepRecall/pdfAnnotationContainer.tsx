@@ -1,3 +1,4 @@
+// src/components/pdfViewer/pdfAnnotationContainer.tsx
 import React, { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -18,12 +19,12 @@ import { LiteratureExtended } from "../../types/literatureTypes";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 import { useAnnotations } from "../../customHooks/useAnnotations";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
-
-import { AnnotationKind } from "../../types/annotationTypes";
+import { AnnotationType } from "../../types/annotationTypes";
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
-type ColorMap = Record<AnnotationKind, { color: string; selectedColor: string }>;
+// now a map from AnnotationType → color string
+type ColorMap = Record<AnnotationType, string>;
 
 interface Props {
   activeLiterature: LiteratureExtended;
@@ -43,10 +44,10 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
   const [mode, setMode] = useState<AnnotationMode>("none");
-  const [selId, setSelId] = useState<string | null>(null);
+  const [selId, setSelId] = useState<string | null>(null);
   const [multi, setMulti] = useState(false);
   const [multiSet, setMultiSet] = useState<Set<string>>(new Set());
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
   const [show, setShow] = useState(true);
 
   const viewerRef = useRef<PdfViewerHandle>(null);
@@ -200,10 +201,16 @@ const PdfAnnotationContainer: React.FC<Props> = ({
               <Plus size={16} />
             </button>
             <div className="w-px h-5 mx-2 bg-gray-700" />
-            <button onClick={fitWidth} /* ... */>
+            <button
+              onClick={fitWidth}
+              className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm hover:bg-gray-700"
+            >
               Fit width
             </button>
-            <button onClick={fitHeight} /* ... */>
+            <button
+              onClick={fitHeight}
+              className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm hover:bg-gray-700"
+            >
               Fit height
             </button>
           </div>
@@ -294,7 +301,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             saveImage={handleSaveImage}
             onCancel={() => setSelId(null)}
           />
-        )}
+        )} 
       </div>
     </div>
   );
