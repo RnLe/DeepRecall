@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 
@@ -10,12 +9,6 @@ import { useLiterature } from "../../customHooks/useLiterature";
 import { LiteratureExtended } from "../../types/literatureTypes";
 import CompactLiteratureList from "./compactLiteratureList";
 import PdfAnnotationContainer from "./pdfAnnotationContainer";
-
-// Tell react‑pdf where to find the worker bundle
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
 
 interface PdfViewerPageProps {
   className?: string;

@@ -1,5 +1,3 @@
-// frontend/app/page.jsx
-
 import React from 'react';
 import PdfViewerPage from '@/app/ui/deepRecall/pdfViewerPage';
 
