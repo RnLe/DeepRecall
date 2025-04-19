@@ -1,5 +1,4 @@
 // annotationOverlay.tsx
-
 import React, { useState } from "react";
 import { Annotation } from "../../types/annotationTypes";
 
@@ -14,7 +13,8 @@ interface Props {
 }
 
 /**
- * Layer on top of the PDF page to draw annotations and show custom tooltips.
+ * Overlay on top of each PDF page.
+ * Shows rectangles/highlights and a tooltip that persists when selected.
  */
 const AnnotationOverlay: React.FC<Props> = ({
   annotations,
@@ -31,11 +31,16 @@ const AnnotationOverlay: React.FC<Props> = ({
     setHovered(a);
     onHoverAnnotation?.(a);
   };
-
   const leave = () => {
     setHovered(null);
     onHoverAnnotation?.(null);
   };
+
+  // show tooltip for whatever is hovered, or if none hovered, the selected one
+  const active =
+    hovered ||
+    annotations.find((a) => a.documentId === selectedId) ||
+    null;
 
   return (
     <div
@@ -85,17 +90,17 @@ const AnnotationOverlay: React.FC<Props> = ({
         );
       })}
 
-      {renderTooltip && hovered && (
+      {renderTooltip && active && (
         <div
           className="absolute"
           style={{
-            left: hovered.x * pageWidth,
-            top: (hovered.y + hovered.height) * pageHeight + 8,
+            left: active.x * pageWidth,
+            top: (active.y + active.height) * pageHeight + 8,
             pointerEvents: "none",
             zIndex: 20,
           }}
         >
-          {renderTooltip(hovered)}
+          {renderTooltip(active)}
         </div>
       )}
     </div>

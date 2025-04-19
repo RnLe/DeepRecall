@@ -11,6 +11,7 @@ interface Props {
   annotation: Annotation | null;
   updateAnnotation: (a: Annotation) => Promise<void>;
   deleteAnnotation: (id: string) => Promise<void>;
+  saveImage: (a: RectangleAnnotation) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -29,6 +30,7 @@ const AnnotationProperties: React.FC<Props> = ({
   annotation,
   updateAnnotation,
   deleteAnnotation,
+  saveImage,
   onCancel,
 }) => {
   const [draft, setDraft] = useState<Annotation | null>(annotation);
@@ -50,41 +52,29 @@ const AnnotationProperties: React.FC<Props> = ({
   };
 
   const kindChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const kind = e.target.value as AnnotationKind;
     setDraft({
       ...(draft as RectangleAnnotation),
-      annotationKind: kind,
-    });
-    setDirty(true);
-  };
-
-  const textChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setDraft({
-      ...(draft as TextAnnotation),
-      highlightedText: e.target.value,
+      annotationKind: e.target.value as AnnotationKind,
     });
     setDirty(true);
   };
 
   const handleSave = async () => {
-    if (draft) await updateAnnotation(draft);
-    setDirty(false);
-  };
-
-  const handleCancel = () => {
-    onCancel();
-    setDraft(annotation);
+    await updateAnnotation(draft);
     setDirty(false);
   };
 
   const handleDelete = async () => {
-    if (draft?.documentId && confirm("Delete this annotation?")) {
+    if (draft.documentId && confirm("Delete?")) {
       await deleteAnnotation(draft.documentId);
     }
   };
 
+  const isRect = draft.type === "rectangle";
+  const hasImage = Boolean(draft.extra?.imageUrl);
+
   return (
-    <div className="p-4 border-l border-gray-700 flex flex-col space-y-2">
+    <div className="p-4 border-l border-gray-700 flex flex-col space-y-3">
       <h3 className="text-lg font-semibold">Properties</h3>
 
       <label className="text-sm">Title</label>
@@ -98,13 +88,13 @@ const AnnotationProperties: React.FC<Props> = ({
       <label className="text-sm">Description</label>
       <textarea
         name="description"
-        rows={3}
+        rows={2}
         value={draft.description ?? ""}
         onChange={commonChange}
         className="p-1 rounded bg-gray-800 border border-gray-600 resize-none"
       />
 
-      {draft.type === "rectangle" && (
+      {isRect && (
         <>
           <label className="text-sm">Kind</label>
           <select
@@ -116,19 +106,29 @@ const AnnotationProperties: React.FC<Props> = ({
               <option key={k}>{k}</option>
             ))}
           </select>
+
+          {!hasImage ? (
+            <button
+              onClick={() => saveImage(draft as RectangleAnnotation)}
+              className="mt-2 p-2 rounded bg-green-600 hover:bg-green-500 text-sm"
+            >
+              Save Image
+            </button>
+          ) : (
+            <div className="mt-2 text-green-400 text-sm">
+              ✔ Image saved!
+            </div>
+          )}
         </>
       )}
 
       {draft.type === "text" && (
-        <>
-          <label className="text-sm">Highlighted Text</label>
-          <textarea
-            rows={4}
-            value={(draft as TextAnnotation).highlightedText}
-            readOnly
-            className="p-1 rounded bg-gray-900 border border-gray-600 resize-none"
-          />
-        </>
+        <textarea
+          rows={3}
+          readOnly
+          value={(draft as TextAnnotation).highlightedText}
+          className="p-1 rounded bg-gray-900 border border-gray-600 resize-none"
+        />
       )}
 
       <div className="mt-auto flex space-x-2">
@@ -141,10 +141,7 @@ const AnnotationProperties: React.FC<Props> = ({
         >
           Save
         </button>
-        <button
-          onClick={handleCancel}
-          className="flex-1 p-2 rounded bg-gray-600"
-        >
+        <button onClick={onCancel} className="flex-1 p-2 rounded bg-gray-600">
           Cancel
         </button>
         {draft.documentId && (

@@ -9,9 +9,8 @@ import React, {
 } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { useVirtualizer } from "@tanstack/react-virtual";
-
 import AnnotationOverlay from "./annotationOverlay";
-import { Annotation } from "../../types/annotationTypes";
+import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
@@ -20,8 +19,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 export interface PdfViewerHandle {
   scrollToPage(page: number): void;
   getPageSize(page?: number): { width: number; height: number } | null;
-  /** New: smoothly center a given annotation in view */
-  scrollToAnnotation(annotation: Annotation): void;
+  getCroppedImage(annotation: RectangleAnnotation): Promise<Blob>;
 }
 
 interface Props {
@@ -35,8 +33,8 @@ interface Props {
   onCreateAnnotation: (a: Annotation) => void;
   onSelectAnnotation: (a: Annotation) => void;
   onHoverAnnotation?: (a: Annotation | null) => void;
-  /** Optional: render any React node as the hover‑tooltip */
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
+  resolution: number;
 }
 
 const DEFAULT_PAGE_HEIGHT = 842;
@@ -55,6 +53,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       onSelectAnnotation,
       onHoverAnnotation,
       renderTooltip,
+      resolution,
     },
     ref
   ) => {
@@ -71,11 +70,10 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       getScrollElement: () => scrollParentRef.current!,
       estimateSize: (index) => {
         const pg = index + 1;
-        const measured = pageSizes.get(pg)?.h;
-        const baseHeight =
-          measured ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
-        const gap = Math.max(1, Math.round(baseHeight * 0.002));
-        return baseHeight + gap;
+        const baseH = pageSizes.get(pg)?.h ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
+        // use scaled height so pages neither overlap nor leave growing gaps
+        const scaledH = baseH * zoom;
+        return scaledH + Math.max(1, Math.round(scaledH * 0.002));
       },
     });
 
@@ -84,30 +82,40 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     }, [zoom, pageSizes, rowVirtualizer]);
 
     useImperativeHandle(ref, () => ({
-      scrollToPage: (p: number) =>
-        rowVirtualizer.scrollToIndex(p - 1, {
-          align: "start",
-          behavior: "smooth",
-        }),
+      scrollToPage: (p) =>
+        rowVirtualizer.scrollToIndex(p - 1, { align: "start", behavior: "smooth" }),
       getPageSize: (p = 1) => {
         const size = pageSizes.get(p);
         return size ? { width: size.w, height: size.h } : null;
       },
-      scrollToAnnotation: (a: Annotation) => {
-        const pg = a.page;
-        const sizes = pageSizes.get(pg);
-        if (!sizes) return;
-        const items = rowVirtualizer.getVirtualItems();
-        const item = items.find((v) => v.index === pg - 1);
-        if (!item) return;
-        const pageStart = item.start;
-        const annOffset = a.y * sizes.h;
-        const annCenter = annOffset + (a.height * sizes.h) / 2;
-        const container = scrollParentRef.current;
-        if (!container) return;
-        const containerH = container.clientHeight;
-        const target = pageStart + annCenter - containerH / 2;
-        container.scrollTo({ top: target, behavior: "smooth" });
+      getCroppedImage: async (a) => {
+        // load page at chosen resolution
+        const loadingTask = pdfjs.getDocument(prefixStrapiUrl(pdfUrl));
+        const pdfDoc = await loadingTask.promise;
+        const pageObj = await pdfDoc.getPage(a.page);
+        const viewport = pageObj.getViewport({ scale: resolution });
+
+        // render full page at resolution
+        const cvs = document.createElement("canvas");
+        cvs.width = viewport.width;
+        cvs.height = viewport.height;
+        const ctx = cvs.getContext("2d")!;
+        await pageObj.render({ canvasContext: ctx, viewport }).promise;
+
+        // crop out the annotation rect
+        const sx = a.x * viewport.width;
+        const sy = a.y * viewport.height;
+        const sw = a.width * viewport.width;
+        const sh = a.height * viewport.height;
+        const crop = document.createElement("canvas");
+        crop.width = sw;
+        crop.height = sh;
+        const cctx = crop.getContext("2d")!;
+        cctx.drawImage(cvs, sx, sy, sw, sh, 0, 0, sw, sh);
+
+        return new Promise<Blob>((res) =>
+          crop.toBlob((b) => res(b!), "image/png")
+        );
       },
     }));
 
@@ -210,9 +218,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       };
     }, [handleTextSelect]);
 
-    const renderRow = (
-      vRow: ReturnType<typeof rowVirtualizer.getVirtualItems>[number]
-    ) => {
+    const renderRow = (vRow: any) => {
       const pg = vRow.index + 1;
       return (
         <div
@@ -228,6 +234,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         >
           <div
             data-page-number={pg}
+            data-index={vRow.index}
             ref={(el) => {
               if (el) {
                 pageRefs.current.set(pg, el);
@@ -246,9 +253,10 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               scale={zoom}
               onRenderSuccess={({ width, height }) => {
                 setPageSizes((m) => {
-                  const copy = new Map(m);
-                  copy.set(pg, { w: width!, h: height! });
-                  return copy;
+                  const c = new Map(m);
+                  // store base (unscaled) dimensions so fitWidth/fitHeight works correctly
+                  c.set(pg, { w: width! / zoom, h: height! / zoom });
+                  return c;
                 });
                 const node = pageRefs.current.get(pg);
                 if (node) rowVirtualizer.measureElement(node);
@@ -256,10 +264,10 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
             />
 
             <AnnotationOverlay
-              annotations={annotations.filter((a) => a.page === pg)}
+              annotations={annotations.filter((x) => x.page === pg)}
               selectedId={selectedId}
-              pageWidth={pageSizes.get(pg)?.w ?? 0}
-              pageHeight={pageSizes.get(pg)?.h ?? 0}
+              pageWidth={(pageSizes.get(pg)?.w ?? 0) * zoom}
+              pageHeight={(pageSizes.get(pg)?.h ?? 0) * zoom}
               onSelectAnnotation={onSelectAnnotation}
               onHoverAnnotation={onHoverAnnotation}
               renderTooltip={renderTooltip}
@@ -269,10 +277,10 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               <div
                 style={{
                   position: "absolute",
-                  left: Math.min(draft.x0, draft.x1),
-                  top: Math.min(draft.y0, draft.y1),
-                  width: Math.abs(draft.x1 - draft.x0),
-                  height: Math.abs(draft.y1 - draft.y0),
+                  left: Math.min(draft!.x0, draft!.x1),
+                  top: Math.min(draft!.y0, draft!.y1),
+                  width: Math.abs(draft!.x1 - draft!.x0),
+                  height: Math.abs(draft!.y1 - draft!.y0),
                   border: "2px dashed red",
                   pointerEvents: "none",
                 }}
@@ -284,11 +292,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     };
 
     return (
-      <div
-        ref={scrollParentRef}
-        className="h-full overflow-y-auto"
-        style={{ cursor: annotationMode === "none" ? "grab" : undefined }}
-      >
+      <div ref={scrollParentRef} className="h-full overflow-y-auto">
         <Document
           file={prefixStrapiUrl(pdfUrl)}
           onLoadSuccess={({ numPages }) => {
@@ -302,12 +306,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
             })
           }
         >
-          <div
-            style={{
-              height: rowVirtualizer.getTotalSize(),
-              position: "relative",
-            }}
-          >
+          <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
             {rowVirtualizer.getVirtualItems().map(renderRow)}
           </div>
         </Document>
