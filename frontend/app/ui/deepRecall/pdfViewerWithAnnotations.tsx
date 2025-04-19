@@ -10,11 +10,10 @@ import React, {
 import { Document, Page, pdfjs } from "react-pdf";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import AnnotationOverlay from "./annotationOverlay";
-import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
+import { Annotation, RectangleAnnotation, AnnotationKind } from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
-// Tell react‑pdf where to find the worker bundle
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
@@ -39,6 +38,7 @@ interface Props {
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
   resolution: number;
+  defaultColors: Record<AnnotationKind, { color: string; selectedColor: string }>;
 }
 
 const DEFAULT_PAGE_HEIGHT = 842;
@@ -58,6 +58,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       onHoverAnnotation,
       renderTooltip,
       resolution,
+      defaultColors,
     },
     ref
   ) => {
@@ -74,8 +75,8 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       getScrollElement: () => scrollParentRef.current!,
       estimateSize: (index) => {
         const pg = index + 1;
-        const baseH = pageSizes.get(pg)?.h ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
-        // use scaled height so pages neither overlap nor leave growing gaps
+        const baseH =
+          pageSizes.get(pg)?.h ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
         const scaledH = baseH * zoom;
         return scaledH + Math.max(1, Math.round(scaledH * 0.002));
       },
@@ -87,26 +88,23 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
 
     useImperativeHandle(ref, () => ({
       scrollToPage: (p) =>
-        rowVirtualizer.scrollToIndex(p - 1, { align: "start", behavior: "smooth" }),
+        rowVirtualizer.scrollToIndex(p - 1, { align: "center", behavior: "smooth" }),
       getPageSize: (p = 1) => {
         const size = pageSizes.get(p);
         return size ? { width: size.w, height: size.h } : null;
       },
       getCroppedImage: async (a) => {
-        // load page at chosen resolution
         const loadingTask = pdfjs.getDocument(prefixStrapiUrl(pdfUrl));
         const pdfDoc = await loadingTask.promise;
         const pageObj = await pdfDoc.getPage(a.page);
         const viewport = pageObj.getViewport({ scale: resolution });
 
-        // render full page at resolution
         const cvs = document.createElement("canvas");
         cvs.width = viewport.width;
         cvs.height = viewport.height;
         const ctx = cvs.getContext("2d")!;
         await pageObj.render({ canvasContext: ctx, viewport }).promise;
 
-        // crop out the annotation rect
         const sx = a.x * viewport.width;
         const sy = a.y * viewport.height;
         const sw = a.width * viewport.width;
@@ -129,7 +127,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       }
     }, [pageNumber, numPages, rowVirtualizer]);
 
-    // rectangle‐drawing draft
+    // draft handling (unchanged)…
     const [draft, setDraft] = useState<null | {
       page: number;
       x0: number;
@@ -167,6 +165,9 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     const mouseUp = () => {
       if (!draft) return;
       const { w, h } = pageSizes.get(draft.page)!;
+      const displayedW = w * zoom;
+      const displayedH = h * zoom;
+
       const xMin = Math.min(draft.x0, draft.x1);
       const yMin = Math.min(draft.y0, draft.y1);
       const xMax = Math.max(draft.x0, draft.x1);
@@ -176,10 +177,10 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         type: "rectangle",
         annotationKind: "Figure",
         page: draft.page,
-        x: xMin / w,
-        y: yMin / h,
-        width: (xMax - xMin) / w,
-        height: (yMax - yMin) / h,
+        x: xMin / displayedW,
+        y: yMin / displayedH,
+        width: (xMax - xMin) / displayedW,
+        height: (yMax - yMin) / displayedH,
         literatureId: "",
         pdfId: "",
       });
@@ -200,15 +201,17 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       const { w, h } = pageSizes.get(pg)!;
       const rect = range.getBoundingClientRect();
       const pr = pgDiv.getBoundingClientRect();
+      const displayedW = pr.width;
+      const displayedH = pr.height;
 
       onCreateAnnotation({
         type: "text",
         highlightedText: sel.toString(),
         page: pg,
-        x: (rect.left - pr.left) / w,
-        y: (rect.top - pr.top) / h,
-        width: rect.width / w,
-        height: rect.height / h,
+        x: (rect.left - pr.left) / displayedW,
+        y: (rect.top - pr.top) / displayedH,
+        width: rect.width / displayedW,
+        height: rect.height / displayedH,
         literatureId: "",
         pdfId: "",
       });
@@ -238,7 +241,6 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         >
           <div
             data-page-number={pg}
-            data-index={vRow.index}
             ref={(el) => {
               if (el) {
                 pageRefs.current.set(pg, el);
@@ -248,9 +250,55 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               }
             }}
             style={{ display: "inline-block", position: "relative" }}
-            onMouseDown={(e) => mouseDown(e, pg)}
-            onMouseMove={mouseMove}
-            onMouseUp={mouseUp}
+            onMouseDown={(e) => {
+              if (annotationMode === "rectangle") {
+                const node = pageRefs.current.get(pg);
+                if (!node) return;
+                const r = node.getBoundingClientRect();
+                setDraft({
+                  page: pg,
+                  x0: e.clientX - r.left,
+                  y0: e.clientY - r.top,
+                  x1: e.clientX - r.left,
+                  y1: e.clientY - r.top,
+                });
+                e.preventDefault();
+              }
+            }}
+            onMouseMove={(e) => {
+              if (!draft) return;
+              const node = pageRefs.current.get(draft.page);
+              if (!node) return;
+              const r = node.getBoundingClientRect();
+              setDraft({
+                ...draft,
+                x1: e.clientX - r.left,
+                y1: e.clientY - r.top,
+              });
+            }}
+            onMouseUp={() => {
+              if (!draft) return;
+              const { w, h } = pageSizes.get(draft.page)!;
+              const displayedW = w * zoom;
+              const displayedH = h * zoom;
+              const xMin = Math.min(draft.x0, draft.x1);
+              const yMin = Math.min(draft.y0, draft.y1);
+              const xMax = Math.max(draft.x0, draft.x1);
+              const yMax = Math.max(draft.y0, draft.y1);
+
+              onCreateAnnotation({
+                type: "rectangle",
+                annotationKind: "Figure",
+                page: draft.page,
+                x: xMin / displayedW,
+                y: yMin / displayedH,
+                width: (xMax - xMin) / displayedW,
+                height: (yMax - yMin) / displayedH,
+                literatureId: "",
+                pdfId: "",
+              });
+              clearDraft();
+            }}
           >
             <Page
               pageNumber={pg}
@@ -258,7 +306,6 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               onRenderSuccess={({ width, height }) => {
                 setPageSizes((m) => {
                   const c = new Map(m);
-                  // store base (unscaled) dimensions so fitWidth/fitHeight works correctly
                   c.set(pg, { w: width! / zoom, h: height! / zoom });
                   return c;
                 });
@@ -275,6 +322,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               onSelectAnnotation={onSelectAnnotation}
               onHoverAnnotation={onHoverAnnotation}
               renderTooltip={renderTooltip}
+              defaultColors={defaultColors}
             />
 
             {draft?.page === pg && (

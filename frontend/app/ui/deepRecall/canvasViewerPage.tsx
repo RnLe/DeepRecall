@@ -9,7 +9,11 @@ import AnnotationList from "./annotationList";
 import CanvasPdfFlow from "./CanvasPdfFlow";
 import { ReactFlowProvider } from "reactflow";
 
-const CanvasViewerPage: React.FC = () => {
+interface CanvasViewerPageProps {
+  className?: string;
+}
+
+const CanvasViewerPage: React.FC<CanvasViewerPageProps> = ({ className }) => {
   // literature list
   const { data: items = [], isLoading, error } = useLiterature();
   const [activeLit, setActiveLit] = useState<LiteratureExtended | null>(null);
@@ -35,7 +39,8 @@ const CanvasViewerPage: React.FC = () => {
   if (error) return <div>Error: {(error as Error).message}</div>;
 
   return (
-    <div className="flex h-full w-full bg-gray-900 text-white">
+    <div className={`flex bg-gray-900 text-white ${className || ""}`}>
+      {/* TOP: title */}
       {/* LEFT: literature + annotation list */}
       <aside className="w-1/4 flex flex-col p-4 bg-gray-800">
         <h2 className="text-xl font-semibold mb-2">Literature</h2>
