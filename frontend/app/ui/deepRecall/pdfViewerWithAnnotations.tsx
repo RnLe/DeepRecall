@@ -1,3 +1,4 @@
+// src/components/pdfViewer/pdfViewerWithAnnotations.tsx
 import React, {
   forwardRef,
   useCallback,
@@ -9,7 +10,11 @@ import React, {
 import { Document, Page, pdfjs } from "react-pdf";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import AnnotationOverlay from "./annotationOverlay";
-import { Annotation, RectangleAnnotation, AnnotationType } from "../../types/annotationTypes";
+import {
+  Annotation,
+  RectangleAnnotation,
+  AnnotationType,
+} from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
@@ -29,6 +34,7 @@ interface Props {
   zoom: number;
   pageNumber: number;
   onLoadSuccess: (info: { numPages: number }) => void;
+  onVisiblePageChange?: (page: number) => void;
   annotationMode: AnnotationMode;
   annotations: Annotation[];
   selectedId: string | null;
@@ -49,6 +55,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       zoom,
       pageNumber,
       onLoadSuccess,
+      onVisiblePageChange,
       annotationMode,
       annotations,
       selectedId,
@@ -61,70 +68,98 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     },
     ref
   ) => {
-    const scrollParentRef = useRef<HTMLDivElement>(null);
+    const scrollElRef = useRef<HTMLDivElement>(null);
     const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
     const [numPages, setNumPages] = useState(0);
     const [pageSizes, setPageSizes] = useState(
       new Map<number, { w: number; h: number }>()
     );
+    const lastPageRef = useRef(1);
 
     const rowVirtualizer = useVirtualizer({
       count: numPages,
-      overscan: 3,
-      getScrollElement: () => scrollParentRef.current!,
-      estimateSize: (index) => {
-        const pg = index + 1;
+      overscan: 4,
+      getScrollElement: () => scrollElRef.current!,
+      estimateSize: (i) => {
+        const pg = i + 1;
         const baseH =
           pageSizes.get(pg)?.h ?? pageSizes.get(1)?.h ?? DEFAULT_PAGE_HEIGHT;
-        const scaledH = baseH * zoom;
-        return scaledH + Math.max(1, Math.round(scaledH * 0.002));
+        const h = baseH * zoom;
+        return h + Math.max(1, Math.round(h * 0.002));
       },
     });
 
-    useEffect(() => rowVirtualizer.measure(), [zoom, pageSizes, rowVirtualizer]);
+    // Scroll listener → reports only on real scrolls
+    useEffect(() => {
+      if (!onVisiblePageChange) return;
+      const el = scrollElRef.current!;
+      const handler = () => {
+        const items = rowVirtualizer.getVirtualItems();
+        if (items.length === 0) return;
+        const scrollY = el.scrollTop;
+        let cur = items[0];
+        for (const it of items) {
+          if (it.start <= scrollY + 1) cur = it;
+          else break;
+        }
+        const pg = cur.index + 1;
+        if (pg !== lastPageRef.current) {
+          lastPageRef.current = pg;
+          onVisiblePageChange(pg);
+        }
+      };
+      el.addEventListener("scroll", handler);
+      // initial trigger
+      handler();
+      return () => el.removeEventListener("scroll", handler);
+    }, [onVisiblePageChange, rowVirtualizer]);
 
     useImperativeHandle(ref, () => ({
       scrollToPage: (p) =>
-        rowVirtualizer.scrollToIndex(p - 1, { align: "center", behavior: "smooth" }),
+        rowVirtualizer.scrollToIndex(p - 1, { align: "auto" }),
       getPageSize: (p = 1) => {
-        const size = pageSizes.get(p);
-        return size ? { width: size.w, height: size.h } : null;
+        const s = pageSizes.get(p);
+        return s ? { width: s.w, height: s.h } : null;
       },
       getCroppedImage: async (a) => {
-        const loadingTask = pdfjs.getDocument(prefixStrapiUrl(pdfUrl));
-        const pdfDoc = await loadingTask.promise;
-        const pageObj = await pdfDoc.getPage(a.page);
-        const viewport = pageObj.getViewport({ scale: resolution });
-
+        const pdf = await pdfjs.getDocument(prefixStrapiUrl(pdfUrl)).promise;
+        const pgObj = await pdf.getPage(a.page);
+        const viewport = pgObj.getViewport({ scale: resolution });
         const cvs = document.createElement("canvas");
         cvs.width = viewport.width;
         cvs.height = viewport.height;
-        const ctx = cvs.getContext("2d")!;
-        await pageObj.render({ canvasContext: ctx, viewport }).promise;
+        await pgObj.render({ canvasContext: cvs.getContext("2d")!, viewport })
+          .promise;
 
-        const sx = a.x * viewport.width;
-        const sy = a.y * viewport.height;
-        const sw = a.width * viewport.width;
-        const sh = a.height * viewport.height;
+        const cw = a.width * viewport.width;
+        const ch = a.height * viewport.height;
         const crop = document.createElement("canvas");
-        crop.width = sw;
-        crop.height = sh;
-        const cctx = crop.getContext("2d")!;
-        cctx.drawImage(cvs, sx, sy, sw, sh, 0, 0, sw, sh);
-
+        crop.width = cw;
+        crop.height = ch;
+        crop.getContext("2d")!.drawImage(
+          cvs,
+          a.x * viewport.width,
+          a.y * viewport.height,
+          cw,
+          ch,
+          0,
+          0,
+          cw,
+          ch
+        );
         return new Promise<Blob>((res) =>
           crop.toBlob((b) => res(b!), "image/png")
         );
       },
     }));
 
+    // parent‑driven jumps
     useEffect(() => {
       if (numPages) {
-        rowVirtualizer.scrollToIndex(pageNumber - 1, { align: "start" });
+        rowVirtualizer.scrollToIndex(pageNumber - 1, { align: "auto" });
       }
     }, [pageNumber, numPages, rowVirtualizer]);
 
-    // draft handling (unchanged) …
     const [draft, setDraft] = useState<null | {
       page: number;
       x0: number;
@@ -134,140 +169,78 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     }>(null);
     const clearDraft = () => setDraft(null);
 
-    const mouseDown = (e: React.MouseEvent, pg: number) => {
-      if (annotationMode !== "rectangle") return;
-      const node = pageRefs.current.get(pg);
-      if (!node) return;
-      const r = node.getBoundingClientRect();
-      setDraft({
-        page: pg,
-        x0: e.clientX - r.left,
-        y0: e.clientY - r.top,
-        x1: e.clientX - r.left,
-        y1: e.clientY - r.top,
-      });
-      e.preventDefault();
-    };
-    const mouseMove = (e: React.MouseEvent) => {
-      if (!draft) return;
-      const node = pageRefs.current.get(draft.page);
-      if (!node) return;
-      const r = node.getBoundingClientRect();
-      setDraft({
-        ...draft,
-        x1: e.clientX - r.left,
-        y1: e.clientY - r.top,
-      });
-    };
-    const mouseUp = () => {
-      if (!draft) return;
-      const { w, h } = pageSizes.get(draft.page)!;
-      const displayedW = w * zoom;
-      const displayedH = h * zoom;
-
-      const xMin = Math.min(draft.x0, draft.x1);
-      const yMin = Math.min(draft.y0, draft.y1);
-      const xMax = Math.max(draft.x0, draft.x1);
-      const yMax = Math.max(draft.y0, draft.y1);
-
-      onCreateAnnotation({
-        type: "rectangle",
-        annotationType: "Figure",
-        page: draft.page,
-        x: xMin / displayedW,
-        y: yMin / displayedH,
-        width: (xMax - xMin) / displayedW,
-        height: (yMax - yMin) / displayedH,
-        literatureId: "",
-        pdfId: "",
-      });
-      clearDraft();
-    };
-
-    // text‐highlight
     const handleTextSelect = useCallback(() => {
       if (annotationMode !== "text") return;
       const sel = document.getSelection();
       if (!sel || sel.isCollapsed) return;
       const range = sel.getRangeAt(0);
-      const pgDiv = range.startContainer.parentElement?.closest(
+      const pgEl = range.startContainer.parentElement?.closest(
         "[data-page-number]"
       );
-      if (!pgDiv) return;
-      const pg = Number(pgDiv.getAttribute("data-page-number"));
-      const { w, h } = pageSizes.get(pg)!;
+      if (!pgEl) return;
+      const pg = Number(pgEl.getAttribute("data-page-number"));
       const rect = range.getBoundingClientRect();
-      const pr = pgDiv.getBoundingClientRect();
-      const displayedW = pr.width;
-      const displayedH = pr.height;
-
+      const pr = pgEl.getBoundingClientRect();
       onCreateAnnotation({
         type: "text",
         highlightedText: sel.toString(),
         page: pg,
-        x: (rect.left - pr.left) / displayedW,
-        y: (rect.top - pr.top) / displayedH,
-        width: rect.width / displayedW,
-        height: rect.height / displayedH,
+        x: (rect.left - pr.left) / pr.width,
+        y: (rect.top - pr.top) / pr.height,
+        width: rect.width / pr.width,
+        height: rect.height / pr.height,
         literatureId: "",
         pdfId: "",
       });
       sel.removeAllRanges();
-    }, [annotationMode, onCreateAnnotation, pageSizes]);
+    }, [annotationMode, onCreateAnnotation]);
 
     useEffect(() => {
       document.addEventListener("mouseup", handleTextSelect);
-      return () => {
-        document.removeEventListener("mouseup", handleTextSelect);
-      };
+      return () => document.removeEventListener("mouseup", handleTextSelect);
     }, [handleTextSelect]);
 
-    const renderRow = (vRow: any) => {
-      const pg = vRow.index + 1;
+    const renderRow = (v: any) => {
+      const pg = v.index + 1;
       return (
         <div
-          key={vRow.key}
+          key={v.key}
+          data-index={v.index}
+          ref={rowVirtualizer.measureElement}
           style={{
             position: "absolute",
             top: 0,
             left: 0,
             width: "100%",
-            transform: `translateY(${vRow.start}px)`,
+            transform: `translateY(${v.start}px)`,
             textAlign: "center",
           }}
         >
           <div
             data-page-number={pg}
-            data-index={vRow.index}
             ref={(el) => {
               if (el) {
                 pageRefs.current.set(pg, el);
-                rowVirtualizer.measureElement(el);
               } else {
                 pageRefs.current.delete(pg);
               }
             }}
             style={{ display: "inline-block", position: "relative" }}
             onMouseDown={(e) => {
-              if (annotationMode === "rectangle") {
-                const node = pageRefs.current.get(pg);
-                if (!node) return;
-                const r = node.getBoundingClientRect();
-                setDraft({
-                  page: pg,
-                  x0: e.clientX - r.left,
-                  y0: e.clientY - r.top,
-                  x1: e.clientX - r.left,
-                  y1: e.clientY - r.top,
-                });
-                e.preventDefault();
-              }
+              if (annotationMode !== "rectangle") return;
+              const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+              setDraft({
+                page: pg,
+                x0: e.clientX - r.left,
+                y0: e.clientY - r.top,
+                x1: e.clientX - r.left,
+                y1: e.clientY - r.top,
+              });
+              e.preventDefault();
             }}
             onMouseMove={(e) => {
               if (!draft) return;
-              const node = pageRefs.current.get(draft.page);
-              if (!node) return;
-              const r = node.getBoundingClientRect();
+              const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
               setDraft({
                 ...draft,
                 x1: e.clientX - r.left,
@@ -277,21 +250,20 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
             onMouseUp={() => {
               if (!draft) return;
               const { w, h } = pageSizes.get(draft.page)!;
-              const displayedW = w * zoom;
-              const displayedH = h * zoom;
-              const xMin = Math.min(draft.x0, draft.x1);
-              const yMin = Math.min(draft.y0, draft.y1);
-              const xMax = Math.max(draft.x0, draft.x1);
-              const yMax = Math.max(draft.y0, draft.y1);
-
+              const dispW = w * zoom;
+              const dispH = h * zoom;
+              const x0 = Math.min(draft.x0, draft.x1);
+              const y0 = Math.min(draft.y0, draft.y1);
+              const width = Math.abs(draft.x1 - draft.x0);
+              const height = Math.abs(draft.y1 - draft.y0);
               onCreateAnnotation({
                 type: "rectangle",
                 annotationType: "Figure",
                 page: draft.page,
-                x: xMin / displayedW,
-                y: yMin / displayedH,
-                width: (xMax - xMin) / displayedW,
-                height: (yMax - yMin) / displayedH,
+                x: x0 / dispW,
+                y: y0 / dispH,
+                width: width / dispW,
+                height: height / dispH,
                 literatureId: "",
                 pdfId: "",
               });
@@ -302,18 +274,20 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               pageNumber={pg}
               scale={zoom}
               onRenderSuccess={({ width, height }) => {
+                const pw = width! / zoom;
+                const ph = height! / zoom;
                 setPageSizes((m) => {
-                  const c = new Map(m);
-                  c.set(pg, { w: width! / zoom, h: height! / zoom });
-                  return c;
+                  const prev = m.get(pg);
+                  if (prev && prev.w === pw && prev.h === ph) return m;
+                  const copy = new Map(m);
+                  copy.set(pg, { w: pw, h: ph });
+                  return copy;
                 });
-                const node = pageRefs.current.get(pg);
-                if (node) rowVirtualizer.measureElement(node);
               }}
             />
 
             <AnnotationOverlay
-              annotations={annotations.filter((x) => x.page === pg)}
+              annotations={annotations.filter((a) => a.page === pg)}
               selectedId={selectedId}
               pageWidth={(pageSizes.get(pg)?.w ?? 0) * zoom}
               pageHeight={(pageSizes.get(pg)?.h ?? 0) * zoom}
@@ -342,21 +316,20 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     };
 
     return (
-      <div ref={scrollParentRef} className="h-full overflow-y-auto">
+      <div ref={scrollElRef} className="h-full overflow-y-auto">
         <Document
           file={prefixStrapiUrl(pdfUrl)}
           onLoadSuccess={({ numPages }) => {
             setNumPages(numPages);
             onLoadSuccess({ numPages });
           }}
-          onItemClick={({ pageNumber }) =>
-            rowVirtualizer.scrollToIndex(pageNumber - 1, {
-              align: "start",
-              behavior: "smooth",
-            })
-          }
         >
-          <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+          <div
+            style={{
+              height: rowVirtualizer.getTotalSize(),
+              position: "relative",
+            }}
+          >
             {rowVirtualizer.getVirtualItems().map(renderRow)}
           </div>
         </Document>

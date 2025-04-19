@@ -159,42 +159,48 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       {/* PDF + nav */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Pagination & Zoom */}
-        <div className="flex items-center space-x-2 p-2 bg-gray-800 border-b border-gray-700 select-none">
-          {[{ type: "button", Icon: ChevronsLeft, onClick: () => goToPage(1), disabled: page===1 },
-            { type: "button", Icon: ArrowLeft, onClick: () => changePage(-1), disabled: page===1 },
-            { type: "input" },
-            { type: "button", Icon: ArrowRight, onClick: () => changePage(1), disabled: page===numPages },
-            { type: "button", Icon: ChevronsRight, onClick: () => goToPage(numPages), disabled: page===numPages },
-          ].map((btn, i) =>
-            btn.type === "input" ? (
-              <React.Fragment key="page-input">
-                <input
-                  type="number"
-                  value={page}
-                  min={1}
-                  max={numPages}
-                  onChange={(e) => goToPage(Number(e.target.value))}
-                  className="w-16 text-center bg-gray-900 border border-gray-600 rounded"
-                />
-                <span>/ {numPages || "-"}</span>
-              </React.Fragment>
-            ) : (
-              <button
-                key={i}
-                onClick={btn.onClick}
-                disabled={btn.disabled}
-                className="p-1"
-              >
-                {btn.Icon &&
-                  React.createElement(btn.Icon, {
+        <div className="flex items-center p-2 bg-gray-800 border-b border-gray-700 select-none">
+          {/* left: empty or other controls */}
+          <div className="w-8" />  {/* maintain spacing */}
+
+          {/* center: page navigation */}
+          <div className="flex-1 flex items-center justify-center space-x-2">
+            {[{ type: "button", Icon: ChevronsLeft, onClick: () => goToPage(1), disabled: page===1 },
+              { type: "button", Icon: ArrowLeft,  onClick: () => changePage(-1), disabled: page===1 },
+              { type: "input" },
+              { type: "button", Icon: ArrowRight, onClick: () => changePage(1), disabled: page===numPages },
+              { type: "button", Icon: ChevronsRight,onClick: () => goToPage(numPages), disabled: page===numPages },
+            ].map((btn, i) =>
+              btn.type === "input" ? (
+                <React.Fragment key="page-input">
+                  <input
+                    type="number"
+                    value={page}
+                    min={1}
+                    max={numPages}
+                    onChange={(e) => goToPage(Number(e.target.value))}
+                    className="w-16 text-center bg-gray-900 border border-gray-600 rounded"
+                  />
+                  <span>/ {numPages || "-"}</span>
+                </React.Fragment>
+              ) : (
+                <button
+                  key={i}
+                  onClick={btn.onClick}
+                  disabled={btn.disabled}
+                  className="p-1"
+                >
+                  {btn.Icon && React.createElement(btn.Icon, {
                     size: 16,
                     className: "text-gray-400 hover:text-white transition-colors",
                   })}
-              </button>
-            )
-          )}
+                </button>
+              )
+            )}
+          </div>
 
-          <div className="ml-auto flex items-center space-x-1">
+          {/* right: zoom controls + percentage + fit */}
+          <div className="flex items-center space-x-2">
             <button onClick={zoomOut}>
               <Minus size={16} className="text-gray-400 hover:text-white transition-colors" />
             </button>
@@ -204,7 +210,6 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             <button onClick={zoomIn}>
               <Plus size={16} className="text-gray-400 hover:text-white transition-colors" />
             </button>
-            <div className="w-px h-5 mx-2 bg-gray-700" />
             <button
               onClick={fitWidth}
               className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm hover:bg-gray-700"
@@ -231,6 +236,10 @@ const PdfAnnotationContainer: React.FC<Props> = ({
               setNumPages(numPages);
               setPage((p) => clamp(p, 1, numPages));
             }}
+            onVisiblePageChange={(pg) => {
+              /* avoid feedback‑loop: update only if user *scrolled* */
+              setPage((cur) => (cur === pg ? cur : pg));
+            }}
             annotationMode={annotationMode}
             annotations={showAnnotations ? display : []}
             selectedId={selId}
@@ -238,12 +247,10 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             onSelectAnnotation={(a) => {
               setSelId(a.documentId!);
               setPage(a.page);
-              setTimeout(() => viewerRef.current?.scrollToPage(a.page), 0);
+              /* let PdfViewer handle scrolling – no explicit scrollToPage here */
             }}
             onHoverAnnotation={(a) => setHovered(a?.documentId || null)}
-            renderTooltip={(a) => (
-              <AnnotationHoverTooltip annotation={a} />
-            )}
+            renderTooltip={(a) => <AnnotationHoverTooltip annotation={a} />}
             resolution={4}
             colorMap={colorMap}
           />

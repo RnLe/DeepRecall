@@ -1,14 +1,20 @@
 // src/components/pdfViewer/annotationProperties.tsx
 import React, { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import { Eye, X, StickyNote } from "lucide-react";
+
 import {
   Annotation,
-  AnnotationType,
   RectangleAnnotation,
-  TextAnnotation,
+  annotationTypes,
+  AnnotationType,
   Solution,
-  annotationTypes
 } from "../../types/annotationTypes";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
+import MarkdownEditorModal from "./MarkdownEditorModal";
 
 interface Props {
   annotation: Annotation | null;
@@ -17,7 +23,6 @@ interface Props {
   saveImage: (a: RectangleAnnotation) => Promise<void>;
   onCancel: () => void;
 }
-
 
 const AnnotationProperties: React.FC<Props> = ({
   annotation,
@@ -29,7 +34,12 @@ const AnnotationProperties: React.FC<Props> = ({
   const [draft, setDraft] = useState<Annotation | null>(annotation);
   const [dirty, setDirty] = useState(false);
 
-  // For solutions upload
+  // modals
+  const [editNotes, setEditNotes] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewSolutionNote, setPreviewSolutionNote] = useState<string | null>(null);
+
+  // For adding new solution
   const [newFile, setNewFile] = useState<File | null>(null);
   const [newDate, setNewDate] = useState("");
   const [newNotes, setNewNotes] = useState("");
@@ -37,13 +47,15 @@ const AnnotationProperties: React.FC<Props> = ({
   useEffect(() => {
     setDraft(annotation);
     setDirty(false);
+    setEditNotes(false);
+    setPreviewImageUrl(null);
+    setPreviewSolutionNote(null);
     setNewFile(null);
     setNewDate("");
     setNewNotes("");
   }, [annotation]);
 
   if (!draft) return <div className="p-4">No annotation selected.</div>;
-
   const isRect = draft.type === "rectangle";
 
   const commonChange = (
@@ -72,8 +84,7 @@ const AnnotationProperties: React.FC<Props> = ({
   };
 
   const colorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    setDraft({ ...draft, color: value });
+    setDraft({ ...draft, color: e.target.value });
     setDirty(true);
   };
 
@@ -90,7 +101,14 @@ const AnnotationProperties: React.FC<Props> = ({
     }
   };
 
-  // --- Solutions for Exercise/Problem ---
+  const saveNotes = async (md: string) => {
+    const next = { ...draft, notes: md } as Annotation;
+    setDraft(next);
+    await updateAnnotation(next);
+    setDirty(false);
+  };
+
+  // Solutions
   const hasSolutions =
     isRect &&
     ["Exercise", "Problem"].includes(
@@ -98,25 +116,20 @@ const AnnotationProperties: React.FC<Props> = ({
     );
   const sols: Solution[] = draft.solutions ?? [];
 
-  const handleSolutionFile = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setNewFile(e.target.files?.[0] ?? null);
+  const handleSolutionFile = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => setNewFile(e.target.files?.[0] ?? null);
 
   const addSolution = async () => {
     if (!newFile || !draft) return;
-    // upload file
     const { id: fileId, url: fileUrl } = await uploadFile(newFile);
     const sol: Solution = {
       fileId,
       fileUrl,
-      date:
-        newDate ||
-        new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+      date: newDate || new Date().toISOString().slice(0, 10),
       notes: newNotes,
     };
-    const updated = {
-      ...draft,
-      solutions: [...sols, sol],
-    };
+    const updated = { ...draft, solutions: [...sols, sol] } as Annotation;
     setDraft(updated);
     await updateAnnotation(updated);
     setDirty(false);
@@ -128,16 +141,11 @@ const AnnotationProperties: React.FC<Props> = ({
   const removeSolution = async (idx: number) => {
     const sol = sols[idx];
     if (!sol || !draft) return;
-    if (!confirm("Delete this solution file?")) return;
+    if (!confirm("Delete this solution?")) return;
     try {
       await deleteFile(sol.fileId);
-    } catch {
-      /* ignore */
-    }
-    const updated = {
-      ...draft,
-      solutions: sols.filter((_, i) => i !== idx),
-    };
+    } catch {}
+    const updated = { ...draft, solutions: sols.filter((_, i) => i !== idx) };
     setDraft(updated);
     await updateAnnotation(updated);
     setDirty(false);
@@ -158,8 +166,24 @@ const AnnotationProperties: React.FC<Props> = ({
         className="w-full p-1 rounded bg-gray-800 border border-gray-600"
       />
 
-      {/* Description */}
-      <label className="text-sm">Description</label>
+      {/* Notes */}
+      <label className="text-sm">Notes (Markdown)</label>
+      <div
+        onClick={() => setEditNotes(true)}
+        className="w-full max-h-40 overflow-auto p-2 rounded bg-gray-800 border border-gray-600 cursor-pointer prose prose-invert text-sm"
+        title="Click to edit"
+      >
+        {draft.notes ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+            {draft.notes}
+          </ReactMarkdown>
+        ) : (
+          <span className="italic text-gray-400">Click to add notes…</span>
+        )}
+      </div>
+
+      {/* Description (kept for old data but can be phased out) */}
+      <label className="text-sm">Description (plain text)</label>
       <textarea
         name="description"
         rows={2}
@@ -177,7 +201,7 @@ const AnnotationProperties: React.FC<Props> = ({
         className="w-full p-1 rounded bg-gray-800 border border-gray-600"
       />
 
-      {/* Color (single) */}
+      {/* Color */}
       <div>
         <label className="text-sm block">Color</label>
         <input
@@ -206,80 +230,64 @@ const AnnotationProperties: React.FC<Props> = ({
         </>
       )}
 
-      {/* Solutions for Exercise/Problem */}
+      {/* Solutions container */}
       {hasSolutions && (
-        <div className="space-y-2">
-          <h4 className="font-medium">Solutions</h4>
+        <div className="border border-gray-600 rounded p-2 space-y-2">
+          <h4 className="font-medium">
+            Solutions{sols.length > 1 && ` (${sols.length})`}
+          </h4>
 
-          {/* Existing */}
           {sols.map((sol, idx) => (
             <div
               key={idx}
               className="flex items-center space-x-2 bg-gray-800 p-2 rounded"
             >
-              <a
-                href={sol.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                View
-              </a>
+              <button onClick={() => setPreviewImageUrl(sol.fileUrl)}>
+                <Eye size={16} className="text-gray-400 hover:text-white" />
+              </button>
 
-              <button
-                onClick={() => removeSolution(idx)}
-                className="text-red-500 hover:text-red-400"
-              >
-                Delete
+              <button onClick={() => removeSolution(idx)}>
+                <X size={16} className="text-red-500 hover:text-red-400" />
               </button>
 
               <input
                 type="date"
                 value={sol.date}
                 onChange={(e) => {
-                  const newSols = sols.map((s, i) =>
+                  const updatedSols = sols.map((s, i) =>
                     i === idx ? { ...s, date: e.target.value } : s
                   );
-                  setDraft({ ...draft, solutions: newSols });
+                  setDraft({ ...draft, solutions: updatedSols });
                   setDirty(true);
                 }}
-                className="p-1 rounded bg-gray-800 border border-gray-600"
+                className="p-1 rounded bg-gray-800 border border-gray-600 w-20 text-sm"
               />
 
-              <textarea
-                value={sol.notes}
-                onChange={(e) => {
-                  const newSols = sols.map((s, i) =>
-                    i === idx ? { ...s, notes: e.target.value } : s
-                  );
-                  setDraft({ ...draft, solutions: newSols });
-                  setDirty(true);
-                }}
-                placeholder="Notes"
-                className="flex-1 p-1 rounded bg-gray-800 border border-gray-600 resize-none"
-              />
+              {sol.notes ? (
+                <button onClick={() => setPreviewSolutionNote(sol.notes)}>
+                  <StickyNote size={16} className="text-gray-400 hover:text-white" />
+                </button>
+              ) : (
+                <div className="w-4" />
+              )}
             </div>
           ))}
 
-          {/* Add new */}
+          {/* Add new solution */}
           <div className="flex flex-col space-y-1">
-            <input
-              type="file"
-              onChange={handleSolutionFile}
-              className="text-sm"
-            />
+            <input type="file" onChange={handleSolutionFile} className="text-sm" />
             <input
               type="date"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
-              className="p-1 rounded bg-gray-800 border border-gray-600"
+              className="p-1 rounded bg-gray-800 border border-gray-600 w-20 text-sm"
             />
             <textarea
               rows={2}
               placeholder="Notes"
               value={newNotes}
               onChange={(e) => setNewNotes(e.target.value)}
-              className="p-1 rounded bg-gray-800 border border-gray-600 resize-none"
+              className="p-1 rounded bg-gray-800 border border-gray-600 resize-none text-sm"
             />
             <button
               onClick={addSolution}
@@ -288,7 +296,7 @@ const AnnotationProperties: React.FC<Props> = ({
                 newFile ? "bg-green-600 hover:bg-green-500" : "bg-gray-700 cursor-not-allowed"
               } text-sm`}
             >
-              Add Solution
+              Add
             </button>
           </div>
         </div>
@@ -330,6 +338,45 @@ const AnnotationProperties: React.FC<Props> = ({
           </button>
         )}
       </div>
+
+      {/* Modals for edit notes, preview image, preview solution note */}
+      {editNotes && (
+        <MarkdownEditorModal
+          initial={draft.notes ?? ""}
+          onSave={saveNotes}
+          onClose={() => setEditNotes(false)}
+        />
+      )}
+
+      {previewImageUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-gray-900 p-4 max-w-[90vw] max-h-[90vh] overflow-auto rounded">
+            <img src={previewImageUrl} alt="Solution" className="mx-auto" />
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="mt-4 px-3 py-1 bg-gray-700 rounded text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {previewSolutionNote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-gray-900 p-4 max-w-[80vw] max-h-[80vh] overflow-auto rounded prose prose-invert">
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+              {previewSolutionNote}
+            </ReactMarkdown>
+            <button
+              onClick={() => setPreviewSolutionNote(null)}
+              className="mt-4 px-3 py-1 bg-gray-700 rounded text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

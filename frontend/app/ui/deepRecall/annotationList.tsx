@@ -1,6 +1,6 @@
 // src/components/pdfViewer/annotationList.tsx
 import React from "react";
-import { Check, Type, Square, Image as ImageIcon } from "lucide-react";
+import { Check, Type, Square, Image as ImageIcon, StickyNote } from "lucide-react";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 
 const DEFAULT_COLOR = "#000000";
@@ -80,6 +80,7 @@ const AnnotationList: React.FC<Props> = ({
                 <td className="text-left py-0 px-0">{a.page}</td>
                 <td className="flex justify-start space-x-1 py-0 px-0">
                   {a.extra?.imageUrl && <ImageIcon size={16} style={{}} />}
+                  {a.notes && <StickyNote size={16} style={{}} />}
                 </td>
               </tr>
             </tbody>
