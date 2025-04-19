@@ -143,6 +143,8 @@ const AnnotationProperties: React.FC<Props> = ({
     setDirty(false);
   };
 
+  const hasImage = Boolean(draft.extra?.imageUrl);
+
   return (
     <div className="p-4 border-l border-gray-700 flex flex-col space-y-4 overflow-y-auto">
       <h3 className="text-lg font-semibold">Properties</h3>
@@ -289,6 +291,19 @@ const AnnotationProperties: React.FC<Props> = ({
               Add Solution
             </button>
           </div>
+        </div>
+      )}
+
+      {!hasImage ? (
+        <button
+          onClick={() => saveImage(draft as RectangleAnnotation)}
+          className="mt-2 p-2 rounded bg-green-600 hover:bg-green-500 text-sm"
+        >
+          Save Image
+        </button>
+      ) : (
+        <div className="mt-2 text-green-400 text-sm">
+          ✔ Image saved!
         </div>
       )}
 
