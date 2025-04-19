@@ -6,6 +6,7 @@ import {
   RectangleAnnotation,
   TextAnnotation,
   Solution,
+  annotationTypes
 } from "../../types/annotationTypes";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
 
@@ -17,18 +18,6 @@ interface Props {
   onCancel: () => void;
 }
 
-const types: AnnotationType[] = [
-  "Equation",
-  "Plot",
-  "Illustration",
-  "Theorem",
-  "Statement",
-  "Definition",
-  "Figure",
-  "Table",
-  "Exercise",
-  "Problem",
-];
 
 const AnnotationProperties: React.FC<Props> = ({
   annotation,
@@ -206,7 +195,7 @@ const AnnotationProperties: React.FC<Props> = ({
             onChange={typeChange}
             className="w-full p-1 rounded bg-gray-800 border border-gray-600"
           >
-            {types.map((t) => (
+            {annotationTypes.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>

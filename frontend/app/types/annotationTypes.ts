@@ -14,7 +14,23 @@ export type AnnotationType =
   | "Figure"
   | "Table"
   | "Exercise"
+  | "Abstract"
   | "Problem";
+
+// Centralized array of all types.
+export const annotationTypes: AnnotationType[] = [
+    "Equation",
+    "Plot",
+    "Illustration",
+    "Theorem",
+    "Statement",
+    "Definition",
+    "Figure",
+    "Table",
+    "Exercise",
+    "Problem",
+    "Abstract",
+];
 
 interface BaseCoords {
   page: number;
