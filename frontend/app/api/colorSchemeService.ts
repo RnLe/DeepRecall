@@ -12,8 +12,12 @@ const jsonHeaders = {
 
 /** Unwrap Strapi v5 record to our ColorScheme, using documentId */
 function unwrapStrapi<T>(data: any): T {
-  const { id, attributes } = data;
-  return { documentId: id.toString(), ...attributes } as T;
+  // support both Strapi v5 nested (data.attributes) and flat responses
+  if (data.attributes) {
+    const { attributes } = data;
+    return { documentId: attributes.documentId, ...attributes } as T;
+  }
+  return data as T;
 }
 
 /** Fetch all schemes (up to 1000) */
@@ -25,6 +29,7 @@ export async function fetchColorSchemes(): Promise<ColorScheme[]> {
   const res = await fetch(`${BASE_URL}?${params}`, { headers: jsonHeaders });
   if (!res.ok) throw new Error(`Fetch schemes failed: ${res.status}`);
   const json = await res.json();
+  console.log("Fetched schemes", json);
   return json.data.map((d: any) => unwrapStrapi<ColorScheme>(d));
 }
 
