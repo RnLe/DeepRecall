@@ -37,7 +37,7 @@ interface Props {
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
   resolution: number;
-  defaultColors: Record<AnnotationType, string>;
+  colorMap: Record<AnnotationType, string>;
 }
 
 const DEFAULT_PAGE_HEIGHT = 842;
@@ -57,7 +57,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       onHoverAnnotation,
       renderTooltip,
       resolution,
-      defaultColors,
+      colorMap,
     },
     ref
   ) => {
@@ -238,6 +238,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         >
           <div
             data-page-number={pg}
+            data-index={vRow.index}
             ref={(el) => {
               if (el) {
                 pageRefs.current.set(pg, el);
@@ -319,7 +320,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               onSelectAnnotation={onSelectAnnotation}
               onHoverAnnotation={onHoverAnnotation}
               renderTooltip={renderTooltip}
-              defaultColors={defaultColors}
+              colorMap={colorMap}
             />
 
             {draft?.page === pg && (

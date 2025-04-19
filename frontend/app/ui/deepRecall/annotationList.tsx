@@ -3,6 +3,8 @@ import React from "react";
 import { Check, Type, Square, Image as ImageIcon } from "lucide-react";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 
+const DEFAULT_COLOR = "#000000";
+
 interface Props {
   annotations: Annotation[];
   selectedId: string | null;
@@ -12,6 +14,7 @@ interface Props {
   onItemClick: (a: Annotation) => void;
   onToggleMulti: (a: Annotation) => void;
   onHover: (id: string | null) => void;
+  colorMap?: Record<string, string>;
 }
 
 const AnnotationList: React.FC<Props> = ({
@@ -23,12 +26,21 @@ const AnnotationList: React.FC<Props> = ({
   onItemClick,
   onToggleMulti,
   onHover,
+  colorMap
 }) => (
   <div className="flex-1 overflow-y-auto divide-y divide-gray-800">
     {annotations.map((a) => {
       const isChecked = multi && multiSet.has(a.documentId!);
       const isActive = selectedId === a.documentId;
       const isHovered = hoveredId === a.documentId;
+
+      // compute icon color same as in overlay
+      const color =
+        a.color ??
+        (a.type === "rectangle"
+          ? colorMap?.[(a as RectangleAnnotation).annotationType]
+          : colorMap?.["text"]) ??
+        DEFAULT_COLOR;
 
       const handleClick = () => {
         multi ? onToggleMulti(a) : onItemClick(a);
@@ -48,22 +60,26 @@ const AnnotationList: React.FC<Props> = ({
             <tbody>
               <tr className="h-4">
                 <td className="flex items-center space-x-1 py-0 px-0">
-                  {multi && (isChecked ? <Check size={16} /> : <span>○</span>)}
+                  {multi && (
+                    isChecked
+                      ? <Check size={16} style={{ color }} />
+                      : <span style={{ color }}>○</span>
+                  )}
                   {a.type === "text" ? (
                     <>
-                      <Type size={20} />
+                      <Type size={20} style={{ color }} />
                       <span></span>
                     </>
                   ) : (
                     <>
-                      <Square size={20} />
+                      <Square size={20} style={{ color }} />
                       <span>{(a as RectangleAnnotation).annotationType}</span>
                     </>
                   )}
                 </td>
                 <td className="text-left py-0 px-0">{a.page}</td>
                 <td className="flex justify-start space-x-1 py-0 px-0">
-                  {a.extra?.imageUrl && <ImageIcon size={16} />}
+                  {a.extra?.imageUrl && <ImageIcon size={16} style={{}} />}
                 </td>
               </tr>
             </tbody>

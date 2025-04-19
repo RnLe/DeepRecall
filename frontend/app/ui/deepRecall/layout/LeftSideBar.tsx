@@ -111,12 +111,10 @@ const LeftSideBar: React.FC<Props> = ({
           )}
 
           {panel === "tools" && (
-            <div className="p-4">
-              <AnnotationToolbar
+            <AnnotationToolbar
                 mode={currentMode}
                 setMode={setCurrentMode}
-              />
-            </div>
+            />
           )}
 
           {panel === "colors" && (

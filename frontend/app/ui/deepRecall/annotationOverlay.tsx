@@ -14,7 +14,7 @@ interface Props {
   onSelectAnnotation: (a: Annotation) => void;
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
-  defaultColors?: Record<AnnotationType, string>;
+  colorMap?: Record<AnnotationType, string>;
 }
 
 const DEFAULT_COLOR = "#000000";
@@ -27,7 +27,7 @@ const AnnotationOverlay: React.FC<Props> = ({
   onSelectAnnotation,
   onHoverAnnotation,
   renderTooltip,
-  defaultColors = {},
+  colorMap = {},
 }) => {
   const [hovered, setHovered] = useState<Annotation | null>(null);
 
@@ -60,8 +60,8 @@ const AnnotationOverlay: React.FC<Props> = ({
         const color =
           a.color ??
           (a.type === "rectangle"
-            ? defaultColors[(a as RectangleAnnotation).annotationType]
-            : defaultColors["text" as AnnotationType]) ??
+            ? colorMap[(a as RectangleAnnotation).annotationType]
+            : colorMap["text" as AnnotationType]) ??
           DEFAULT_COLOR;
 
         // Rectangle border

@@ -245,7 +245,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
               <AnnotationHoverTooltip annotation={a} />
             )}
             resolution={4}
-            defaultColors={colorMap}
+            colorMap={colorMap}
           />
         </div>
       </div>
@@ -282,6 +282,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         saveImage={handleSaveImage}
         selected={selected}
         onCancelSelect={() => setSelId(null)}
+        colorMap={colorMap}
       />
     </div>
   );
