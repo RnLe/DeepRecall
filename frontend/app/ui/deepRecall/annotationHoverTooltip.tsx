@@ -1,5 +1,4 @@
 // annotationHoverTooltip.tsx
-
 import React from "react";
 import { Annotation } from "../../types/annotationTypes";
 

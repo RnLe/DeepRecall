@@ -16,12 +16,23 @@ export const uploadFile = async (file: File): Promise<UploadedFileInfo> => {
     },
   });
   if (!response.ok) {
-    const errorBody = await response.json();
-    console.error("Upload API Error", response.status, errorBody);
-    throw new Error(`Upload API Error: ${response.status} - ${JSON.stringify(errorBody)}`);
+    const err = await response.json();
+    throw new Error(`Upload API Error: ${response.status} – ${JSON.stringify(err)}`);
   }
   const json = await response.json();
-  // Assuming json[0] is the uploaded file object
-  const fileInfo = json[0];
-  return { id: fileInfo.id, url: fileInfo.url };
+  const f = json[0];
+  return { id: f.id, url: f.url };
+};
+
+export const deleteFile = async (fileId: number): Promise<void> => {
+  const res = await fetch(`http://localhost:1337/api/upload/files/${fileId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_TOKEN}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(`Delete file failed: ${res.status} – ${JSON.stringify(err)}`);
+  }
 };

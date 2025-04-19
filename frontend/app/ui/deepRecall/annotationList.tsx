@@ -1,7 +1,6 @@
 // annotationList.tsx
-
 import React from "react";
-import { Check } from "lucide-react";
+import { Check, Type, Square, Image as ImageIcon } from "lucide-react";
 import { Annotation } from "../../types/annotationTypes";
 
 interface Props {
@@ -10,11 +9,8 @@ interface Props {
   hoveredId: string | null;
   multi: boolean;
   multiSet: Set<string>;
-  /** Click in single‑select mode */
-  onItemClick: (annotation: Annotation) => void;
-  /** Toggle in multi‑select mode */
-  onToggleMulti: (annotation: Annotation) => void;
-  /** Hover enter/leave */
+  onItemClick: (a: Annotation) => void;
+  onToggleMulti: (a: Annotation) => void;
   onHover: (id: string | null) => void;
 }
 
@@ -28,42 +24,54 @@ const AnnotationList: React.FC<Props> = ({
   onToggleMulti,
   onHover,
 }) => (
-  <ul className="flex-1 overflow-y-auto divide-y divide-gray-800">
+  <div className="flex-1 overflow-y-auto divide-y divide-gray-800">
     {annotations.map((a) => {
       const isChecked = multi && multiSet.has(a.documentId!);
       const isActive = selectedId === a.documentId;
       const isHovered = hoveredId === a.documentId;
 
       const handleClick = () => {
-        if (multi) onToggleMulti(a);
-        else onItemClick(a);
+        multi ? onToggleMulti(a) : onItemClick(a);
       };
 
       return (
-        <li
+        <div
           key={a.documentId}
-          className={`px-3 py-1 flex items-center space-x-2 cursor-pointer ${
+          className={`p-1 cursor-pointer ${
             isActive ? "bg-gray-700" : isHovered ? "bg-gray-600" : ""
           }`}
           onClick={handleClick}
           onMouseEnter={() => onHover(a.documentId!)}
           onMouseLeave={() => onHover(null)}
         >
-          {multi && (
-            isChecked ? (
-              <Check size={16} />
-            ) : (
-              <span className="text-gray-600">○</span>
-            )
-          )}
-          <span className="flex-1 truncate">
-            {a.type === "rectangle" ? a.annotationKind : "Highlight"} – p.
-            {a.page}
-          </span>
-        </li>
+          <table className="w-full table-fixed">
+            <tbody>
+              <tr className="h-4">
+                <td className="flex items-center space-x-1 py-0 px-0">
+                  {multi && (isChecked ? <Check size={16} /> : <span>○</span>)}
+                  {a.type === "text" ? (
+                    <>
+                      <Type size={20} />
+                      <span></span>
+                    </>
+                  ) : (
+                    <>
+                      <Square size={20} />
+                      <span>{a.annotationKind}</span>
+                    </>
+                  )}
+                </td>
+                <td className="text-left py-0 px-0">{a.page}</td>
+                <td className="flex justify-start space-x-1 py-0 px-0">
+                  {a.extra?.imageUrl && <ImageIcon size={16} />}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       );
     })}
-  </ul>
+  </div>
 );
 
 export default AnnotationList;

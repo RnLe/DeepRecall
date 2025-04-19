@@ -32,13 +32,13 @@ const PdfViewerPage: React.FC<PdfViewerPageProps> = ({ className }) => {
 
   return (
     <div className={`flex h-full w-full bg-gray-900 text-white ${className || ""}`}>
-      {/* LEFT – list -------------------------------- */}      
+      {/* LEFT – list */}
       <aside className="w-1/4 p-4 bg-gray-800">
         <h2 className="text-xl font-semibold mb-4">Literature</h2>
         <CompactLiteratureList items={items} onSelect={setActiveLit} />
       </aside>
 
-      {/* RIGHT – viewer ----------------------------- */}
+      {/* RIGHT – viewer */}
       <main className="flex-1 overflow-hidden p-4">
         {activeLit ? (
           <PdfAnnotationContainer activeLiterature={activeLit} />

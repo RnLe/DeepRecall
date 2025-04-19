@@ -9,9 +9,6 @@ interface Props {
   setMode: (m: AnnotationMode) => void;
 }
 
-/* ------------------------------------------------------------------ */
-/* ----------------------------  Cursor  ---------------------------- */
-
 const cursorForMode: Record<AnnotationMode, string> = {
   none: "default",
   text: "text",
@@ -28,8 +25,6 @@ const useGlobalCursor = (mode: AnnotationMode) => {
   }, [mode]);
 };
 
-/* ------------------------------------------------------------------ */
-
 const ToolBtn: React.FC<{
   active: boolean;
   onClick: () => void;
@@ -38,9 +33,7 @@ const ToolBtn: React.FC<{
   <button
     onClick={onClick}
     className={`flex items-center space-x-2 p-2 rounded text-sm ${
-      active
-        ? "bg-blue-600"
-        : "bg-gray-700 hover:bg-gray-600 active:bg-gray-500"
+      active ? "bg-blue-600" : "bg-gray-700 hover:bg-gray-600 active:bg-gray-500"
     }`}
   >
     {children}
@@ -50,9 +43,7 @@ const ToolBtn: React.FC<{
 const AnnotationToolbar: React.FC<Props> = ({ mode, setMode }) => {
   useGlobalCursor(mode);
 
-  /** Click → toggle: deactivate when already active */
-  const toggle = (m: AnnotationMode) =>
-    setMode(mode === m ? "none" : m);
+  const toggle = (m: AnnotationMode) => setMode(mode === m ? "none" : m);
 
   return (
     <div className="w-48 p-4 border-r border-gray-700 flex flex-col space-y-2">
@@ -66,7 +57,6 @@ const AnnotationToolbar: React.FC<Props> = ({ mode, setMode }) => {
         <Square size={16} /> <span>Rectangle</span>
       </ToolBtn>
 
-      {/* Visually distinct but subtle “clear” button  */}
       <div className="pt-4 border-t border-gray-700" />
 
       <ToolBtn active={mode === "none"} onClick={() => setMode("none")}>
