@@ -69,7 +69,10 @@ const AnnotationOverlay: React.FC<Props> = ({
           return (
             <div
               key={a.documentId}
-              onClick={() => onSelectAnnotation(a)}
+              onClick={e => {
+                e.stopPropagation();
+                onSelectAnnotation(a);
+              }}
               onMouseEnter={() => enter(a)}
               onMouseLeave={leave}
               style={{
@@ -99,7 +102,10 @@ const AnnotationOverlay: React.FC<Props> = ({
         return (
           <div
             key={a.documentId}
-            onClick={() => onSelectAnnotation(a)}
+            onClick={e => {
+              e.stopPropagation();
+              onSelectAnnotation(a);
+            }}
             onMouseEnter={() => enter(a)}
             onMouseLeave={leave}
             style={{

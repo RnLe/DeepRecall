@@ -1,7 +1,19 @@
 // src/types/annotationTypes.ts
 import { StrapiResponse } from "./strapiTypes";
 
-/* ---------- ENUMS & ARRAYS ---------- */
+/* ──────────────────── NEW relational helper types ──────────────────── */
+
+export interface AnnotationTag extends StrapiResponse {
+  /** uniqueness is enforced in Strapi */
+  name: string;
+}
+
+export interface AnnotationGroup extends StrapiResponse {
+  /** will get more fields later */
+  name: string;
+}
+
+/* ────────────────── Annotation‑specific value enums ────────────────── */
 
 export type AnnotationType =
   | "Equation"
@@ -14,7 +26,9 @@ export type AnnotationType =
   | "Table"
   | "Exercise"
   | "Abstract"
-  | "Problem";
+  | "Problem"
+  | "Calculation"     // ← NEW
+  | "Other";          // ← NEW
 
 export const annotationTypes: AnnotationType[] = [
   "Equation",
@@ -28,9 +42,11 @@ export const annotationTypes: AnnotationType[] = [
   "Exercise",
   "Problem",
   "Abstract",
+  "Calculation",      // ← NEW
+  "Other",            // ← NEW
 ];
 
-/* ---------- BASE TYPES ---------- */
+/* ────────────────────── Core model definitions ─────────────────────── */
 
 interface BaseCoords {
   page: number;
@@ -49,16 +65,19 @@ export interface Solution {
 
 /**
  * Core for every annotation.
- * NEW: `notes` → markdown string (rendered elsewhere).
+ * Relations (`tags`, `groups`) come straight from Strapi.
  */
 export interface BaseAnnotation extends BaseCoords {
   documentId?: string;
   literatureId: string;
   pdfId: string;
   title?: string;
-  description?: string;      // kept for backwards‑compat
-  notes?: string;            // ← NEW
-  tags?: string[];
+  description?: string;
+  notes?: string;
+  /** Strapi M‑to‑M relation (empty array = none) */
+  annotation_tags?: AnnotationTag[];
+  /** reserved for later */
+  annotation_groups?: AnnotationGroup[];
   color?: string;
   solutions?: Solution[];
   createdAt?: string;
@@ -70,33 +89,47 @@ export interface BaseAnnotation extends BaseCoords {
   };
 }
 
-/* ---------- CONCRETE VARIANTS ---------- */
+/* ───────────────────── Concrete annotation variants ────────────────── */
 
 export interface RectangleAnnotation extends BaseAnnotation {
   type: "rectangle";
   annotationType: AnnotationType;
 }
-
 export interface TextAnnotation extends BaseAnnotation {
   type: "text";
   highlightedText: string;
 }
-
 export type Annotation = RectangleAnnotation | TextAnnotation;
 
-/* ---------- STRAPI (DE)SERIALISATION ---------- */
+/* ──────────────────── Strapi (de)serialisation helpers ─────────────── */
 
 export interface AnnotationStrapi extends StrapiResponse {
   type: Annotation["type"];
   literatureId: string;
   pdfId: string;
+  /** plain‑JS object stringified by Strapi component field `metadata` */
   metadata: string;
+  /** many-to-many relations */
+  annotation_tags?: {
+    data?:      AnnotationTag[];      // for responses
+    connect?:   string[];             // for POST/PUT
+    disconnect?:string[];
+    set?:       string[];
+  };
+  annotation_groups?: {
+    data?:      AnnotationGroup[];
+    connect?:   string[];
+    disconnect?:string[];
+    set?:       string[];
+  };
 }
 
+/** helper for clearer code */
+const mapTags = (rel?: { data?: AnnotationTag[] }) => rel?.data ?? [];
+
 export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
-  const raw = rec.metadata ?? {};
-  const meta =
-    typeof raw === "string" ? (raw ? JSON.parse(raw) : {}) : raw;
+  /* metadata blob (legacy scalar data) */
+  const meta = rec.metadata ? JSON.parse(rec.metadata) : {};
 
   const extra = {
     ...(meta.extra ?? {}),
@@ -104,10 +137,11 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
     ...(meta.imageFileId ? { imageFileId: meta.imageFileId } : {}),
   };
 
-  const common = {
+  const common: Omit<BaseAnnotation, keyof BaseCoords> & BaseCoords = {
     documentId: rec.documentId,
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
+    /* coords from metadata */
     page: meta.page,
     x: meta.x,
     y: meta.y,
@@ -117,12 +151,14 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
     pdfId: rec.pdfId ?? meta.pdfId,
     title: meta.title,
     description: meta.description,
-    notes: meta.notes,                // ← NEW
-    tags: meta.tags ?? [],
+    notes: meta.notes,
+    /* relations */
+    annotation_tags: mapTags(rec.annotation_tags),
+    annotation_groups: mapTags(rec.annotation_groups),
     color: meta.color,
     solutions: meta.solutions ?? [],
     extra,
-  } as const;
+  };
 
   return rec.type === "text"
     ? {
@@ -149,8 +185,9 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     height,
     title,
     description,
-    notes,                          // ← NEW
-    tags,
+    notes,
+    annotation_tags,
+    annotation_groups,
     color,
     solutions,
     extra = {},
@@ -164,14 +201,11 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     height,
     title,
     description,
-    notes,                          // ← NEW
+    notes,
     ...extra,
   };
-
-  if (tags) meta.tags = tags;
   if (color) meta.color = color;
   if (solutions) meta.solutions = solutions;
-
   if (type === "text") {
     meta.highlightedText = (ann as TextAnnotation).highlightedText;
   } else {
@@ -183,5 +217,12 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     literatureId,
     pdfId,
     metadata: JSON.stringify(meta),
+    /**
+     * Strapi‑v5: use `set` to replace all relations in one go.
+     * This ensures removing a tag in the UI will
+     * actually disconnect it on save.
+     */
+    annotation_tags:    { set: annotation_tags?.map((t) => t.documentId) },
+    annotation_groups:  { set: (ann.annotation_groups ?? []).map((g) => g.documentId) },
   } as unknown as AnnotationStrapi;
 }

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useLiterature, useLiteratureTypes } from "../../customHooks/useLiterature";
+import { useAnnotationGroups } from "@/app/customHooks/useAnnotationGroups";
+import { useAnnotationTags } from "@/app/customHooks/useAnnotationTags";
 import { LiteratureExtended } from "../../types/literatureTypes";
 import { AnnotationType, annotationTypes } from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";

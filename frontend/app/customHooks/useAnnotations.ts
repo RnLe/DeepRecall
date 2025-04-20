@@ -8,7 +8,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Annotation } from "../types/annotationTypes";
 
-export function useAnnotations(literatureId?: string) {
+export function useAnnotations(literatureId: string, pdfId: string) {
   const qc = useQueryClient();
 
   /* ----------------------------- READ ---------------------------- */
@@ -17,10 +17,13 @@ export function useAnnotations(literatureId?: string) {
     isPending: isLoading,
     error,
   } = useQuery<Annotation[]>({
-    queryKey: ["annotations", literatureId],
-    queryFn: () => fetchAnnotations(literatureId),
-    enabled: literatureId !== undefined,
+    queryKey: ["annotations", literatureId, pdfId],
+    queryFn: () => fetchAnnotations(literatureId, pdfId),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
+
+  console.log("Fetched annotations:", annotations);
 
   /* --------------------------- CREATE --------------------------- */
   const createMutation = useMutation({
