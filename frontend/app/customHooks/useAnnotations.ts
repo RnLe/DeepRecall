@@ -23,8 +23,6 @@ export function useAnnotations(literatureId: string, pdfId: string) {
     refetchOnWindowFocus: false,
   });
 
-  console.log("Fetched annotations:", annotations);
-
   /* --------------------------- CREATE --------------------------- */
   const createMutation = useMutation({
     mutationFn: apiCreate,

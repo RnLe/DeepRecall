@@ -31,21 +31,31 @@ export async function fetchAnnotations(
   pdfId?: string
 ): Promise<Annotation[]> {
   const params = new URLSearchParams();
+
   if (literatureId !== undefined)
     params.append("filters[literatureId][$eq]", literatureId);
-  if (pdfId !== undefined) params.append("filters[pdfId][$eq]", pdfId);
+  if (pdfId !== undefined)
+    params.append("filters[pdfId][$eq]", pdfId);
+
   params.append("pagination[pageSize]", "1000");
   params.append("sort", "createdAt:asc");
+
+  // Include related annotation_tags in the response
+  params.append("populate[0]", "annotation_tags");
+  params.append("populate[1]", "annotation_groups");
+
 
   const res = await fetch(`${BASE_URL}?${params.toString()}`, {
     headers: jsonHeaders,
   });
+
   if (!res.ok) throw new Error(`Fetch annotations failed: ${res.status}`);
-  console.log("Fetched super raw annotations:", res);
+
   const json = await res.json();
-  console.log("Fetched raw annotations:", json);
+
   return json.data.map((d: any) => deserializeAnnotation(d));
 }
+
 
 export async function createAnnotation(
   ann: Annotation
