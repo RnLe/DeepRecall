@@ -71,7 +71,6 @@ const AnnotationProperties: React.FC<Props> = ({
       .split(",")
       .map((t) => t.trim())
       .filter((t) => t);
-    setDraft({ ...draft, tags: vals });
     setDirty(true);
   };
 
@@ -196,7 +195,6 @@ const AnnotationProperties: React.FC<Props> = ({
       <label className="text-sm">Tags (comma‑separated)</label>
       <input
         type="text"
-        value={(draft.tags ?? []).join(", ")}
         onChange={tagsChange}
         className="w-full p-1 rounded bg-gray-800 border border-gray-600"
       />
