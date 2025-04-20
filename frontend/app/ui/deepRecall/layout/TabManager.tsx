@@ -13,6 +13,7 @@ interface Props {
   tabs: LiteratureExtended[];
   activeTabId: string | null;
   annotationMode: AnnotationMode;
+  setAnnotationMode: (mode: AnnotationMode) => void;    // <-- new
   colorMap: Record<AnnotationType, string>;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
@@ -22,6 +23,7 @@ const TabManager: React.FC<Props> = ({
   tabs,
   activeTabId,
   annotationMode,
+  setAnnotationMode,       // <-- new
   colorMap,
   sidebarOpen,
   onToggleSidebar,
@@ -66,6 +68,7 @@ const TabManager: React.FC<Props> = ({
           onOpenDescription={noop}
           onOpenImage={noop}
           onOpenSolutions={noop}
+          fileOpen={false} // <-- add this prop
         />
       </div>
     );
@@ -77,6 +80,7 @@ const TabManager: React.FC<Props> = ({
       key={active.documentId}           // ← forces React to tear down & rebuild
       activeLiterature={active}
       annotationMode={annotationMode}
+      setAnnotationMode={setAnnotationMode}    // <-- forward setter
       colorMap={colorMap}
       sidebarOpen={sidebarOpen}
       onToggleSidebar={onToggleSidebar}

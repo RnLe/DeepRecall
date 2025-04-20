@@ -27,8 +27,9 @@ export type AnnotationType =
   | "Exercise"
   | "Abstract"
   | "Problem"
-  | "Calculation"     // ← NEW
-  | "Other";          // ← NEW
+  | "Calculation"
+  | "Other"
+  | "Recipe";        // ← NEW
 
 export const annotationTypes: AnnotationType[] = [
   "Equation",
@@ -42,8 +43,9 @@ export const annotationTypes: AnnotationType[] = [
   "Exercise",
   "Problem",
   "Abstract",
-  "Calculation",      // ← NEW
-  "Other",            // ← NEW
+  "Calculation",
+  "Other",
+  "Recipe",         // ← NEW
 ];
 
 /* ────────────────────── Core model definitions ─────────────────────── */
@@ -98,6 +100,7 @@ export interface RectangleAnnotation extends BaseAnnotation {
 export interface TextAnnotation extends BaseAnnotation {
   type: "text";
   highlightedText: string;
+  annotationType: "Text Highlight";
 }
 export type Annotation = RectangleAnnotation | TextAnnotation;
 
@@ -170,6 +173,7 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
         ...common,
         type: "text",
         highlightedText: meta.highlightedText ?? "",
+        annotationType: "Text Highlight",
       }
     : {
         ...common,

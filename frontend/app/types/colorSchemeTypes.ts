@@ -1,5 +1,6 @@
 // src/types/colorSchemeTypes.ts
 import { StrapiResponse } from "./strapiTypes";
+import { AnnotationType } from "./annotationTypes";
 
 /**
  * Definition of all color‑related settings in a scheme.
@@ -7,7 +8,7 @@ import { StrapiResponse } from "./strapiTypes";
  */
 export interface ColorSchemeDefinition {
     /** Mapping from annotationType to its base color (hex). */
-    annotationColors: Record<string, string>;
+    annotationColors: Record<AnnotationType, string>;
     // e.g. chartColors?: Record<string,string>;
 }
   

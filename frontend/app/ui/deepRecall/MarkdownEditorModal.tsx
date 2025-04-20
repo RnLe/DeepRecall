@@ -6,7 +6,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
-import { Type, Square } from "lucide-react";
+import { Type, Square, Trash2, Eye, Pencil } from "lucide-react";
 
 interface Props {
   initial: string;
@@ -15,6 +15,7 @@ interface Props {
   annotation?: Annotation;
   objectName?: string;
   colorMap?: Record<string, string>;
+  startInPreview?: boolean;
 }
 
 const DEFAULT_COLOR = "#000000";
@@ -26,9 +27,13 @@ const MarkdownEditorModal: React.FC<Props> = ({
   annotation,
   objectName,
   colorMap = {},
+  startInPreview = false,
 }) => {
   const [text, setText] = useState(initial);
-  const [mode, setMode] = useState<"edit" | "preview">("edit");
+  const [mode, setMode] = useState<"edit" | "preview">(startInPreview ? "preview" : "edit");
+
+  // Ref for textarea to enable undoable clear
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const titleContent = (() => {
     if (annotation && objectName) {
@@ -84,9 +89,9 @@ const MarkdownEditorModal: React.FC<Props> = ({
           <h3 className="text-lg">{titleContent}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-xl leading-none"
+            className="text-gray-400 hover:text-white text-2xl leading-none"
           >
-            ×
+            X
           </button>
         </div>
 
@@ -94,6 +99,7 @@ const MarkdownEditorModal: React.FC<Props> = ({
         <div className="flex-1 overflow-hidden flex flex-col">
           {mode === "edit" ? (
             <textarea
+              ref={textareaRef}
               className="flex-1 w-full bg-gray-800 p-3 outline-none resize-none font-mono text-sm"
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -114,12 +120,43 @@ const MarkdownEditorModal: React.FC<Props> = ({
         <div className="flex justify-between items-center px-4 py-2 border-t border-gray-700">
           <button
             onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
-            className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm"
+            className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm flex items-center"
           >
-            {mode === "edit" ? "Preview" : "Edit"}
+            {mode === "edit" ? (
+              <>
+                <Eye size={16} className="mr-1" />
+                Preview
+              </>
+            ) : (
+              <>
+                <Pencil size={16} className="mr-1" />
+                Edit
+              </>
+            )}
           </button>
 
-          <div className="space-x-2">
+          <div className="flex items-center space-x-2">
+            {/* Clear button with icon, tooltip, and undoable clear */}
+            {mode === "edit" && (
+              <button
+                title="Clear the entire note"
+                onClick={() => {
+                  if (textareaRef.current) {
+                    textareaRef.current.focus();
+                    textareaRef.current.select();
+                    document.execCommand("delete");
+                  } else {
+                    setText("");
+                  }
+                }}
+                className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm flex items-center"
+              >
+                <Trash2 size={16} className="mr-1" />
+                Clear
+              </button>
+            )}
+            {/* Visual separator */}
+            {mode === "edit" && <span className="mx-2 text-gray-600">|</span>}
             <button
               onClick={onClose}
               className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm"

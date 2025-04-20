@@ -24,6 +24,7 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
     initialBottomHeightPercent
   );
   const [lastPercent, setLastPercent] = useState<number>(initialBottomHeightPercent);
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const topPaneRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +53,7 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
     const container = containerRef.current;
     if (!container) return;
     const totalH = container.getBoundingClientRect().height;
+    setIsDragging(true);
 
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientY - startY;
@@ -63,6 +65,7 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
     };
     const onUp = () => {
       setLastPercent(bottomHeightPercent);
+      setIsDragging(false);
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
     };
@@ -89,7 +92,7 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
         ref={topPaneRef}
         style={{
           flex: `0 0 ${topBasis}`,
-          transition: "flex-basis 0.2s ease"
+          transition: isDragging ? "none" : "flex-basis 0.2s ease"
         }}
         className="overflow-auto"
       >
@@ -114,7 +117,7 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
       <div
         style={{
           flex: `0 0 ${bottomBasis}`,
-          transition: "flex-basis 0.2s ease"
+          transition: isDragging ? "none" : "flex-basis 0.2s ease"
         }}
         className="overflow-auto"
       >

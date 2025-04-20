@@ -31,6 +31,7 @@ interface Props {
   colorMap: ColorMap;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  setAnnotationMode: (mode: AnnotationMode) => void;   // <-- new
 }
 
 const PdfAnnotationContainer: React.FC<Props> = ({
@@ -39,6 +40,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   colorMap,
   sidebarOpen,
   onToggleSidebar,
+  setAnnotationMode,                                    // <-- new
 }) => {
   const litId = activeLiterature.documentId!;
   const version = activeLiterature.versions[0];
@@ -107,6 +109,10 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     });
   };
   const handleMassDelete = async () => {
+    if (!multiSet.size) return;
+    if (!confirm("Are you sure you want to delete all selected annotations? This action cannot be undone.")) {
+      return;
+    }
     for (const id of Array.from(multiSet)) {
       const ann = display.find((x) => x.documentId === id);
       if (ann?.extra?.imageFileId) {
@@ -300,6 +306,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             renderTooltip={(a) => <AnnotationHoverTooltip annotation={a} />}
             resolution={4}
             colorMap={colorMap}
+            onToolUsed={() => setAnnotationMode("none")}        // <-- forward callback
           />
         </div>
       </div>
@@ -345,6 +352,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         onOpenDescription={handleOpenDescription}
         onOpenImage={handleOpenImage}
         onOpenSolutions={handleOpenSolutions}
+        fileOpen={true} // <-- add this prop
       />
 
       {/* ────────────────── DESCRIPTION EDITOR ────────────────── */}
@@ -359,6 +367,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
           annotation={descriptionModalAnn}
           objectName="Description"
           colorMap={colorMap}
+          startInPreview={true}
         />
       )}
 
@@ -374,6 +383,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
           annotation={notesModalAnn}
           objectName="Notes"
           colorMap={colorMap}
+          startInPreview={true}
         />
       )}
 

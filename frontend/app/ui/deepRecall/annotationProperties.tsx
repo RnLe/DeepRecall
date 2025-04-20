@@ -122,10 +122,12 @@ const AnnotationProperties: React.FC<Props> = ({
 
   const typeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     if (!draft || draft.type !== "rectangle") return;
-    setDraft({
+    const next = {
       ...(draft as RectangleAnnotation),
       annotationType: e.target.value as AnnotationType,
-    });
+    };
+    setDraft(next);
+    updateAnnotation(next);    // <- persist change immediately
   };
 
   const handleDelete = async () => {
@@ -413,7 +415,11 @@ const AnnotationProperties: React.FC<Props> = ({
         </button>
         {draft.documentId && (
           <button
-            onClick={() => deleteAnnotation(draft.documentId!)}
+            onClick={async () => {
+              if (confirm("Are you sure you want to delete this annotation? This action cannot be undone.")) {
+                await deleteAnnotation(draft.documentId!);
+              }
+            }}
             className="flex-1 p-2 rounded bg-red-700 hover:bg-red-600"
           >
             Delete
@@ -466,12 +472,19 @@ const AnnotationProperties: React.FC<Props> = ({
           annotation={draft}
           objectName="Notes"
           colorMap={colorMap}
+          startInPreview={true}
         />
       )}
 
       {previewImageUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-gray-900 p-4 max-w-[90vw] max-h-[90vh] overflow-auto rounded">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div
+            className="bg-gray-900 p-4 max-w-[90vw] max-h-[90vh] overflow-auto rounded"
+            onClick={e => e.stopPropagation()}
+          >
             <img src={previewImageUrl} alt="Solution" className="mx-auto" />
             <button
               onClick={() => setPreviewImageUrl(null)}
@@ -484,8 +497,14 @@ const AnnotationProperties: React.FC<Props> = ({
       )}
 
       {previewSolutionNote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-gray-900 p-4 max-w-[80vw] max-h-[80vh] overflow-auto rounded prose prose-invert">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={() => setPreviewSolutionNote(null)}
+        >
+          <div
+            className="bg-gray-900 p-4 max-w-[80vw] max-h-[80vh] overflow-auto rounded prose prose-invert"
+            onClick={e => e.stopPropagation()}
+          >
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
               {previewSolutionNote}
             </ReactMarkdown>

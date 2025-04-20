@@ -58,6 +58,7 @@ interface Props {
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
   resolution: number;
   colorMap: Record<AnnotationType, string>;
+  onToolUsed?: () => void;    // <-- new
 }
 
 const DEFAULT_PAGE_HEIGHT = 842;
@@ -78,6 +79,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       renderTooltip,
       resolution,
       colorMap,
+      onToolUsed,              // <-- new
     },
     ref
   ) => {
@@ -252,6 +254,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       const pr = pgEl.getBoundingClientRect();
       onCreateAnnotation({
         type: "text",
+        annotationType: "Text Highlight",
         highlightedText: sel.toString(),
         page: pg,
         x: (rect.left - pr.left) / pr.width,
@@ -263,8 +266,9 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         annotation_tags: [],
         annotation_groups: [],
       });
+      onToolUsed?.();                    // <-- call tool‐deselect
       sel.removeAllRanges();
-    }, [annotationMode, onCreateAnnotation]);
+    }, [annotationMode, onCreateAnnotation, onToolUsed]);
 
     useEffect(() => {
       document.addEventListener("mouseup", handleTextSelect);
@@ -335,6 +339,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
                 annotation_tags: [],
                 annotation_groups: [],
               });
+              onToolUsed?.();                // <-- call tool‐deselect
               clearDraft();
             }}
           >

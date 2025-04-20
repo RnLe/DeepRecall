@@ -36,6 +36,7 @@ interface Props {
   onOpenDescription: (a: Annotation) => void;
   onOpenImage: (a: Annotation) => void;
   onOpenSolutions: (a: Annotation) => void;
+  fileOpen: boolean; // <-- add this prop
 }
 
 const RightSidebar: React.FC<Props> = ({
@@ -65,6 +66,7 @@ const RightSidebar: React.FC<Props> = ({
   onOpenDescription,
   onOpenImage,
   onOpenSolutions,
+  fileOpen, // <-- add this prop
 }) => {
   /* track whether the properties panel is open */
   const [propsOpen, setPropsOpen] = useState(false);
@@ -98,7 +100,9 @@ const RightSidebar: React.FC<Props> = ({
         onOpenSolutions={onOpenSolutions}
       />
     ) : (
-      <div className="p-4 text-gray-400">Open a file to view annotations</div>
+      <div className="p-4 text-gray-400">
+        {fileOpen ? "No annotations in this file" : "Open a file to view annotations"}
+      </div>
     );
 
   return (

@@ -1,5 +1,6 @@
 // src/components/pdfViewer/CollapsiblePanel.tsx
 import React, { useState, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
 
 interface CollapsiblePanelProps {
   title: string;
@@ -33,11 +34,17 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
       {/* Banner */}
       <div
         onClick={toggle}
-        className={`cursor-pointer p-2 bg-gray-800 border-t border-gray-700 text-center text-sm text-white ${
+        className={`relative cursor-pointer p-2 bg-gray-800 border-t border-gray-700 text-center text-sm text-white ${
           expanded ? "" : "mt-auto"
-        }`}
+        } flex items-center justify-center`}
+        style={{ minHeight: 36 }}
       >
-        {title}
+        {expanded && (
+          <span className="absolute left-2 top-1/2 -translate-y-1/2">
+            <ChevronDown size={18} className="text-gray-400" />
+          </span>
+        )}
+        <span className="w-full">{title}</span>
       </div>
 
       {/* Content */}
