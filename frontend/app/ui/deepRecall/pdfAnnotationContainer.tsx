@@ -62,7 +62,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     createAnnotation,
     updateAnnotation: mutateUpdate,
     deleteAnnotation: mutateDelete,
-  } = useAnnotations(litId);
+  } = useAnnotations(litId, pdfId);
 
   const display = useMemo(
     () => annotations.filter((a) => a.pdfId === pdfId),
@@ -257,9 +257,15 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             selectedId={selId}
             onCreateAnnotation={handleAdd}
             onSelectAnnotation={(a) => {
-              setSelId(a.documentId!);
-              setPage(a.page);
-              /* let PdfViewer handle scrolling – no explicit scrollToPage here */
+                if (a) {
+                  setSelId(a.documentId!);
+                  setPage(a.page);
+                  /* auto‑open sidebar when an annotation is clicked */
+                  if (!sidebarOpen) onToggleSidebar();
+                } else {
+                  /* clicked void → deselect */
+                  setSelId(null);
+                }
             }}
             onHoverAnnotation={(a) => setHovered(a?.documentId || null)}
             renderTooltip={(a) => <AnnotationHoverTooltip annotation={a} />}
