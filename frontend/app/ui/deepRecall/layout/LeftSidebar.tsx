@@ -70,7 +70,7 @@ const LeftSideBar: React.FC<Props> = ({
               }`}
             >
               <Icon
-                size={20}
+                size={25}
                 className={`transition-colors ${
                   isActive
                     ? "text-white"

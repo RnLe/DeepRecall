@@ -228,6 +228,6 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
      * actually disconnect it on save.
      */
     annotation_tags:    { set: annotation_tags?.map((t) => t.documentId) },
-    annotation_groups:  { set: (ann.annotation_groups ?? []).map((g) => g.documentId) },
+    annotation_groups:  { set: annotation_groups?.map((g) => g.documentId) },
   } as unknown as AnnotationStrapi;
 }

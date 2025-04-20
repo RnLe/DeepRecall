@@ -39,9 +39,7 @@ export default function TagInput({ tags, onChange }: TagInputProps) {
       await addTag(val);
       setOpen(false);
     }
-    if (e.key === "Backspace" && !input && tags.length) {
-      onChange(tags.slice(0, -1));
-    }
+    // removed Backspace branch so Backspace no longer removes last tag
   };
 
   const handleSelectSuggestion = async (tag: AnnotationTag) => {
@@ -56,12 +54,26 @@ export default function TagInput({ tags, onChange }: TagInputProps) {
     onChange(out);
   };
 
+  // derive filtered suggestions
+  const filteredSuggestions = suggestions.filter(
+    (s) => !tags.some((t) => t.documentId === s.documentId)
+  );
+
   return (
     <div className="relative" ref={containerRef}>
-      <div
-        className="flex flex-wrap items-center gap-1 p-1 bg-gray-800 border border-gray-600 rounded"
-        onClick={() => setOpen(true)}
-      >
+      <input
+        className="w-full p-1 bg-gray-800 border border-gray-600 rounded text-sm text-white"
+        value={input}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          const v = e.target.value.replace(/[\s,]/g, "");
+          setInput(v);
+          setOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder="Add tag…"
+      />
+      <div className="flex flex-wrap gap-1 mt-2">
         {tags.map((t, i) => (
           <span
             key={t.documentId || t.name}
@@ -69,28 +81,13 @@ export default function TagInput({ tags, onChange }: TagInputProps) {
           >
             {t.name}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                removeTag(i);
-              }}
+              onClick={() => removeTag(i)}
               className="ml-1 text-gray-400 hover:text-white"
             >
               ×
             </button>
           </span>
         ))}
-
-        <input
-          className="flex-1 min-w-[6rem] bg-transparent outline-none text-sm p-1"
-          value={input}
-          onChange={(e) => {
-            const v = e.target.value.replace(/[\s,]/g, "");
-            setInput(v);
-            setOpen(true);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Add tag…"
-        />
       </div>
 
       {/* suggestions dropdown */}
@@ -98,8 +95,8 @@ export default function TagInput({ tags, onChange }: TagInputProps) {
         <ul className="absolute z-10 w-full max-h-40 overflow-auto bg-gray-800 border border-gray-600 rounded mt-1">
           {isLoading ? (
             <li className="p-2 text-sm text-gray-400">Loading…</li>
-          ) : suggestions.length ? (
-            suggestions.map((s) => (
+          ) : filteredSuggestions.length ? (
+            filteredSuggestions.map((s) => (
               <li
                 key={s.documentId}
                 className="px-2 py-1 cursor-pointer hover:bg-gray-700 text-sm"

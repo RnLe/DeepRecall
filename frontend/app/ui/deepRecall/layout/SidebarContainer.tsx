@@ -1,5 +1,6 @@
 // src/components/pdfViewer/SidebarContainer.tsx
 import React, { useState, useRef, useEffect } from "react";
+import { ChevronsUpDown } from "lucide-react";
 
 interface SidebarContainerProps {
   top: React.ReactNode;
@@ -84,9 +85,13 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
       {bottomActive && (
         <div className="h-4 flex items-center justify-center">
           <div
-            className="h-px w-12 bg-gray-600 hover:bg-gray-500 cursor-row-resize"
+            className="relative w-full h-2 bg-gray-600 hover:bg-gray-500 cursor-row-resize"
             onMouseDown={handleMouseDown}
-          />
+          >
+            <ChevronsUpDown
+              className="absolute inset-0 m-auto h-2 w-2 text-gray-200 pointer-events-none"
+            />
+          </div>
         </div>
       )}
 

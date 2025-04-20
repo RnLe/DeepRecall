@@ -1,6 +1,6 @@
 // src/components/pdfViewer/annotationList.tsx
 import React from "react";
-import { CircleCheckBig, Type, Square, Image as ImageIcon, StickyNote, Circle } from "lucide-react";
+import { CircleCheckBig, Type, Square, Image as ImageIcon, StickyNote, Circle, Tags, FileText, Sigma } from "lucide-react";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 
 const DEFAULT_COLOR = "#000000";
@@ -14,6 +14,11 @@ interface Props {
   onItemClick: (a: Annotation) => void;
   onToggleMulti: (a: Annotation) => void;
   onHover: (id: string | null) => void;
+  onOpenTags: (a: Annotation) => void;
+  onOpenNotes: (a: Annotation) => void;
+  onOpenDescription: (a: Annotation) => void;
+  onOpenImage: (a: Annotation) => void;
+  onOpenSolutions: (a: Annotation) => void;
   colorMap?: Record<string, string>;
 }
 
@@ -26,6 +31,11 @@ const AnnotationList: React.FC<Props> = ({
   onItemClick,
   onToggleMulti,
   onHover,
+  onOpenTags,
+  onOpenNotes,
+  onOpenDescription,
+  onOpenImage,
+  onOpenSolutions,
   colorMap
 }) => (
   <div className="flex-1 overflow-y-auto divide-y divide-gray-800">
@@ -79,8 +89,31 @@ const AnnotationList: React.FC<Props> = ({
                 </td>
                 <td className="text-left py-0 px-0">{a.page}</td>
                 <td className="flex justify-start space-x-1 py-0 px-0">
-                  {a.extra?.imageUrl && <ImageIcon size={16} style={{}} />}
-                  {a.notes && <StickyNote size={16} style={{}} />}
+                  {a.annotation_tags?.length! > 0 && (
+                    <button onClick={() => onOpenTags(a)} title="Tags">
+                      <Tags size={16} />
+                    </button>
+                  )}
+                  {a.description && (
+                    <button onClick={() => onOpenDescription(a)} title="Description">
+                      <FileText size={16} />
+                    </button>
+                  )}
+                  {a.solutions?.length! > 0 && (
+                    <button onClick={() => onOpenSolutions(a)} title="Solutions">
+                      <Sigma size={16} />
+                    </button>
+                  )}
+                  {a.extra?.imageUrl && (
+                    <button onClick={() => onOpenImage(a)} title="Image">
+                      <ImageIcon size={16} />
+                    </button>
+                  )}
+                  {a.notes && (
+                    <button onClick={() => onOpenNotes(a)} title="Notes">
+                      <StickyNote size={16} />
+                    </button>
+                  )}
                 </td>
               </tr>
             </tbody>

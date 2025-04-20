@@ -61,6 +61,11 @@ const TabManager: React.FC<Props> = ({
           selected={null}
           onCancelSelect={noop}
           colorMap={colorMap}
+          onOpenTags={noop}
+          onOpenNotes={noop}
+          onOpenDescription={noop}
+          onOpenImage={noop}
+          onOpenSolutions={noop}
         />
       </div>
     );

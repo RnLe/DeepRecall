@@ -24,13 +24,18 @@ interface Props {
   onToggleShow: () => void;
   onToggleMultiMode: () => void;
   onSelectAll: () => void;
-  onDeselectAll: () => void;          // ⬅ NEW
+  onDeselectAll: () => void;
   updateAnnotation: (a: Annotation) => Promise<void>;
   deleteAnnotation: (id: string) => Promise<void>;
   saveImage: (a: RectangleAnnotation) => Promise<void>;
   selected: Annotation | null;
   onCancelSelect: () => void;
   colorMap?: Record<string, string>;
+  onOpenTags: (a: Annotation) => void;
+  onOpenNotes: (a: Annotation) => void;
+  onOpenDescription: (a: Annotation) => void;
+  onOpenImage: (a: Annotation) => void;
+  onOpenSolutions: (a: Annotation) => void;
 }
 
 const RightSidebar: React.FC<Props> = ({
@@ -55,6 +60,11 @@ const RightSidebar: React.FC<Props> = ({
   selected,
   onCancelSelect,
   colorMap = {},
+  onOpenTags,
+  onOpenNotes,
+  onOpenDescription,
+  onOpenImage,
+  onOpenSolutions,
 }) => {
   /* track whether the properties panel is open */
   const [propsOpen, setPropsOpen] = useState(false);
@@ -72,6 +82,11 @@ const RightSidebar: React.FC<Props> = ({
         onToggleMulti={onToggleMulti}
         onHover={onHover}
         colorMap={colorMap}
+        onOpenTags={onOpenTags}
+        onOpenNotes={onOpenNotes}
+        onOpenDescription={onOpenDescription}
+        onOpenImage={onOpenImage}
+        onOpenSolutions={onOpenSolutions}
       />
     ) : (
       <div className="p-4 text-gray-400">Open a file to view annotations</div>

@@ -4,9 +4,17 @@
 // "X seconds ago", "X minutes ago", "X hours ago", "X days ago"
 // "X weeks ago", "X months ago", "X years ago"
 
-export const agoTimeToString = (timestamp: number): string => {
+export const agoTimeToString = (
+  timestamp: number,
+  compactUnderDay: boolean = false
+): string => {
   const now = Date.now() / 1000; // Convert to seconds
   const diff = now - timestamp;
+
+  // compact mode: any interval under 1 day
+  if (compactUnderDay && diff < 86400) {
+    return "less than a day ago";
+  }
 
   if (diff < 60) {
     return `${Math.floor(diff)} seconds ago`;

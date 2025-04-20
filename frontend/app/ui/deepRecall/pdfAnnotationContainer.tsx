@@ -164,6 +164,17 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     }
   };
 
+  // open‑icon handlers
+  const openSideAndSelect = (a: Annotation) => {
+    setSelId(a.documentId!);
+    if (!sidebarOpen) onToggleSidebar();
+  };
+  const handleOpenTags = (a: Annotation) => openSideAndSelect(a);
+  const handleOpenNotes = (a: Annotation) => openSideAndSelect(a);
+  const handleOpenDescription = (a: Annotation) => openSideAndSelect(a);
+  const handleOpenImage = (a: Annotation) => openSideAndSelect(a);
+  const handleOpenSolutions = (a: Annotation) => openSideAndSelect(a);
+
   if (isLoading) return <div>Loading…</div>;
 
   return (
@@ -311,6 +322,11 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         colorMap={colorMap}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={onToggleSidebar}
+        onOpenTags={handleOpenTags}
+        onOpenNotes={handleOpenNotes}
+        onOpenDescription={handleOpenDescription}
+        onOpenImage={handleOpenImage}
+        onOpenSolutions={handleOpenSolutions}
       />
     </div>
   );
