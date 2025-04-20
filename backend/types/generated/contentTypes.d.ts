@@ -369,6 +369,76 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiAnnotationGroupAnnotationGroup
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'annotation_groups';
+  info: {
+    displayName: 'AnnotationGroup';
+    pluralName: 'annotation-groups';
+    singularName: 'annotation-group';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    annotations: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::annotation.annotation'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::annotation-group.annotation-group'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiAnnotationTagAnnotationTag
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'annotation_tags';
+  info: {
+    displayName: 'AnnotationTag';
+    pluralName: 'annotation-tags';
+    singularName: 'annotation-tag';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    annotations: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::annotation.annotation'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::annotation-tag.annotation-tag'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiAnnotationTypeAnnotationType
   extends Struct.CollectionTypeSchema {
   collectionName: 'annotation_types';
@@ -411,6 +481,14 @@ export interface ApiAnnotationAnnotation extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    annotation_groups: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::annotation-group.annotation-group'
+    >;
+    annotation_tags: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::annotation-tag.annotation-tag'
+    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -939,6 +1017,8 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::annotation-group.annotation-group': ApiAnnotationGroupAnnotationGroup;
+      'api::annotation-tag.annotation-tag': ApiAnnotationTagAnnotationTag;
       'api::annotation-type.annotation-type': ApiAnnotationTypeAnnotationType;
       'api::annotation.annotation': ApiAnnotationAnnotation;
       'api::author.author': ApiAuthorAuthor;

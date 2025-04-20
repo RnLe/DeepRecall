@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useLiterature } from "../../customHooks/useLiterature";
-import { useLiteratureTypes } from "../../customHooks/useLiterature";
-import { LiteratureExtended, LiteratureType } from "../../types/literatureTypes";
+import { useLiterature, useLiteratureTypes } from "../../customHooks/useLiterature";
+import { LiteratureExtended } from "../../types/literatureTypes";
 import { AnnotationType, annotationTypes } from "../../types/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { useColors } from "../../customHooks/useColors";
@@ -11,7 +10,7 @@ import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 
 import TopNavBar from "./layout/TopNavBar";
-import LeftSidebar from "./layout/LeftSideBar";
+import LeftSidebar from "./layout/LeftSidebar";
 import TabManager from "./layout/TabManager";
 
 const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
@@ -57,9 +56,12 @@ const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
     });
   }, [selectedSchemeId, schemes]);
 
-  // --- tab management ---
+  // --- sidebar toggle state (for TopNavBar & PdfAnnotationContainer) ---
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [activeTabs, setActiveTabs] = useState<LiteratureExtended[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  const toggleSidebar = () => { setSidebarOpen(o => !o); };
 
   const openTab = (lit: LiteratureExtended) => {
     setActiveTabs((prev) =>
@@ -118,6 +120,8 @@ const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
           activeTabId={activeTabId}
           onSelectTab={setActiveTabId}
           onCloseTab={closeTab}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={toggleSidebar}
         />
 
         <TabManager
@@ -125,6 +129,8 @@ const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
           activeTabId={activeTabId}
           annotationMode={currentMode}
           colorMap={colorMap}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={toggleSidebar}
         />
       </div>
     </div>

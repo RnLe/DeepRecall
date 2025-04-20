@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import PdfViewerWithAnnotations, { PdfViewerHandle } from "./pdfViewerWithAnnotations";
-import RightSidebar from "./layout/RightSideBar";
+import RightSidebar from "./layout/RightSidebar";
 import AnnotationHoverTooltip from "./annotationHoverTooltip";
 
 import { LiteratureExtended } from "../../types/literatureTypes";
@@ -29,12 +29,16 @@ interface Props {
   activeLiterature: LiteratureExtended;
   annotationMode: AnnotationMode;
   colorMap: ColorMap;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
 }
 
 const PdfAnnotationContainer: React.FC<Props> = ({
   activeLiterature,
   annotationMode,
   colorMap,
+  sidebarOpen,
+  onToggleSidebar,
 }) => {
   const litId = activeLiterature.documentId!;
   const version = activeLiterature.versions[0];
@@ -46,6 +50,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
   const [showAnnotations, setShowAnnotations] = useState(true);
+  const deselectAll = () => setMultiSet(new Set());
 
   const viewerRef = useRef<PdfViewerHandle>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -125,9 +130,16 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     setMultiSet(new Set(display.map((a) => a.documentId!)));
 
   // --- navigation & zoom ---
-  const changePage = (delta: number) =>
-    setPage((p) => clamp(p + delta, 1, numPages));
-  const goToPage = (n: number) => setPage(clamp(n, 1, numPages));
+  // centralised page jump: updates state *and* scrolls viewer
+  const jumpToPage = (n: number) => {
+      const target = clamp(n, 1, numPages);
+      setPage(target);
+      viewerRef.current?.scrollToPage(target);
+    };
+  
+  const changePage = (delta: number) => jumpToPage(page + delta);
+  const goToPage    = (n: number)    => jumpToPage(n);
+
   const zoomIn = () => setZoom((z) => z + 0.1);
   const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.1));
 
@@ -178,7 +190,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
                     value={page}
                     min={1}
                     max={numPages}
-                    onChange={(e) => goToPage(Number(e.target.value))}
+                    onChange={(e) => jumpToPage(Number(e.target.value))}
                     className="w-16 text-center bg-gray-900 border border-gray-600 rounded"
                   />
                   <span>/ {numPages || "-"}</span>
@@ -284,12 +296,15 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         onToggleShow={() => setShowAnnotations((s) => !s)}
         onToggleMultiMode={toggleMultiMode}
         onSelectAll={selectAll}
+        onDeselectAll={deselectAll}
         updateAnnotation={handleUpdate}
         deleteAnnotation={handleDelete}
         saveImage={handleSaveImage}
         selected={selected}
         onCancelSelect={() => setSelId(null)}
         colorMap={colorMap}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={onToggleSidebar}
       />
     </div>
   );
