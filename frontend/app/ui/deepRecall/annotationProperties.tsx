@@ -12,9 +12,19 @@ import {
   annotationTypes,
   AnnotationType,
   Solution,
+  AnnotationTag,
 } from "../../types/annotationTypes";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
 import MarkdownEditorModal from "./MarkdownEditorModal";
+import TagInput from "./TagInput";
+
+// Which rectangle‑annotation types should show the Solutions panel?
+const solutionTypes: AnnotationType[] = [
+    "Exercise",
+    "Problem",
+    "Calculation",
+    "Other",
+];
 
 interface Props {
   annotation: Annotation | null;
@@ -58,6 +68,12 @@ const AnnotationProperties: React.FC<Props> = ({
   if (!draft) return <div className="p-4">No annotation selected.</div>;
   const isRect = draft.type === "rectangle";
 
+  // generic field updater
+  const setField = <K extends keyof Annotation>(key: K, val: Annotation[K]) => {
+    setDraft((d) => (d ? { ...d, [key]: val } : d));
+    setDirty(true);
+  };
+
   const commonChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -66,16 +82,9 @@ const AnnotationProperties: React.FC<Props> = ({
     setDirty(true);
   };
 
-  const tagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const vals = e.target.value
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t);
-    setDraft({ ...draft, tags: vals });
-    setDirty(true);
-  };
-
+  // when annotation is rectangle, change its annotationType
   const typeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!draft || draft.type !== "rectangle") return;
     setDraft({
       ...(draft as RectangleAnnotation),
       annotationType: e.target.value as AnnotationType,
@@ -109,11 +118,7 @@ const AnnotationProperties: React.FC<Props> = ({
   };
 
   // Solutions
-  const hasSolutions =
-    isRect &&
-    ["Exercise", "Problem"].includes(
-      (draft as RectangleAnnotation).annotationType
-    );
+  const hasSolutions = isRect && solutionTypes.includes((draft as RectangleAnnotation).annotationType);
   const sols: Solution[] = draft.solutions ?? [];
 
   const handleSolutionFile = (
@@ -157,67 +162,11 @@ const AnnotationProperties: React.FC<Props> = ({
     <div className="p-4 border-l border-gray-700 flex flex-col space-y-4 overflow-y-auto">
       <h3 className="text-lg font-semibold">Properties</h3>
 
-      {/* Title */}
-      <label className="text-sm">Title</label>
-      <input
-        name="title"
-        value={draft.title ?? ""}
-        onChange={commonChange}
-        className="w-full p-1 rounded bg-gray-800 border border-gray-600"
-      />
-
-      {/* Notes */}
-      <label className="text-sm">Notes (Markdown)</label>
-      <div
-        onClick={() => setEditNotes(true)}
-        className="w-full max-h-40 overflow-auto p-2 rounded bg-gray-800 border border-gray-600 cursor-pointer prose prose-invert text-sm"
-        title="Click to edit"
-      >
-        {draft.notes ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-            {draft.notes}
-          </ReactMarkdown>
-        ) : (
-          <span className="italic text-gray-400">Click to add notes…</span>
-        )}
-      </div>
-
-      {/* Description (kept for old data but can be phased out) */}
-      <label className="text-sm">Description (plain text)</label>
-      <textarea
-        name="description"
-        rows={2}
-        value={draft.description ?? ""}
-        onChange={commonChange}
-        className="w-full p-1 rounded bg-gray-800 border border-gray-600 resize-none"
-      />
-
-      {/* Tags */}
-      <label className="text-sm">Tags (comma‑separated)</label>
-      <input
-        type="text"
-        value={(draft.tags ?? []).join(", ")}
-        onChange={tagsChange}
-        className="w-full p-1 rounded bg-gray-800 border border-gray-600"
-      />
-
-      {/* Color */}
-      <div>
-        <label className="text-sm block">Color</label>
-        <input
-          type="color"
-          value={draft.color ?? "#000000"}
-          onChange={colorChange}
-          className="h-8 w-12 p-0 border-0"
-        />
-      </div>
-
-      {/* Annotation Type */}
       {isRect && (
         <>
           <label className="text-sm">Annotation Type</label>
           <select
-            value={(draft as RectangleAnnotation).annotationType}
+            value={draft.annotationType}
             onChange={typeChange}
             className="w-full p-1 rounded bg-gray-800 border border-gray-600"
           >
@@ -229,6 +178,63 @@ const AnnotationProperties: React.FC<Props> = ({
           </select>
         </>
       )}
+
+      {/* Tags */}
+      <label className="text-sm">Tags</label>
+      <TagInput
+        tags={draft.annotation_tags ?? []}
+        onChange={(newTags: AnnotationTag[]) =>
+          setField("annotation_tags", newTags)
+        }
+      />
+
+      {/* Title */}
+      <label className="text-sm">Title</label>
+      <input
+        name="title"
+        value={draft.title ?? ""}
+        onChange={(e) => setField("title", e.target.value)}
+        className="w-full p-1 rounded bg-gray-800 border border-gray-600"
+      />
+
+      {/* Notes */}
+      <label className="text-sm">Notes (Markdown)</label>
+      <div
+        onClick={() => setEditNotes(true)}
+        className="w-full max-h-40 overflow-auto p-2 rounded bg-gray-800 border border-gray-600 cursor-pointer prose prose-invert text-sm"
+      >
+        {draft.notes ? (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
+            {draft.notes}
+          </ReactMarkdown>
+        ) : (
+          <span className="italic text-gray-400">Click to add notes…</span>
+        )}
+      </div>
+
+      {/* Description */}
+      <label className="text-sm">Description</label>
+      <textarea
+        name="description"
+        rows={2}
+        value={draft.description ?? ""}
+        onChange={(e) => setField("description", e.target.value)}
+        className="w-full p-1 rounded bg-gray-800 border border-gray-600 resize-none"
+      />
+
+      {/* Color picker */}
+      <div>
+        <label className="text-sm block">Color</label>
+        <input
+          type="color"
+          value={draft.color ?? "#000000"}
+          onChange={(e) => setField("color", e.target.value)}
+          className="h-8 w-12 p-0 border-0"
+        />
+      </div>
 
       {/* Solutions container */}
       {hasSolutions && (
@@ -316,6 +322,7 @@ const AnnotationProperties: React.FC<Props> = ({
       )}
 
       {/* Actions */}
+      {/* Save / Cancel / Delete */}
       <div className="mt-auto flex space-x-2">
         <button
           onClick={handleSave}
@@ -326,12 +333,15 @@ const AnnotationProperties: React.FC<Props> = ({
         >
           Save
         </button>
-        <button onClick={onCancel} className="flex-1 p-2 rounded bg-gray-600">
+        <button
+          onClick={onCancel}
+          className="flex-1 p-2 rounded bg-gray-600"
+        >
           Cancel
         </button>
         {draft.documentId && (
           <button
-            onClick={handleDelete}
+            onClick={() => deleteAnnotation(draft.documentId!)}
             className="flex-1 p-2 rounded bg-red-700 hover:bg-red-600"
           >
             Delete
