@@ -18,6 +18,7 @@ import { uploadFile, deleteFile } from "../../api/uploadFile";
 import { agoTimeToString } from "../../helpers/timesToString";
 import MarkdownEditorModal from "./MarkdownEditorModal";
 import TagInput from "./TagInput";
+import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
 // Which rectangle‑annotation types should show the Solutions panel?
 const solutionTypes: AnnotationType[] = [
@@ -33,6 +34,7 @@ interface Props {
   deleteAnnotation: (id: string) => Promise<void>;
   saveImage: (a: RectangleAnnotation) => Promise<void>;
   onCancel: () => void;
+  colorMap?: Record<string, string>;
 }
 
 const AnnotationProperties: React.FC<Props> = ({
@@ -41,13 +43,14 @@ const AnnotationProperties: React.FC<Props> = ({
   deleteAnnotation,
   saveImage,
   onCancel,
+  colorMap = {},
 }) => {
   const today = new Date().toISOString().slice(0, 10);
   const [editDescription, setEditDescription] = useState(false);
   const [editNewSolNotes, setEditNewSolNotes] = useState(false);
 
   const [draft, setDraft] = useState<Annotation | null>(annotation);
-  const [dirty, setDirty] = useState(false);
+  const [titleDirty, setTitleDirty] = useState(false);
 
   // modals
   const [editNotes, setEditNotes] = useState(false);
@@ -60,10 +63,11 @@ const AnnotationProperties: React.FC<Props> = ({
   const [newDate, setNewDate] = useState("");
   const [newNotes, setNewNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showAddSol, setShowAddSol] = useState(false);
 
   useEffect(() => {
     setDraft(annotation);
-    setDirty(false);
+    setTitleDirty(false);
     setEditNotes(false);
     setEditDescription(false);
     setEditNewSolNotes(false);
@@ -77,10 +81,36 @@ const AnnotationProperties: React.FC<Props> = ({
   if (!draft) return <div className="p-4">No annotation selected.</div>;
   const isRect = draft.type === "rectangle";
 
-  // generic field updater
+  // generic field updater (no longer used for title/color/tags)
   const setField = <K extends keyof Annotation>(key: K, val: Annotation[K]) => {
     setDraft((d) => (d ? { ...d, [key]: val } : d));
-    setDirty(true);
+  };
+
+  // Title change only => mark dirty
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = { ...draft!, title: e.target.value };
+    setDraft(next);
+    setTitleDirty(true);
+  };
+  const applyTitle = async () => {
+    if (draft) {
+      await updateAnnotation(draft);
+      setTitleDirty(false);
+    }
+  };
+
+  // Color change => immediate update
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = { ...draft!, color: e.target.value };
+    setDraft(next);
+    updateAnnotation(next);
+  };
+
+  // Tags change => immediate update
+  const handleTagsChange = (newTags: AnnotationTag[]) => {
+    const next = { ...draft!, annotation_tags: newTags };
+    setDraft(next);
+    updateAnnotation(next);
   };
 
   const commonChange = (
@@ -88,15 +118,6 @@ const AnnotationProperties: React.FC<Props> = ({
   ) => {
     const { name, value } = e.target;
     setDraft({ ...draft, [name]: value } as Annotation);
-    setDirty(true);
-  };
-
-  const tagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const vals = e.target.value
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t);
-    setDirty(true);
   };
 
   const typeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -105,19 +126,6 @@ const AnnotationProperties: React.FC<Props> = ({
       ...(draft as RectangleAnnotation),
       annotationType: e.target.value as AnnotationType,
     });
-    setDirty(true);
-  };
-
-  const colorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDraft({ ...draft, color: e.target.value });
-    setDirty(true);
-  };
-
-  const handleSave = async () => {
-    if (draft) {
-      await updateAnnotation(draft);
-      setDirty(false);
-    }
   };
 
   const handleDelete = async () => {
@@ -130,14 +138,12 @@ const AnnotationProperties: React.FC<Props> = ({
     const next = { ...draft, notes: md } as Annotation;
     setDraft(next);
     await updateAnnotation(next);
-    setDirty(false);
   };
 
   const saveDescription = async (md: string) => {
     const next = { ...draft, description: md } as Annotation;
     setDraft(next);
     await updateAnnotation(next);
-    setDirty(false);
   };
 
   const saveSolNote = async (md: string) => {
@@ -148,7 +154,6 @@ const AnnotationProperties: React.FC<Props> = ({
       const updated = { ...draft, solutions: updatedSols } as Annotation;
       setDraft(updated);
       await updateAnnotation(updated);
-      setDirty(false);
       setEditSolIdx(null);
     }
   };
@@ -173,7 +178,6 @@ const AnnotationProperties: React.FC<Props> = ({
     const updated = { ...draft, solutions: [...sols, sol] } as Annotation;
     setDraft(updated);
     await updateAnnotation(updated);
-    setDirty(false);
     setNewFile(null);
     setNewDate(today);                // reset to today
     setNewNotes("");
@@ -191,7 +195,6 @@ const AnnotationProperties: React.FC<Props> = ({
     const updated = { ...draft, solutions: sols.filter((_, i) => i !== idx) };
     setDraft(updated);
     await updateAnnotation(updated);
-    setDirty(false);
   };
 
   const hasImage = Boolean(draft.extra?.imageUrl);
@@ -221,9 +224,17 @@ const AnnotationProperties: React.FC<Props> = ({
       <input
         name="title"
         value={draft.title ?? ""}
-        onChange={(e) => setField("title", e.target.value)}
+        onChange={handleTitleChange}
         className="w-full p-1 rounded bg-gray-800 border border-gray-600"
       />
+      {titleDirty && (
+        <button
+          onClick={applyTitle}
+          className="mt-1 p-2 rounded bg-blue-600 hover:bg-blue-500 text-sm transition"
+        >
+          Apply
+        </button>
+      )}
 
       {/* Description */}
       <div className="flex items-center space-x-1">
@@ -244,9 +255,7 @@ const AnnotationProperties: React.FC<Props> = ({
       </div>
       <TagInput
         tags={draft.annotation_tags ?? []}
-        onChange={(newTags: AnnotationTag[]) =>
-          setField("annotation_tags", newTags)
-        }
+        onChange={handleTagsChange}
       />
 
       {/* Notes */}
@@ -272,10 +281,14 @@ const AnnotationProperties: React.FC<Props> = ({
           <input
             type="color"
             value={draft.color ?? "#000000"}
-            onChange={(e) => setField("color", e.target.value)}
+            onChange={handleColorChange}
           />
           <button
-            onClick={() => setField("color", undefined)}
+            onClick={() => {
+              const next = { ...draft, color: undefined };
+              setDraft(next);
+              updateAnnotation(next);
+            }}
             className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
           >
             Reset
@@ -300,7 +313,7 @@ const AnnotationProperties: React.FC<Props> = ({
               className="flex items-center justify-between bg-gray-800 p-2 rounded"
             >
               <div className="flex items-center space-x-2">
-                <button onClick={() => setPreviewImageUrl(sol.fileUrl)}>
+                <button onClick={() => setPreviewImageUrl(prefixStrapiUrl(sol.fileUrl))}>
                   <ImageIcon
                     size={24}
                     className="text-gray-400 hover:text-white"
@@ -328,40 +341,50 @@ const AnnotationProperties: React.FC<Props> = ({
             </div>
           ))}
 
-          <div className="border-t-2 border-double border-t-gray-600 my-2" />
-
-          {/* Add new solution */}
-          <div className="flex flex-col space-y-1">
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleSolutionFile}
-              className="text-sm"
-            />
-            <input
-              type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              className="p-1 rounded bg-gray-800 border border-gray-600 w-full text-sm"
-            />
-            <div
-              onClick={() => setEditNewSolNotes(true)}
-              className="w-full h-auto p-2 rounded bg-gray-800 border border-gray-600 cursor-pointer prose prose-invert text-sm text-center"
-            >
-              <span className="italic text-gray-400">
-                {newNotes ? "Edit notes" : "Click to add notes"}
-              </span>
-            </div>
+          {!showAddSol ? (
             <button
-              onClick={addSolution}
-              disabled={!newFile}
-              className={`mt-1 p-2 rounded ${
-                newFile ? "bg-green-600 hover:bg-green-500" : "bg-gray-700 cursor-not-allowed"
-              } text-sm`}
+              onClick={() => setShowAddSol(true)}
+              className="w-full p-2 mt-2 border border-dashed border-gray-600 rounded text-sm text-gray-400"
             >
-              Add
+              Add new {(draft as RectangleAnnotation).annotationType.toLowerCase()}
             </button>
-          </div>
+          ) : (
+            <>
+              <div className="border-t-2 border-double border-t-gray-600 my-2" />
+              {/* Add new solution inputs */}
+              <div className="flex flex-col space-y-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleSolutionFile}
+                  className="text-sm"
+                />
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="p-1 rounded bg-gray-800 border border-gray-600 w-full text-sm"
+                />
+                <div
+                  onClick={() => setEditNewSolNotes(true)}
+                  className="w-full h-auto p-2 rounded bg-gray-800 border border-gray-600 cursor-pointer prose prose-invert text-sm text-center"
+                >
+                  <span className="italic text-gray-400">
+                    {newNotes ? "Edit notes" : "Click to add notes"}
+                  </span>
+                </div>
+                <button
+                  onClick={addSolution}
+                  disabled={!newFile}
+                  className={`mt-1 p-2 rounded ${
+                    newFile ? "bg-green-600 hover:bg-green-500" : "bg-gray-700 cursor-not-allowed"
+                  } text-sm`}
+                >
+                  Add
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -381,17 +404,7 @@ const AnnotationProperties: React.FC<Props> = ({
       )}
 
       {/* Actions */}
-      {/* Save / Cancel / Delete */}
       <div className="mt-auto flex space-x-2">
-        <button
-          onClick={handleSave}
-          disabled={!dirty}
-          className={`flex-1 p-2 rounded ${
-            dirty ? "bg-blue-600" : "bg-gray-700 cursor-not-allowed"
-          }`}
-        >
-          Save
-        </button>
         <button
           onClick={onCancel}
           className="flex-1 p-2 rounded bg-gray-600"
@@ -414,6 +427,9 @@ const AnnotationProperties: React.FC<Props> = ({
           initial={draft.notes ?? ""}
           onSave={saveNotes}
           onClose={() => setEditNotes(false)}
+          annotation={draft}
+          objectName="Notes"
+          colorMap={colorMap}
         />
       )}
 
@@ -422,6 +438,9 @@ const AnnotationProperties: React.FC<Props> = ({
           initial={draft.description ?? ""}
           onSave={saveDescription}
           onClose={() => setEditDescription(false)}
+          annotation={draft}
+          objectName="Description"
+          colorMap={colorMap}
         />
       )}
 
@@ -433,6 +452,9 @@ const AnnotationProperties: React.FC<Props> = ({
             setEditNewSolNotes(false);
           }}
           onClose={() => setEditNewSolNotes(false)}
+          annotation={draft}
+          objectName="Notes"
+          colorMap={colorMap}
         />
       )}
 
@@ -441,6 +463,9 @@ const AnnotationProperties: React.FC<Props> = ({
           initial={sols[editSolIdx].notes}
           onSave={saveSolNote}
           onClose={() => setEditSolIdx(null)}
+          annotation={draft}
+          objectName="Notes"
+          colorMap={colorMap}
         />
       )}
 

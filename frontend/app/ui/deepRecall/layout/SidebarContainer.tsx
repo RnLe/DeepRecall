@@ -25,36 +25,44 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
   );
   const [lastPercent, setLastPercent] = useState<number>(initialBottomHeightPercent);
   const containerRef = useRef<HTMLDivElement>(null);
+  const topPaneRef = useRef<HTMLDivElement>(null);
 
-  // When bottomActive toggles, store/restore the last size
   useEffect(() => {
     if (bottomActive) {
-      setBottomHeightPercent(lastPercent);
+      // on first expand, measure top list and grow bottom so it starts just below last item
+      if (lastPercent === initialBottomHeightPercent && containerRef.current && topPaneRef.current) {
+        const totalH = containerRef.current.getBoundingClientRect().height;
+        const topH = topPaneRef.current.getBoundingClientRect().height;
+        let computed = 100 - (topH / totalH) * 100;
+        computed = Math.max(computed, initialBottomHeightPercent);
+        setBottomHeightPercent(computed);
+      } else {
+        setBottomHeightPercent(lastPercent);
+      }
     } else {
       setLastPercent(bottomHeightPercent);
     }
   }, [bottomActive]);
 
-  // Drag‑to‑resize (only when expanded)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!bottomActive) return;
     e.preventDefault();
     const startY = e.clientY;
+    const startPercent = bottomHeightPercent;
     const container = containerRef.current;
     if (!container) return;
-
     const totalH = container.getBoundingClientRect().height;
-    const startPx = (bottomHeightPercent / 100) * totalH;
 
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientY - startY;
       const newPx = Math.max(
         minBottomHeightPx,
-        Math.min(startPx - delta, totalH - minBottomHeightPx)
+        Math.min((startPercent / 100) * totalH - delta, totalH - minBottomHeightPx)
       );
       setBottomHeightPercent((newPx / totalH) * 100);
     };
     const onUp = () => {
+      setLastPercent(bottomHeightPercent);
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
     };
@@ -76,8 +84,15 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
 
   return (
     <div ref={containerRef} className="flex flex-col h-full">
-      {/* Top pane */}
-      <div style={{ flex: `0 0 ${topBasis}` }} className="overflow-auto">
+      {/* Top pane with ref for measurement */}
+      <div
+        ref={topPaneRef}
+        style={{
+          flex: `0 0 ${topBasis}`,
+          transition: "flex-basis 0.2s ease"
+        }}
+        className="overflow-auto"
+      >
         {top}
       </div>
 
@@ -96,7 +111,13 @@ const SidebarContainer: React.FC<SidebarContainerProps> = ({
       )}
 
       {/* Bottom pane (banner + content) */}
-      <div style={{ flex: `0 0 ${bottomBasis}` }} className="overflow-auto">
+      <div
+        style={{
+          flex: `0 0 ${bottomBasis}`,
+          transition: "flex-basis 0.2s ease"
+        }}
+        className="overflow-auto"
+      >
         {bottom}
       </div>
     </div>

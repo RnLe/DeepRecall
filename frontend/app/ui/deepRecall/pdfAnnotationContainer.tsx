@@ -6,13 +6,12 @@ import {
   ChevronsRight,
   Plus,
   Minus,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 
 import PdfViewerWithAnnotations, { PdfViewerHandle } from "./pdfViewerWithAnnotations";
 import RightSidebar from "./layout/RightSidebar";
 import AnnotationHoverTooltip from "./annotationHoverTooltip";
+import MarkdownEditorModal from "./MarkdownEditorModal";
 
 import { LiteratureExtended } from "../../types/literatureTypes";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
@@ -20,6 +19,7 @@ import { useAnnotations } from "../../customHooks/useAnnotations";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
 import { AnnotationMode } from "./annotationToolbar";
 import { AnnotationType } from "../../types/annotationTypes";
+import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
@@ -68,6 +68,12 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     () => annotations.filter((a) => a.pdfId === pdfId),
     [annotations, pdfId]
   );
+
+  // State for the annotation modals (clickable icons in the annotation list)
+  const [descriptionModalAnn, setDescriptionModalAnn] = useState<Annotation|null>(null);
+  const [notesModalAnn,       setNotesModalAnn]       = useState<Annotation|null>(null);
+  const [previewAnnImageUrl,  setPreviewAnnImageUrl]  = useState<string|null>(null);
+  const [previewSolImageUrl,  setPreviewSolImageUrl]  = useState<string|null>(null);
 
   const [selId, setSelId] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -169,11 +175,23 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     setSelId(a.documentId!);
     if (!sidebarOpen) onToggleSidebar();
   };
-  const handleOpenTags = (a: Annotation) => openSideAndSelect(a);
-  const handleOpenNotes = (a: Annotation) => openSideAndSelect(a);
-  const handleOpenDescription = (a: Annotation) => openSideAndSelect(a);
-  const handleOpenImage = (a: Annotation) => openSideAndSelect(a);
-  const handleOpenSolutions = (a: Annotation) => openSideAndSelect(a);
+  const handleOpenDescription = (a: Annotation) => {
+    setDescriptionModalAnn(a);
+  };
+  const handleOpenNotes = (a: Annotation) => {
+    setNotesModalAnn(a);
+  };
+  const handleOpenImage = (a: Annotation) => {
+    if (a.extra?.imageUrl) setPreviewAnnImageUrl(prefixStrapiUrl(a.extra.imageUrl));
+  };
+  const handleOpenSolutions = (a: Annotation) => {
+    if (a.solutions?.length) {
+      const last = a.solutions[a.solutions.length - 1];
+      setPreviewSolImageUrl(prefixStrapiUrl(last.fileUrl));
+    }
+  };
+  // inert tags:
+  const handleOpenTags = (_: Annotation) => {};
 
   if (isLoading) return <div>Loading…</div>;
 
@@ -328,6 +346,89 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         onOpenImage={handleOpenImage}
         onOpenSolutions={handleOpenSolutions}
       />
+
+      {/* ────────────────── DESCRIPTION EDITOR ────────────────── */}
+      {descriptionModalAnn && (
+        <MarkdownEditorModal
+          initial={descriptionModalAnn.description || ""}
+          onSave={async (md) => {
+            await handleUpdate({ ...descriptionModalAnn, description: md });
+            setDescriptionModalAnn(null);
+          }}
+          onClose={() => setDescriptionModalAnn(null)}
+          annotation={descriptionModalAnn}
+          objectName="Description"
+          colorMap={colorMap}
+        />
+      )}
+
+      {/* ───────────────────── NOTES EDITOR ──────────────────── */}
+      {notesModalAnn && (
+        <MarkdownEditorModal
+          initial={notesModalAnn.notes || ""}
+          onSave={async (md) => {
+            await handleUpdate({ ...notesModalAnn, notes: md });
+            setNotesModalAnn(null);
+          }}
+          onClose={() => setNotesModalAnn(null)}
+          annotation={notesModalAnn}
+          objectName="Notes"
+          colorMap={colorMap}
+        />
+      )}
+
+      {/* ────────────────── ANNOTATION IMAGE PREVIEW ────────────────── */}
+      {previewAnnImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={() => setPreviewAnnImageUrl(null)}
+        >
+          <div
+            className="bg-gray-900 p-4 max-w-[90vw] max-h-[90vh] overflow-auto rounded"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewAnnImageUrl}
+              alt="Annotation"
+              className="mx-auto"
+              style={{ maxWidth: "75vw", maxHeight: "75vh" }}
+            />
+            <button
+              onClick={() => setPreviewAnnImageUrl(null)}
+              className="mt-4 px-3 py-1 bg-gray-700 rounded text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────── SOLUTION IMAGE PREVIEW ────────────────── */}
+      {previewSolImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={() => setPreviewSolImageUrl(null)}
+        >
+          <div
+            className="bg-gray-900 p-4 max-w-[90vw] max-h-[90vh] overflow-auto rounded"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewSolImageUrl}
+              alt="Solution"
+              className="mx-auto"
+              style={{ maxWidth: "75vw", maxHeight: "75vh" }}
+            />
+            <button
+              onClick={() => setPreviewSolImageUrl(null)}
+              className="mt-4 px-3 py-1 bg-gray-700 rounded text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

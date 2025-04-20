@@ -1,5 +1,5 @@
 // src/components/pdfViewer/CollapsiblePanel.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface CollapsiblePanelProps {
   title: string;
@@ -15,6 +15,12 @@ const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
   children,
 }) => {
   const [expanded, setExpanded] = useState(initialOpen);
+
+  // keep expanded in sync when initialOpen prop changes
+  useEffect(() => {
+    setExpanded(initialOpen);
+    onExpandedChange?.(initialOpen);
+  }, [initialOpen]);
 
   const toggle = () => {
     const next = !expanded;

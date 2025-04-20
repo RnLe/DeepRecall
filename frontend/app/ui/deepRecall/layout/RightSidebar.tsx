@@ -1,5 +1,5 @@
 // src/components/pdfViewer/layout/RightSidebar.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import AnnotationList from "../annotationList";
 import AnnotationProperties from "../annotationProperties";
@@ -68,6 +68,15 @@ const RightSidebar: React.FC<Props> = ({
 }) => {
   /* track whether the properties panel is open */
   const [propsOpen, setPropsOpen] = useState(false);
+
+  // when selection changes open/close the properties pane
+  useEffect(() => {
+    if (selected) {
+      setPropsOpen(true);
+    } else {
+      setPropsOpen(false);
+    }
+  }, [selected]);
 
   /* decide list vs placeholder */
   const topPane =
@@ -158,8 +167,10 @@ const RightSidebar: React.FC<Props> = ({
               top={topPane}
               bottom={
                 <CollapsiblePanel
+                  initialOpen={!!selected}
                   title="Annotation Properties"
                   onExpandedChange={setPropsOpen}
+                  key={selected?.documentId ?? "none"}
                 >
                   {!multi && selected ? (
                     <AnnotationProperties
@@ -168,6 +179,7 @@ const RightSidebar: React.FC<Props> = ({
                       deleteAnnotation={deleteAnnotation}
                       saveImage={saveImage}
                       onCancel={onCancelSelect}
+                      colorMap={colorMap}
                     />
                   ) : (
                     <div className="p-4 text-gray-400">

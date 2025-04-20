@@ -5,23 +5,83 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
+import { Type, Square } from "lucide-react";
 
 interface Props {
   initial: string;
   onSave: (md: string) => void;
   onClose: () => void;
+  annotation?: Annotation;
+  objectName?: string;
+  colorMap?: Record<string, string>;
 }
 
-const MarkdownEditorModal: React.FC<Props> = ({ initial, onSave, onClose }) => {
+const DEFAULT_COLOR = "#000000";
+
+const MarkdownEditorModal: React.FC<Props> = ({
+  initial,
+  onSave,
+  onClose,
+  annotation,
+  objectName,
+  colorMap = {},
+}) => {
   const [text, setText] = useState(initial);
   const [mode, setMode] = useState<"edit" | "preview">("edit");
 
+  const titleContent = (() => {
+    if (annotation && objectName) {
+      const color =
+        annotation.color ??
+        (annotation.type === "text"
+          ? colorMap["text"]
+          : colorMap[(annotation as RectangleAnnotation).annotationType]) ??
+        DEFAULT_COLOR;
+      const Icon = annotation.type === "text" ? Type : Square;
+      const typeName =
+        annotation.type === "text"
+          ? "Text"
+          : (annotation as RectangleAnnotation).annotationType;
+      return (
+        <>
+          Editing{"\u00A0\u00A0"}
+          <span className="font-semibold">{objectName}</span>{"\u00A0\u00A0"}
+          for{"\u00A0\u00A0"}
+          <Icon size={16} style={{ color }} className="inline mb-1 mr-1" />
+          {" "}
+          <span style={{ }}>{typeName}</span>
+        </>
+      );
+    }
+    if (objectName) {
+      return (
+        <>
+          Editing{"\u00A0\u00A0"}
+          <span className="font-semibold">{objectName}</span>
+        </>
+      );
+    }
+    return <>Edit Notes (Markdown)</>;
+  })();
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-gray-900 w-[min(90vw,800px)] h-[min(90vh,600px)] rounded-lg shadow-lg flex flex-col">
-        {/* header */}
-        <div className="flex justify-between items-center px-4 py-2 border-b border-gray-700">
-          <h3 className="text-lg">Edit Notes (Markdown)</h3>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-gray-900 w-[min(90vw,800px)] h-[min(90vh,600px)] rounded-lg shadow-lg flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* moved, centered label (taller) */}
+        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
+          Markdown Editor
+        </div>
+
+        {/* header (removed separator border) */}
+        <div className="flex justify-between items-center px-4 pt-6">
+          <h3 className="text-lg">{titleContent}</h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-xl leading-none"

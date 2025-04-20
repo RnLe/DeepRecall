@@ -1,6 +1,6 @@
 // src/components/pdfViewer/annotationList.tsx
 import React from "react";
-import { CircleCheckBig, Type, Square, Image as ImageIcon, StickyNote, Circle, Tags, FileText, Sigma } from "lucide-react";
+import { CircleCheckBig, Type, Square, Image as ImageIcon, StickyNote, Tags, FileText, Sigma } from "lucide-react";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 
 const DEFAULT_COLOR = "#000000";
@@ -44,7 +44,6 @@ const AnnotationList: React.FC<Props> = ({
       const isActive = selectedId === a.documentId;
       const isHovered = hoveredId === a.documentId;
 
-      // compute icon color same as in overlay
       const color =
         a.color ??
         (a.type === "rectangle"
@@ -67,51 +66,99 @@ const AnnotationList: React.FC<Props> = ({
           onMouseLeave={() => onHover(null)}
         >
           <table className="w-full table-fixed">
+            <colgroup>
+              <col style={{ width: "24px" }} />
+              <col style={{ width: "auto" }} />
+              <col style={{ width: "4ch" }} />
+              <col style={{ width: "24px" }} />
+              <col style={{ width: "24px" }} />
+              <col style={{ width: "24px" }} />
+              <col style={{ width: "24px" }} />
+              <col style={{ width: "24px" }} />
+            </colgroup>
             <tbody>
-              <tr className="h-4">
-                <td className="flex items-center space-x-1 py-0 px-0">
-                  {multi && (
-                    isChecked
-                      ? <CircleCheckBig size={16} style={{ }} />
-                      : <Circle size={16} style={{ }} />
-                  )}
-                  {a.type === "text" ? (
-                    <>
-                      <Type size={20} style={{ color }} />
-                      <span></span>
-                    </>
-                  ) : (
-                    <>
-                      <Square size={20} style={{ color }} />
-                      <span>{(a as RectangleAnnotation).annotationType}</span>
-                    </>
-                  )}
+              <tr className="h-6">
+                {/* Type icon */}
+                <td className="text-center">
+                  {multi
+                    ? isChecked
+                      ? <CircleCheckBig size={16} />
+                      : <Square size={16} style={{ color }} />
+                    : a.type === "text"
+                      ? <Type size={16} style={{ color }} />
+                      : <Square size={16} style={{ color }} />}
                 </td>
-                <td className="text-left py-0 px-0">{a.page}</td>
-                <td className="flex justify-start space-x-1 py-0 px-0">
-                  {a.annotation_tags?.length! > 0 && (
-                    <button onClick={() => onOpenTags(a)} title="Tags">
-                      <Tags size={16} />
-                    </button>
-                  )}
+                {/* Type label */}
+                <td className="text-left px-1">
+                  {a.type === "text" ? "Text" : (a as RectangleAnnotation).annotationType}
+                </td>
+                {/* Page */}
+                <td className="text-left">{a.page}</td>
+                {/* Description */}
+                <td className="text-center">
                   {a.description && (
-                    <button onClick={() => onOpenDescription(a)} title="Description">
+                    <button
+                      type="button"
+                      title="Description"
+                      className="inline-flex items-center justify-center w-6 h-6 p-0 m-0"
+                      onClick={(e) => { e.stopPropagation(); onOpenDescription(a); }}
+                    >
                       <FileText size={16} />
                     </button>
                   )}
+                </td>
+
+                {/* Tags (inert) */}
+                <td className="text-center">
+                  {a.annotation_tags?.length! > 0 && (
+                    <span
+                      title="Tags"
+                      className="inline-flex items-center justify-center w-6 h-6 p-0 m-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Tags size={16} />
+                    </span>
+                  )}
+                </td>
+
+                {/* Notes */}
+                <td className="text-center">
+                  {a.notes && (
+                    <button
+                      type="button"
+                      title="Notes"
+                      className="inline-flex items-center justify-center w-6 h-6 p-0 m-0"
+                      onClick={(e) => { e.stopPropagation(); onOpenNotes(a); }}
+                    >
+                      <StickyNote size={16} />
+                    </button>
+                  )}
+                </td>
+
+                {/* Calculation/Solutions */}
+                <td className="text-center">
                   {a.solutions?.length! > 0 && (
-                    <button onClick={() => onOpenSolutions(a)} title="Solutions">
+                    <button
+                      type="button"
+                      title="Calculation"
+                      className="inline-flex items-center justify-center w-6 h-6 p-0 m-0"
+                      onClick={(e) => { e.stopPropagation(); onOpenSolutions(a); }}
+                    >
                       <Sigma size={16} />
                     </button>
                   )}
+                </td>
+
+                {/* Image */}
+                <td className="text-center">
                   {a.extra?.imageUrl && (
-                    <button onClick={() => onOpenImage(a)} title="Image">
+                    <button
+                      type="button"
+                      title="Image Copy"
+                      className="inline-flex items-center justify-center w-6 h-6 p-0 m-0"
+                      onClick={(e) => { e.stopPropagation(); onOpenImage(a); }}
+                    >
                       <ImageIcon size={16} />
-                    </button>
-                  )}
-                  {a.notes && (
-                    <button onClick={() => onOpenNotes(a)} title="Notes">
-                      <StickyNote size={16} />
                     </button>
                   )}
                 </td>

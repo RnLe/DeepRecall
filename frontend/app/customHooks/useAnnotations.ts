@@ -27,7 +27,7 @@ export function useAnnotations(literatureId: string, pdfId: string) {
   const createMutation = useMutation({
     mutationFn: apiCreate,
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["annotations", literatureId] }),
+      qc.invalidateQueries({ queryKey: ["annotations", literatureId, pdfId] }),
   });
 
   /* --------------------------- UPDATE --------------------------- */
@@ -37,7 +37,7 @@ export function useAnnotations(literatureId: string, pdfId: string) {
     onSuccess: (_returned, { ann }) => {
       // write the exact annotation we passed in back into the cache
       qc.setQueryData<Annotation[]>(
-        ["annotations", literatureId],
+        ["annotations", literatureId, pdfId],
         (old) =>
           old
             ? old.map((a) =>
@@ -59,7 +59,7 @@ export function useAnnotations(literatureId: string, pdfId: string) {
   const deleteMutation = useMutation<void, Error, string>({
     mutationFn: apiDelete,
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["annotations", literatureId] }),
+      qc.invalidateQueries({ queryKey: ["annotations", literatureId, pdfId] }),
   });
 
   return {
