@@ -27,6 +27,18 @@
     "pdfId": {
       "type": "string",
       "required": true
+    },
+    "annotation_tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::annotation-tag.annotation-tag",
+      "inversedBy": "annotations"
+    },
+    "annotation_groups": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::annotation-group.annotation-group",
+      "inversedBy": "annotations"
     }
   }
 }

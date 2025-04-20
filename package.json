@@ -13,6 +13,7 @@
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
+    "lodash": "^4.17.21",
     "lucide-react": "^0.492.0",
     "pdfjs-dist": "^4.8.69",
     "reactflow": "^11.11.4"

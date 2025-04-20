@@ -1,6 +1,6 @@
 // src/components/pdfViewer/annotationList.tsx
 import React from "react";
-import { Check, Type, Square, Image as ImageIcon, StickyNote } from "lucide-react";
+import { CircleCheckBig, Type, Square, Image as ImageIcon, StickyNote, Circle } from "lucide-react";
 import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
 
 const DEFAULT_COLOR = "#000000";
@@ -62,8 +62,8 @@ const AnnotationList: React.FC<Props> = ({
                 <td className="flex items-center space-x-1 py-0 px-0">
                   {multi && (
                     isChecked
-                      ? <Check size={16} style={{ color }} />
-                      : <span style={{ color }}>○</span>
+                      ? <CircleCheckBig size={16} style={{ }} />
+                      : <Circle size={16} style={{ }} />
                   )}
                   {a.type === "text" ? (
                     <>
