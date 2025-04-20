@@ -89,21 +89,19 @@ export interface BaseAnnotation extends BaseCoords {
   };
 }
 
-/* ---------- CONCRETE VARIANTS ---------- */
+/* ───────────────────── Concrete annotation variants ────────────────── */
 
 export interface RectangleAnnotation extends BaseAnnotation {
   type: "rectangle";
   annotationType: AnnotationType;
 }
-
 export interface TextAnnotation extends BaseAnnotation {
   type: "text";
   highlightedText: string;
 }
-
 export type Annotation = RectangleAnnotation | TextAnnotation;
 
-/* ---------- STRAPI (DE)SERIALISATION ---------- */
+/* ──────────────────── Strapi (de)serialisation helpers ─────────────── */
 
 export interface AnnotationStrapi extends StrapiResponse {
   type: Annotation["type"];
@@ -126,7 +124,13 @@ export interface AnnotationStrapi extends StrapiResponse {
   };
 }
 
-const mapTags = (rel?: { data?: AnnotationTag[] }) => rel?.data ?? [];
+/** helper: accept either `T[]` or `{ data?: T[] }` */
+const mapTags = <T>(rel?: T[] | { data?: T[] }): T[] =>
+  Array.isArray(rel)
+    ? rel
+    : rel?.data
+    ? rel.data
+    : [];
 
 export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
   const raw = rec.metadata ?? {};
@@ -154,8 +158,8 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
     description: meta.description,
     notes: meta.notes,                // ← NEW
     /* relations */
-    annotation_tags: mapTags(rec.annotation_tags),
-    annotation_groups: mapTags(rec.annotation_groups),
+    annotation_tags: mapTags<AnnotationTag>(rec.annotation_tags),
+    annotation_groups: mapTags<AnnotationGroup>(rec.annotation_groups),
     color: meta.color,
     solutions: meta.solutions ?? [],
     extra,

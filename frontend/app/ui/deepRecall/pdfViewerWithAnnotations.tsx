@@ -53,7 +53,7 @@ interface Props {
   annotations: Annotation[];
   selectedId: string | null;
   onCreateAnnotation: (a: Annotation) => void;
-  onSelectAnnotation: (a: Annotation) => void;
+  onSelectAnnotation: (a: Annotation | null) => void;
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
   resolution: number;
@@ -260,6 +260,8 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         height: rect.height / pr.height,
         literatureId: "",
         pdfId: "",
+        annotation_tags: [],
+        annotation_groups: [],
       });
       sel.removeAllRanges();
     }, [annotationMode, onCreateAnnotation]);
@@ -330,6 +332,8 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
                 height: height / dispH,
                 literatureId: "",
                 pdfId: "",
+                annotation_tags: [],
+                annotation_groups: [],
               });
               clearDraft();
             }}
@@ -388,7 +392,11 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
      * 7 Render wrapper + spacer (mandatory for stable scrollHeight)
      *************************************************************************/
     return (
-      <div ref={scrollElRef} className="h-full overflow-y-auto">
+      <div
+        ref={scrollElRef}
+        className="h-full overflow-y-auto"
+        onClick={() => onSelectAnnotation(null)}>
+        <div onClick={e => e.stopPropagation()}></div>
         <Document
           file={prefixStrapiUrl(pdfUrl)}
           onLoadSuccess={({ numPages }) => {
