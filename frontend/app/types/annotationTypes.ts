@@ -124,12 +124,18 @@ export interface AnnotationStrapi extends StrapiResponse {
   };
 }
 
-/** helper for clearer code */
-const mapTags = (rel?: { data?: AnnotationTag[] }) => rel?.data ?? [];
+/** helper: accept either `T[]` or `{ data?: T[] }` */
+const mapTags = <T>(rel?: T[] | { data?: T[] }): T[] =>
+  Array.isArray(rel)
+    ? rel
+    : rel?.data
+    ? rel.data
+    : [];
 
 export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
-  /* metadata blob (legacy scalar data) */
-  const meta = rec.metadata ? JSON.parse(rec.metadata) : {};
+  const raw = rec.metadata ?? {};
+  const meta =
+    typeof raw === "string" ? (raw ? JSON.parse(raw) : {}) : raw;
 
   const extra = {
     ...(meta.extra ?? {}),
@@ -141,7 +147,6 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
     documentId: rec.documentId,
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
-    /* coords from metadata */
     page: meta.page,
     x: meta.x,
     y: meta.y,
@@ -151,14 +156,14 @@ export function deserializeAnnotation(rec: AnnotationStrapi): Annotation {
     pdfId: rec.pdfId ?? meta.pdfId,
     title: meta.title,
     description: meta.description,
-    notes: meta.notes,
+    notes: meta.notes,                // ← NEW
     /* relations */
-    annotation_tags: mapTags(rec.annotation_tags),
-    annotation_groups: mapTags(rec.annotation_groups),
+    annotation_tags: mapTags<AnnotationTag>(rec.annotation_tags),
+    annotation_groups: mapTags<AnnotationGroup>(rec.annotation_groups),
     color: meta.color,
     solutions: meta.solutions ?? [],
     extra,
-  };
+  } as const;
 
   return rec.type === "text"
     ? {
