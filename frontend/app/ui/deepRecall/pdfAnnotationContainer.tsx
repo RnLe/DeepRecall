@@ -1,3 +1,6 @@
+// -----------------------------------------------
+// Imports: React, icons, components, hooks, types, APIs
+// -----------------------------------------------
 import React, { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -21,6 +24,10 @@ import { AnnotationMode } from "./annotationToolbar";
 import { AnnotationType } from "../../types/annotationTypes";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
+// -----------------------------------------------
+// Type & Utility Definitions
+// -----------------------------------------------
+// Clamp a value between min and max
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
 type ColorMap = Record<AnnotationType, string>;
@@ -31,33 +38,45 @@ interface Props {
   colorMap: ColorMap;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  setAnnotationMode: (mode: AnnotationMode) => void;   // <-- new
+  setAnnotationMode: (mode: AnnotationMode) => void;
 }
 
+// -----------------------------------------------
+// Main Component: PdfAnnotationContainer
+// -----------------------------------------------
 const PdfAnnotationContainer: React.FC<Props> = ({
   activeLiterature,
   annotationMode,
   colorMap,
   sidebarOpen,
   onToggleSidebar,
-  setAnnotationMode,                                    // <-- new
+  setAnnotationMode,
 }) => {
-  const litId = activeLiterature.documentId!;
-  const version = activeLiterature.versions[0];
-  const pdfId = version.fileHash ?? "";
-  const pdfUrl = version.fileUrl ?? "";
+  // -----------------------------------------------
+  // Derived constants from props & literature
+  // -----------------------------------------------
+  const litId = activeLiterature.documentId!;              // Unique literature identifier
+  const version = activeLiterature.versions[0];            // Use first version
+  const pdfId = version.fileHash ?? "";                  // File hash for annotations
+  const pdfUrl = version.fileUrl ?? "";                  // PDF source URL
 
-  // viewer state
-  const [zoom, setZoom] = useState(1);
-  const [page, setPage] = useState(1);
-  const [numPages, setNumPages] = useState(0);
-  const [showAnnotations, setShowAnnotations] = useState(true);
-  const deselectAll = () => setMultiSet(new Set());
+  // -----------------------------------------------
+  // Viewer References
+  // -----------------------------------------------
+  const viewerRef = useRef<PdfViewerHandle>(null);         // Ref to PDF viewer instance
+  const wrapRef = useRef<HTMLDivElement>(null);            // Ref to container for fit calculations
 
-  const viewerRef = useRef<PdfViewerHandle>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  // -----------------------------------------------
+  // Viewer State: zoom, pagination, annotations toggle
+  // -----------------------------------------------
+  const [zoom, setZoom] = useState(1);                     // Current zoom level
+  const [page, setPage] = useState(1);                     // Current page number
+  const [numPages, setNumPages] = useState(0);             // Total pages in PDF
+  const [showAnnotations, setShowAnnotations] = useState(true); // Toggle annotation display
 
-  // annotation state
+  // -----------------------------------------------
+  // Annotation Data & State via custom hook
+  // -----------------------------------------------
   const {
     annotations,
     isLoading,
@@ -66,35 +85,47 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     deleteAnnotation: mutateDelete,
   } = useAnnotations(litId, pdfId);
 
+  // Filter annotations for current PDF
   const display = useMemo(
     () => annotations.filter((a) => a.pdfId === pdfId),
     [annotations, pdfId]
   );
 
-  // State for the annotation modals (clickable icons in the annotation list)
-  const [descriptionModalAnn, setDescriptionModalAnn] = useState<Annotation|null>(null);
-  const [notesModalAnn,       setNotesModalAnn]       = useState<Annotation|null>(null);
-  const [previewAnnImageUrl,  setPreviewAnnImageUrl]  = useState<string|null>(null);
-  const [previewSolImageUrl,  setPreviewSolImageUrl]  = useState<string|null>(null);
+  // Modal & Preview States for description, notes, and images
+  const [descriptionModalAnn, setDescriptionModalAnn] = useState<Annotation | null>(null);
+  const [notesModalAnn,       setNotesModalAnn]       = useState<Annotation | null>(null);
+  const [previewAnnImageUrl,  setPreviewAnnImageUrl]  = useState<string | null>(null);
+  const [previewSolImageUrl,  setPreviewSolImageUrl]  = useState<string | null>(null);
 
-  const [selId, setSelId] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
-  const [multi, setMulti] = useState(false);
-  const [multiSet, setMultiSet] = useState<Set<string>>(new Set());
+  // Selection & Hover State
+  const [selId,    setSelId]    = useState<string | null>(null);  // Currently selected annotation ID
+  const [hovered,  setHovered]  = useState<string | null>(null);  // Currently hovered annotation ID
 
+  // Multi-select state
+  const [multi,    setMulti]    = useState(false);                // Multi-select mode on/off
+  const [multiSet, setMultiSet] = useState<Set<string>>(new Set()); // Set of selected IDs
+
+  // Derived: selected annotation object
   const selected = useMemo(
     () => display.find((a) => a.documentId === selId) ?? null,
     [display, selId]
   );
 
-  // --- annotation actions ---
+  // -----------------------------------------------
+  // Annotation Action Handlers
+  // -----------------------------------------------
+  // Add a new annotation
   const handleAdd = async (ann: Annotation) => {
     await createAnnotation({ ...ann, literatureId: litId, pdfId });
   };
+
+  // Update an existing annotation
   const handleUpdate = async (ann: Annotation) => {
     if (!ann.documentId) return;
     await mutateUpdate({ id: ann.documentId, ann: { ...ann, literatureId: litId, pdfId } });
   };
+
+  // Delete a single annotation (and its image file, if present)
   const handleDelete = async (id: string) => {
     const ann = display.find((x) => x.documentId === id);
     if (ann?.extra?.imageFileId) {
@@ -108,6 +139,8 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       return n;
     });
   };
+
+  // Delete all annotations currently in multi-select set
   const handleMassDelete = async () => {
     if (!multiSet.size) return;
     if (!confirm("Are you sure you want to delete all selected annotations? This action cannot be undone.")) {
@@ -122,12 +155,12 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     }
     setMultiSet(new Set());
   };
+
+  // Capture and save an image of a rectangular annotation
   const handleSaveImage = async (a: RectangleAnnotation) => {
     try {
       const blob = await viewerRef.current!.getCroppedImage(a);
-      const file = new File([blob], `ann-${a.documentId}.png`, {
-        type: "image/png",
-      });
+      const file = new File([blob], `ann-${a.documentId}.png`, { type: "image/png" });
       const { id: fid, url } = await uploadFile(file);
       await handleUpdate({
         ...a,
@@ -136,87 +169,101 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     } catch {}
   };
 
-  // --- multi‑select helpers ---
-  const toggleMultiMode = () => setMulti((m) => !m);
-  const selectAll = () =>
-    setMultiSet(new Set(display.map((a) => a.documentId!)));
+  // -----------------------------------------------
+  // Multi-Select Helpers
+  // -----------------------------------------------
+  const toggleMultiMode = () => setMulti((m) => !m); // Toggle multi-select mode
+  const selectAll      = () =>
+    setMultiSet(new Set(display.map((a) => a.documentId!))); // Select all annotations
+  const deselectAll    = () => setMultiSet(new Set());      // Deselect all annotations
 
-  // --- navigation & zoom ---
-  // centralised page jump: updates state *and* scrolls viewer
+  // -----------------------------------------------
+  // Navigation & Zoom Handlers
+  // -----------------------------------------------
+  // Jump to a valid page number and scroll viewer
   const jumpToPage = (n: number) => {
-      const target = clamp(n, 1, numPages);
-      setPage(target);
-      viewerRef.current?.scrollToPage(target);
-    };
-  
-  const changePage = (delta: number) => jumpToPage(page + delta);
-  const goToPage    = (n: number)    => jumpToPage(n);
+    const target = clamp(n, 1, numPages);
+    setPage(target);
+    viewerRef.current?.scrollToPage(target);
+  };
 
-  const zoomIn = () => setZoom((z) => z + 0.1);
-  const zoomOut = () => setZoom((z) => Math.max(0.1, z - 0.1));
+  const changePage = (delta: number) => jumpToPage(page + delta); // Increment/decrement page
+  const goToPage    = (n: number)    => jumpToPage(n);            // Direct jump
 
+  const zoomIn      = () => setZoom((z) => z + 0.1);              // Increase zoom
+  const zoomOut     = () => setZoom((z) => Math.max(0.1, z - 0.1)); // Decrease zoom
+
+  // Fit PDF to container width
   const fitWidth = () => {
     if (viewerRef.current && wrapRef.current) {
       const size = viewerRef.current.getPageSize(page);
       if (size) {
         setZoom(wrapRef.current.clientWidth / size.width);
-        // ensure the canvas stays on the same page
-        viewerRef.current?.scrollToPage(page);
+        viewerRef.current?.scrollToPage(page); // Keep page position
       }
     }
   };
+
+  // Fit PDF to container height
   const fitHeight = () => {
     if (viewerRef.current && wrapRef.current) {
       const size = viewerRef.current.getPageSize(page);
       if (size) {
         setZoom(wrapRef.current.clientHeight / size.height);
-        // ensure the canvas stays on the same page
-        viewerRef.current?.scrollToPage(page);
+        viewerRef.current?.scrollToPage(page); // Keep page position
       }
     }
   };
 
-  // open‑icon handlers
-  const openSideAndSelect = (a: Annotation) => {
+  // -----------------------------------------------
+  // Sidebar & Modal Open Handlers
+  // -----------------------------------------------
+  // Select annotation and open sidebar if closed
+  const openSideAndSelect    = (a: Annotation) => {
     setSelId(a.documentId!);
     if (!sidebarOpen) onToggleSidebar();
   };
-  const handleOpenDescription = (a: Annotation) => {
-    setDescriptionModalAnn(a);
-  };
-  const handleOpenNotes = (a: Annotation) => {
-    setNotesModalAnn(a);
-  };
-  const handleOpenImage = (a: Annotation) => {
+  const handleOpenDescription = (a: Annotation) => setDescriptionModalAnn(a); // Open description editor
+  const handleOpenNotes       = (a: Annotation) => setNotesModalAnn(a);       // Open notes editor
+  const handleOpenImage       = (a: Annotation) => {
     if (a.extra?.imageUrl) setPreviewAnnImageUrl(prefixStrapiUrl(a.extra.imageUrl));
   };
-  const handleOpenSolutions = (a: Annotation) => {
+  const handleOpenSolutions   = (a: Annotation) => {
     if (a.solutions?.length) {
       const last = a.solutions[a.solutions.length - 1];
       setPreviewSolImageUrl(prefixStrapiUrl(last.fileUrl));
     }
   };
-  // inert tags:
-  const handleOpenTags = (_: Annotation) => {};
+  const handleOpenTags        = (_: Annotation) => {}; // Placeholder for future tag handling
 
+  // -----------------------------------------------
+  // Render: Loading State
+  // -----------------------------------------------
   if (isLoading) return <div>Loading…</div>;
 
+  // -----------------------------------------------
+  // Render: Main Layout
+  // -----------------------------------------------
   return (
     <div className="flex h-full overflow-hidden">
-      {/* PDF + nav */}
+      {/* ------------------------------------------- */}
+      {/* Left Panel: PDF Viewer + Navigation Controls */}
+      {/* ------------------------------------------- */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Pagination & Zoom */}
+        {/* -------------------------------------------------------------------- */}
+        {/* PDF Pagination & Zoom Controls: navigation buttons, page input, zoom */}
+        {/* -------------------------------------------------------------------- */}
         <div className="flex items-center p-2 bg-gray-800 border-b border-gray-700 select-none">
-          {/* left: empty or other controls */}
-          <div className="w-8" />  {/* maintain spacing */}
+          <div className="w-8" /> {/* Spacer for left-aligned items */}
 
-          {/* center: page navigation */}
+          {/* Center controls: first, prev, page input, next, last */}
           <div className="flex-1 flex items-center justify-center space-x-2">
-            {[{ type: "button", Icon: ChevronsLeft, onClick: () => goToPage(1), disabled: page===1 },
-              { type: "button", Icon: ArrowLeft,  onClick: () => changePage(-1), disabled: page===1 },
+            {[
+              { type: "button", Icon: ChevronsLeft, onClick: () => goToPage(1), disabled: page === 1 },
+              { type: "button", Icon: ArrowLeft,    onClick: () => changePage(-1), disabled: page === 1 },
               { type: "input" },
-              { type: "button", Icon: ArrowRight, onClick: () => changePage(1), disabled: page===numPages },
-              { type: "button", Icon: ChevronsRight,onClick: () => goToPage(numPages), disabled: page===numPages },
+              { type: "button", Icon: ArrowRight,   onClick: () => changePage(1), disabled: page === numPages },
+              { type: "button", Icon: ChevronsRight,onClick: () => goToPage(numPages), disabled: page === numPages },
             ].map((btn, i) =>
               btn.type === "input" ? (
                 <React.Fragment key="page-input">
@@ -226,7 +273,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
                     min={1}
                     max={numPages}
                     onChange={(e) => jumpToPage(Number(e.target.value))}
-                    className="w-16 text-center bg-gray-900 border border-gray-600 rounded"
+                    className="w-16 text-center background-gray-900 border-gray-600 rounded"
                   />
                   <span>/ {numPages || "-"}</span>
                 </React.Fragment>
@@ -246,33 +293,27 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             )}
           </div>
 
-          {/* right: zoom controls + percentage + fit */}
+          {/* Right controls: zoom out/in, percentage, fit width/height */}
           <div className="flex items-center space-x-2">
             <button onClick={zoomOut}>
               <Minus size={16} className="text-gray-400 hover:text-white transition-colors" />
             </button>
-            <span className="px-2 text-sm w-14 text-center">
-              {(zoom * 100).toFixed(0)}%
-            </span>
+            <span className="px-2 text-sm w-14 text-center">{(zoom * 100).toFixed(0)}%</span>
             <button onClick={zoomIn}>
               <Plus size={16} className="text-gray-400 hover:text-white transition-colors" />
             </button>
-            <button
-              onClick={fitWidth}
-              className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm hover:bg-gray-700"
-            >
+            <button onClick={fitWidth} className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm hover:bg-gray-700">
               Fit width
             </button>
-            <button
-              onClick={fitHeight}
-              className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm hover:bg-gray-700"
-            >
+            <button onClick={fitHeight} className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm hover:bg-gray-700">
               Fit height
             </button>
           </div>
         </div>
 
-        {/* PDF viewer */}
+        {/* ------------------------------------------------------- */}
+        {/* PDF Viewer: renders pages, annotations, tool interactions */}
+        {/* ------------------------------------------------------- */}
         <div className="flex-1 relative overflow-auto" ref={wrapRef}>
           <PdfViewerWithAnnotations
             ref={viewerRef}
@@ -284,7 +325,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
               setPage((p) => clamp(p, 1, numPages));
             }}
             onVisiblePageChange={(pg) => {
-              /* avoid feedback‑loop: update only if user *scrolled* */
+              // Sync page state when user scrolls
               setPage((cur) => (cur === pg ? cur : pg));
             }}
             annotationMode={annotationMode}
@@ -292,26 +333,27 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             selectedId={selId}
             onCreateAnnotation={handleAdd}
             onSelectAnnotation={(a) => {
-                if (a) {
-                  setSelId(a.documentId!);
-                  setPage(a.page);
-                  /* auto‑open sidebar when an annotation is clicked */
-                  if (!sidebarOpen) onToggleSidebar();
-                } else {
-                  /* clicked void → deselect */
-                  setSelId(null);
-                }
+              if (a) {
+                setSelId(a.documentId!);
+                setPage(a.page);
+                // Auto-open sidebar when an annotation is clicked
+                if (!sidebarOpen) onToggleSidebar();
+              } else {
+                setSelId(null); // Deselect on void click
+              }
             }}
             onHoverAnnotation={(a) => setHovered(a?.documentId || null)}
             renderTooltip={(a) => <AnnotationHoverTooltip annotation={a} />}
             resolution={4}
             colorMap={colorMap}
-            onToolUsed={() => setAnnotationMode("none")}        // <-- forward callback
+            onToolUsed={() => setAnnotationMode("none")} // Exit annotation mode on use
           />
         </div>
       </div>
 
-      {/* right sidebar */}
+      {/* ------------------------------------------- */}
+      {/* Right Sidebar: annotation list & controls */}
+      {/* ------------------------------------------- */}
       <RightSidebar
         annotations={display}
         selectedId={selId}
@@ -326,9 +368,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         onToggleMulti={(a) =>
           setMultiSet((s) => {
             const n = new Set(s);
-            n.has(a.documentId!)
-              ? n.delete(a.documentId!)
-              : n.add(a.documentId!);
+            n.has(a.documentId!) ? n.delete(a.documentId!) : n.add(a.documentId!);
             return n;
           })
         }
@@ -352,10 +392,13 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         onOpenDescription={handleOpenDescription}
         onOpenImage={handleOpenImage}
         onOpenSolutions={handleOpenSolutions}
-        fileOpen={true} // <-- add this prop
+        fileOpen={true} // Prop to enable file attachments
       />
 
-      {/* ────────────────── DESCRIPTION EDITOR ────────────────── */}
+      {/* ----------------------------------------------- */}
+      {/* Modals & Previews: description, notes, images */}
+      {/* ----------------------------------------------- */}
+      {/* Description Editor Modal */}
       {descriptionModalAnn && (
         <MarkdownEditorModal
           initial={descriptionModalAnn.description || ""}
@@ -371,7 +414,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         />
       )}
 
-      {/* ───────────────────── NOTES EDITOR ──────────────────── */}
+      {/* Notes Editor Modal */}
       {notesModalAnn && (
         <MarkdownEditorModal
           initial={notesModalAnn.notes || ""}
@@ -387,7 +430,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         />
       )}
 
-      {/* ────────────────── ANNOTATION IMAGE PREVIEW ────────────────── */}
+      {/* Annotation Image Preview */}
       {previewAnnImageUrl && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
@@ -413,7 +456,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ────────────────── SOLUTION IMAGE PREVIEW ────────────────── */}
+      {/* Solution Image Preview */}
       {previewSolImageUrl && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"

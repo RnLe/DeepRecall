@@ -13,7 +13,7 @@ interface Props {
   tabs: LiteratureExtended[];
   activeTabId: string | null;
   annotationMode: AnnotationMode;
-  setAnnotationMode: (mode: AnnotationMode) => void;    // <-- new
+  setAnnotationMode: (mode: AnnotationMode) => void;
   colorMap: Record<AnnotationType, string>;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
@@ -23,7 +23,7 @@ const TabManager: React.FC<Props> = ({
   tabs,
   activeTabId,
   annotationMode,
-  setAnnotationMode,       // <-- new
+  setAnnotationMode,
   colorMap,
   sidebarOpen,
   onToggleSidebar,
@@ -80,7 +80,7 @@ const TabManager: React.FC<Props> = ({
       key={active.documentId}           // ← forces React to tear down & rebuild
       activeLiterature={active}
       annotationMode={annotationMode}
-      setAnnotationMode={setAnnotationMode}    // <-- forward setter
+      setAnnotationMode={setAnnotationMode}
       colorMap={colorMap}
       sidebarOpen={sidebarOpen}
       onToggleSidebar={onToggleSidebar}

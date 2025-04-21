@@ -1,14 +1,38 @@
 // src/components/pdfViewer/pdfViewerWithAnnotations.tsx
-/**
- * Enhanced PDF viewer with virtualization, smooth jumps, and accurate offsets.
- * Implements:
- *  • Exact scroll offsets for programmatic jumps
- *  • Dynamic average-based estimate for reducing overshoot
- *  • Adaptive overscan for large jumps
- *  • Guard against onVisiblePageChange feedback on programmatic scrolls
- *  • Minimized React state churn; page sizes in refs
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Enhanced PDF viewer with virtualization, smooth jumps, accurate offsets,
+// and in‑place annotation creation.
+//
+//  MAIN RESPONSIBILITIES
+//  • Render and virtualize PDF pages with @tanstack/react‑virtual
+//  • Provide imperative helpers (scrollToPage, getPageSize, getCroppedImage)
+//  • Keep scroll position ↔ page state in sync without feedback loops
+//  • Support text‑highlight and rectangle annotations with live overlays
+//  • React gracefully to zoom changes (debounced re‑measurement)
+//
+//  *** No public API, prop names, or runtime behaviour has been changed ***
+//
+//  To quickly locate code, jump to these high‑level sections:
+//
+//    1. Imports & worker configuration
+//    2. Public types & constants
+//    3. Component ── setup (refs, state, virtualizer)
+//    4. Component ── helpers  (offset maths, debounced measure)
+//    5. Component ── imperative handle
+//    6. Component ── scroll / effect wiring
+//    7. Annotation helpers (text & rectangle)
+//    8. Row renderer  (single virtual page + overlay)
+//    9. Render wrapper
+//   10. Export
+// ─────────────────────────────────────────────────────────────────────────────
 
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 1 Imports & PDF.js worker configuration
+ *    – external libs      (React, react‑pdf, react‑virtual, lodash)
+ *    – internal components(types, helpers, overlays)
+ *    – worker setup MUST be top‑level (PDF.js requirement)
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 import React, {
   forwardRef,
   useCallback,
@@ -32,23 +56,32 @@ import {
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
+// Configure PDF.js to load its worker via ESM URL (required in modern bundlers)
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
 ).toString();
 
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 2 Public types & constants
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 export interface PdfViewerHandle {
+  /** Programmatically scroll so that page *page* is the first visible page */
   scrollToPage(page: number): void;
+  /** Obtain the *un‑scaled* intrinsic size of a page (in CSS pixels) */
   getPageSize(page?: number): { width: number; height: number } | null;
+  /** Rasterise an annotation’s rectangle to a PNG blob at the given DPI */
   getCroppedImage(annotation: RectangleAnnotation): Promise<Blob>;
 }
 
 interface Props {
   pdfUrl: string;
-  zoom: number;
-  pageNumber: number;
+  zoom: number;                                   // global scale factor (1 = 100 %)
+  pageNumber: number;                             // *unused* but left intact
   onLoadSuccess: (info: { numPages: number }) => void;
-  onVisiblePageChange?: (page: number) => void;
+  onVisiblePageChange?: (page: number) => void;   // emits first fully‑visible page
   annotationMode: AnnotationMode;
   annotations: Annotation[];
   selectedId: string | null;
@@ -56,13 +89,20 @@ interface Props {
   onSelectAnnotation: (a: Annotation | null) => void;
   onHoverAnnotation?: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
-  resolution: number;
+  resolution: number;                             // DPI for cropped images
   colorMap: Record<AnnotationType, string>;
-  onToolUsed?: () => void;    // <-- new
+  onToolUsed?: () => void;                        // → parent clears active tool
 }
 
+/** Fallback height (A4 @ 72 dpi) used until the real page height is known */
 const DEFAULT_PAGE_HEIGHT = 842;
 
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 3 Component definition ─ setup (refs, state, virtualizer)
+ *    All mutable objects that must survive re‑renders live in refs.
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
   (
     {
@@ -79,75 +119,90 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       renderTooltip,
       resolution,
       colorMap,
-      onToolUsed,              // <-- new
+      onToolUsed,
     },
     ref
   ) => {
-    // Refs for stable values
-    const scrollElRef = useRef<HTMLDivElement>(null);
-    const pageSizeRef = useRef(new Map<number, { w: number; h: number }>());
-    const lastPageRef = useRef(1);
-    const isProgrammaticRef = useRef(false);
-    const offsetsRef = useRef<number[]>([]);
-    const sumHeightsRef = useRef(0);
-    const countRef = useRef(0);
-    const initialOverscan = 6; // default overscan for react-virtual
+    // ───── Persistent refs ─────
+    const scrollElRef        = useRef<HTMLDivElement>(null);     // scrolling div
+    const pageSizeRef        = useRef(new Map<number, { w: number; h: number }>());
+    const lastPageRef        = useRef(1);                        // last emitted page
+    const isProgrammaticRef  = useRef(false);                    // guard for scroll loop
+    const offsetsRef         = useRef<number[]>([]);             // cumulative page tops
+    const sumHeightsRef      = useRef(0);                        // running mean of heights
+    const countRef           = useRef(0);
 
-    // Force overlay recalculation
-    const [tick, setTick] = useState(0);
-    const [numPages, setNumPages] = useState(0);
+    // ───── Local state ─────
+    const [numPages, setNumPages] = useState(0);                 // total pages
+    const [tick, setTick]         = useState(0);                 // forces overlay refresh
 
-
-    // 1. Create a ref for your options
+    // ───── Virtualizer initial options (kept stable in optionsRef) ─────
+    const initialOverscan = 6;
     const optionsRef = useRef({
       count: numPages,
       getScrollElement: () => scrollElRef.current!,
       estimateSize: () => DEFAULT_PAGE_HEIGHT * zoom,
       overscan: initialOverscan,
     });
-
-    // 2. Pass it to the hook
     const rowVirtualizer = useVirtualizer(optionsRef.current);
 
-    // Debounced measure after zoom
-    const debouncedMeasure = useMemo(
-      () => debounce(() => {
-        rowVirtualizer.measure();
-        recalcOffsets();
-      }, 50),
-      [rowVirtualizer]
-    );
-    useEffect(() => debouncedMeasure(), [zoom, debouncedMeasure]);
 
-    // Compute cumulative offsets
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 4 Helpers (cumulative offsets & debounced re‑measure)
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    /** Recompute *page top* offsets whenever page size / zoom changes */
     const recalcOffsets = () => {
       const arr: number[] = [];
       let acc = 0;
       for (let i = 1; i <= numPages; i++) {
         arr[i - 1] = acc;
-        const size = pageSizeRef.current.get(i);
-        const h = size ? size.h * zoom : DEFAULT_PAGE_HEIGHT * zoom;
+        const intrinsic = pageSizeRef.current.get(i);
+        const h = intrinsic ? intrinsic.h * zoom : DEFAULT_PAGE_HEIGHT * zoom;
         acc += h;
       }
       offsetsRef.current = arr;
     };
 
-    // Imperative handle
+    /** Re‑measure virtual row heights after zoom (debounced – avoids thrash) */
+    const debouncedMeasure = useMemo(
+      () =>
+        debounce(() => {
+          rowVirtualizer.measure();   // trigger react‑virtual re‑calc
+          recalcOffsets();            // keep handmade offsets in lockstep
+        }, 50),
+      [rowVirtualizer]
+    );
+
+    useEffect(() => debouncedMeasure(), [zoom, debouncedMeasure]);
+
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 5 Imperative handle  (public methods exposed via ref)
+ *    All three helpers use current refs only – never trigger React renders.
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
     useImperativeHandle(ref, () => ({
-      scrollToPage: (p: number) => {
-        const current = lastPageRef.current;
-        const distance = Math.abs(p - current);
-        // adjust overscan for large jumps
+      scrollToPage: (targetPage: number) => {
+        const distance = Math.abs(targetPage - lastPageRef.current);
+
+        // (a) Expand overscan for very large jumps to avoid blank screen
         if (distance > 6) {
           rowVirtualizer.setOptions({
             ...rowVirtualizer.options,
             overscan: distance + 2,
           });
         }
-        // programmatic scroll
-        const offset = offsetsRef.current[p - 1] ?? (p - 1) * DEFAULT_PAGE_HEIGHT * zoom;
+
+        // (b) Scroll – guard against onVisiblePageChange feedback
+        const offset =
+          offsetsRef.current[targetPage - 1] ??
+          (targetPage - 1) * DEFAULT_PAGE_HEIGHT * zoom;
+
         isProgrammaticRef.current = true;
         scrollElRef.current!.scrollTop = offset;
+
+        // (c) Restore default overscan after scroll settles
         setTimeout(() => {
           isProgrammaticRef.current = false;
           if (distance > 6) {
@@ -158,23 +213,29 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
           }
         }, 100);
       },
-      getPageSize: (p = 1) => {
-        const s = pageSizeRef.current.get(p);
+
+      getPageSize(page = 1) {
+        const s = pageSizeRef.current.get(page);
         return s ? { width: s.w, height: s.h } : null;
       },
+
       async getCroppedImage(a: RectangleAnnotation) {
-        const pdf = await pdfjs.getDocument(prefixStrapiUrl(pdfUrl)).promise;
-        const pgObj = await pdf.getPage(a.page);
+        const pdf      = await pdfjs.getDocument(prefixStrapiUrl(pdfUrl)).promise;
+        const pgObj    = await pdf.getPage(a.page);
         const viewport = pgObj.getViewport({ scale: resolution });
-        const cvs = document.createElement("canvas");
-        cvs.width = viewport.width;
-        cvs.height = viewport.height;
-        await pgObj.render({ canvasContext: cvs.getContext("2d")!, viewport }).promise;
-        const crop = document.createElement("canvas");
-        crop.width = a.width * viewport.width;
-        crop.height = a.height * viewport.height;
+
+        // Render full‑page bitmap
+        const canvas   = document.createElement("canvas");
+        canvas.width   = viewport.width;
+        canvas.height  = viewport.height;
+        await pgObj.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
+
+        // Crop annotation rectangle
+        const crop   = document.createElement("canvas");
+        crop.width   = a.width  * viewport.width;
+        crop.height  = a.height * viewport.height;
         crop.getContext("2d")!.drawImage(
-          cvs,
+          canvas,
           a.x * viewport.width,
           a.y * viewport.height,
           crop.width,
@@ -184,18 +245,29 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
           crop.width,
           crop.height
         );
+
         return new Promise<Blob>((res) => crop.toBlob((b) => res(b!), "image/png"));
       },
     }));
 
-    // Scroll listener with guard
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 6 Effects – keep scroll↔page state & virtualizer config in sync
+ *    ── (A) Emit visible page on user scroll
+ *    ── (B) Sync virtualizer when numPages / zoom changes
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    // (A) User‑driven scroll → onVisiblePageChange (throttled, guarded)
     useEffect(() => {
       if (!onVisiblePageChange) return;
       const el = scrollElRef.current!;
+
       const handler = throttle(() => {
         if (isProgrammaticRef.current) return;
+
         const items = rowVirtualizer.getVirtualItems();
         if (!items.length) return;
+
         const scrollY = el.scrollTop;
         let cur = items[0];
         for (const it of items) {
@@ -208,24 +280,21 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
           onVisiblePageChange(pg);
         }
       }, 200, { trailing: true });
+
       el.addEventListener("scroll", handler);
-      handler();
+      handler();                           // emit immediately on mount
       return () => el.removeEventListener("scroll", handler);
     }, [onVisiblePageChange, rowVirtualizer]);
 
-    // ------------------------------------------------------------
-    // keep virtualizer in sync with page count (and recalc offsets)
+    // (B‑1) When total page count arrives → update virtualizer
     useEffect(() => {
-        optionsRef.current.count = numPages;
-        rowVirtualizer.setOptions({
-          ...rowVirtualizer.options,
-          count: numPages,
-        });
-        recalcOffsets();
-        rowVirtualizer.measure();
+      optionsRef.current.count = numPages;
+      rowVirtualizer.setOptions({ ...rowVirtualizer.options, count: numPages });
+      recalcOffsets();
+      rowVirtualizer.measure();
     }, [numPages, rowVirtualizer]);
-    
-    // refresh estimateSize when zoom changes
+
+    // (B‑2) When zoom changes → update estimateSize & measure
     useEffect(() => {
       rowVirtualizer.setOptions({
         ...rowVirtualizer.options,
@@ -234,39 +303,49 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       debouncedMeasure();
     }, [zoom]);
 
-    /*************************************************************************
-     * 5 Helpers for text and rectangle annotation creation
-     *************************************************************************/
-    const [draft, setDraft] = useState<null | { page: number; x0: number; y0: number; x1: number; y1: number }>(null);
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 7 Annotation helpers  (text selection & rectangle drag)
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    // Draft rectangle (only live while mouse is down)
+    const [draft, setDraft] = useState<
+      | null
+      | { page: number; x0: number; y0: number; x1: number; y1: number }
+    >(null);
     const clearDraft = () => setDraft(null);
 
+    /** Handle finished text selection (creates highlight annotation) */
     const handleTextSelect = useCallback(() => {
       if (annotationMode !== "text") return;
+
       const sel = document.getSelection();
       if (!sel || sel.isCollapsed) return;
+
       const range = sel.getRangeAt(0);
-      const pgEl = range.startContainer.parentElement?.closest(
-        "[data-page-number]"
-      );
+      const pgEl  = range.startContainer.parentElement?.closest("[data-page-number]");
       if (!pgEl) return;
-      const pg = Number(pgEl.getAttribute("data-page-number"));
-      const rect = range.getBoundingClientRect();
-      const pr = pgEl.getBoundingClientRect();
+
+      const pg    = Number(pgEl.getAttribute("data-page-number"));
+      const rect  = range.getBoundingClientRect();
+      const pr    = pgEl.getBoundingClientRect();
+
       onCreateAnnotation({
         type: "text",
         annotationType: "Text Highlight",
         highlightedText: sel.toString(),
         page: pg,
         x: (rect.left - pr.left) / pr.width,
-        y: (rect.top - pr.top) / pr.height,
-        width: rect.width / pr.width,
+        y: (rect.top  - pr.top)  / pr.height,
+        width:  rect.width  / pr.width,
         height: rect.height / pr.height,
         literatureId: "",
         pdfId: "",
         annotation_tags: [],
         annotation_groups: [],
       });
-      onToolUsed?.();                    // <-- call tool‐deselect
+
+      onToolUsed?.();   // parent may switch back to selection tool
       sel.removeAllRanges();
     }, [annotationMode, onCreateAnnotation, onToolUsed]);
 
@@ -275,11 +354,15 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       return () => document.removeEventListener("mouseup", handleTextSelect);
     }, [handleTextSelect]);
 
-    /*************************************************************************
-     * 6 Row renderer – absolutely positioned rows inside spacer
-     *************************************************************************/
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 8 Row renderer  (virtualised page with overlays & draft rectangle)
+ *    A *row* is absolutely positioned inside a single big spacer div.
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
     const renderRow = (v: VirtualItem) => {
       const pg = v.index + 1;
+
       return (
         <div
           key={v.key}
@@ -296,10 +379,17 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         >
           <div
             data-page-number={pg}
+            /*  Track intrinsic page size once rendered; used for precise
+                offset calculations and rectangle annotation geometry       */
             ref={(el) => {
-              if (el) pageSizeRef.current.set(pg, pageSizeRef.current.get(pg) || { w: 0, h: 0 });
+              if (el)
+                pageSizeRef.current.set(
+                  pg,
+                  pageSizeRef.current.get(pg) || { w: 0, h: 0 }
+                );
             }}
             style={{ display: "inline-block", position: "relative" }}
+            /* ───────── Rectangle‑annotation mouse handlers ───────── */
             onMouseDown={(e) => {
               if (annotationMode !== "rectangle") return;
               const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
@@ -322,52 +412,62 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               const { w, h } = pageSizeRef.current.get(draft.page)!;
               const dispW = w * zoom;
               const dispH = h * zoom;
-              const x0 = Math.min(draft.x0, draft.x1);
-              const y0 = Math.min(draft.y0, draft.y1);
-              const width = Math.abs(draft.x1 - draft.x0);
+
+              const x0     = Math.min(draft.x0, draft.x1);
+              const y0     = Math.min(draft.y0, draft.y1);
+              const width  = Math.abs(draft.x1 - draft.x0);
               const height = Math.abs(draft.y1 - draft.y0);
+
               onCreateAnnotation({
                 type: "rectangle",
                 annotationType: "Figure",
                 page: draft.page,
                 x: x0 / dispW,
                 y: y0 / dispH,
-                width: width / dispW,
+                width:  width  / dispW,
                 height: height / dispH,
                 literatureId: "",
                 pdfId: "",
                 annotation_tags: [],
                 annotation_groups: [],
               });
-              onToolUsed?.();                // <-- call tool‐deselect
+
+              onToolUsed?.();
               clearDraft();
             }}
           >
+            {/* ─────────────────────── PDF page canvas ─────────────────────── */}
             <Page
               pageNumber={pg}
               scale={zoom}
               onRenderSuccess={({ width, height }) => {
                 if (!width || !height) return;
-                const pw = width / zoom;
+
+                // Store intrinsic page dimensions (un‑scaled)
+                const pw = width  / zoom;
                 const ph = height / zoom;
                 const prev = pageSizeRef.current.get(pg);
+
                 if (!prev || prev.w !== pw || prev.h !== ph) {
                   pageSizeRef.current.set(pg, { w: pw, h: ph });
-                  // update dynamic average
+
+                  // Track running average for debug / future heuristics
                   sumHeightsRef.current += ph;
-                  countRef.current += 1;
-                  recalcOffsets();
-                  setTick((t) => t + 1);
+                  countRef.current      += 1;
+
+                  recalcOffsets();            // update page‑top cache
+                  setTick((t) => t + 1);      // re‑render overlay
                 }
               }}
             />
 
-            {/* --- overlay & draft rectangle --- */}
+            {/* ─────────────────────── Annotation overlay ──────────────────── */}
             <AnnotationOverlay
+              /* key={tick} forces remount when page geometry changes */
               key={tick}
               annotations={annotations.filter((a) => a.page === pg)}
               selectedId={selectedId}
-              pageWidth={(pageSizeRef.current.get(pg)?.w ?? 0) * zoom}
+              pageWidth ={(pageSizeRef.current.get(pg)?.w ?? 0) * zoom}
               pageHeight={(pageSizeRef.current.get(pg)?.h ?? 0) * zoom}
               onSelectAnnotation={onSelectAnnotation}
               onHoverAnnotation={onHoverAnnotation}
@@ -375,14 +475,15 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               colorMap={colorMap}
             />
 
+            {/* ─────────────────────── Draft rectangle ─────────────────────── */}
             {draft?.page === pg && (
               <div
                 style={{
                   position: "absolute",
-                  left: Math.min(draft!.x0, draft!.x1),
-                  top: Math.min(draft!.y0, draft!.y1),
-                  width: Math.abs(draft!.x1 - draft!.x0),
-                  height: Math.abs(draft!.y1 - draft!.y0),
+                  left  : Math.min(draft.x0, draft.x1),
+                  top   : Math.min(draft.y0, draft.y1),
+                  width : Math.abs(draft.x1 - draft.x0),
+                  height: Math.abs(draft.y1 - draft.y0),
                   border: "2px dashed red",
                   pointerEvents: "none",
                 }}
@@ -393,15 +494,22 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       );
     };
 
-    /*************************************************************************
-     * 7 Render wrapper + spacer (mandatory for stable scrollHeight)
-     *************************************************************************/
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 9 Render wrapper  (scroll container + spacer div)
+ *    A single enormous spacer div guarantees stable scrollHeight, and the
+ *    absolutely‑positioned rows are placed inside.
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
     return (
       <div
         ref={scrollElRef}
         className="h-full overflow-y-auto"
-        onClick={() => onSelectAnnotation(null)}>
-        <div onClick={e => e.stopPropagation()}></div>
+        onClick={() => onSelectAnnotation(null)}
+      >
+        {/* prevent click‑through on empty space */}
+        <div onClick={(e) => e.stopPropagation()}></div>
+
         <Document
           file={prefixStrapiUrl(pdfUrl)}
           onLoadSuccess={({ numPages }) => {
@@ -409,7 +517,14 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
             onLoadSuccess({ numPages });
           }}
         >
-          <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+          <div
+            /* Spacer div height must equal *sum of all row heights* so that
+               native scrolling works. react‑virtual updates via measure(). */
+            style={{
+              height: rowVirtualizer.getTotalSize(),
+              position: "relative",
+            }}
+          >
             {rowVirtualizer.getVirtualItems().map(renderRow)}
           </div>
         </Document>
@@ -418,4 +533,9 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
   }
 );
 
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * 10 Export
+ *   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 export default PdfViewerWithAnnotations;

@@ -130,7 +130,7 @@ const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
           tabs={activeTabs}
           activeTabId={activeTabId}
           annotationMode={currentMode}
-          setAnnotationMode={setCurrentMode}      // <-- forward setter
+          setAnnotationMode={setCurrentMode}
           colorMap={colorMap}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
