@@ -12,9 +12,9 @@ interface Props {
   pageWidth: number;
   pageHeight: number;
   onSelectAnnotation: (a: Annotation) => void;
-  onHoverAnnotation?: (a: Annotation | null) => void;
+  onHoverAnnotation: (a: Annotation | null) => void;
   renderTooltip?: (annotation: Annotation) => React.ReactNode;
-  colorMap?: Record<AnnotationType, string>;
+  colorMap: Record<AnnotationType, string>;
 }
 
 const DEFAULT_COLOR = "#000000";

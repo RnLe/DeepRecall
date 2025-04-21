@@ -192,7 +192,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       const size = viewerRef.current.getPageSize(page);
       if (size) {
         setZoom(wrapRef.current.clientWidth / size.width);
-        // viewerRef.current?.scrollToPage(page); // Keep page position
+        viewerRef.current?.scrollToPage(page); // Keep page position
       }
     }
   };
@@ -203,7 +203,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       const size = viewerRef.current.getPageSize(page);
       if (size) {
         setZoom(wrapRef.current.clientHeight / size.height);
-        // viewerRef.current?.scrollToPage(page); // Keep page position
+        viewerRef.current?.scrollToPage(page); // Keep page position
       }
     }
   };
@@ -228,6 +228,22 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     }
   };
   const handleOpenTags        = (_: Annotation) => {}; // Placeholder for future tag handling
+
+  const handleSelectAnnotation = (a: Annotation | null) => {
+    if (!a) {
+      setSelId(null);
+      return;
+    }
+    // clicked same annotation → just toggle sidebar
+    if (selId === a.documentId) {
+      onToggleSidebar();
+      return;
+    }
+    // new annotation → select, scroll, and open sidebar if needed
+    setSelId(a.documentId!);
+    setPage(a.page);
+    if (!sidebarOpen) onToggleSidebar();
+  };
 
   // -----------------------------------------------
   // Render: Loading State
@@ -266,7 +282,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
                     min={1}
                     max={numPages}
                     onChange={(e) => jumpToPage(Number(e.target.value))}
-                    className="w-16 text-center background-gray-900 border-gray-600 rounded"
+                    className="w-16 text-center bg-gray-900 text-white border border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-gray-700"
                   />
                   <span>/ {numPages || "-"}</span>
                 </React.Fragment>
@@ -316,10 +332,10 @@ const PdfAnnotationContainer: React.FC<Props> = ({
               setNumPages(numPages);
               setPage((p) => clamp(p, 1, numPages));
             }}
-            // onVisiblePageChange={(pg) => {
-            //   // Sync page state when user scrolls
-            //   setPage((cur) => (cur === pg ? cur : pg));
-            // }}
+            onVisiblePageChange={(pg) => {
+              // always sync page state when scroll changes visible page
+              setPage(pg);
+            }}
             annotationMode={annotationMode}
             annotations={showAnnotations ? annotations : []}
             selectedId={selId}
@@ -353,8 +369,9 @@ const PdfAnnotationContainer: React.FC<Props> = ({
         multi={multi}
         multiSet={multiSet}
         onItemClick={(a) => {
-          setSelId(a.documentId!);
-          setPage(a.page);
+          // reuse the same logic
+          handleSelectAnnotation(a);
+          // then scroll
           setTimeout(() => viewerRef.current?.scrollToPage(a.page), 0);
         }}
         onToggleMulti={(a) =>

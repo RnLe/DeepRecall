@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import debounce from "lodash/debounce";
+import throttle from "lodash/throttle";
 import { AnnotationType, annotationTypes } from "../../../types/annotationTypes";
 import {
   ColorSchemeDefinition,
@@ -106,13 +108,17 @@ const SidebarColorAssignmentPanel: React.FC<Props> = ({
     if (scheme) setColorMap(scheme.scheme.annotationColors);
   };
 
+  // throttle color updates by 150ms
+  const throttledSet = useMemo(
+    () => throttle((m: Record<AnnotationType,string>) => setColorMap(m), 100),
+    [setColorMap]
+  );
   const handleChange = (t: AnnotationType) => (
     e: React.ChangeEvent<HTMLInputElement>
-  ) =>
-    setColorMap({
-      ...colorMap,
-      [t]: e.target.value,
-    });
+  ) => {
+    const next = { ...colorMap, [t]: e.target.value };
+    throttledSet(next);
+  };
 
   return (
     <div className="flex flex-col h-full">
