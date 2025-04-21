@@ -85,12 +85,6 @@ const PdfAnnotationContainer: React.FC<Props> = ({
     deleteAnnotation: mutateDelete,
   } = useAnnotations(litId, pdfId);
 
-  // Filter annotations for current PDF
-  const display = useMemo(
-    () => annotations.filter((a) => a.pdfId === pdfId),
-    [annotations, pdfId]
-  );
-
   // Modal & Preview States for description, notes, and images
   const [descriptionModalAnn, setDescriptionModalAnn] = useState<Annotation | null>(null);
   const [notesModalAnn,       setNotesModalAnn]       = useState<Annotation | null>(null);
@@ -107,8 +101,8 @@ const PdfAnnotationContainer: React.FC<Props> = ({
 
   // Derived: selected annotation object
   const selected = useMemo(
-    () => display.find((a) => a.documentId === selId) ?? null,
-    [display, selId]
+    () => annotations.find((a) => a.documentId === selId) ?? null,
+    [annotations, selId]
   );
 
   // -----------------------------------------------
@@ -127,7 +121,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
 
   // Delete a single annotation (and its image file, if present)
   const handleDelete = async (id: string) => {
-    const ann = display.find((x) => x.documentId === id);
+    const ann = annotations.find((x) => x.documentId === id);
     if (ann?.extra?.imageFileId) {
       try { await deleteFile(ann.extra.imageFileId); } catch {}
     }
@@ -147,7 +141,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       return;
     }
     for (const id of Array.from(multiSet)) {
-      const ann = display.find((x) => x.documentId === id);
+      const ann = annotations.find((x) => x.documentId === id);
       if (ann?.extra?.imageFileId) {
         try { await deleteFile(ann.extra.imageFileId); } catch {}
       }
@@ -173,8 +167,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   // Multi-Select Helpers
   // -----------------------------------------------
   const toggleMultiMode = () => setMulti((m) => !m); // Toggle multi-select mode
-  const selectAll      = () =>
-    setMultiSet(new Set(display.map((a) => a.documentId!))); // Select all annotations
+  const selectAll      = () => setMultiSet(new Set(annotations.map((a) => a.documentId!))); // Select all annotations
   const deselectAll    = () => setMultiSet(new Set());      // Deselect all annotations
 
   // -----------------------------------------------
@@ -199,7 +192,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       const size = viewerRef.current.getPageSize(page);
       if (size) {
         setZoom(wrapRef.current.clientWidth / size.width);
-        viewerRef.current?.scrollToPage(page); // Keep page position
+        // viewerRef.current?.scrollToPage(page); // Keep page position
       }
     }
   };
@@ -210,7 +203,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       const size = viewerRef.current.getPageSize(page);
       if (size) {
         setZoom(wrapRef.current.clientHeight / size.height);
-        viewerRef.current?.scrollToPage(page); // Keep page position
+        // viewerRef.current?.scrollToPage(page); // Keep page position
       }
     }
   };
@@ -319,17 +312,16 @@ const PdfAnnotationContainer: React.FC<Props> = ({
             ref={viewerRef}
             pdfUrl={pdfUrl}
             zoom={zoom}
-            pageNumber={page}
             onLoadSuccess={({ numPages }) => {
               setNumPages(numPages);
               setPage((p) => clamp(p, 1, numPages));
             }}
-            onVisiblePageChange={(pg) => {
-              // Sync page state when user scrolls
-              setPage((cur) => (cur === pg ? cur : pg));
-            }}
+            // onVisiblePageChange={(pg) => {
+            //   // Sync page state when user scrolls
+            //   setPage((cur) => (cur === pg ? cur : pg));
+            // }}
             annotationMode={annotationMode}
-            annotations={showAnnotations ? display : []}
+            annotations={showAnnotations ? annotations : []}
             selectedId={selId}
             onCreateAnnotation={handleAdd}
             onSelectAnnotation={(a) => {
@@ -355,7 +347,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
       {/* Right Sidebar: annotation list & controls */}
       {/* ------------------------------------------- */}
       <RightSidebar
-        annotations={display}
+        annotations={annotations}
         selectedId={selId}
         hoveredId={hovered}
         multi={multi}
