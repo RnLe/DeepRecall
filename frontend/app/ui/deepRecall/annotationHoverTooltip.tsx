@@ -43,7 +43,8 @@ const AnnotationHoverTooltip: React.FC<{ annotation: Annotation }> = ({
     return null;
   }
   return (
-    <div className="bg-gray-800 text-white p-2 rounded shadow-lg bg-opacity-80 max-w-xs prose prose-invert text-xs text-left min-w-40">
+    // Removed the `prose` utility so it no longer injects its own spacing
+    <div className="bg-gray-800 text-white p-2 rounded shadow-lg bg-opacity-80 max-w-xs prose-invert text-xs text-left min-w-40">
       {/* annotation type label */}
       <div className="flex justify-center">
         <span className="rounded text-[10px] uppercase">
@@ -52,34 +53,34 @@ const AnnotationHoverTooltip: React.FC<{ annotation: Annotation }> = ({
       </div>
       {/* optional title */}
       {annotation.title && (
-        <strong className="block text-sm mb-1">{annotation.title}</strong>
+        <strong className="block text-sm my-1">{annotation.title}</strong>
       )}
       {/* description */}
       {annotation.description && (
-        <div className="mb-1">
-          <div className="font-semibold text-xs mb-1">Description</div>
-          <div className="border border-white rounded p-1">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
-            >
-              {annotation.description}
-            </ReactMarkdown>
+        <div className="">
+          <div className="flex justify-center">
+            <span className="my-2 rounded text-[10px] uppercase">Description</span>
           </div>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
+            {annotation.description}
+          </ReactMarkdown>
         </div>
       )}
       {/* notes */}
       {annotation.notes && (
-        <div className="mb-1">
-          <div className="font-semibold text-xs mb-1">Notes</div>
-          <div className="border border-white rounded p-1">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
-            >
-              {annotation.notes}
-            </ReactMarkdown>
+        <div className="">
+          <div className="flex justify-center">
+            <span className="my-2 rounded text-[10px] uppercase">Notes</span>
           </div>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
+            {annotation.notes}
+          </ReactMarkdown>
         </div>
       )}
       {/* tags */}
