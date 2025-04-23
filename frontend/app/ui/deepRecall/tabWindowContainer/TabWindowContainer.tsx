@@ -17,12 +17,16 @@ import AnnotationHoverTooltip from "../annotationHoverTooltip";
 import MarkdownEditorModal from "../MarkdownEditorModal";
 
 import { LiteratureExtended } from "../../../types/deepRecall/strapi/literatureTypes";
-import { Annotation } from "../../../types/deepRecall/strapi/annotationTypes";
+import { AIResponse, Annotation } from "../../../types/deepRecall/strapi/annotationTypes";
 import { useAnnotations } from "../../../customHooks/useAnnotations";
 import { uploadFile, deleteFile } from "../../../api/uploadFile";
 import { AnnotationMode } from "../annotationToolbar";
 import { AnnotationType } from "../../../types/deepRecall/strapi/annotationTypes";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
+
+import { AiTasks, AiTaskKey, fieldByTask } from "@/app/api/openAI/promptTypes";
+import MarkdownResponseModal from "../MarkdownResponseModal";
+import { executeOpenAIRequest } from "@/app/api/openAI/openAIService";
 
 // -----------------------------------------------
 // Type & Utility Definitions
@@ -245,6 +249,52 @@ const TabWindowContainer: React.FC<Props> = ({
     if (!sidebarOpen) onToggleSidebar();
   };
 
+  // Ai handling
+  const [aiModal, setAiModal] = useState<{title:string; markdown?:string}|null>(null);
+
+  const handleAiTask = async (ann: Annotation, taskKey: AiTaskKey) => {
+    // 1. open modal immediately with skeleton
+    setAiModal({ title: AiTasks[taskKey].name });
+  
+    try {
+      // 2. crop the region → File
+      const blob    = await viewerRef.current!.getCroppedImage(ann);
+      const imgFile = new File([blob], "clip.png", { type: "image/png" });
+  
+      // 3. pick the promptKey & model out of AiTasks
+      const { promptKey, defaultModel } = AiTasks[taskKey];
+  
+      // 4. call OpenAI with exactly (promptKey, model, images)
+      const md = await executeOpenAIRequest(
+        promptKey,
+        defaultModel,
+        [imgFile]
+      );
+  
+      // 5. update annotation field
+      const field = fieldByTask[taskKey];
+      const newAiResponse = {
+        text: md,
+        createdAt: new Date().toISOString(),
+        model: defaultModel,
+      };
+      const updated: Annotation = {
+        ...ann,
+        [field]: [...((ann[field] as AIResponse[]) ?? []), newAiResponse],
+      };
+      await handleUpdate(updated);
+  
+      // 6. show markdown
+      setAiModal({
+        title:    AiTasks[taskKey].name,
+        markdown: md
+      });
+    } catch (err) {
+      setAiModal({ title: "Error", markdown: (err as Error).message });
+    }
+  };
+
+
   // -----------------------------------------------
   // Render: Loading State
   // -----------------------------------------------
@@ -355,6 +405,7 @@ const TabWindowContainer: React.FC<Props> = ({
             resolution={4}
             colorMap={colorMap}
             onToolUsed={() => setAnnotationMode("none")} // Exit annotation mode on use
+            handleAiTask={handleAiTask}
           />
         </div>
       </div>
@@ -490,6 +541,15 @@ const TabWindowContainer: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      {aiModal && (
+        <MarkdownResponseModal
+          title={aiModal.title}
+          markdown={aiModal.markdown}
+          onClose={() => setAiModal(null)}
+        />
+      )}
+
 
     </div>
   );

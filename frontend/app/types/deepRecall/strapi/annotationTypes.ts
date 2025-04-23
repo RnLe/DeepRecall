@@ -86,6 +86,15 @@ export interface Solution {
   notes: string;
 }
 
+export interface AIResponse {
+  // The actual response from the model
+  text: string;
+  // Date and time when the response was generated
+  createdAt: string;
+  // The model used to generate the response
+  model: string;
+}
+
 // Data that is saved in the customMetadata field
 export interface AnnotationCustomMetadata extends BaseCoords {
   title?: string;
@@ -100,6 +109,15 @@ export interface AnnotationCustomMetadata extends BaseCoords {
     imageFileId?: number;
     [key: string]: unknown;
   };
+  // Here are all the OPTIONAL fields an annotation can have depending on AI tasks
+  tocExtractions?:            AIResponse[];
+  exerciseExplanations?:      AIResponse[];
+  exerciseSolutions?:         AIResponse[];
+  tableExtractions?:          AIResponse[];      // only one array for all formats
+  figureExplanations?:        AIResponse[];
+  illustrationExplanations?:  AIResponse[];
+  latexConversions?:          AIResponse[];
+  markdownConversions?:       AIResponse[];
 }
 
 // Interface for the frontend.
@@ -159,6 +177,15 @@ export function deserializeAnnotation(response: AnnotationStrapi): Annotation {
       ...deserializeAnnotationGroup(annotationGroup),
     })),
     deck_card: response.deck_card,
+    // AI task specific fields
+    tocExtractions: meta.tocExtractions,
+    exerciseExplanations: meta.exerciseExplanations,
+    exerciseSolutions: meta.exerciseSolutions,
+    tableExtractions: meta.tableExtractions,
+    figureExplanations: meta.figureExplanations,
+    illustrationExplanations: meta.illustrationExplanations,
+    latexConversions: meta.latexConversions,
+    markdownConversions: meta.markdownConversions,
   };
 
   return {
@@ -178,6 +205,7 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     height,
     title,
     description,
+    textContent,
     notes,
     type,
     annotation_tags,
@@ -186,6 +214,15 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     solutions,
     extra = {},
     deck_card,
+    // AI task specific fields
+    tocExtractions,
+    exerciseExplanations,
+    exerciseSolutions,
+    tableExtractions,
+    figureExplanations,
+    illustrationExplanations,
+    latexConversions,
+    markdownConversions,
   } = ann;
 
   // Build the metadata payload
@@ -200,6 +237,15 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
     notes,
     ...extra,
     type,
+    textContent,
+    tocExtractions,
+    exerciseExplanations,
+    exerciseSolutions,
+    tableExtractions,
+    figureExplanations,
+    illustrationExplanations,
+    latexConversions,
+    markdownConversions,
   };
 
   if (color) {
@@ -208,7 +254,7 @@ export function serializeAnnotation(ann: Annotation): AnnotationStrapi {
   if (solutions) {
     meta.solutions = solutions;
   }
-
+  
   // Prepare relations
   const tagsSet = (annotation_tags?.map((t) => t.documentId) ?? []).filter((id): id is string => id !== undefined);
   const groupsSet = (annotation_groups?.map((g) => g.documentId) ?? []).filter((id): id is string => id !== undefined);

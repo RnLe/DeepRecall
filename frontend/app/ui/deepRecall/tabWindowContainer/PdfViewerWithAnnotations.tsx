@@ -20,6 +20,7 @@ import AnnotationOverlay from "../annotationOverlay";
 import { Annotation, AnnotationType } from "@/app/types/deepRecall/strapi/annotationTypes";
 import { AnnotationMode } from "../annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
+import { AiTaskKey, AiTasks } from "@/app/api/openAI/promptTypes";
 
 // Configure PDF.js worker via ESM URL
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -51,6 +52,7 @@ interface Props {
   resolution: number;
   colorMap: Record<AnnotationType, string>;
   onToolUsed?: () => void;
+  handleAiTask: (ann: Annotation, taskKey: AiTaskKey) => void;
 }
 
 const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
@@ -70,6 +72,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       resolution,
       colorMap,
       onToolUsed,
+      handleAiTask,
     },
     ref
   ) => {
@@ -394,6 +397,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               onHoverAnnotation={onHoverAnnotation}
               renderTooltip={renderTooltip}
               colorMap={colorMap}
+              handleAiTask={handleAiTask}
             />
 
             {draft?.page === pg && (

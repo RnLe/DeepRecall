@@ -12,11 +12,19 @@ import "react-pdf/dist/esm/Page/TextLayer.css";
 import TopNavBar from "./TopNavBar";
 import LeftSidebar from "./LeftSidebar";
 import TabManager from "./TabManager";
+import { AiTasks } from "@/app/api/openAI/promptTypes";
 
 const EditorView: React.FC<{ className?: string }> = ({ className }) => {
   // --- fetch literature & types ---
   const { data: items = [], isLoading: litLoading, error: litError } = useLiterature();
   const { data: types = [], isLoading: typesLoading, error: typesError } = useLiteratureTypes();
+
+  const [taskModelMap, setTaskModelMap] = useState(() => {
+    const init: Record<string, string> = {};
+    Object.entries(AiTasks).forEach(([k, v]) => (init[k] = v.defaultModel));
+    return init;
+  });
+  
 
   // --- color schemes (for sidebar) ---
   const {
@@ -112,6 +120,8 @@ const EditorView: React.FC<{ className?: string }> = ({ className }) => {
         deleteScheme={deleteScheme}
         currentMode={currentMode}
         setCurrentMode={setCurrentMode}
+        taskModelMap={taskModelMap}
+        setTaskModelMap={setTaskModelMap}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -132,6 +142,7 @@ const EditorView: React.FC<{ className?: string }> = ({ className }) => {
           colorMap={colorMap}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
+          taskModelMap={taskModelMap}
         />
       </div>
     </div>

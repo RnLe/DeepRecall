@@ -17,6 +17,7 @@ interface Props {
   colorMap: Record<AnnotationType, string>;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  taskModelMap: Record<string, string>;
 }
 
 const TabManager: React.FC<Props> = ({
@@ -27,6 +28,7 @@ const TabManager: React.FC<Props> = ({
   colorMap,
   sidebarOpen,
   onToggleSidebar,
+  taskModelMap,
 }) => {
   const active = tabs.find((t) => t.documentId === activeTabId);
 

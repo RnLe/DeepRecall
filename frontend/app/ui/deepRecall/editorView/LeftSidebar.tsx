@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { Folder, PenToolIcon, Palette } from "lucide-react";
+import { Folder, PenToolIcon, Palette, BrainCog  } from "lucide-react";
 import { LiteratureExtended, LiteratureType } from "../../../types/deepRecall/strapi/literatureTypes";
 import AnnotationToolbar, { AnnotationMode } from "../annotationToolbar";
 import SidebarColorAssignmentPanel from "./SidebarColorAssignmentPanel";
+import AiTasksPanel from "./AiTasksPanel";
+import { AiTasks } from "@/app/api/openAI/promptTypes";
 
 interface Props {
   literature: LiteratureExtended[];
@@ -19,6 +21,8 @@ interface Props {
 
   currentMode: AnnotationMode;
   setCurrentMode: (mode: AnnotationMode) => void;
+  taskModelMap: Record<string, string>;
+  setTaskModelMap: (map: Record<string, string>) => void;
 }
 
 const LeftSidebar: React.FC<Props> = ({
@@ -34,8 +38,10 @@ const LeftSidebar: React.FC<Props> = ({
   deleteScheme,
   currentMode,
   setCurrentMode,
+  taskModelMap,
+  setTaskModelMap,
 }) => {
-  const [panel, setPanel] = useState<"explorer" | "tools" | "colors" | null>(
+  const [panel, setPanel] = useState<"explorer" | "tools" | "colors" | "ai" | null>(
     "explorer"
   );
   const toggle = (p: typeof panel) => setPanel(panel === p ? null : p);
@@ -57,6 +63,7 @@ const LeftSidebar: React.FC<Props> = ({
           { key: "explorer", Icon: Folder },
           { key: "tools", Icon: PenToolIcon },
           { key: "colors", Icon: Palette },
+          { key: "ai", Icon: BrainCog  },
         ].map(({ key, Icon }) => {
           const isActive = panel === key;
           return (
@@ -127,6 +134,13 @@ const LeftSidebar: React.FC<Props> = ({
               createScheme={createScheme}
               updateScheme={updateScheme}
               deleteScheme={deleteScheme}
+            />
+          )}
+
+          {panel === "ai" && (
+            <AiTasksPanel
+              taskModelMap={taskModelMap}
+              setTaskModelMap={setTaskModelMap}
             />
           )}
         </div>
