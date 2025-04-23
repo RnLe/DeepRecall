@@ -35,7 +35,6 @@ export function serializeAnnotationTag(tag: AnnotationTag): AnnotationTagStrapi 
 
     return {
         ...tag,
-        // In many-to-many relations, we need to use the `set` field
         annotations: {
             set: annotationIds,
         },
