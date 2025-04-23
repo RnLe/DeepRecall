@@ -1,8 +1,8 @@
 // src/types/annotationTypes.ts
 import { StrapiResponse } from "../../strapiTypes";
 import { DeckCardStrapi } from "./deckCardTypes";
-import { AnnotationTag, AnnotationTagStrapi } from "./annotationTagTypes";
-import { AnnotationGroup, AnnotationGroupStrapi } from "./annotationGroupTypes";
+import { AnnotationTag, AnnotationTagStrapi, deserializeAnnotationTag } from "./annotationTagTypes";
+import { AnnotationGroup, AnnotationGroupStrapi, deserializeAnnotationGroup } from "./annotationGroupTypes";
 
 export interface AnnotationStrapi extends StrapiResponse {
   mode: AnnotationMode;
@@ -115,14 +115,6 @@ export interface Annotation extends AnnotationCustomMetadata, StrapiResponse {
 
 /* ──────────────────── Strapi (de)serialisation helpers ─────────────── */
 
-/** helper: accept either `T[]` or `{ data?: T[] }` */
-const mapTags = <T>(rel?: T[] | { data?: T[] }): T[] =>
-  Array.isArray(rel)
-    ? rel
-    : rel?.data
-    ? rel.data
-    : [];
-
 export function deserializeAnnotation(response: AnnotationStrapi): Annotation {
   const raw = response.customMetadata ?? {};
   const meta = typeof raw === "string" ? (raw ? JSON.parse(raw) : {}) : raw;
@@ -131,6 +123,8 @@ export function deserializeAnnotation(response: AnnotationStrapi): Annotation {
     ...(meta.imageUrl ? { imageUrl: meta.imageUrl } : {}),
     ...(meta.imageFileId ? { imageFileId: meta.imageFileId } : {}),
   };
+  const annotationTags = response.annotation_tags?.data || [];
+  const annotationGroups = response.annotation_groups?.data || [];
 
   const annotation: Annotation = {
     // From StrapiResponse
@@ -158,8 +152,12 @@ export function deserializeAnnotation(response: AnnotationStrapi): Annotation {
     solutions: meta.solutions ?? [],
     extra,
     // Relations from AnnotationStrapi
-    annotation_tags: mapTags<AnnotationTag>(response.annotation_tags),
-    annotation_groups: mapTags<AnnotationGroup>(response.annotation_groups),
+    annotation_tags: annotationTags.map((annotationTag) => ({
+      ...deserializeAnnotationTag(annotationTag),
+    })),
+    annotation_groups: annotationGroups.map((annotationGroup) => ({
+      ...deserializeAnnotationGroup(annotationGroup),
+    })),
     deck_card: response.deck_card,
   };
 

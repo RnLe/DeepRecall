@@ -1,30 +1,43 @@
 import { StrapiResponse } from "../../strapiTypes";
-import { AnnotationStrapi } from "./annotationTypes";
+import { Annotation, AnnotationStrapi, deserializeAnnotation, serializeAnnotation } from "./annotationTypes";
 
 export interface AnnotationTagStrapi extends StrapiResponse {
   name: string;
   annotations?: {
-    data?:      AnnotationStrapi[];
-    connect?:   string[];
-    disconnect?: string[];
-    set?:       string[];
+    data?:          AnnotationStrapi[];
+    connect?:       string[];
+    disconnect?:    string[];
+    set?:           string[];
   };
 }
 
-export interface AnnotationTag extends AnnotationTagStrapi {
+// Frontend interface for AnnotationTag
+export interface AnnotationTag extends StrapiResponse {
+    name: string;
+    annotations?: Annotation[];
 }
 
-// The serialization and deserialization functions are not needed for this type (yet).
-// They are introduced anyway for consistency with other types.
-
-export function deserializeAnnotationTag(tag: AnnotationTagStrapi): AnnotationTag {
-  return {
-    ...tag,
-  };
+export function deserializeAnnotationTag(response: AnnotationTagStrapi): AnnotationTag {
+    // Get each annotation strapi object from the response
+    // Note: This field is only populated when explicitly requested (via the API)
+    const annotations = response.annotations?.data || [];
+    return {
+        ...response,
+        annotations: annotations.map((annotation) => ({
+            ...deserializeAnnotation(annotation), // Deserialize each annotation
+        })),
+    };
 }
 
 export function serializeAnnotationTag(tag: AnnotationTag): AnnotationTagStrapi {
-  return {
-    ...tag,
-  } as AnnotationTagStrapi;
+    // Get a list of documentIds from the annotations
+    const annotationIds = tag.annotations?.map((annotation) => annotation.documentId) || [];
+
+    return {
+        ...tag,
+        // In many-to-many relations, we need to use the `set` field
+        annotations: {
+            set: annotationIds,
+        },
+    } as AnnotationTagStrapi;
 }
