@@ -3,8 +3,8 @@
 import React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteLiterature, updateLiterature } from "../../api/literatureService";
-import { LiteratureExtended, Literature } from "../../types/literatureTypes";
-import { VersionExtended } from "../../types/versionTypes";
+import { LiteratureExtended, Literature } from "../../types/deepRecall/strapi/literatureTypes";
+import { VersionExtended } from "../../types/deepRecall/strapi/versionTypes";
 import { prefixStrapiUrl } from "../../helpers/getStrapiMedia";
 
 /**

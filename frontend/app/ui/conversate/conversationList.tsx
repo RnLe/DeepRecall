@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import ConversationCard from './conversationCard';
 // Removed ConversationPipeline import as it is not shown in the sidebar.
 import SparkMD5 from 'spark-md5';
-import { Conversation } from '../../types/diarizationTypes';
+import { Conversation } from '../../types/conversate/diarizationTypes';
 import { useActiveConversation } from '../../context/activeConversationContext';
 
 const fetchConversations = async (): Promise<Conversation[]> => {

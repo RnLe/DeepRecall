@@ -1,6 +1,6 @@
 // src/api/colorSchemeService.ts
 
-import { ColorScheme } from "../types/colorSchemeTypes";
+import { ColorScheme } from "../types/deepRecall/strapi/colorSchemeTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/color-schemes";

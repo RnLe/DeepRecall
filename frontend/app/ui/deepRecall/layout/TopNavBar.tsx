@@ -1,7 +1,7 @@
 // src/components/pdfViewer/layout/TopNavBar.tsx
 import React from "react";
 import { X, PanelRightOpen, PanelRightClose } from "lucide-react";
-import { LiteratureExtended } from "../../../types/literatureTypes";
+import { LiteratureExtended } from "../../../types/deepRecall/strapi/literatureTypes";
 
 interface Props {
   tabs: LiteratureExtended[];

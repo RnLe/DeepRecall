@@ -1,6 +1,6 @@
 // ChatAnalysis.tsx
 import React, { useState } from 'react';
-import { ChatCompact, Speaker } from '../../types/diarizationTypes';
+import { ChatCompact, Speaker } from '../../types/conversate/diarizationTypes';
 import { SpeakerData, SpeakerCard } from './speakerCard';
 
 interface AnalysisResponse {

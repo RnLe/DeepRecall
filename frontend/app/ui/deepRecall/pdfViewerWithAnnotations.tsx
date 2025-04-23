@@ -21,7 +21,7 @@ import {
   Annotation,
   AnnotationType,
   RectangleAnnotation,
-} from "../../types/annotationTypes";
+} from "../../types/deepRecall/strapi/annotationTypes";
 import { AnnotationMode } from "./annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
@@ -263,7 +263,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       const pr = pgEl.getBoundingClientRect();
 
       onCreateAnnotation({
-        type: "text",
+        mode: "text",
         annotationType: "Text Highlight",
         highlightedText: sel.toString(),
         page: pg,
@@ -351,7 +351,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
               const height = Math.abs(draft.y1 - draft.y0);
 
               onCreateAnnotation({
-                type: "rectangle",
+                mode: "rectangle",
                 annotationType: "Figure",
                 page: draft.page,
                 x: x0 / dispW,

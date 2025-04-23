@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import debounce from "lodash/debounce";
 import throttle from "lodash/throttle";
-import { AnnotationType, annotationTypes } from "../../../types/annotationTypes";
+import { AnnotationType, annotationTypes } from "../../../types/deepRecall/strapi/annotationTypes";
 import {
   ColorSchemeDefinition,
   ColorScheme,
-} from "../../../types/colorSchemeTypes";
+} from "../../../types/deepRecall/strapi/colorSchemeTypes";
 import { Edit2, CheckCircle, XCircle, Trash2 } from "lucide-react";
 
 interface Props {

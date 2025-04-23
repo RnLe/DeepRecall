@@ -1,7 +1,7 @@
 // conversationCard.tsx
 import React, { useEffect, useState } from 'react';
 import { SpeakerData } from './speakerCard';
-import { Conversation } from '../../types/diarizationTypes';
+import { Conversation } from '../../types/conversate/diarizationTypes';
 import { agoTimeToString, secondsToString } from '../../helpers/timesToString';
 
 interface ConversationCardProps {

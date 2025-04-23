@@ -9,8 +9,8 @@ import "reactflow/dist/style.css";
 import { Document, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
-import { LiteratureExtended } from "../../types/literatureTypes";
-import { Annotation } from "../../types/annotationTypes";
+import { LiteratureExtended } from "../../types/deepRecall/strapi/literatureTypes";
+import { Annotation } from "../../types/deepRecall/strapi/annotationTypes";
 import { useAnnotations } from "../../customHooks/useAnnotations";
 import CanvasPageNode from "./CanvasPageNode";
 import CanvasAnnotationNode from "./CanvasAnnotationNode";
@@ -119,7 +119,7 @@ const CanvasPdfFlow: React.FC<Props> = ({
         .map((a) => {
           const x =
             CENTER_X +
-            (a.type === "text"
+            (a.mode === "text"
               ? -(PAGE_WIDTH / 2 + SIDEBAR_OFFSET)
               : PAGE_WIDTH / 2 + SIDEBAR_OFFSET);
           const y =

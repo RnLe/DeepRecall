@@ -1,6 +1,6 @@
 import React from "react";
 import { useVersionTypes } from "../../customHooks/useLiterature";
-import { transformVersion, VersionType } from "../../types/versionTypes";
+import { transformVersion, VersionType } from "../../types/deepRecall/strapi/versionTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteVersionType } from "../../api/literatureService";
 

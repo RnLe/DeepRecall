@@ -1,5 +1,5 @@
 // src/types/colorSchemeTypes.ts
-import { StrapiResponse } from "./strapiTypes";
+import { StrapiResponse } from "../../strapiTypes";
 import { AnnotationType } from "./annotationTypes";
 
 /**

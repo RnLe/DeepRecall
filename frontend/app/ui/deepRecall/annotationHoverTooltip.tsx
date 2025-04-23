@@ -6,7 +6,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 
-import { Annotation } from "../../types/annotationTypes";
+import { Annotation } from "../../types/deepRecall/strapi/annotationTypes";
 
 /** A lightweight hover tooltip for annotations. */
 const AnnotationHoverTooltip: React.FC<{ annotation: Annotation }> = ({

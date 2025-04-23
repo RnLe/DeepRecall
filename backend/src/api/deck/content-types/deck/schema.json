@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "decks",
+  "info": {
+    "singularName": "deck",
+    "pluralName": "decks",
+    "displayName": "Deck",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "customData": {
+      "type": "json"
+    },
+    "knowledge_packs": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::knowledge-pack.knowledge-pack",
+      "mappedBy": "decks"
+    },
+    "deck_cards": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::card-type.card-type",
+      "mappedBy": "decks"
+    }
+  }
+}

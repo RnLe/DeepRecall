@@ -1,6 +1,6 @@
 // helpers/groupLiteratures.ts
 
-import { LiteratureExtended } from '../types/literatureTypes';
+import { LiteratureExtended } from '../types/deepRecall/strapi/literatureTypes';
 
 export const groupLiteraturesByType = (literatures: LiteratureExtended[]) => {
   return literatures.reduce((acc: { [key: string]: LiteratureExtended[] }, lit) => {

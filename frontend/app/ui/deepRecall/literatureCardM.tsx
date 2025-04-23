@@ -1,6 +1,6 @@
 // literatureCardM.tsx
 import React from 'react';
-import { LiteratureExtended } from '../../types/literatureTypes';
+import { LiteratureExtended } from '../../types/deepRecall/strapi/literatureTypes';
 import VersionBannerCardM from './versionBannerCardM';
 
 interface LiteratureCardProps {

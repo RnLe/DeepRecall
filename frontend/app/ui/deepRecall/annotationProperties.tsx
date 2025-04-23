@@ -13,7 +13,7 @@ import {
   AnnotationType,
   Solution,
   AnnotationTag,
-} from "../../types/annotationTypes";
+} from "../../types/deepRecall/strapi/annotationTypes";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
 import { agoTimeToString } from "../../helpers/timesToString";
 import MarkdownEditorModal from "./MarkdownEditorModal";
@@ -79,7 +79,7 @@ const AnnotationProperties: React.FC<Props> = ({
   }, [annotation]);
 
   if (!draft) return <div className="p-4">No annotation selected.</div>;
-  const isRect = draft.type === "rectangle";
+  const isRect = draft.mode === "rectangle";
 
   // generic field updater (no longer used for title/color/tags)
   const setField = <K extends keyof Annotation>(key: K, val: Annotation[K]) => {
@@ -121,7 +121,7 @@ const AnnotationProperties: React.FC<Props> = ({
   };
 
   const typeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!draft || draft.type !== "rectangle") return;
+    if (!draft || draft.mode !== "rectangle") return;
     const next = {
       ...(draft as RectangleAnnotation),
       annotationType: e.target.value as AnnotationType,

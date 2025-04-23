@@ -1,6 +1,6 @@
 import React from "react";
 import { Handle, Position } from "reactflow";
-import { Annotation } from "../../types/annotationTypes";
+import { Annotation } from "../../types/deepRecall/strapi/annotationTypes";
 import { Edit2 } from "lucide-react";
 import AnnotationHoverTooltip from "./annotationHoverTooltip";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
@@ -26,7 +26,7 @@ const CanvasAnnotationNode: React.FC<Props> = ({ data }) => {
     onEdit,
   } = data;
 
-  const isText = annotation.type === "text";
+  const isText = annotation.mode === "text";
   const isSelected = annotation.documentId === selectedId;
   const isHovered = annotation.documentId === hoveredId;
 

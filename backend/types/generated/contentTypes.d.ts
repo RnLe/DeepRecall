@@ -439,36 +439,6 @@ export interface ApiAnnotationTagAnnotationTag
   };
 }
 
-export interface ApiAnnotationTypeAnnotationType
-  extends Struct.CollectionTypeSchema {
-  collectionName: 'annotation_types';
-  info: {
-    displayName: 'AnnotationType';
-    pluralName: 'annotation-types';
-    singularName: 'annotation-type';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::annotation-type.annotation-type'
-    > &
-      Schema.Attribute.Private;
-    name: Schema.Attribute.String & Schema.Attribute.Required;
-    publishedAt: Schema.Attribute.DateTime;
-    typeMetadata: Schema.Attribute.JSON & Schema.Attribute.Required;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-  };
-}
-
 export interface ApiAnnotationAnnotation extends Struct.CollectionTypeSchema {
   collectionName: 'annotations';
   info: {
@@ -492,6 +462,11 @@ export interface ApiAnnotationAnnotation extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customMetadata: Schema.Attribute.JSON & Schema.Attribute.Required;
+    deck_card: Schema.Attribute.Relation<
+      'oneToOne',
+      'api::card-type.card-type'
+    >;
     literatureId: Schema.Attribute.String & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -499,10 +474,9 @@ export interface ApiAnnotationAnnotation extends Struct.CollectionTypeSchema {
       'api::annotation.annotation'
     > &
       Schema.Attribute.Private;
-    metadata: Schema.Attribute.JSON & Schema.Attribute.Required;
+    mode: Schema.Attribute.String & Schema.Attribute.Required;
     pdfId: Schema.Attribute.String & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
-    type: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -540,6 +514,41 @@ export interface ApiAuthorAuthor extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiCardTypeCardType extends Struct.CollectionTypeSchema {
+  collectionName: 'card_types';
+  info: {
+    description: '';
+    displayName: 'DeckCard';
+    pluralName: 'card-types';
+    singularName: 'card-type';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    annotation: Schema.Attribute.Relation<
+      'oneToOne',
+      'api::annotation.annotation'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    customData: Schema.Attribute.JSON;
+    decks: Schema.Attribute.Relation<'manyToMany', 'api::deck.deck'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::card-type.card-type'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiColorSchemeColorScheme extends Struct.CollectionTypeSchema {
   collectionName: 'color_schemes';
   info: {
@@ -563,6 +572,76 @@ export interface ApiColorSchemeColorScheme extends Struct.CollectionTypeSchema {
     name: Schema.Attribute.String & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     scheme: Schema.Attribute.JSON;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiDeckDeck extends Struct.CollectionTypeSchema {
+  collectionName: 'decks';
+  info: {
+    description: '';
+    displayName: 'Deck';
+    pluralName: 'decks';
+    singularName: 'deck';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    customData: Schema.Attribute.JSON;
+    deck_cards: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::card-type.card-type'
+    >;
+    knowledge_packs: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::knowledge-pack.knowledge-pack'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::deck.deck'> &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiKnowledgePackKnowledgePack
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'knowledge_packs';
+  info: {
+    description: '';
+    displayName: 'KnowledgePack';
+    pluralName: 'knowledge-packs';
+    singularName: 'knowledge-pack';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    customData: Schema.Attribute.JSON;
+    decks: Schema.Attribute.Relation<'manyToMany', 'api::deck.deck'>;
+    goals: Schema.Attribute.Text;
+    intention: Schema.Attribute.Text;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::knowledge-pack.knowledge-pack'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    targetDate: Schema.Attribute.Date;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1019,10 +1098,12 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::annotation-group.annotation-group': ApiAnnotationGroupAnnotationGroup;
       'api::annotation-tag.annotation-tag': ApiAnnotationTagAnnotationTag;
-      'api::annotation-type.annotation-type': ApiAnnotationTypeAnnotationType;
       'api::annotation.annotation': ApiAnnotationAnnotation;
       'api::author.author': ApiAuthorAuthor;
+      'api::card-type.card-type': ApiCardTypeCardType;
       'api::color-scheme.color-scheme': ApiColorSchemeColorScheme;
+      'api::deck.deck': ApiDeckDeck;
+      'api::knowledge-pack.knowledge-pack': ApiKnowledgePackKnowledgePack;
       'api::literature-type.literature-type': ApiLiteratureTypeLiteratureType;
       'api::literature.literature': ApiLiteratureLiterature;
       'api::version-type.version-type': ApiVersionTypeVersionType;

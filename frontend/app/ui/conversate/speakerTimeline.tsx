@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { DiarizationResult } from '../../helpers/diarizationHelpers';
-import { Speaker } from '../../types/diarizationTypes';
+import { Speaker } from '../../types/conversate/diarizationTypes';
 
 interface SpeakerTimelineProps {
   results: DiarizationResult[];

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { secondsToString } from '../../helpers/timesToString';
-import { Conversation } from '../../types/diarizationTypes';
+import { Conversation } from '../../types/conversate/diarizationTypes';
 import { useActiveConversation } from '../../context/activeConversationContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -13,11 +13,11 @@ import { formatLogMessage, formatReadableDateTime } from '../../helpers/logHelpe
 import { DiarizationResult, parseRTTM, extractSpeakerCount, getSpeakerAudioFilename } from '../../helpers/diarizationHelpers';
 import { SpeakerTimeline } from './speakerTimeline';
 import { SpeakerCard } from './speakerCard';
-import { Speaker } from '../../types/diarizationTypes';
+import { Speaker } from '../../types/conversate/diarizationTypes';
 import ReactModal from 'react-modal'; // added for modal support
 import { getBlockTranscription, getLineTranscription } from '../../helpers/transcriptionHelpers';
 import { parseChatContent, formatChatContentForClipboard, createChatCompact } from '../../helpers/chatHelpers';
-import { ChatContent } from '../../types/diarizationTypes';
+import { ChatContent } from '../../types/conversate/diarizationTypes';
 import Chat from './chat';
 import ChatAnalysis from './chatAnalysis';
 

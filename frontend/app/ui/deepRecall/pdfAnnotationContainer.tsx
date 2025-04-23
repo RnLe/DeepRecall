@@ -16,12 +16,12 @@ import RightSidebar from "./layout/RightSidebar";
 import AnnotationHoverTooltip from "./annotationHoverTooltip";
 import MarkdownEditorModal from "./MarkdownEditorModal";
 
-import { LiteratureExtended } from "../../types/literatureTypes";
-import { Annotation, RectangleAnnotation } from "../../types/annotationTypes";
+import { LiteratureExtended } from "../../types/deepRecall/strapi/literatureTypes";
+import { Annotation, RectangleAnnotation } from "../../types/deepRecall/strapi/annotationTypes";
 import { useAnnotations } from "../../customHooks/useAnnotations";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
 import { AnnotationMode } from "./annotationToolbar";
-import { AnnotationType } from "../../types/annotationTypes";
+import { AnnotationType } from "../../types/deepRecall/strapi/annotationTypes";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
 // -----------------------------------------------

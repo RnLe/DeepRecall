@@ -3,8 +3,8 @@ import React from "react";
 import PdfAnnotationContainer from "../pdfAnnotationContainer";
 import RightSidebar from "../layout/RightSidebar";
 import { AnnotationMode } from "../annotationToolbar";
-import { AnnotationType } from "../../../types/annotationTypes";
-import { LiteratureExtended } from "../../../types/literatureTypes";
+import { AnnotationType } from "../../../types/deepRecall/strapi/annotationTypes";
+import { LiteratureExtended } from "../../../types/deepRecall/strapi/literatureTypes";
 
 const noop = () => {};
 const noopAsync = async () => {};

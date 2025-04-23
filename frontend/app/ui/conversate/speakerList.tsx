@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SpeakerCard } from './speakerCard';
 import SpeakerCreationForm from './speakerCreationForm';
-import { Speaker } from '../../types/diarizationTypes';
+import { Speaker } from '../../types/conversate/diarizationTypes';
 
 // Fetch speakers from backend.
 const fetchSpeakers = async (): Promise<Speaker[]> => {

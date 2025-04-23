@@ -1,6 +1,6 @@
 // literatureTypes.ts
 
-import { StrapiResponse } from "./strapiTypes";
+import { StrapiResponse } from "../../strapiTypes";
 // Import new version types & transformer.
 import { VersionExtended, transformVersion } from "./versionTypes";
 

@@ -12,11 +12,11 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "type": {
+    "mode": {
       "type": "string",
       "required": true
     },
-    "metadata": {
+    "customMetadata": {
       "type": "json",
       "required": true
     },
@@ -39,6 +39,12 @@
       "relation": "manyToMany",
       "target": "api::annotation-group.annotation-group",
       "inversedBy": "annotations"
+    },
+    "deck_card": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::card-type.card-type",
+      "mappedBy": "annotation"
     }
   }
 }

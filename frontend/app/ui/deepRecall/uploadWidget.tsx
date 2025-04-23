@@ -5,7 +5,7 @@ import VersionForm from "./versionForm";
 import LiteratureForm from "./literatureForm";
 import LiteratureTypeCreationForm from "./literatureTypeCreationForm";
 import VersionTypeCreationForm from "./versionTypeCreationForm";
-import { LiteratureExtended, LiteratureType } from "../../types/literatureTypes";
+import { LiteratureExtended, LiteratureType } from "../../types/deepRecall/strapi/literatureTypes";
 import { useLiterature, useLiteratureTypes, useVersionTypes } from "../../customHooks/useLiterature";
 import LiteratureCardL from "./literatureCardL";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

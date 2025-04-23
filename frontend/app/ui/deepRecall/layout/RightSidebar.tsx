@@ -5,7 +5,7 @@ import AnnotationList from "../annotationList";
 import AnnotationProperties from "../annotationProperties";
 import SidebarContainer from "./SidebarContainer";
 import CollapsiblePanel from "./CollapsiblePanel";
-import { Annotation, RectangleAnnotation } from "@/app/types/annotationTypes";
+import { Annotation, RectangleAnnotation } from "@/app/types/deepRecall/strapi/annotationTypes";
 
 interface Props {
   sidebarOpen: boolean;

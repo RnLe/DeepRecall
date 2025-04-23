@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "card_types",
+  "info": {
+    "singularName": "card-type",
+    "pluralName": "card-types",
+    "displayName": "DeckCard",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "customData": {
+      "type": "json"
+    },
+    "decks": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::deck.deck",
+      "inversedBy": "deck_cards"
+    },
+    "annotation": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::annotation.annotation",
+      "inversedBy": "deck_card"
+    }
+  }
+}

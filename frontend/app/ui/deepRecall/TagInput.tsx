@@ -1,6 +1,6 @@
 // src/components/pdfViewer/TagInput.tsx
 import React, { useState, useRef, useEffect } from "react";
-import { AnnotationTag } from "../../types/annotationTypes";
+import { AnnotationTag } from "../../types/deepRecall/strapi/annotationTypes";
 import { useAnnotationTags } from "../../customHooks/useAnnotationTags";
 
 interface TagInputProps {

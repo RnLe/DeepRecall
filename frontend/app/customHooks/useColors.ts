@@ -6,7 +6,7 @@ import {
     updateColorScheme,
     deleteColorScheme,
   } from "../api/colorSchemeService";
-  import { ColorScheme } from "../types/colorSchemeTypes";
+  import { ColorScheme } from "../types/deepRecall/strapi/colorSchemeTypes";
   import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
   
   const SCHEMES_KEY = ["colorSchemes"];

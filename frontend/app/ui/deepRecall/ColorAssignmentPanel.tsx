@@ -1,7 +1,7 @@
 // src/components/pdfViewer/ColorAssignmentPanel.tsx
 import React, { useState } from "react";
-import { AnnotationType, annotationTypes } from "../../types/annotationTypes";
-import { ColorSchemeDefinition, ColorScheme } from "../../types/colorSchemeTypes";
+import { AnnotationType, annotationTypes } from "../../types/deepRecall/strapi/annotationTypes";
+import { ColorSchemeDefinition, ColorScheme } from "../../types/deepRecall/strapi/colorSchemeTypes";
 
 interface Props {
   colorMap: Record<AnnotationType, string>;

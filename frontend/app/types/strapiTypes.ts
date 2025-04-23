@@ -28,4 +28,4 @@ export interface MediaFile {
     updatedAt: string;
     publishedAt: string;
     documentId: string;
-  }
+}

@@ -1,8 +1,8 @@
 // chatHelpers.ts
-import { ChatContent, ChatCompact, Speaker } from '../types/diarizationTypes';
+import { ChatContent, ChatCompact, Speaker } from '../types/conversate/diarizationTypes';
 import { secondsToString } from './timesToString';
 import { DiarizationResult } from './diarizationHelpers';
-import { WhisperTranscription } from '../types/diarizationTypes';
+import { WhisperTranscription } from '../types/conversate/diarizationTypes';
 
 // New interface for grouped messages
 export interface GroupedMessage {

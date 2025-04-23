@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Folder, PenToolIcon, Palette } from "lucide-react";
-import { LiteratureExtended, LiteratureType } from "../../../types/literatureTypes";
+import { LiteratureExtended, LiteratureType } from "../../../types/deepRecall/strapi/literatureTypes";
 import AnnotationToolbar, { AnnotationMode } from "../annotationToolbar";
 import SidebarColorAssignmentPanel from "./SidebarColorAssignmentPanel";
 

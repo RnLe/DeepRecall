@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AnnotationTag } from "../types/annotationTypes";
+import { AnnotationTag } from "../types/deepRecall/strapi/annotationTypes";
 import { fetchTags, createTag, updateTag, deleteTag } from "../api/annotationTagService";
 
 /* -------------------------------------------------------------- */

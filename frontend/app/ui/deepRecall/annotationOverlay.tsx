@@ -4,7 +4,7 @@ import {
   Annotation,
   RectangleAnnotation,
   AnnotationType,
-} from "../../types/annotationTypes";
+} from "../../types/deepRecall/strapi/annotationTypes";
 
 interface Props {
   annotations: Annotation[];
@@ -59,13 +59,13 @@ const AnnotationOverlay: React.FC<Props> = ({
         const isSelected = a.documentId === selectedId;
         const color =
           a.color ??
-          (a.type === "rectangle"
+          (a.mode === "rectangle"
             ? colorMap[(a as RectangleAnnotation).annotationType]
             : colorMap["text" as AnnotationType]) ??
           DEFAULT_COLOR;
 
         // Rectangle border
-        if (a.type === "rectangle") {
+        if (a.mode === "rectangle") {
           return (
             <div
               key={a.documentId}

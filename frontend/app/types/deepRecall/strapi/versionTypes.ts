@@ -1,4 +1,4 @@
-import { StrapiResponse } from "./strapiTypes";
+import { StrapiResponse } from "../../strapiTypes";
 
 // If needed, re-declare DynamicMetadata (or import from literatureTypes to avoid circular deps)
 export type DynamicMetadata = { [key: string]: any };

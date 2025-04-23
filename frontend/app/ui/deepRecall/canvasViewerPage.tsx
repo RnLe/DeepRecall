@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { useLiterature } from "../../customHooks/useLiterature";
 import { useAnnotations } from "../../customHooks/useAnnotations";
-import { LiteratureExtended } from "../../types/literatureTypes";
+import { LiteratureExtended } from "../../types/deepRecall/strapi/literatureTypes";
 import CompactLiteratureList from "./compactLiteratureList";
 import AnnotationList from "./annotationList";
 import CanvasPdfFlow from "./CanvasPdfFlow";

@@ -1,7 +1,7 @@
 // hardwareBanner.tsx
 
 import React, { useState, useEffect } from 'react';
-import { hardwareResponse } from '../../types/diarizationTypes';
+import { hardwareResponse } from '../../types/conversate/diarizationTypes';
 
 export const HardwareBanner: React.FC = () => {
   const [hardware, setHardware] = useState<hardwareResponse | null>(null);

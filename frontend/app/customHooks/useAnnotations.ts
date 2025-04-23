@@ -6,7 +6,7 @@ import {
   deleteAnnotation as apiDelete,
 } from "../api/annotationService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Annotation } from "../types/annotationTypes";
+import { Annotation } from "../types/deepRecall/strapi/annotationTypes";
 
 export function useAnnotations(literatureId: string, pdfId: string) {
   const qc = useQueryClient();

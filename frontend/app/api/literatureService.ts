@@ -5,8 +5,8 @@ import {
   LiteratureType,
   transformLiterature,
   LiteratureExtended,
-} from "../types/literatureTypes";
-import { VersionType } from "../types/versionTypes";
+} from "../types/deepRecall/strapi/literatureTypes";
+import { VersionType } from "../types/deepRecall/strapi/versionTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/literatures";

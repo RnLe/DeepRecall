@@ -3,7 +3,7 @@ import { Handle, Position } from "reactflow";
 import { Page } from "react-pdf";
 import AnnotationOverlay from "./annotationOverlay";
 import AnnotationHoverTooltip from "./annotationHoverTooltip";
-import { Annotation } from "../../types/annotationTypes";
+import { Annotation } from "../../types/deepRecall/strapi/annotationTypes";
 
 interface Props {
   data: {

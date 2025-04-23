@@ -1,7 +1,7 @@
 // literatureForm.tsx
 
 import React, { useState, useEffect } from "react";
-import { Literature, LiteratureType } from "../../types/literatureTypes";
+import { Literature, LiteratureType } from "../../types/deepRecall/strapi/literatureTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLiterature } from "../../api/literatureService";
 
