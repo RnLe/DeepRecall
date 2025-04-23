@@ -1,8 +1,4 @@
 // src/api/annotationService.ts
-/**
- * CRUD around the Strapi “annotations” collection.
- * Always (de)serialises via our updated helpers.
- */
 
 import {
   Annotation,
@@ -18,18 +14,12 @@ const jsonHeaders = {
   Authorization: `Bearer ${API_TOKEN}`,
 };
 
-function unwrapStrapi<T>(data: any): T {
-  const { id, attributes } = data;
-  return {
-    documentId: id.toString(),
-    ...attributes,
-  } as T;
-}
-
 export async function fetchAnnotations(
   literatureId?: string,
   pdfId?: string
 ): Promise<Annotation[]> {
+  // Fetches raw AnnotationStrapi responses and deserializes them
+  // Takes in optional literatureId and pdfId to filter by
   const params = new URLSearchParams();
 
   if (literatureId !== undefined)
@@ -37,6 +27,7 @@ export async function fetchAnnotations(
   if (pdfId !== undefined)
     params.append("filters[pdfId][$eq]", pdfId);
 
+  // Pagination and sorting
   params.append("pagination[pageSize]", "1000");
   params.append("sort", "createdAt:asc");
 
@@ -52,7 +43,8 @@ export async function fetchAnnotations(
   if (!res.ok) throw new Error(`Fetch annotations failed: ${res.status}`);
 
   const json = await res.json();
-
+  // Response is wrapped in a data object
+  // Additionally, deserialize the AnnotationStrapi object into an Annotation (frontend type)
   return json.data.map((d: any) => deserializeAnnotation(d));
 }
 
@@ -60,28 +52,9 @@ export async function fetchAnnotations(
 export async function createAnnotation(
   ann: Annotation
 ): Promise<Annotation> {
-  // 1) Build the base payload (with your "set" logic inside serializeAnnotation)
-  const data = serializeAnnotation(ann);
+  // Annotation has to be wrapped in a data object
+  const payload = { data: serializeAnnotation(ann) };
 
-  // 2) Override for create: only include connect if there are any tags
-  const tagIds = (ann.annotation_tags?.map((t) => t.documentId).filter((t): t is string => !!t)) ?? [];
-  if (tagIds.length > 0) {
-    data.annotation_tags = { connect: tagIds };
-  } else {
-    delete data.annotation_tags;
-  }
-
-  // same for groups
-  const groupIds = ann.annotation_groups?.map((g) => g.documentId).filter((id): id is string => Boolean(id)) ?? [];
-  if (groupIds.length > 0) {
-    data.annotation_groups = { connect: groupIds };
-  } else {
-    delete data.annotation_groups;
-  }
-
-  const payload = { data };
-
-  // 3) Fire off the POST
   const res = await fetch(BASE_URL, {
     method: "POST",
     headers: jsonHeaders,
@@ -94,15 +67,18 @@ export async function createAnnotation(
     );
   }
   const json = await res.json();
-  return deserializeAnnotation(unwrapStrapi(json.data));
+  // The response is a AnnotationStrapi object, so we need to unwrap it
+  return deserializeAnnotation(json.data);
 }
 
 export async function updateAnnotation(
-  id: string,
+  documentId: string,
   ann: Annotation
 ): Promise<Annotation> {
+  // Annotation has to be wrapped in a data object
   const payload = { data: serializeAnnotation(ann) };
-  const res = await fetch(`${BASE_URL}/${id}`, {
+  
+  const res = await fetch(`${BASE_URL}/${documentId}`, {
     method: "PUT",
     headers: jsonHeaders,
     body: JSON.stringify(payload),
@@ -114,11 +90,12 @@ export async function updateAnnotation(
     );
   }
   const json = await res.json();
-  return deserializeAnnotation(unwrapStrapi(json.data));
+  
+  return deserializeAnnotation(json.data);
 }
 
-export async function deleteAnnotation(id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/${id}`, {
+export async function deleteAnnotation(documentId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/${documentId}`, {
     method: "DELETE",
     headers: jsonHeaders,
   });

@@ -89,7 +89,7 @@ export interface Solution {
 // Data that is saved in the customMetadata field
 export interface AnnotationCustomMetadata extends BaseCoords {
   title?: string;
-  type: AnnotationMode;
+  type: AnnotationType;
   description?: string;
   textContent?: string;
   notes?: string;

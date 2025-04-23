@@ -21,7 +21,7 @@ interface Props {
   setCurrentMode: (mode: AnnotationMode) => void;
 }
 
-const LeftSideBar: React.FC<Props> = ({
+const LeftSidebar: React.FC<Props> = ({
   literature,
   openTab,
   schemes,
@@ -134,4 +134,4 @@ const LeftSideBar: React.FC<Props> = ({
     </div>
 )};
 
-export default LeftSideBar;
+export default LeftSidebar;

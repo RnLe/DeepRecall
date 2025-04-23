@@ -5,7 +5,7 @@ import AnnotationList from "../annotationList";
 import AnnotationProperties from "../annotationProperties";
 import SidebarContainer from "./SidebarContainer";
 import CollapsiblePanel from "./CollapsiblePanel";
-import { Annotation, RectangleAnnotation } from "@/app/types/deepRecall/strapi/annotationTypes";
+import { Annotation } from "@/app/types/deepRecall/strapi/annotationTypes";
 
 interface Props {
   sidebarOpen: boolean;
@@ -27,7 +27,7 @@ interface Props {
   onDeselectAll: () => void;
   updateAnnotation: (a: Annotation) => Promise<void>;
   deleteAnnotation: (id: string) => Promise<void>;
-  saveImage: (a: RectangleAnnotation) => Promise<void>;
+  saveImage: (a: Annotation) => Promise<void>;
   selected: Annotation | null;
   onCancelSelect: () => void;
   colorMap?: Record<string, string>;

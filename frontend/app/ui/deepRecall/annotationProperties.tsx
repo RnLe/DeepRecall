@@ -8,12 +8,11 @@ import { Eye, X, StickyNote, Tags, FileText, Sigma, Image as ImageIcon } from "l
 
 import {
   Annotation,
-  RectangleAnnotation,
   annotationTypes,
   AnnotationType,
-  Solution,
-  AnnotationTag,
+  Solution
 } from "../../types/deepRecall/strapi/annotationTypes";
+import { AnnotationTag } from "@/app/types/deepRecall/strapi/annotationTagTypes";
 import { uploadFile, deleteFile } from "../../api/uploadFile";
 import { agoTimeToString } from "../../helpers/timesToString";
 import MarkdownEditorModal from "./MarkdownEditorModal";
@@ -32,7 +31,7 @@ interface Props {
   annotation: Annotation | null;
   updateAnnotation: (a: Annotation) => Promise<void>;
   deleteAnnotation: (id: string) => Promise<void>;
-  saveImage: (a: RectangleAnnotation) => Promise<void>;
+  saveImage: (a: Annotation) => Promise<void>;
   onCancel: () => void;
   colorMap?: Record<string, string>;
 }
@@ -121,10 +120,10 @@ const AnnotationProperties: React.FC<Props> = ({
   };
 
   const typeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!draft || draft.mode !== "rectangle") return;
+    if (!draft) return;
     const next = {
-      ...(draft as RectangleAnnotation),
-      annotationType: e.target.value as AnnotationType,
+      ...(draft as Annotation),
+      type: e.target.value as AnnotationType,
     };
     setDraft(next);
     updateAnnotation(next);    // <- persist change immediately
@@ -161,7 +160,7 @@ const AnnotationProperties: React.FC<Props> = ({
   };
 
   // Solutions
-  const hasSolutions = isRect && solutionTypes.includes((draft as RectangleAnnotation).annotationType);
+  const hasSolutions = isRect && solutionTypes.includes((draft as Annotation).type);
   const sols: Solution[] = draft.solutions ?? [];
 
   const handleSolutionFile = (
@@ -208,7 +207,7 @@ const AnnotationProperties: React.FC<Props> = ({
         <>
           <label className="text-sm">Annotation Type</label>
           <select
-            value={draft.annotationType}
+            value={draft.type}
             onChange={typeChange}
             className="w-full p-1 rounded bg-gray-800 border border-gray-600"
           >
@@ -304,7 +303,7 @@ const AnnotationProperties: React.FC<Props> = ({
           <div className="flex items-center space-x-1">
             <Sigma size={16} className="text-gray-400" />
             <h4 className="font-medium">
-              {(draft as RectangleAnnotation).annotationType}
+              {(draft as Annotation).type}
               {sols.length > 1 && ` (${sols.length})`}
             </h4>
           </div>
@@ -348,7 +347,7 @@ const AnnotationProperties: React.FC<Props> = ({
               onClick={() => setShowAddSol(true)}
               className="w-full p-2 mt-2 border border-dashed border-gray-600 rounded text-sm text-gray-400"
             >
-              Add new {(draft as RectangleAnnotation).annotationType.toLowerCase()}
+              Add new {(draft as Annotation).type.toLowerCase()}
             </button>
           ) : (
             <>
@@ -392,7 +391,7 @@ const AnnotationProperties: React.FC<Props> = ({
 
       {!hasImage ? (
         <button
-          onClick={() => saveImage(draft as RectangleAnnotation)}
+          onClick={() => saveImage(draft as Annotation)}
           className="mt-2 p-2 rounded bg-green-600 hover:bg-green-500 flex items-center space-x-1"
         >
           <ImageIcon size={16} />

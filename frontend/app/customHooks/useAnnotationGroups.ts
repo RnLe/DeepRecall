@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AnnotationGroup } from "../types/deepRecall/strapi/annotationTypes";
+import { AnnotationGroup } from "../types/deepRecall/strapi/annotationGroupTypes";
 import { fetchGroups, createGroup, updateGroup, deleteGroup } from "../api/annotationGroupService";
 
 export function useAnnotationGroups() {

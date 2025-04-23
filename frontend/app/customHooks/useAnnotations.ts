@@ -31,9 +31,9 @@ export function useAnnotations(literatureId: string, pdfId: string) {
   });
 
   /* --------------------------- UPDATE --------------------------- */
-  type UpdateVars = { id: string; ann: Annotation };
+  type UpdateVars = { documentId: string; ann: Annotation };
   const updateMutation = useMutation<Annotation, Error, UpdateVars>({
-    mutationFn: ({ id, ann }) => apiUpdate(id, ann),
+    mutationFn: ({ documentId, ann }) => apiUpdate(documentId, ann),
     onSuccess: (_returned, { ann }) => {
       // write the exact annotation we passed in back into the cache
       qc.setQueryData<Annotation[]>(
@@ -49,7 +49,7 @@ export function useAnnotations(literatureId: string, pdfId: string) {
     onError: (err, vars) => {
       console.error(
         "[useAnnotations] updateMutation failed for",
-        vars.id,
+        vars.documentId,
         err
       );
     },

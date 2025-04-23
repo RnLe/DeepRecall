@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import {
   Annotation,
-  RectangleAnnotation,
   AnnotationType,
 } from "../../types/deepRecall/strapi/annotationTypes";
 
@@ -60,7 +59,7 @@ const AnnotationOverlay: React.FC<Props> = ({
         const color =
           a.color ??
           (a.mode === "rectangle"
-            ? colorMap[(a as RectangleAnnotation).annotationType]
+            ? colorMap[(a as Annotation).type]
             : colorMap["text" as AnnotationType]) ??
           DEFAULT_COLOR;
 

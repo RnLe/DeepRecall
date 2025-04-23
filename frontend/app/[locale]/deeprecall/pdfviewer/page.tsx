@@ -1,5 +1,5 @@
 import React from 'react';
-import PdfViewerPage from '@/app/ui/deepRecall/pdfViewerPage';
+import EditorView from '@/app/ui/deepRecall/editorView/EditorView';
 
 // Import logger
 import logger from '@/src/logger';
@@ -11,7 +11,7 @@ export default function PDFViewer() {
   // Return the JSX
   return (
     <div className="w-full h-full flex">
-      <PdfViewerPage className="w-full h-full"/>
+      <EditorView className="w-full h-full"/>
     </div>
   );
 }

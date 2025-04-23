@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AnnotationTag } from "../types/deepRecall/strapi/annotationTypes";
+import { AnnotationTag } from "../types/deepRecall/strapi/annotationTagTypes";
 import { fetchTags, createTag, updateTag, deleteTag } from "../api/annotationTagService";
 
 /* -------------------------------------------------------------- */
@@ -23,8 +23,6 @@ export function useAnnotationTags(search: string = "") {
     queryKey: ["annotation-tags", search],
     queryFn: () => fetchTags(search),
   });
-
-  console.log("Fetched tags", search, tags);
 
   /* --------------- create (invalidate list) --------------- */
   const createMutation = useMutation({

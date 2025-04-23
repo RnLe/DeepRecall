@@ -11,17 +11,17 @@ import {
   Minus,
 } from "lucide-react";
 
-import PdfViewerWithAnnotations, { PdfViewerHandle } from "./pdfViewerWithAnnotations";
-import RightSidebar from "./layout/RightSidebar";
-import AnnotationHoverTooltip from "./annotationHoverTooltip";
-import MarkdownEditorModal from "./MarkdownEditorModal";
+import PdfViewerWithAnnotations, { PdfViewerHandle } from "./PdfViewerWithAnnotations";
+import RightSidebar from "../editorView/RightSidebar";
+import AnnotationHoverTooltip from "../annotationHoverTooltip";
+import MarkdownEditorModal from "../MarkdownEditorModal";
 
-import { LiteratureExtended } from "../../types/deepRecall/strapi/literatureTypes";
-import { Annotation, RectangleAnnotation } from "../../types/deepRecall/strapi/annotationTypes";
-import { useAnnotations } from "../../customHooks/useAnnotations";
-import { uploadFile, deleteFile } from "../../api/uploadFile";
-import { AnnotationMode } from "./annotationToolbar";
-import { AnnotationType } from "../../types/deepRecall/strapi/annotationTypes";
+import { LiteratureExtended } from "../../../types/deepRecall/strapi/literatureTypes";
+import { Annotation } from "../../../types/deepRecall/strapi/annotationTypes";
+import { useAnnotations } from "../../../customHooks/useAnnotations";
+import { uploadFile, deleteFile } from "../../../api/uploadFile";
+import { AnnotationMode } from "../annotationToolbar";
+import { AnnotationType } from "../../../types/deepRecall/strapi/annotationTypes";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
 // -----------------------------------------------
@@ -44,7 +44,7 @@ interface Props {
 // -----------------------------------------------
 // Main Component: PdfAnnotationContainer
 // -----------------------------------------------
-const PdfAnnotationContainer: React.FC<Props> = ({
+const TabWindowContainer: React.FC<Props> = ({
   activeLiterature,
   annotationMode,
   colorMap,
@@ -116,7 +116,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   // Update an existing annotation
   const handleUpdate = async (ann: Annotation) => {
     if (!ann.documentId) return;
-    await mutateUpdate({ id: ann.documentId, ann: { ...ann, literatureId: litId, pdfId } });
+    await mutateUpdate({ documentId: ann.documentId, ann: { ...ann, literatureId: litId, pdfId } });
   };
 
   // Delete a single annotation (and its image file, if present)
@@ -151,7 +151,7 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   };
 
   // Capture and save an image of a rectangular annotation
-  const handleSaveImage = async (a: RectangleAnnotation) => {
+  const handleSaveImage = async (a: Annotation) => {
     try {
       const blob = await viewerRef.current!.getCroppedImage(a);
       const file = new File([blob], `ann-${a.documentId}.png`, { type: "image/png" });
@@ -495,4 +495,4 @@ const PdfAnnotationContainer: React.FC<Props> = ({
   );
 };
 
-export default PdfAnnotationContainer;
+export default TabWindowContainer;

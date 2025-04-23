@@ -4,7 +4,7 @@
  * Only name + id so the code is minimal.
  */
 
-import { AnnotationTag } from "../types/deepRecall/strapi/annotationTypes";
+import { AnnotationTag } from "../types/deepRecall/strapi/annotationTagTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE = "http://localhost:1337/api/annotation-tags";

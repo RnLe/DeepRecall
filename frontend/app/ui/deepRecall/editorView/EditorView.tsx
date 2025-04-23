@@ -1,21 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useLiterature, useLiteratureTypes } from "../../customHooks/useLiterature";
-import { useAnnotationGroups } from "@/app/customHooks/useAnnotationGroups";
-import { useAnnotationTags } from "@/app/customHooks/useAnnotationTags";
-import { LiteratureExtended } from "../../types/deepRecall/strapi/literatureTypes";
-import { AnnotationType, annotationTypes } from "../../types/deepRecall/strapi/annotationTypes";
-import { AnnotationMode } from "./annotationToolbar";
-import { useColors } from "../../customHooks/useColors";
+import { useLiterature, useLiteratureTypes } from "../../../customHooks/useLiterature";
+import { LiteratureExtended } from "../../../types/deepRecall/strapi/literatureTypes";
+import { AnnotationType, annotationTypes } from "../../../types/deepRecall/strapi/annotationTypes";
+import { AnnotationMode } from "../annotationToolbar";
+import { useColors } from "../../../customHooks/useColors";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 
-import TopNavBar from "./layout/TopNavBar";
-import LeftSidebar from "./layout/LeftSidebar";
-import TabManager from "./layout/TabManager";
+import TopNavBar from "./TopNavBar";
+import LeftSidebar from "./LeftSidebar";
+import TabManager from "./TabManager";
 
-const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
+const EditorView: React.FC<{ className?: string }> = ({ className }) => {
   // --- fetch literature & types ---
   const { data: items = [], isLoading: litLoading, error: litError } = useLiterature();
   const { data: types = [], isLoading: typesLoading, error: typesError } = useLiteratureTypes();
@@ -140,4 +138,4 @@ const PdfViewerPage: React.FC<{ className?: string }> = ({ className }) => {
   );
 };
 
-export default PdfViewerPage;
+export default EditorView;

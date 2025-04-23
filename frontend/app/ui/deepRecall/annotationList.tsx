@@ -1,7 +1,7 @@
 // src/components/pdfViewer/annotationList.tsx
 import React from "react";
 import { CircleCheckBig, Type, Square, Image as ImageIcon, StickyNote, Tags, FileText, Sigma } from "lucide-react";
-import { Annotation, RectangleAnnotation } from "../../types/deepRecall/strapi/annotationTypes";
+import { Annotation } from "../../types/deepRecall/strapi/annotationTypes";
 
 const DEFAULT_COLOR = "#000000";
 
@@ -47,7 +47,7 @@ const AnnotationList: React.FC<Props> = ({
       const color =
         a.color ??
         (a.mode === "rectangle"
-          ? colorMap?.[(a as RectangleAnnotation).annotationType]
+          ? colorMap?.[(a as Annotation).type]
           : colorMap?.["text"]) ??
         DEFAULT_COLOR;
 
@@ -90,7 +90,7 @@ const AnnotationList: React.FC<Props> = ({
                 </td>
                 {/* Type label */}
                 <td className="text-left px-1">
-                  {a.mode === "text" ? "Text" : (a as RectangleAnnotation).annotationType}
+                  {a.mode === "text" ? "Text" : (a as Annotation).type}
                 </td>
                 {/* Page */}
                 <td className="text-left">{a.page}</td>

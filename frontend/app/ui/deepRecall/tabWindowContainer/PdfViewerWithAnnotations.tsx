@@ -16,13 +16,9 @@ import { useVirtualizer, VirtualItem } from "@tanstack/react-virtual";
 import throttle from "lodash/throttle";
 import debounce from "lodash/debounce";
 
-import AnnotationOverlay from "./annotationOverlay";
-import {
-  Annotation,
-  AnnotationType,
-  RectangleAnnotation,
-} from "../../types/deepRecall/strapi/annotationTypes";
-import { AnnotationMode } from "./annotationToolbar";
+import AnnotationOverlay from "../annotationOverlay";
+import { Annotation, AnnotationType } from "@/app/types/deepRecall/strapi/annotationTypes";
+import { AnnotationMode } from "../annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 
 // Configure PDF.js worker via ESM URL
@@ -37,7 +33,7 @@ const DEFAULT_PAGE_HEIGHT = 792;
 export interface PdfViewerHandle {
   scrollToPage(page: number): void;
   getPageSize(page?: number): { width: number; height: number } | null;
-  getCroppedImage(annotation: RectangleAnnotation): Promise<Blob>;
+  getCroppedImage(annotation: Annotation): Promise<Blob>;
 }
 
 interface Props {
@@ -167,7 +163,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         return s ? { width: s.w, height: s.h } : null;
       },
 
-      async getCroppedImage(a: RectangleAnnotation) {
+      async getCroppedImage(a: Annotation) {
         const pdf = await pdfjs.getDocument(
           prefixStrapiUrl(pdfUrl)
         ).promise;
@@ -264,8 +260,8 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
 
       onCreateAnnotation({
         mode: "text",
-        annotationType: "Text Highlight",
-        highlightedText: sel.toString(),
+        type: "Definition",
+        textContent: sel.toString(),
         page: pg,
         x: (rect.left - pr.left) / pr.width,
         y: (rect.top - pr.top) / pr.height,
@@ -352,7 +348,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
 
               onCreateAnnotation({
                 mode: "rectangle",
-                annotationType: "Figure",
+                type: "Figure",
                 page: draft.page,
                 x: x0 / dispW,
                 y: y0 / dispH,

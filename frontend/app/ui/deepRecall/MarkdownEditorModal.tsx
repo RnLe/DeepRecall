@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { Annotation, RectangleAnnotation } from "../../types/deepRecall/strapi/annotationTypes";
+import { Annotation } from "../../types/deepRecall/strapi/annotationTypes";
 import { Type, Square, Trash2, Eye, Pencil } from "lucide-react";
 
 interface Props {
@@ -41,13 +41,13 @@ const MarkdownEditorModal: React.FC<Props> = ({
         annotation.color ??
         (annotation.mode === "text"
           ? colorMap["text"]
-          : colorMap[(annotation as RectangleAnnotation).annotationType]) ??
+          : colorMap[(annotation as Annotation).type]) ??
         DEFAULT_COLOR;
       const Icon = annotation.mode === "text" ? Type : Square;
       const typeName =
         annotation.mode === "text"
           ? "Text"
-          : (annotation as RectangleAnnotation).annotationType;
+          : (annotation as Annotation).type;
       return (
         <>
           Editing{"\u00A0\u00A0"}

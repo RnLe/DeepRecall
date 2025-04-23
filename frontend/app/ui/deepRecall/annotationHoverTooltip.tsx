@@ -48,7 +48,7 @@ const AnnotationHoverTooltip: React.FC<{ annotation: Annotation }> = ({
       {/* annotation type label */}
       <div className="flex justify-center">
         <span className="rounded text-[10px] uppercase">
-          {annotation.annotationType}
+          {annotation.type}
         </span>
       </div>
       {/* optional title */}

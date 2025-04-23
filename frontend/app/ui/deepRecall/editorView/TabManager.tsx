@@ -1,7 +1,7 @@
 // src/components/pdfViewer/layout/TabManager.tsx
 import React from "react";
-import PdfAnnotationContainer from "../pdfAnnotationContainer";
-import RightSidebar from "../layout/RightSidebar";
+import TabWindowContainer from "../tabWindowContainer/TabWindowContainer";
+import RightSidebar from "./RightSidebar";
 import { AnnotationMode } from "../annotationToolbar";
 import { AnnotationType } from "../../../types/deepRecall/strapi/annotationTypes";
 import { LiteratureExtended } from "../../../types/deepRecall/strapi/literatureTypes";
@@ -76,7 +76,7 @@ const TabManager: React.FC<Props> = ({
 
   /* ---------- TAB OPEN ---------- */
   return (
-    <PdfAnnotationContainer
+    <TabWindowContainer
       key={active.documentId}           // ← forces React to tear down & rebuild
       activeLiterature={active}
       annotationMode={annotationMode}

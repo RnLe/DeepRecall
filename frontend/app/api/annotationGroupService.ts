@@ -4,7 +4,7 @@
  * Model is currently just { id, name } – kept for future use.
  */
 
-import { AnnotationGroup } from "../types/deepRecall/strapi/annotationTypes";
+import { AnnotationGroup } from "../types/deepRecall/strapi/annotationGroupTypes";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE = "http://localhost:1337/api/annotation-groups";
