@@ -6,7 +6,7 @@ import {
   updateProject,
   deleteProject,
 } from "../api/meepProjectService";
-import { MeepProject } from "../types/meepStudio/meepProjectTypes";
+import { MeepProject } from "../types/meepStudio/strapi/meepProjectTypes";
 
 export function useMeepProjects() {
   const qc = useQueryClient();

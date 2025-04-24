@@ -1,6 +1,6 @@
 import React from "react";
 import ProjectCanvas from "../canvas/ProjectCanvas";
-import { MeepProject } from "@/app/types/meepStudio/meepProjectTypes";
+import { MeepProject } from "@/app/types/meepStudio/strapi/meepProjectTypes";
 
 const TabWindowContainer: React.FC<{ activeProject: MeepProject }> = ({ activeProject }) => {
   return (

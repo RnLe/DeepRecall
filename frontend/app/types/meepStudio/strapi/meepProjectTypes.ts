@@ -1,11 +1,12 @@
 // meepProjectTypes.ts
 
-import { StrapiResponse } from "../strapiTypes";
+import { StrapiResponse } from "../../strapiTypes";
 
 // This is the object strapi sends you
 // These fields must match the fields in the strapi collection
 export interface MeepProjectStrapi extends StrapiResponse {
     title: string;
+    dimension: number;
     description?: string;
     customMetadata?: string;         // JSON string for custom data
 }
@@ -23,6 +24,7 @@ export interface MeepProject extends MeepStudioCustomData, StrapiResponse {
     // We also inherit all the customData fields
     // List all fields here THAT ARE NOT in the customData object or in the StrapiResponse
     title: string;
+    dimension: number;
     description?: string;
 }
 
@@ -39,6 +41,7 @@ export function deserializeMeepProject(project: MeepProjectStrapi): MeepProject 
         updatedAt:   project.updatedAt,
         // MeepProject fields
         title:       project.title,
+        dimension:   project.dimension,
         description: project.description,
         // customData unpacked
         lastExecution:             meta.lastExecution,
@@ -50,9 +53,10 @@ export function deserializeMeepProject(project: MeepProjectStrapi): MeepProject 
 // Method to serialize the customData field; converting Example into ExampleStrapi
 export function serializeMeepProject(
   project: MeepProject
-): Pick<MeepProjectStrapi, "title" | "description" | "customMetadata"> {
+): Pick<MeepProjectStrapi, "title" | "description" | "customMetadata" | "dimension"> {
     const {
       title,
+      dimension,
       description,
       lastExecution,
       lastExecutionConsoleLogs,
@@ -65,6 +69,7 @@ export function serializeMeepProject(
     };
     return {
       title,
+      dimension,
       description,
       customMetadata: JSON.stringify(meta)
     };

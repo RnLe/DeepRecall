@@ -1,6 +1,6 @@
 import React from "react";
 import { X, Layout } from "lucide-react";
-import { MeepProject } from "@/app/types/meepStudio/meepProjectTypes";
+import { MeepProject } from "@/app/types/meepStudio/strapi/meepProjectTypes";
 
 interface Props {
   tabs: MeepProject[];

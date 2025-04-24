@@ -713,6 +713,7 @@ export interface ApiLiteratureLiterature extends Struct.CollectionTypeSchema {
 export interface ApiMeepProjectMeepProject extends Struct.CollectionTypeSchema {
   collectionName: 'meep_projects';
   info: {
+    description: '';
     displayName: 'MeepProject';
     pluralName: 'meep-projects';
     singularName: 'meep-project';
@@ -726,6 +727,7 @@ export interface ApiMeepProjectMeepProject extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     customMetadata: Schema.Attribute.JSON;
     description: Schema.Attribute.Text;
+    dimension: Schema.Attribute.Integer & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

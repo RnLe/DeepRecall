@@ -1,7 +1,10 @@
 // src/components/layout/RightSidebar.tsx
 import React from "react";
 import SimulationConsole from "../SimulationConsole";
-import { MeepProject } from "@/app/types/meepStudio/meepProjectTypes";
+import { MeepProject } from "@/app/types/meepStudio/strapi/meepProjectTypes";
+import ObjectsList from "./ObjectList";
+import ObjectPropertiesPanel from "./ObjectPropertiesPanels";
+
 
 interface Props {
   open: boolean;
@@ -26,6 +29,10 @@ const RightSidebar: React.FC<Props> = ({ open, project }) => {
         <p className="text-gray-500">No project selected</p>
       )}
 
+      <hr className="border-gray-700" />
+      <ObjectsList />
+      <hr className="border-gray-700" />
+      <ObjectPropertiesPanel />
       <hr className="border-gray-700" />
 
       <h3 className="text-lg font-semibold text-white">Simulation</h3>

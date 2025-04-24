@@ -4,7 +4,8 @@
   "info": {
     "singularName": "meep-project",
     "pluralName": "meep-projects",
-    "displayName": "MeepProject"
+    "displayName": "MeepProject",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -20,6 +21,10 @@
     },
     "customMetadata": {
       "type": "json"
+    },
+    "dimension": {
+      "type": "integer",
+      "required": true
     }
   }
 }

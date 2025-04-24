@@ -1,5 +1,5 @@
 // src/api/meepProjectService.ts
-import { MeepProject, serializeMeepProject, deserializeMeepProject } from "../types/meepStudio/meepProjectTypes";
+import { MeepProject, serializeMeepProject, deserializeMeepProject } from "../types/meepStudio/strapi/meepProjectTypes";
   
   /* -------------------- Strapi config -------------------- */
   const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;

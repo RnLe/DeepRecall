@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { MeepProject } from "@/app/types/meepStudio/meepProjectTypes";
+import { MeepProject } from "@/app/types/meepStudio/strapi/meepProjectTypes";
 
 type Tab = MeepProject;
 interface Ctx {
