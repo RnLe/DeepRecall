@@ -1,6 +1,7 @@
 /* 100 % self-contained zustand hook – no extra context needed */
 "use client";
-import create from "zustand";
+import { createWithEqualityFn } from "zustand/traditional";
+import { shallow } from "zustand/shallow";
 import { nanoid } from "nanoid";
 import {
   CanvasElement,
@@ -25,27 +26,30 @@ interface CanvasState {
   update: (id: string, partial: Partial<CanvasElement>) => void;
 }
 
-export const useCanvasStore = create<CanvasState>((set) => ({
-  elements: [],
-  selectedId: null,
+export const useCanvasStore = createWithEqualityFn<CanvasState>(
+  (set) => ({
+    elements: [],
+    selectedId: null,
 
-  add: (e) =>
-    set((s) => ({
-      elements: [...s.elements, { ...e, id: nanoid() } as CanvasElement],
-    })),
+    add: (e) =>
+      set((s) => ({
+        elements: [...s.elements, { ...e, id: nanoid() } as CanvasElement],
+      })),
 
-  remove: (id) =>
-    set((s) => ({
-      elements: s.elements.filter((el) => el.id !== id),
-      selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    remove: (id) =>
+      set((s) => ({
+        elements: s.elements.filter((el) => el.id !== id),
+        selectedId: s.selectedId === id ? null : s.selectedId,
+      })),
 
-  select: (id) => set({ selectedId: id }),
+    select: (id) => set({ selectedId: id }),
 
-  update: (id, partial) =>
-    set((s) => ({
-      elements: s.elements.map((el) =>
-        el.id === id ? ({ ...el, ...partial } as CanvasElement) : el
-      ),
-    })),
-}));
+    update: (id, partial) =>
+      set((s) => ({
+        elements: s.elements.map((el) =>
+          el.id === id ? { ...(el as CanvasElement), ...partial } as CanvasElement : el
+        ),
+      })),
+  }),
+  shallow
+);

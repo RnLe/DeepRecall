@@ -21,7 +21,7 @@ const ProjectCanvas: React.FC = () => {
 
   /* draw grid only once */
   const gridLines = useMemo(() => {
-    const lines: JSX.Element[] = [];
+    const lines: React.ReactNode[] = [];
     for (let i = 0; i <= GRID_SIZE; i++) {
       const p = i * GRID_PX;
       lines.push(

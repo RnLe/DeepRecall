@@ -1,14 +1,19 @@
 "use client";
 import React from "react";
+import { shallow } from "zustand/shallow";
 import { useCanvasStore } from "../canvas/CanvasStateContext";
 
 const ObjectsList: React.FC = () => {
-  const { elements, selectedId, select, remove } = useCanvasStore((s) => ({
-    elements: s.elements,
-    selectedId: s.selectedId,
-    select: s.select,
-    remove: s.remove,
-  }));
+  // now uses shallow to compare the 4 fields rather than the wrapper object
+  const { elements, selectedId, select, remove } = useCanvasStore(
+    (s) => ({
+      elements:    s.elements,
+      selectedId:  s.selectedId,
+      select:      s.select,
+      remove:      s.remove,
+    }),
+    shallow
+  );
 
   return (
     <div className="space-y-1">
