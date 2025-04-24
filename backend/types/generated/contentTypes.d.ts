@@ -710,6 +710,36 @@ export interface ApiLiteratureLiterature extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiMeepProjectMeepProject extends Struct.CollectionTypeSchema {
+  collectionName: 'meep_projects';
+  info: {
+    displayName: 'MeepProject';
+    pluralName: 'meep-projects';
+    singularName: 'meep-project';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    customMetadata: Schema.Attribute.JSON;
+    description: Schema.Attribute.Text;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::meep-project.meep-project'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiVersionTypeVersionType extends Struct.CollectionTypeSchema {
   collectionName: 'version_types';
   info: {
@@ -1106,6 +1136,7 @@ declare module '@strapi/strapi' {
       'api::knowledge-pack.knowledge-pack': ApiKnowledgePackKnowledgePack;
       'api::literature-type.literature-type': ApiLiteratureTypeLiteratureType;
       'api::literature.literature': ApiLiteratureLiterature;
+      'api::meep-project.meep-project': ApiMeepProjectMeepProject;
       'api::version-type.version-type': ApiVersionTypeVersionType;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

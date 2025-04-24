@@ -1,0 +1,25 @@
+{
+  "kind": "collectionType",
+  "collectionName": "meep_projects",
+  "info": {
+    "singularName": "meep-project",
+    "pluralName": "meep-projects",
+    "displayName": "MeepProject"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "customMetadata": {
+      "type": "json"
+    }
+  }
+}
