@@ -21,6 +21,9 @@ export default function TopNav({ isLoggedIn }: TopNavProps) {
                     <li>
                         <Link href="/conversate" className="hover:underline">Conversate</Link>
                     </li>
+                    <li>
+                        <Link href="/meepStudio" className="hover:underline">Meep Studio</Link>
+                    </li>
                     <li className="relative group">
                         <button className="flex items-center hover:underline focus:outline-none">
                             DeepRecall
