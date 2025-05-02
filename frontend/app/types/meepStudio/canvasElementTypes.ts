@@ -1,13 +1,16 @@
 import { Vector2d } from "konva/lib/types";
 
 /** Discriminated union tag */
-export type ElementKind = "cylinder" | "rectangle" | "continuousSource" | "gaussianSource" | "pmlBoundary";
+export type ElementType = "cylinder" | "rectangle" | "continuousSource" | "gaussianSource" | "pmlBoundary";
+
+// Geometry types
+// Sphere, Cylinder, Wedge, Cone, Block, Ellipsoid, Prism
 
 /** Common to *all* drawables */
 interface BaseElement {
   /** stable id – never re-use, generated with nanoid() */
   id: string;
-  kind: ElementKind;
+  type: ElementType;
   /** centre position in lattice units (a = 1) */
   pos: Vector2d;
   /** rotation in radians (may stay 0 for now) */
@@ -16,11 +19,15 @@ interface BaseElement {
   selected?: boolean;
 }
 
+interface GeometricObject {
+  material?: string;
+}
+
 /* ---------- geometry ---------- */
 export interface Cylinder extends BaseElement {
   kind: "cylinder";
   radius: number;
-  /** material εr etc. will go here later */
+  
 }
 
 export interface Rectangle extends BaseElement {

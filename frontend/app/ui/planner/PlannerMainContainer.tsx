@@ -42,6 +42,8 @@ export const PlannerMainContainer: React.FC = () => {
           console.log('Main: toggling right sidebar', !rightCollapsed);
           setRightCollapsed((v) => !v);
         }}
+        canvasState={null}
+        setCanvasState={() => {}}
       />
     </div>
   );

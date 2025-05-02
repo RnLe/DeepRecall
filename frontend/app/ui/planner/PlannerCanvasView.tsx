@@ -1,10 +1,11 @@
-// PlannerCanvasView.tsx
+// PlannerCanvasView.tsx – updated to include DayTemplates node
 "use client";
 
 import React, { useEffect, useCallback } from "react";
 import ReactFlow, {
   Controls,
   Background,
+  BackgroundVariant,
   useNodesState,
   useEdgesState,
   Node,
@@ -12,9 +13,9 @@ import ReactFlow, {
   useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
-// Import the new Planner12WeekGoals component
 import Planner12WeekGoals from "./Planner12WeekGoals";
 import PlannerVisions from "./PlannerVisions";
+import DayTemplates from "./DayTemplates";
 
 interface CanvasViewProps {
   selectedCard: string | null;
@@ -23,13 +24,14 @@ interface CanvasViewProps {
   clearCardToCenter: () => void;
 }
 
-// Define our node types with the new PlannerVisions node.
+// Register our custom node components
 const nodeTypes = {
   planner12week: Planner12WeekGoals,
   plannerVisions: PlannerVisions,
+  plannerDayTemplates: DayTemplates,
 };
 
-// Add a new node for PlannerVisions to the canvas.
+// Initial nodes placed on the canvas
 const nodesInitial: Node[] = [
   {
     id: "planner12week",
@@ -41,7 +43,13 @@ const nodesInitial: Node[] = [
     id: "plannerVisions",
     type: "plannerVisions",
     data: {},
-    position: { x: -700, y: 200 }, // Position it to the left of the 12-week node
+    position: { x: -700, y: 200 },
+  },
+  {
+    id: "plannerDayTemplates",
+    type: "plannerDayTemplates",
+    data: {},
+    position: { x: -200, y: -1000 },
   },
 ];
 
@@ -55,15 +63,14 @@ const PlannerCanvasInner: React.FC<CanvasViewProps> = ({
   const [edges, , onEdgesChange] = useEdgesState([]);
   const reactFlowInstance = useReactFlow();
 
-  // When a node is clicked, update the selected card.
   const onNodeClick = useCallback(
-    (_, node) => {
+    (_: unknown, node: Node) => {
       onSelectCard(node.id);
     },
     [onSelectCard]
   );
 
-  // Centering logic remains the same.
+  // Centering logic
   useEffect(() => {
     if (cardToCenter) {
       if (cardToCenter === "ALL") {
@@ -71,8 +78,8 @@ const PlannerCanvasInner: React.FC<CanvasViewProps> = ({
       } else {
         const node = nodes.find((n) => n.id === cardToCenter);
         if (node) {
-          const width = node.style?.width || 0;
-          const height = node.style?.height || 0;
+          const width = Number(node.style?.width) || 0;
+          const height = Number(node.style?.height) || 0;
           reactFlowInstance.setCenter(
             node.position.x + width / 2,
             node.position.y + height / 2,
@@ -88,7 +95,6 @@ const PlannerCanvasInner: React.FC<CanvasViewProps> = ({
     <ReactFlow
       nodes={nodes.map((n) => ({
         ...n,
-        // Highlighting if a node is selected (optional)
         style: {
           ...n.style,
           border: selectedCard === n.id ? "2px solid #93c5fd" : "1px solid #555",
@@ -102,11 +108,11 @@ const PlannerCanvasInner: React.FC<CanvasViewProps> = ({
       minZoom={0.01}
       maxZoom={20}
       fitView
-      // Disable moving and connecting nodes
       nodesDraggable={false}
       nodesConnectable={false}
+      className="text-gray-800"
     >
-      <Background variant="dots" gap={15} />
+      <Background variant={BackgroundVariant.Dots} gap={15} />
       <Controls />
     </ReactFlow>
   );

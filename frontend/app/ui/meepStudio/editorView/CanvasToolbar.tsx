@@ -1,23 +1,23 @@
 "use client";
 import React from "react";
-import { useCanvasStore } from "../canvas/CanvasStateContext";
-import {
-  Cylinder,
-  Rectangle,
-} from "@/app/types/meepStudio/canvasElementTypes";
+import { useCanvasStore } from "../canvas/CanvasStore";
+import { Cylinder, Rectangle } from "@/app/types/meepStudio/canvasElementTypes";
 
 const CanvasToolbar: React.FC = () => {
-  const add = useCanvasStore((s) => s.add);
+  const snapToGrid = useCanvasStore((s) => s.snapToGrid);
+  const toggleSnap = useCanvasStore((s) => s.toggleSnap);
+  const addCylinder = useCanvasStore((s) => s.addCylinder);
+  const addRectangle = useCanvasStore((s) => s.addRectangle);
 
   const newCylinder = () =>
-    add({
+    addCylinder({
       kind: "cylinder",
       pos: { x: 5, y: 5 },
       radius: 1,
     } as Omit<Cylinder, "id">);
 
   const newRect = () =>
-    add({
+    addRectangle({
       kind: "rectangle",
       pos: { x: 10, y: 8 },
       width: 2,
@@ -26,6 +26,9 @@ const CanvasToolbar: React.FC = () => {
 
   return (
     <div className="flex space-x-2 p-2 bg-gray-800 text-white text-xs">
+      <button onClick={toggleSnap} className="px-2 py-1 bg-yellow-600 rounded">
+        Snap: {snapToGrid ? "On" : "Off"}
+      </button>
       <button onClick={newCylinder} className="px-2 py-1 bg-blue-600 rounded">
         + Cylinder
       </button>
