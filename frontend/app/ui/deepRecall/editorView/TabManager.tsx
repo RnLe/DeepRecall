@@ -45,7 +45,7 @@ const TabManager: React.FC<Props> = ({
         <RightSidebar
           sidebarOpen={sidebarOpen}
           onToggleSidebar={onToggleSidebar}
-          annotations={[]}               /* no annotations yet */
+          annotations={[]}
           selectedId={null}
           hoveredId={null}
           multi={false}
@@ -70,7 +70,7 @@ const TabManager: React.FC<Props> = ({
           onOpenDescription={noop}
           onOpenImage={noop}
           onOpenSolutions={noop}
-          fileOpen={false} // <-- add this prop
+          fileOpen={false}
         />
       </div>
     );
@@ -79,7 +79,7 @@ const TabManager: React.FC<Props> = ({
   /* ---------- TAB OPEN ---------- */
   return (
     <TabWindowContainer
-      key={active.documentId}           // ← forces React to tear down & rebuild
+      key={active.documentId}
       activeLiterature={active}
       annotationMode={annotationMode}
       setAnnotationMode={setAnnotationMode}

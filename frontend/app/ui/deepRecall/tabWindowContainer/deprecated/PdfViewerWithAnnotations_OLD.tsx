@@ -13,14 +13,15 @@ import React, {
 } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { useVirtualizer, VirtualItem } from "@tanstack/react-virtual";
-import throttle from "lodash/throttle";
 import debounce from "lodash/debounce";
+import throttle from "lodash/throttle";
 
 import AnnotationOverlay from "../annotationOverlay";
 import { Annotation, AnnotationType } from "@/app/types/deepRecall/strapi/annotationTypes";
 import { AnnotationMode } from "../annotationToolbar";
 import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 import { AiTaskKey, AiTasks } from "@/app/api/openAI/promptTypes";
+import { usePdfViewerStore } from "@/app/stores/pdfViewerStore";
 
 // Configure PDF.js worker via ESM URL
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -39,9 +40,7 @@ export interface PdfViewerHandle {
 
 interface Props {
   pdfUrl: string;
-  zoom: number;
   onLoadSuccess: (info: { numPages: number }) => void;
-  onVisiblePageChange?: (page: number) => void;
   annotationMode: AnnotationMode;
   annotations: Annotation[];
   selectedId: string | null;
@@ -59,9 +58,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
   (
     {
       pdfUrl,
-      zoom,
       onLoadSuccess,
-      onVisiblePageChange,
       annotationMode,
       annotations,
       selectedId,
@@ -76,16 +73,16 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     },
     ref
   ) => {
+    // ───── Store state ─────
+    const { currentPage, zoom, numPages, isJumping, isScrollBlocked, setCurrentPageFromScroll, setNumPages, setZoom, setIsJumping } = usePdfViewerStore();
+
     // ───── Refs ─────
     const scrollElRef = useRef<HTMLDivElement>(null);
     const pageSizeRef = useRef(new Map<number, { w: number; h: number }>());
     const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-    const lastPageRef = useRef(1);
-    const isProgrammaticRef = useRef(false);
     const offsetsRef = useRef<number[]>([]);
 
     // ───── State ─────
-    const [numPages, setNumPages] = useState(0);
     const [tick, setTick] = useState(0);
     const [basePageHeight, setBasePageHeight] = useState<number>(
       DEFAULT_PAGE_HEIGHT
@@ -137,27 +134,27 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
     // ───── Imperative methods ─────
     useImperativeHandle(ref, () => ({
       scrollToPage: (targetPage: number) => {
-        const distance = Math.abs(targetPage - lastPageRef.current);
-        // Changed: use virtualizer to scroll instead of manual scrollTop
+        const distance = Math.abs(targetPage - currentPage);
+        // Use higher overscan for large jumps
         if (distance > 6) {
           rowVirtualizer.setOptions({
             ...rowVirtualizer.options,
             overscan: distance + 2,
           });
         }
-        isProgrammaticRef.current = true;
         rowVirtualizer.scrollToIndex(targetPage - 1, {
           align: "start",
           behavior: "smooth",
         });
         setTimeout(() => {
-          isProgrammaticRef.current = false;
           if (distance > 6) {
             rowVirtualizer.setOptions({
               ...rowVirtualizer.options,
               overscan: initialOverscan,
             });
           }
+          // Clear jumping flag after scroll completes
+          setIsJumping(false);
         }, 100);
       },
 
@@ -208,14 +205,13 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
 
     // ───── Sync effects ─────
     useEffect(() => {
-      options.count = numPages;
       rowVirtualizer.setOptions({
         ...rowVirtualizer.options,
         count: numPages,
       });
       recalcOffsets();
       rowVirtualizer.measure();
-    }, [numPages]);
+    }, [numPages, rowVirtualizer]);
 
     useEffect(() => {
       // Update estimateSize on zoom change
@@ -239,7 +235,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       requestAnimationFrame(() => {
         el.scrollTop = ratio * rowVirtualizer.getTotalSize();
       });
-    }, [zoom]);
+    }, [zoom, rowVirtualizer, basePageHeight]);
 
     // ───── Annotation handlers ─────
     const [draft, setDraft] = useState<
@@ -284,16 +280,38 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
       return () => document.removeEventListener("mouseup", handleTextSelect);
     }, [handleTextSelect]);
 
-    // 1) Detect true visible‐page changes
-    const handleScroll = useCallback(() => {
+    // ───── Page change detection ─────
+    const handleScrollRaw = useCallback(() => {
+      if (isJumping || isScrollBlocked) return; // Don't update page during jumps or when blocked
+      
       const items = rowVirtualizer.getVirtualItems();
       if (items.length === 0) return;
-      const currentPage = items[0].index + 1;
-      if (currentPage !== lastPageRef.current) {
-        lastPageRef.current = currentPage;
-        onVisiblePageChange?.(currentPage);
+      
+      const scrollTop = scrollElRef.current?.scrollTop || 0;
+      const viewportHeight = scrollElRef.current?.clientHeight || 0;
+      const viewportCenter = scrollTop + viewportHeight / 2;
+      
+      // Find which page the viewport center is in
+      let detectedPage = items[0].index + 1;
+      
+      for (const item of items) {
+        if (viewportCenter >= item.start && viewportCenter < item.end) {
+          detectedPage = item.index + 1;
+          break;
+        }
       }
-    }, [onVisiblePageChange, rowVirtualizer]);
+      
+      // Only update if the detected page is different from current
+      if (detectedPage !== currentPage) {
+        setCurrentPageFromScroll(detectedPage);
+      }
+    }, [isJumping, isScrollBlocked, rowVirtualizer, setCurrentPageFromScroll, currentPage]);
+
+    // Throttle scroll handler to avoid rapid updates
+    const handleScroll = useMemo(
+      () => throttle(handleScrollRaw, 100),
+      [handleScrollRaw]
+    );
 
     // ───── Row renderer ─────
     const renderRow = (v: VirtualItem) => {
@@ -311,6 +329,7 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
           }}
         >
           <div
+            data-index={v.index}
             data-page-number={pg}
             ref={(el) => {
               if (el) {
@@ -428,9 +447,9 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
         <div onClick={(e) => e.stopPropagation()}></div>
         <Document
           file={prefixStrapiUrl(pdfUrl)}
-          onLoadSuccess={({ numPages }) => {
-            setNumPages(numPages);
-            onLoadSuccess({ numPages });
+          onLoadSuccess={({ numPages: pages }) => {
+            setNumPages(pages);
+            onLoadSuccess({ numPages: pages });
           }}
         >
           <div
@@ -447,4 +466,4 @@ const PdfViewerWithAnnotations = forwardRef<PdfViewerHandle, Props>(
   }
 );
 
-export default React.memo(PdfViewerWithAnnotations);
+export default PdfViewerWithAnnotations;

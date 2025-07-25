@@ -1,7 +1,7 @@
 // -----------------------------------------------
 // Imports: React, icons, components, hooks, types, APIs
 // -----------------------------------------------
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,7 +11,7 @@ import {
   Minus,
 } from "lucide-react";
 
-import PdfViewerWithAnnotations, { PdfViewerHandle } from "./PdfViewerWithAnnotations";
+import CanvasPdfViewer, { CanvasPdfViewerHandle } from "./CanvasPdfViewer";
 import RightSidebar from "../editorView/RightSidebar";
 import AnnotationHoverTooltip from "../annotationHoverTooltip";
 import MarkdownEditorModal from "../MarkdownEditorModal";
@@ -27,6 +27,7 @@ import { prefixStrapiUrl } from "@/app/helpers/getStrapiMedia";
 import { AiTasks, AiTaskKey, fieldByTask } from "@/app/api/openAI/promptTypes";
 import MarkdownResponseModal from "../MarkdownResponseModal";
 import { executeOpenAIRequest } from "@/app/api/openAI/openAIService";
+import { useCanvasPdfViewerStore } from "@/app/stores/canvasPdfViewerStore";
 
 // -----------------------------------------------
 // Type & Utility Definitions
@@ -56,26 +57,23 @@ const TabWindowContainer: React.FC<Props> = ({
   onToggleSidebar,
   setAnnotationMode,
 }) => {
-  // -----------------------------------------------
-  // Derived constants from props & literature
-  // -----------------------------------------------
+  // ───── Store state ─────
+  const { currentPage, numPages, zoom, jumpToPage, setZoom, setNumPages, reset, isScrollingProgrammatically } = useCanvasPdfViewerStore();
+
+  // ───── Derived constants from props & literature ─────
   const litId = activeLiterature.documentId!;              // Unique literature identifier
   const version = activeLiterature.versions[0];            // Use first version
   const pdfId = version.fileHash ?? "";                  // File hash for annotations
   const pdfUrl = version.fileUrl ?? "";                  // PDF source URL
 
-  // -----------------------------------------------
-  // Viewer References
-  // -----------------------------------------------
-  const viewerRef = useRef<PdfViewerHandle>(null);         // Ref to PDF viewer instance
+  // Remove the reset effect - let CanvasPdfViewer handle document changes
+  // This was causing unnecessary resets
+
+  // ───── Viewer References ─────
+  const viewerRef = useRef<CanvasPdfViewerHandle>(null);         // Ref to PDF viewer instance
   const wrapRef = useRef<HTMLDivElement>(null);            // Ref to container for fit calculations
 
-  // -----------------------------------------------
-  // Viewer State: zoom, pagination, annotations toggle
-  // -----------------------------------------------
-  const [zoom, setZoom] = useState(1);                     // Current zoom level
-  const [page, setPage] = useState(1);                     // Current page number
-  const [numPages, setNumPages] = useState(0);             // Total pages in PDF
+  // ───── Viewer State: annotations toggle ─────
   const [showAnnotations, setShowAnnotations] = useState(true); // Toggle annotation display
 
   // -----------------------------------------------
@@ -174,40 +172,31 @@ const TabWindowContainer: React.FC<Props> = ({
   const selectAll      = () => setMultiSet(new Set(annotations.map((a) => a.documentId!))); // Select all annotations
   const deselectAll    = () => setMultiSet(new Set());      // Deselect all annotations
 
-  // -----------------------------------------------
-  // Navigation & Zoom Handlers
-  // -----------------------------------------------
-  // Jump to a valid page number and scroll viewer
-  const jumpToPage = (n: number) => {
-    const target = clamp(n, 1, numPages);
-    setPage(target);
-    viewerRef.current?.scrollToPage(target);
-  };
-
-  const changePage = (delta: number) => jumpToPage(page + delta); // Increment/decrement page
+  // ───── Navigation & Zoom Handlers ─────
+  const changePage = (delta: number) => jumpToPage(currentPage + delta); // Increment/decrement page
   const goToPage    = (n: number)    => jumpToPage(n);            // Direct jump
 
-  const zoomIn      = () => setZoom((z) => z + 0.1);              // Increase zoom
-  const zoomOut     = () => setZoom((z) => Math.max(0.1, z - 0.1)); // Decrease zoom
+  const zoomIn      = () => setZoom(zoom + 0.1);              // Increase zoom
+  const zoomOut     = () => setZoom(Math.max(0.1, zoom - 0.1)); // Decrease zoom
 
   // Fit PDF to container width
-  const fitWidth = () => {
-    if (viewerRef.current && wrapRef.current) {
-      const size = viewerRef.current.getPageSize(page);
-      if (size) {
-        setZoom(wrapRef.current.clientWidth / size.width);
-        viewerRef.current?.scrollToPage(page); // Keep page position
+  const fitWidth = async () => {
+    if (viewerRef.current) {
+      try {
+        await viewerRef.current.fitToWidth();
+      } catch (error) {
+        console.warn('Failed to fit to width:', error);
       }
     }
   };
 
   // Fit PDF to container height
-  const fitHeight = () => {
-    if (viewerRef.current && wrapRef.current) {
-      const size = viewerRef.current.getPageSize(page);
-      if (size) {
-        setZoom(wrapRef.current.clientHeight / size.height);
-        viewerRef.current?.scrollToPage(page); // Keep page position
+  const fitHeight = async () => {
+    if (viewerRef.current) {
+      try {
+        await viewerRef.current.fitToHeight();
+      } catch (error) {
+        console.warn('Failed to fit to height:', error);
       }
     }
   };
@@ -245,7 +234,7 @@ const TabWindowContainer: React.FC<Props> = ({
     }
     // new annotation → select, scroll, and open sidebar if needed
     setSelId(a.documentId!);
-    setPage(a.page);
+    jumpToPage(a.page);
     if (!sidebarOpen) onToggleSidebar();
   };
 
@@ -294,10 +283,27 @@ const TabWindowContainer: React.FC<Props> = ({
     }
   };
 
+  // ───── Effect to scroll when jumping to page programmatically ─────
+  useEffect(() => {
+    const unsubscribe = useCanvasPdfViewerStore.subscribe(
+      (state) => ({ currentPage: state.currentPage, isScrollingProgrammatically: state.isScrollingProgrammatically }),
+      ({ currentPage, isScrollingProgrammatically }, previous) => {
+        // Only scroll if it's a programmatic jump (isScrollingProgrammatically is true)
+        // and the page actually changed
+        if (currentPage !== previous.currentPage && isScrollingProgrammatically && viewerRef.current) {
+          console.log(`Programmatic jump to page ${currentPage}`);
+          viewerRef.current.scrollToPage(currentPage);
+          // Reset the flag after scrolling completes
+          setTimeout(() => {
+            useCanvasPdfViewerStore.getState().setScrollingProgrammatically(false);
+          }, 200); // Give more time for scroll to complete
+        }
+      }
+    );
+    return unsubscribe;
+  }, []);
 
-  // -----------------------------------------------
-  // Render: Loading State
-  // -----------------------------------------------
+  // ───── Render: Loading State ─────
   if (isLoading) return <div>Loading…</div>;
 
   // -----------------------------------------------
@@ -318,17 +324,17 @@ const TabWindowContainer: React.FC<Props> = ({
           {/* Center controls: first, prev, page input, next, last */}
           <div className="flex-1 flex items-center justify-center space-x-2">
             {[
-              { type: "button", Icon: ChevronsLeft, onClick: () => goToPage(1), disabled: page === 1 },
-              { type: "button", Icon: ArrowLeft,    onClick: () => changePage(-1), disabled: page === 1 },
+              { type: "button", Icon: ChevronsLeft, onClick: () => goToPage(1), disabled: currentPage === 1 },
+              { type: "button", Icon: ArrowLeft,    onClick: () => changePage(-1), disabled: currentPage === 1 },
               { type: "input" },
-              { type: "button", Icon: ArrowRight,   onClick: () => changePage(1), disabled: page === numPages },
-              { type: "button", Icon: ChevronsRight,onClick: () => goToPage(numPages), disabled: page === numPages },
+              { type: "button", Icon: ArrowRight,   onClick: () => changePage(1), disabled: currentPage === numPages },
+              { type: "button", Icon: ChevronsRight,onClick: () => goToPage(numPages), disabled: currentPage === numPages },
             ].map((btn, i) =>
               btn.type === "input" ? (
                 <React.Fragment key="page-input">
                   <input
                     type="number"
-                    value={page}
+                    value={currentPage}
                     min={1}
                     max={numPages}
                     onChange={(e) => jumpToPage(Number(e.target.value))}
@@ -374,17 +380,11 @@ const TabWindowContainer: React.FC<Props> = ({
         {/* PDF Viewer: renders pages, annotations, tool interactions */}
         {/* ------------------------------------------------------- */}
         <div className="flex-1 relative overflow-auto" ref={wrapRef}>
-          <PdfViewerWithAnnotations
+          <CanvasPdfViewer
             ref={viewerRef}
             pdfUrl={pdfUrl}
-            zoom={zoom}
             onLoadSuccess={({ numPages }) => {
               setNumPages(numPages);
-              setPage((p) => clamp(p, 1, numPages));
-            }}
-            onVisiblePageChange={(pg) => {
-              // always sync page state when scroll changes visible page
-              setPage(pg);
             }}
             annotationMode={annotationMode}
             annotations={showAnnotations ? annotations : []}
@@ -393,7 +393,7 @@ const TabWindowContainer: React.FC<Props> = ({
             onSelectAnnotation={(a) => {
               if (a) {
                 setSelId(a.documentId!);
-                setPage(a.page);
+                jumpToPage(a.page);
                 // Auto-open sidebar when an annotation is clicked
                 if (!sidebarOpen) onToggleSidebar();
               } else {

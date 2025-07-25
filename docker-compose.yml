@@ -73,7 +73,5 @@ services:
     environment:
       - HF_ACCESS_TOKEN=your_hf_token_here
       - USE_CUDA=true
-    # Expose all GPUs to this container
-    gpus: all
     volumes:
       - ./python/:/app/

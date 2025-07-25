@@ -6,8 +6,6 @@ import { LiteratureExtended } from "../../../types/deepRecall/strapi/literatureT
 import { AnnotationType, annotationTypes } from "../../../types/deepRecall/strapi/annotationTypes";
 import { AnnotationMode } from "../annotationToolbar";
 import { useColors } from "../../../customHooks/useColors";
-import "react-pdf/dist/esm/Page/AnnotationLayer.css";
-import "react-pdf/dist/esm/Page/TextLayer.css";
 
 import TopNavBar from "./TopNavBar";
 import LeftSidebar from "./LeftSidebar";

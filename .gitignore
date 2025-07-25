@@ -3,7 +3,7 @@ trace
 
 # Ignore installation folders in all directories
 .next/
-node_modules/
+**/node_modules/
 playground/
 assets/
 
