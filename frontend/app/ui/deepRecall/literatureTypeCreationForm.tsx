@@ -14,6 +14,7 @@ interface CustomField {
 interface LiteratureTypeCreationFormProps {
   className?: string;
   onSubmit: (payload: { name: string; typeMetadata: string }) => void;
+  onCancel?: () => void;
 }
 
 // Define the preset core (native) fields with their types and defaults.
@@ -29,6 +30,7 @@ const coreFieldDefinitions: Record<string, { type: string; default: any }> = {
 const LiteratureTypeCreationForm: React.FC<LiteratureTypeCreationFormProps> = ({
   className,
   onSubmit,
+  onCancel,
 }) => {
   // State for the literature type name.
   const [typeName, setTypeName] = useState("");
@@ -321,12 +323,24 @@ const LiteratureTypeCreationForm: React.FC<LiteratureTypeCreationFormProps> = ({
           </button>
         </div>
 
-        <button
-          type="submit"
-          className="bg-green-500 text-white px-4 py-2 rounded"
-        >
-          Create Type
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-700/50">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            type="submit"
+            className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white rounded-lg font-medium hover:from-emerald-700 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            Create Type
+          </button>
+        </div>
       </form>
     </div>
   );

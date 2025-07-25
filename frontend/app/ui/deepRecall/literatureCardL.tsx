@@ -117,12 +117,26 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
     publisher,
     journal,
     doi,
+    type,
   } = literature;
   const latestThumbnail = getLatestThumbnail(versions);
   const createdDays = createdAt ? daysAgo(createdAt) : null;
   const updatedDays = updatedAt ? daysAgo(updatedAt) : null;
   const editionsDisplay = getEditionsDisplay(versions);
   const yearsRange = getYearsRange(versions);
+
+  // Type color mapping (same as compact card)
+  const getTypeColor = (type: string) => {
+    const colors = {
+      'paper': 'from-blue-500 to-cyan-500',
+      'book': 'from-emerald-500 to-teal-500',
+      'article': 'from-purple-500 to-indigo-500',
+      'thesis': 'from-orange-500 to-red-500',
+      'report': 'from-pink-500 to-rose-500',
+      'conference': 'from-yellow-500 to-amber-500',
+    };
+    return colors[type?.toLowerCase() as keyof typeof colors] || 'from-slate-500 to-slate-600';
+  };
 
   const handleRemoveLiterature = () => {
     if (documentId && confirm(`Delete literature "${title}"? This cannot be undone.`)) {
@@ -165,78 +179,105 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
   };
 
   return (
-    <div className={`bg-gray-700 rounded-lg shadow-sm p-4 hover:bg-gray-600 hover:shadow-lg transition-colors ${className}`}>
-      <div className="flex justify-between items-start">
-        <h3 className="text-lg font-semibold text-white whitespace-normal break-words">
-          {title}
-        </h3>
-        <button
-          className="text-red-500 hover:text-red-700 text-sm"
-          onClick={handleRemoveLiterature}
-        >
-          Remove Literature
-        </button>
-      </div>
-      {subtitle && <h4 className="text-sm text-gray-400 truncate">{subtitle}</h4>}
-      {/* single-string authors */}
-      {authors && (
-        <p className="mt-1 text-sm text-gray-400 truncate">{authors}</p>
-      )}
-      <div className="mt-2 text-sm text-gray-500">
-        <p>
-          Created:{" "}
-          {createdDays !== null
-            ? createdDays < 1
-              ? "less than 1 day ago"
-              : `created ${createdDays} days ago`
-            : "Unknown"}
-        </p>
-        <p>
-          Updated:{" "}
-          {updatedDays !== null
-            ? updatedDays < 1
-              ? "less than 1 day ago"
-              : `updated ${updatedDays} days ago`
-            : "Unknown"}
-        </p>
-        {editionsDisplay !== "Unknown" && (
-          <p>Edition/Version: {editionsDisplay}</p>
-        )}
-        <p>Year(s): {yearsRange}</p>
-        {publisher && <p>Publisher: {publisher}</p>}
-        {journal && <p>Journal: {journal}</p>}
-        {doi && <p>DOI: {doi}</p>}
+    <div className={`group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6 hover:border-slate-600/50 transition-all duration-300 hover:shadow-lg hover:shadow-black/10 ${className}`}>
+      {/* Type indicator */}
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r opacity-60 rounded-t-xl ${getTypeColor(type || '')}`}></div>
+      
+      <div className="flex gap-6">
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex items-center space-x-3">
+              <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${getTypeColor(type || '')} shadow-sm`}></div>
+              {type && (
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider px-2 py-1 bg-slate-700/30 rounded">
+                  {type}
+                </span>
+              )}
+            </div>
+            <button
+              className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+              onClick={handleRemoveLiterature}
+            >
+              Remove Literature
+            </button>
+          </div>
+
+          <h3 className="text-xl font-bold text-slate-100 leading-tight mb-2 group-hover:text-white transition-colors">
+            {title}
+          </h3>
+          
+          {subtitle && (
+            <h4 className="text-sm text-slate-400 mb-3 leading-relaxed">{subtitle}</h4>
+          )}
+          
+          {authors && (
+            <p className="text-sm text-slate-300 mb-4">{authors}</p>
+          )}
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-slate-400">
+            <p>
+              <span className="text-slate-500">Created:</span>{" "}
+              {createdDays !== null
+                ? createdDays < 1
+                  ? "less than 1 day ago"
+                  : `${createdDays} days ago`
+                : "Unknown"}
+            </p>
+            <p>
+              <span className="text-slate-500">Updated:</span>{" "}
+              {updatedDays !== null
+                ? updatedDays < 1
+                  ? "less than 1 day ago"
+                  : `${updatedDays} days ago`
+                : "Unknown"}
+            </p>
+            {editionsDisplay !== "Unknown" && (
+              <p><span className="text-slate-500">Edition/Version:</span> {editionsDisplay}</p>
+            )}
+            <p><span className="text-slate-500">Year(s):</span> {yearsRange}</p>
+            {publisher && <p><span className="text-slate-500">Publisher:</span> {publisher}</p>}
+            {journal && <p><span className="text-slate-500">Journal:</span> {journal}</p>}
+            {doi && <p className="col-span-2"><span className="text-slate-500">DOI:</span> {doi}</p>}
+          </div>
+        </div>
+
+        {/* Thumbnail - right side with square-like shape */}
+        <div className="w-32 h-40 flex-shrink-0 flex items-center justify-center rounded-xl overflow-hidden">
+          {latestThumbnail ? (
+            <img
+              src={latestThumbnail}
+              alt={`${title} thumbnail`}
+              className="object-cover w-full h-full rounded-xl"
+            />
+          ) : (
+            <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type || '')} opacity-20 rounded-xl flex items-center justify-center`}>
+              <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="w-32 h-full flex-shrink-0 flex items-center justify-center bg-gray-600 rounded-lg">
-        {latestThumbnail ? (
-          <img
-            src={latestThumbnail}
-            alt={`${title} thumbnail`}
-            className="object-cover w-full h-full rounded-lg"
-          />
-        ) : (
-          <span className="text-gray-300">No Thumbnail</span>
-        )}
-      </div>
-
-      <div className="mt-4">
-        <h4 className="text-sm font-semibold text-gray-300">
+      {/* Versions section */}
+      <div className="mt-6 pt-4 border-t border-slate-700/30">
+        <h4 className="text-sm font-semibold text-slate-300 mb-3">
           Versions ({versions.length})
         </h4>
-        <div className="flex flex-wrap gap-2 mt-2">
+        <div className="flex flex-wrap gap-2">
           {versions.map((v, idx) => (
             <div
               key={idx}
-              className="relative px-2 py-1 bg-gray-600 rounded cursor-pointer hover:bg-gray-500"
+              className="relative px-3 py-2 bg-slate-700/40 backdrop-blur-sm border border-slate-600/30 rounded-lg cursor-pointer hover:bg-slate-600/40 hover:border-slate-500/50 transition-all duration-200 group/version"
             >
-              <span>
+              <span className="text-sm text-slate-300">
                 {v.publishingDate
                   ? new Date(v.publishingDate).toLocaleDateString()
                   : "Unknown"}
               </span>
               <span
-                className="absolute top-0 right-0 mt-[-4px] mr-[-4px] text-red-400 hover:text-red-600 cursor-pointer"
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500/80 hover:bg-red-400 rounded-full flex items-center justify-center text-white text-xs cursor-pointer opacity-0 group-hover/version:opacity-100 transition-opacity"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRemoveVersion(v);

@@ -9,12 +9,14 @@ interface LiteratureFormProps {
   literatureType: LiteratureType;
   className?: string;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 const LiteratureForm: React.FC<LiteratureFormProps> = ({
   literatureType,
   className,
   onSuccess,
+  onCancel,
 }) => {
   // Only the title is required as a top-level field.
   const [title, setTitle] = useState("");
@@ -72,14 +74,18 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
   // For the "versionsAreEqual" field, it is rendered as read-only.
   const renderAdditionalField = (key: string, value: any) => {
     if (key === "versionsAreEqual") {
-      return additionalFields[key] ? "True" : "False";
+      return (
+        <div className="px-3 py-2 bg-slate-700/30 border border-slate-600/30 rounded-lg text-slate-300">
+          {additionalFields[key] ? "True" : "False"}
+        </div>
+      );
     }
     if (Array.isArray(value)) {
       return (
         <select
           value={additionalFields[key]}
           onChange={(e) => handleAdditionalFieldChange(key, e.target.value)}
-          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
         >
           <option value="">Select an option</option>
           {value.map((option: string | number, idx: number) => (
@@ -95,7 +101,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
           type="number"
           value={additionalFields[key]}
           onChange={(e) => handleAdditionalFieldChange(key, Number(e.target.value))}
-          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
         />
       );
     } else {
@@ -104,7 +110,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
           type="text"
           value={additionalFields[key]}
           onChange={(e) => handleAdditionalFieldChange(key, e.target.value)}
-          className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
         />
       );
     }
@@ -140,14 +146,11 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
   };
 
   return (
-    <div className={`p-4 border rounded shadow mt-4 bg-gray-800 text-white ${className}`}>
-      <h3 className="text-lg font-semibold mb-2">
-         Create New {literatureType.name.charAt(0).toUpperCase() + literatureType.name.slice(1)}
-      </h3>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className={className}>
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Title Field */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-300">
             Title
           </label>
           <input
@@ -155,39 +158,74 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="mt-1 block w-full border border-gray-600 bg-gray-700 p-2 text-white"
+            placeholder="Enter literature title..."
+            className="w-full px-3 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
           />
         </div>
 
         {/* Additional type-specific attributes from the metadata template */}
-        <div className="p-4 border border-gray-600 rounded">
-          <h4 className="text-md font-semibold mb-2">
-            Additional type-specific attributes
-          </h4>
-          {Object.keys(additionalFields).length === 0 ? (
-            <p className="text-gray-400">No additional attributes defined</p>
-          ) : (
-            Object.entries(additionalFields).map(([key, value]) => (
-              <div key={key} className="mb-4">
-                <label className="block text-sm font-medium text-gray-300 capitalize">
-                  {key}
-                </label>
-                {renderAdditionalField(key, value)}
-              </div>
-            ))
-          )}
-        </div>
+        {Object.keys(additionalFields).length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-1 h-4 bg-gradient-to-b from-emerald-500 to-blue-600 rounded-full"></div>
+              <h4 className="text-md font-semibold text-slate-200">
+                Type-specific Attributes
+              </h4>
+            </div>
+            
+            <div className="space-y-4 pl-4 border-l border-slate-700/50">
+              {Object.entries(additionalFields).map(([key, value]) => (
+                <div key={key} className="space-y-2">
+                  <label className="block text-sm font-medium text-slate-300 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </label>
+                  {renderAdditionalField(key, value)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-        {errorMsg && <p className="text-red-500">{errorMsg}</p>}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className={`bg-green-500 text-white px-4 py-2 rounded ${
-            isSubmitting ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          {isSubmitting ? "Creating…" : "Submit"}
-        </button>
+        {/* Error Message */}
+        {errorMsg && (
+          <div className="bg-red-950/20 border border-red-900/20 rounded-lg p-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <p className="text-red-400 text-sm">{errorMsg}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-700/50">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={isSubmitting || !title.trim()}
+            className={`px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
+              isSubmitting || !title.trim()
+                ? "bg-slate-700/50 text-slate-500 cursor-not-allowed"
+                : "bg-gradient-to-r from-emerald-600 to-blue-600 text-white hover:from-emerald-700 hover:to-blue-700 shadow-sm hover:shadow-md"
+            }`}
+          >
+            {isSubmitting ? (
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>Creating...</span>
+              </div>
+            ) : (
+              `Create ${literatureType.name.charAt(0).toUpperCase() + literatureType.name.slice(1)}`
+            )}
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -12,6 +12,7 @@ interface FormProps {
   className?: string;
   literatureTypeName: string;
   onSubmit: (payload: { versionMetadata: string; name: string }) => void;
+  onCancel?: () => void;
 }
 
 // core definitions
@@ -22,7 +23,7 @@ const coreDefs: Record<string, { type: FieldType; default: any }> = {
   versionNumber: { type: "number", default: 0 },
 };
 
-const VersionTypeCreationForm: React.FC<FormProps> = ({ className, literatureTypeName, onSubmit }) => {
+const VersionTypeCreationForm: React.FC<FormProps> = ({ className, literatureTypeName, onSubmit, onCancel }) => {
   // Name is prefilled by literatureTypeName prop
 
   const [enabled, setEnabled] = useState<Record<string, boolean>>(
@@ -135,9 +136,24 @@ const VersionTypeCreationForm: React.FC<FormProps> = ({ className, literatureTyp
             + Add Custom Field
           </button>
         </div>
-        <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded">
-          Create Version Type
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-700/50">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+          <button 
+            type="submit" 
+            className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 text-white rounded-lg font-medium hover:from-emerald-700 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            Create Version Type
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -11,7 +11,8 @@ const config: Config = {
   },
   plugins: [
     require('@tailwindcss/forms'),
-    require("@tailwindcss/typography")
+    require("@tailwindcss/typography"),
+    require('@tailwindcss/line-clamp')
   ],
 };
 export default config;
