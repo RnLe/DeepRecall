@@ -176,8 +176,73 @@ const TabWindowContainer: React.FC<Props> = ({
   const changePage = (delta: number) => jumpToPage(currentPage + delta); // Increment/decrement page
   const goToPage    = (n: number)    => jumpToPage(n);            // Direct jump
 
-  const zoomIn      = () => setZoom(zoom + 0.1);              // Increase zoom
-  const zoomOut     = () => setZoom(Math.max(0.1, zoom - 0.1)); // Decrease zoom
+  const zoomIn      = () => {
+    if (viewerRef.current) {
+      // Preserve scroll position when zooming
+      const currentPageElement = document.querySelector(`[data-page-number="${currentPage}"]`);
+      const scrollContainer = document.querySelector('.h-full.overflow-y-auto');
+      
+      if (currentPageElement && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const pageRect = currentPageElement.getBoundingClientRect();
+        const relativeScrollY = (containerRect.top - pageRect.top) / pageRect.height;
+        
+        setZoom(zoom + 0.1);
+        
+        // Restore position after zoom
+        setTimeout(() => {
+          if (currentPageElement && scrollContainer) {
+            const newPageRect = currentPageElement.getBoundingClientRect();
+            const newContainerRect = scrollContainer.getBoundingClientRect();
+            const targetScrollTop = scrollContainer.scrollTop + 
+              (newPageRect.top - newContainerRect.top) + 
+              (relativeScrollY * newPageRect.height);
+            
+            scrollContainer.scrollTo({
+              top: targetScrollTop,
+              behavior: 'auto'
+            });
+          }
+        }, 50);
+      } else {
+        setZoom(zoom + 0.1);
+      }
+    }
+  };
+
+  const zoomOut     = () => {
+    if (viewerRef.current) {
+      // Preserve scroll position when zooming
+      const currentPageElement = document.querySelector(`[data-page-number="${currentPage}"]`);
+      const scrollContainer = document.querySelector('.h-full.overflow-y-auto');
+      
+      if (currentPageElement && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const pageRect = currentPageElement.getBoundingClientRect();
+        const relativeScrollY = (containerRect.top - pageRect.top) / pageRect.height;
+        
+        setZoom(Math.max(0.1, zoom - 0.1));
+        
+        // Restore position after zoom
+        setTimeout(() => {
+          if (currentPageElement && scrollContainer) {
+            const newPageRect = currentPageElement.getBoundingClientRect();
+            const newContainerRect = scrollContainer.getBoundingClientRect();
+            const targetScrollTop = scrollContainer.scrollTop + 
+              (newPageRect.top - newContainerRect.top) + 
+              (relativeScrollY * newPageRect.height);
+            
+            scrollContainer.scrollTo({
+              top: targetScrollTop,
+              behavior: 'auto'
+            });
+          }
+        }, 50);
+      } else {
+        setZoom(Math.max(0.1, zoom - 0.1));
+      }
+    }
+  };
 
   // Fit PDF to container width
   const fitWidth = async () => {
@@ -232,9 +297,11 @@ const TabWindowContainer: React.FC<Props> = ({
       onToggleSidebar();
       return;
     }
-    // new annotation → select, scroll, and open sidebar if needed
+    // new annotation → select, scroll to annotation position, and open sidebar if needed
     setSelId(a.documentId!);
-    jumpToPage(a.page);
+    if (viewerRef.current) {
+      viewerRef.current.scrollToAnnotation(a);
+    }
     if (!sidebarOpen) onToggleSidebar();
   };
 

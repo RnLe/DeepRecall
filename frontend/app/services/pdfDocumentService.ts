@@ -27,7 +27,7 @@ export class PdfDocumentService {
   private document: PDFDocumentProxy | null = null;
   private pages: Map<number, PDFPageProxy> = new Map();
   private renderingQueue: Set<number> = new Set();
-  private maxCachedPages = 10; // Limit cached pages to prevent memory issues
+  private maxCachedPages = 15; // Slightly increased for window-based rendering
   private currentUrl: string | null = null;
   
   /**
@@ -293,10 +293,33 @@ export class PdfDocumentService {
     
     this.pages.forEach((page, pageNumber) => {
       if (!keepSet.has(pageNumber)) {
-        page.cleanup();
+        try {
+          page.cleanup();
+        } catch (error) {
+          console.warn(`Error cleaning up page ${pageNumber}:`, error);
+        }
         this.pages.delete(pageNumber);
       }
     });
+    
+    console.log(`PDF cache cleaned: kept ${keepSet.size} pages, removed ${this.pages.size - keepSet.size} pages`);
+  }
+
+  /**
+   * Aggressively clean pages outside the current window
+   */
+  cleanupPagesOutsideWindow(currentPage: number, windowSize: number = 5): void {
+    const startPage = Math.max(1, currentPage - windowSize);
+    const endPage = currentPage + windowSize; // Don't limit by numPages here since we don't know it
+    
+    const pagesToKeep: number[] = [];
+    for (let page = startPage; page <= endPage; page++) {
+      if (this.pages.has(page)) {
+        pagesToKeep.push(page);
+      }
+    }
+    
+    this.clearCachedPagesExcept(pagesToKeep);
   }
 
   /**

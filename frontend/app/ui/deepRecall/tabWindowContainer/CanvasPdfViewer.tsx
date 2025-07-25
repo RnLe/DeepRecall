@@ -10,6 +10,7 @@ import { prefixStrapiUrl } from '@/app/helpers/getStrapiMedia';
 
 export interface CanvasPdfViewerHandle {
   scrollToPage(page: number): void;
+  scrollToAnnotation(annotation: Annotation): void;
   getPageSize(page?: number): { width: number; height: number } | null;
   getCroppedImage(annotation: Annotation): Promise<Blob>;
   fitToWidth(): Promise<void>;
@@ -68,6 +69,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
     const [pageDimensions, setPageDimensions] = useState<Map<number, { width: number; height: number }>>(new Map());
+    const [firstPageDimensions, setFirstPageDimensions] = useState<{ width: number; height: number } | null>(null); // Stable reference for placeholders
     const [isDocumentReady, setIsDocumentReady] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set());
@@ -107,24 +109,41 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
               setPdfUrl(pdfUrl);
               setIsDocumentReady(true);
               
-              // Pre-calculate page dimensions at base scale (zoom will be applied in render)
-              try {
-                for (let i = 1; i <= Math.min(pages, 10); i++) {
-                  const pageInfo = await pdfDocumentService.getPageInfo(i);
-                  setPageDimensions(prev => {
-                    const newMap = new Map(prev);
-                    newMap.set(i, { 
-                      width: pageInfo.width, // Store base dimensions, zoom applied in render
-                      height: pageInfo.height 
-                    });
-                    return newMap;
-                  });
-                }
-              } catch (error) {
-                console.warn('Failed to pre-calculate page dimensions:', error);
+          // Pre-calculate ALL page dimensions at base scale for accurate annotation positioning
+          // BUT set first page dimensions immediately for stable placeholders
+          try {
+            console.log('Pre-calculating page dimensions for', pages, 'pages');
+            
+            // Get first page dimensions immediately for stable placeholders
+            const firstPageInfo = await pdfDocumentService.getPageInfo(1);
+            setFirstPageDimensions({ 
+              width: firstPageInfo.width, 
+              height: firstPageInfo.height 
+            });
+            console.log('First page dimensions set:', firstPageInfo.width, 'x', firstPageInfo.height);
+            
+            // Then get all page dimensions (this can happen in background)
+            for (let i = 1; i <= pages; i++) {
+              const pageInfo = await pdfDocumentService.getPageInfo(i);
+              setPageDimensions(prev => {
+                const newMap = new Map(prev);
+                newMap.set(i, { 
+                  width: pageInfo.width, // Store base dimensions, zoom applied in render
+                  height: pageInfo.height 
+                });
+                return newMap;
+              });
+            }
+            console.log('All page dimensions pre-calculated');
+          } catch (error) {
+            console.warn('Failed to pre-calculate page dimensions:', error);
+          }              // Initialize visibility window around page 1
+              const windowSize = 5;
+              const initialWindow = new Set<number>();
+              for (let page = 1; page <= Math.min(pages, windowSize + 1); page++) {
+                initialWindow.add(page);
               }
-              
-              setVisiblePages(new Set([1, 2, 3].filter(p => p <= pages))); // Load first 3 pages initially
+              setVisiblePages(initialWindow);
               loadedUrlRef.current = pdfUrl;
               onLoadSuccess({ numPages: pages });
             }
@@ -158,9 +177,21 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
           setPdfUrl(pdfUrl);
           setIsDocumentReady(true);
           
-          // Pre-calculate all page dimensions at base scale for better placeholder sizing
+          // Pre-calculate ALL page dimensions at base scale for immediate annotation positioning
+          // BUT set first page dimensions immediately for stable placeholders
           try {
-            for (let i = 1; i <= Math.min(pages, 10); i++) {
+            console.log('Pre-calculating page dimensions for', pages, 'pages');
+            
+            // Get first page dimensions immediately for stable placeholders
+            const firstPageInfo = await pdfDocumentService.getPageInfo(1);
+            setFirstPageDimensions({ 
+              width: firstPageInfo.width, 
+              height: firstPageInfo.height 
+            });
+            console.log('First page dimensions set:', firstPageInfo.width, 'x', firstPageInfo.height);
+            
+            // Then get all page dimensions (this can happen in background)
+            for (let i = 1; i <= pages; i++) {
               const pageInfo = await pdfDocumentService.getPageInfo(i);
               setPageDimensions(prev => {
                 const newMap = new Map(prev);
@@ -171,14 +202,18 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
                 return newMap;
               });
             }
+            console.log('All page dimensions pre-calculated');
           } catch (error) {
             console.warn('Failed to pre-calculate page dimensions:', error);
           }
           
-          // Initialize visibility for first few pages
-          setVisiblePages(new Set([1, 2, 3].filter(p => p <= pages))); // Load first 3 pages initially
-          
-          onLoadSuccess({ numPages: pages });
+              // Initialize visibility window around page 1
+              const windowSize = 5;
+              const initialWindow = new Set<number>();
+              for (let page = 1; page <= Math.min(numPages, windowSize + 1); page++) {
+                initialWindow.add(page);
+              }
+              setVisiblePages(initialWindow);          onLoadSuccess({ numPages: pages });
 
         } catch (error) {
           console.error('Failed to load PDF:', error);
@@ -212,6 +247,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
       setIsDocumentReady(false);
       setVisiblePages(new Set());
       setPageDimensions(new Map());
+      setFirstPageDimensions(null); // Reset stable reference
       setDraft(null);
       // Reset the ref so load effect will run
       loadedUrlRef.current = null;
@@ -226,22 +262,58 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
       };
     }, []); // Empty dependency array - only run on mount/unmount
 
-    // Remove the effect that updates dimensions on zoom change - this was causing issues
-    // Dimensions are now handled properly in the page rendering process
+    // Memory management: Clean up pages outside the visible window
+    useEffect(() => {
+      if (!isDocumentReady || visiblePages.size === 0) return;
+
+      // Clean up canvases and PDF cache outside the visible window
+      const cleanupTimeout = setTimeout(() => {
+        // Clean PDF service cache
+        pdfDocumentService.cleanupPagesOutsideWindow(currentPage, 5);
+        
+        // Clean up store page data outside the visible window
+        const { pages } = useCanvasPdfViewerStore.getState();
+        const visibleArray = Array.from(visiblePages);
+        const minVisible = Math.min(...visibleArray);
+        const maxVisible = Math.max(...visibleArray);
+        
+        pages.forEach((pageData, pageNumber) => {
+          if (pageNumber < minVisible - 2 || pageNumber > maxVisible + 2) {
+            // Clear canvas to free memory
+            if (pageData.canvas) {
+              const ctx = pageData.canvas.getContext('2d');
+              if (ctx) {
+                ctx.clearRect(0, 0, pageData.canvas.width, pageData.canvas.height);
+              }
+              // Reset canvas dimensions to minimum
+              pageData.canvas.width = 1;
+              pageData.canvas.height = 1;
+            }
+          }
+        });
+        
+        console.log(`Memory cleanup completed for pages outside window ${minVisible}-${maxVisible}`);
+      }, 500); // Delay cleanup to avoid interrupting fast scrolling
+
+      return () => clearTimeout(cleanupTimeout);
+    }, [visiblePages, currentPage, isDocumentReady]);
 
     // Handle page rendered - store base dimensions without zoom
     const handlePageRendered = useCallback((pageNumber: number, width: number, height: number) => {
       // Store the actual rendered dimensions from the canvas
+      const baseWidth = width / zoom; // Convert back to base dimensions
+      const baseHeight = height / zoom;
+      
       setPageDimensions(prev => {
-        const baseWidth = width / zoom; // Convert back to base dimensions
-        const baseHeight = height / zoom;
         const existing = prev.get(pageNumber);
-        if (existing && existing.width === baseWidth && existing.height === baseHeight) {
-          return prev;
+        // Always update if dimensions changed, even slightly
+        if (!existing || Math.abs(existing.width - baseWidth) > 0.1 || Math.abs(existing.height - baseHeight) > 0.1) {
+          const newMap = new Map(prev);
+          newMap.set(pageNumber, { width: baseWidth, height: baseHeight });
+          console.log(`Updated dimensions for page ${pageNumber}: ${baseWidth.toFixed(1)}x${baseHeight.toFixed(1)}`);
+          return newMap;
         }
-        const newMap = new Map(prev);
-        newMap.set(pageNumber, { width: baseWidth, height: baseHeight });
-        return newMap;
+        return prev;
       });
     }, [zoom]);
 
@@ -336,19 +408,72 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
       scrollToPage: (page: number) => {
         const pageElement = pageRefs.current.get(page);
         if (pageElement && scrollContainerRef.current) {
-          // Ensure the target page and adjacent pages are loaded
+          // Ensure the target page and surrounding pages are loaded
+          const windowSize = 5; // Use same window size as intersection observer
+          const startPage = Math.max(1, page - windowSize);
+          const endPage = Math.min(numPages, page + windowSize);
+          
+          const newVisible = new Set<number>();
+          for (let p = startPage; p <= endPage; p++) {
+            newVisible.add(p);
+          }
+          
           setVisiblePages(prev => {
-            const newVisible = new Set(prev);
-            for (let offset = -2; offset <= 2; offset++) {
-              const adjacentPage = page + offset;
-              if (adjacentPage >= 1 && adjacentPage <= numPages) {
-                newVisible.add(adjacentPage);
-              }
-            }
-            return newVisible;
+            // Merge with existing to ensure smooth transition
+            const merged = new Set([...prev, ...newVisible]);
+            console.log(`ScrollToPage: Updated window to ${startPage}-${endPage} for page ${page}`);
+            return merged;
           });
           
-          pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Small delay to ensure pages are rendered before scrolling
+          setTimeout(() => {
+            pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        }
+      },
+
+      scrollToAnnotation: (annotation: Annotation) => {
+        const pageElement = pageRefs.current.get(annotation.page);
+        if (pageElement && scrollContainerRef.current) {
+          // First ensure the page is loaded
+          const windowSize = 5;
+          const startPage = Math.max(1, annotation.page - windowSize);
+          const endPage = Math.min(numPages, annotation.page + windowSize);
+          
+          const newVisible = new Set<number>();
+          for (let p = startPage; p <= endPage; p++) {
+            newVisible.add(p);
+          }
+          
+          setVisiblePages(prev => {
+            const merged = new Set([...prev, ...newVisible]);
+            return merged;
+          });
+          
+          // Wait for page to be rendered, then scroll to annotation position
+          setTimeout(() => {
+            if (pageElement && scrollContainerRef.current) {
+              const pageRect = pageElement.getBoundingClientRect();
+              const containerRect = scrollContainerRef.current.getBoundingClientRect();
+              
+              // Calculate annotation position within the page
+              const annotationTop = annotation.y * pageRect.height;
+              const annotationLeft = annotation.x * pageRect.width;
+              
+              // Calculate target scroll position (center annotation in viewport)
+              const targetScrollTop = scrollContainerRef.current.scrollTop + 
+                (pageRect.top - containerRect.top) + 
+                annotationTop - 
+                (containerRect.height / 2); // Center vertically
+              
+              scrollContainerRef.current.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth'
+              });
+              
+              console.log(`Scrolled to annotation at page ${annotation.page}, position (${annotation.x}, ${annotation.y})`);
+            }
+          }, 150); // Slightly longer delay to ensure page is fully rendered
         }
       },
 
@@ -724,10 +849,9 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
       };
     }, [currentPage, zoom, isDocumentReady, setZoom]);
 
-    // Set up intersection observer for page visibility
+    // Set up intersection observer for page visibility with windowed approach
     useEffect(() => {
       if (!isDocumentReady || !scrollContainerRef.current || numPages === 0) {
-        // console.log('Not ready for intersection observer:', { isDocumentReady, hasContainer: !!scrollContainerRef.current, numPages });
         return;
       }
 
@@ -736,69 +860,64 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
         observerRef.current.disconnect();
       }
 
-      // console.log('Setting up intersection observer');
+      console.log('Setting up optimized intersection observer');
 
-      // Create new observer with larger margin for faster scrolling
+      // Create new observer with optimized settings
       let observerTimeout: NodeJS.Timeout | null = null;
       
       observerRef.current = new IntersectionObserver(
         (entries) => {
-          // Debounce observer updates to prevent rapid re-renders but keep it responsive
+          // Debounce observer updates but keep it responsive
           if (observerTimeout) {
             clearTimeout(observerTimeout);
           }
           
           observerTimeout = setTimeout(() => {
-            setVisiblePages(prev => {
-              const newVisible = new Set(prev);
-              let hasChanges = false;
-              
-              entries.forEach(entry => {
+            // Simple intersection-based window updates
+            let mostVisiblePage = currentPage;
+            let maxVisibleRatio = 0;
+            
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
                 const pageNumber = Number(entry.target.getAttribute('data-page-number'));
-                if (isNaN(pageNumber)) return;
-                
-                if (entry.isIntersecting) {
-                  if (!newVisible.has(pageNumber)) {
-                    newVisible.add(pageNumber);
-                    hasChanges = true;
-                    console.log(`Page ${pageNumber} becoming visible`);
-                  }
-                  // Preload adjacent pages more aggressively for fast scrolling
-                  for (let offset = -2; offset <= 2; offset++) {
-                    const adjacentPage = pageNumber + offset;
-                    if (adjacentPage >= 1 && adjacentPage <= numPages && !newVisible.has(adjacentPage)) {
-                      newVisible.add(adjacentPage);
-                      hasChanges = true;
-                    }
-                  }
-                } else {
-                  // Only remove pages that are far from any visible page
-                  const nearAnyVisible = Array.from(newVisible).some(visiblePage => 
-                    Math.abs(visiblePage - pageNumber) <= 3
-                  );
-                  
-                  if (!nearAnyVisible && newVisible.has(pageNumber)) {
-                    newVisible.delete(pageNumber);
-                    hasChanges = true;
-                    console.log(`Page ${pageNumber} no longer visible`);
-                  }
+                if (!isNaN(pageNumber) && entry.intersectionRatio > maxVisibleRatio) {
+                  maxVisibleRatio = entry.intersectionRatio;
+                  mostVisiblePage = pageNumber;
                 }
-              });
+              }
+            });
+            
+            // Only update visibility window if we have a clear winner
+            if (maxVisibleRatio > 0.1) {
+              const windowSize = zoom > 2.0 ? 3 : 5;
+              const startPage = Math.max(1, mostVisiblePage - windowSize);
+              const endPage = Math.min(numPages, mostVisiblePage + windowSize);
               
-              // Only update state if there are actual changes
-              if (!hasChanges) {
-                return prev;
+              const newVisiblePages = new Set<number>();
+              for (let page = startPage; page <= endPage; page++) {
+                newVisiblePages.add(page);
               }
               
-              console.log('Visible pages updated:', Array.from(newVisible).sort((a, b) => a - b));
-              return newVisible;
-            });
-          }, 50); // Faster response for fast scrolling
+              setVisiblePages(prev => {
+                // Less aggressive updates - only change if significantly different
+                const sizeDiff = Math.abs(prev.size - newVisiblePages.size);
+                const overlap = Array.from(prev).filter(page => newVisiblePages.has(page)).length;
+                const overlapRatio = overlap / Math.max(prev.size, newVisiblePages.size);
+                
+                if (sizeDiff > 2 || overlapRatio < 0.5) {
+                  console.log(`Observer: Significant change detected, updating to pages ${startPage}-${endPage}`);
+                  return newVisiblePages;
+                }
+                
+                return prev; // Keep existing if change is minor
+              });
+            }
+          }, zoom > 2.0 ? 200 : 150); // Even slower updates to prevent oscillation
         },
         {
           root: scrollContainerRef.current,
-          rootMargin: '300px 0px', // Larger margin for faster scrolling
-          threshold: 0.01
+          rootMargin: zoom > 2.0 ? '100px 0px' : '200px 0px', // Smaller margin at high zoom
+          threshold: zoom > 2.0 ? [0.0, 0.3, 0.7, 1.0] : [0.0, 0.1, 0.25, 0.5, 0.75, 1.0] // Fewer thresholds at high zoom
         }
       );
 
@@ -808,7 +927,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
         }
         observerRef.current?.disconnect();
       };
-    }, [isDocumentReady, numPages]);
+    }, [isDocumentReady, numPages, zoom]); // Add zoom dependency for adaptive behavior
 
     // Observe page elements when they're added
     useEffect(() => {
@@ -829,13 +948,13 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
       };
     }, [isDocumentReady, numPages]); // Remove visiblePages dependency that causes infinite loop
 
-    // Update current page based on intersection observer (no scroll jumping)
+    // Update current page based on intersection observer and ensure pages are loaded during scrolling
     useEffect(() => {
       if (!isDocumentReady || !scrollContainerRef.current) return;
 
       let updateTimeout: NodeJS.Timeout;
       
-      const updateCurrentPage = () => {
+      const updateCurrentPageAndVisibility = () => {
         if (updateTimeout) clearTimeout(updateTimeout);
         
         updateTimeout = setTimeout(() => {
@@ -845,11 +964,12 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
           const containerRect = container.getBoundingClientRect();
           const containerTop = containerRect.top;
           const containerBottom = containerRect.bottom;
+          const containerCenter = containerTop + (containerRect.height / 2);
           
           let bestPage = currentPage;
           let maxVisibleArea = 0;
           
-          // Find the page with the most visible area in the viewport
+          // Simplified: Always use visible area detection, but with center bias when zoomed
           pageRefs.current.forEach((pageEl, pageNum) => {
             if (!pageEl) return;
             
@@ -857,26 +977,69 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
             const visibleTop = Math.max(rect.top, containerTop);
             const visibleBottom = Math.min(rect.bottom, containerBottom);
             const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-            const visibleArea = visibleHeight * rect.width;
             
-            if (visibleArea > maxVisibleArea) {
-              maxVisibleArea = visibleArea;
-              bestPage = pageNum;
+            if (visibleHeight > 0) {
+              let visibleArea = visibleHeight * rect.width;
+              
+              // When zoomed in, bias towards pages closer to center
+              if (zoom > 1.5) {
+                const pageCenter = rect.top + (rect.height / 2);
+                const distanceFromCenter = Math.abs(pageCenter - containerCenter);
+                const centerBias = Math.max(0, 1 - (distanceFromCenter / containerRect.height));
+                visibleArea *= (1 + centerBias); // Boost area for pages closer to center
+              }
+              
+              if (visibleArea > maxVisibleArea) {
+                maxVisibleArea = visibleArea;
+                bestPage = pageNum;
+              }
             }
           });
           
-          // Only update if we have significant visible area and page changed
-          // AND we're not currently scrolling programmatically
-          if (maxVisibleArea > 0 && bestPage !== currentPage && !isScrollingProgrammatically) {
-            console.log(`Page changed from ${currentPage} to ${bestPage} (intersection-based)`);
-            setCurrentPageSilent(bestPage); // Use silent method to prevent scrolling
+          // Update visible pages window - simplified and more conservative
+          const windowSize = zoom > 2.0 ? 3 : 5;
+          const scrollBasedStartPage = Math.max(1, bestPage - windowSize);
+          const scrollBasedEndPage = Math.min(numPages, bestPage + windowSize);
+          
+          const scrollBasedVisiblePages = new Set<number>();
+          for (let page = scrollBasedStartPage; page <= scrollBasedEndPage; page++) {
+            scrollBasedVisiblePages.add(page);
           }
-        }, 100); // Faster response for page tracking
+          
+          // Conservative page visibility updates to prevent jumping
+          setVisiblePages(prev => {
+            const merged = new Set([...prev, ...scrollBasedVisiblePages]);
+            
+            // Remove pages that are too far from best page
+            const finalVisible = new Set<number>();
+            const maxDistance = windowSize + 2;
+            
+            merged.forEach(page => {
+              if (Math.abs(page - bestPage) <= maxDistance) {
+                finalVisible.add(page);
+              }
+            });
+            
+            // Only update if there's a meaningful change
+            if (finalVisible.size !== prev.size || 
+                !Array.from(prev).every(page => finalVisible.has(page))) {
+              return finalVisible;
+            }
+            
+            return prev;
+          });
+          
+          // Update current page - only if significantly different and not programmatically scrolling
+          if (maxVisibleArea > 0 && bestPage !== currentPage && !isScrollingProgrammatically) {
+            console.log(`Page changed from ${currentPage} to ${bestPage} (area: ${maxVisibleArea.toFixed(0)}, zoom: ${zoom.toFixed(2)})`);
+            setCurrentPageSilent(bestPage);
+          }
+        }, zoom > 2.0 ? 100 : 50); // Slower updates when zoomed
       };
 
-      // Use scroll event for more immediate page tracking
+      // Use scroll event for more immediate page tracking and visibility updates
       const handleScroll = () => {
-        updateCurrentPage();
+        updateCurrentPageAndVisibility();
       };
 
       const container = scrollContainerRef.current;
@@ -887,7 +1050,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
         (entries) => {
           // Trigger update when any page intersects
           if (entries.some(entry => entry.isIntersecting)) {
-            updateCurrentPage();
+            updateCurrentPageAndVisibility();
           }
         },
         {
@@ -909,7 +1072,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
         container.removeEventListener('scroll', handleScroll);
         pageTrackingObserver.disconnect();
       };
-    }, [setCurrentPageSilent, isDocumentReady, currentPage, isScrollingProgrammatically]);
+    }, [setCurrentPageSilent, isDocumentReady, currentPage, isScrollingProgrammatically, numPages, zoom]); // Add zoom dependency
 
     // Generate pages array with lazy loading consideration
     // Convert Set and Map to stable arrays/objects for useMemo dependencies
@@ -941,14 +1104,13 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
         const pageNumber = i + 1;
         const isPageVisible = visiblePagesArr.includes(pageNumber);
 
-        // For non-visible pages, render a placeholder with proper dimensions
+        // For non-visible pages, render a placeholder with stable dimensions
         if (!isPageVisible) {
-          const baseDims = pageDimensionsObj[pageNumber];
-          // Fall back to first page dimensions if current page not available
-          const fallbackDims = baseDims || pageDimensionsObj[1];
-          // Default to A4 proportions (210:297) if no dimensions available yet
-          const placeholderWidth = fallbackDims ? fallbackDims.width * zoom : 595 * zoom; // A4 width in points
-          const placeholderHeight = fallbackDims ? fallbackDims.height * zoom : 842 * zoom; // A4 height in points
+          // Use first page dimensions for ALL placeholders to ensure consistent sizing
+          // This prevents layout shifts and intersection observer confusion
+          const stableDims = firstPageDimensions;
+          const placeholderWidth = stableDims ? stableDims.width * zoom : 595 * zoom; // A4 fallback only if no first page yet
+          const placeholderHeight = stableDims ? stableDims.height * zoom : 842 * zoom; // A4 fallback only if no first page yet
           
           return (
             <div
@@ -976,6 +1138,9 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
         // For visible pages, render the full component
         const pageAnnotations = pageAnnotationsMap[pageNumber] || [];
         const baseDims = pageDimensionsObj[pageNumber];
+        
+        // Only show annotations when we have real dimensions
+        // This prevents misaligned annotations with fallback dimensions
         const displayDims = baseDims ? {
           width: baseDims.width * zoom,
           height: baseDims.height * zoom
@@ -1076,6 +1241,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
       visiblePagesArr,
       pageAnnotationsMap,
       pageDimensionsObj,
+      firstPageDimensions, // Add stable dimension reference
       annotationMode,
       draft,
       selectedId,

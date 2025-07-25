@@ -97,8 +97,13 @@ const CanvasPage: React.FC<CanvasPageProps> = ({
       // console.log(`CanvasPage ${pageNumber}: Got page info, dimensions=${scaledWidth}x${scaledHeight}`);
       setDimensions({ width: scaledWidth, height: scaledHeight });
       
-      // Use RAF to ensure DOM updates
+      // Report dimensions immediately so annotations can be positioned
+      // even before the canvas is fully rendered
+      onPageRendered?.(pageNumber, scaledWidth, scaledHeight);
+      
+      // Use RAF to ensure DOM updates and make rendering non-blocking
       await new Promise(resolve => requestAnimationFrame(resolve));
+      await new Promise(resolve => setTimeout(resolve, 0)); // Yield to other tasks
       
       // Check abort and canvas availability
       if (controller.signal.aborted || !canvasRef.current) {
@@ -163,14 +168,19 @@ const CanvasPage: React.FC<CanvasPageProps> = ({
   // Clean up canvas when page becomes invisible
   useEffect(() => {
     if (!isVisible && canvasRef.current) {
+      // Clear the canvas immediately when it becomes invisible
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        // Reset canvas to minimal size to save memory
+        canvasRef.current.width = 1;
+        canvasRef.current.height = 1;
       }
       setIsRendered(false);
       setDimensions({ width: 0, height: 0 });
+      console.log(`CanvasPage ${pageNumber}: Cleaned up - no longer visible`);
     }
-  }, [isVisible]);
+  }, [isVisible, pageNumber]);
 
   // Handle canvas clicks for annotation creation
   const handleCanvasClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
