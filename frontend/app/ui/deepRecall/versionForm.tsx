@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import SparkMD5 from "spark-md5";
+import { X } from "lucide-react";
 import { Literature, LiteratureExtended } from "../../types/deepRecall/strapi/literatureTypes";
 import { VersionType } from "../../types/deepRecall/strapi/versionTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateLiterature } from "../../api/literatureService";
 import { uploadFile } from "../../api/uploadFile";
 import { renderPdfPageToImage, dataURLtoFile } from "../../helpers/pdfThumbnail";
+import { useLiterature } from "../../customHooks/useLiterature";
 
 // Compute MD5 hash of a file
 function computeMD5(file: File): Promise<string> {
@@ -29,44 +31,144 @@ interface VersionFormProps {
   className?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
+  initialFile?: File; // Add support for pre-selected file
 }
 
-const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className, onSuccess, onCancel }) => {
+const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className, onSuccess, onCancel, initialFile }) => {
   // File upload state
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(initialFile || null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isGlobalDrag, setIsGlobalDrag] = useState(false);
+
+  // Get all literature for duplicate checking
+  const { data: allLiterature } = useLiterature();
+
+  // Global drag detection
+  useEffect(() => {
+    const handleGlobalDragEnter = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) {
+        setIsGlobalDrag(true);
+      }
+    };
+
+    const handleGlobalDragLeave = (e: DragEvent) => {
+      // Only set to false if we're leaving the entire window
+      if (!e.relatedTarget) {
+        setIsGlobalDrag(false);
+      }
+    };
+
+    const handleGlobalDrop = () => {
+      setIsGlobalDrag(false);
+    };
+
+    document.addEventListener('dragenter', handleGlobalDragEnter);
+    document.addEventListener('dragleave', handleGlobalDragLeave);
+    document.addEventListener('drop', handleGlobalDrop);
+
+    return () => {
+      document.removeEventListener('dragenter', handleGlobalDragEnter);
+      document.removeEventListener('dragleave', handleGlobalDragLeave);
+      document.removeEventListener('drop', handleGlobalDrop);
+    };
+  }, []);
 
   // Compute file hash and display as text
   const [fileHash, setFileHash] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    exists: boolean;
+    literatureTitle: string;
+  } | null>(null);
   useEffect(() => {
     if (file) {
-      computeMD5(file).then((hash) => setFileHash(hash));
+      computeMD5(file).then((hash) => {
+        setFileHash(hash);
+        checkForDuplicateHash(hash);
+      });
     } else {
       setFileHash("");
+      setDuplicateWarning(null);
     }
-  }, [file]);
+  }, [file, allLiterature]);
+
+  // Function to check for duplicate file hashes across all literature
+  const checkForDuplicateHash = (hash: string) => {
+    if (!allLiterature || !hash) {
+      setDuplicateWarning(null);
+      return;
+    }
+
+    for (const literature of allLiterature) {
+      // Skip the current literature entry
+      if (literature.documentId === entry.documentId) continue;
+
+      let metadata: any = {};
+      if (typeof literature.metadata === "string") {
+        try {
+          metadata = JSON.parse(literature.metadata);
+        } catch {
+          continue;
+        }
+      } else if (typeof literature.metadata === "object" && literature.metadata !== null) {
+        metadata = literature.metadata;
+      }
+
+      const versions = Array.isArray(metadata.versions) ? metadata.versions : [];
+      
+      for (const version of versions) {
+        try {
+          const versionData = typeof version.versionMetadata === "string" 
+            ? JSON.parse(version.versionMetadata)
+            : version.versionMetadata;
+          
+          if (versionData.fileHash === hash) {
+            setDuplicateWarning({
+              exists: true,
+              literatureTitle: literature.title || "Unknown Title"
+            });
+            return;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    setDuplicateWarning(null);
+  };
 
   // parse versionType template
   const [versionTpl, setVersionTpl] = useState<Record<string, any>>({});
   const [versionFields, setVersionFields] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    let tpl: Record<string, any> = {};
-    const metadata = versionType.versionMetadata;
-    if (typeof metadata === "string") {
+    if (versionType.versionMetadata) {
       try {
-        tpl = JSON.parse(metadata);
-      } catch {
-        tpl = {};
+        // Check if versionMetadata is already an object or a JSON string
+        const tpl = typeof versionType.versionMetadata === 'string' 
+          ? JSON.parse(versionType.versionMetadata)
+          : versionType.versionMetadata;
+        setVersionTpl({ ...tpl });
+        setVersionFields({ ...tpl });
+      } catch (e) {
+        console.error("Error parsing versionMetadata:", e);
+        setVersionTpl({});
+        setVersionFields({});
       }
-    } else if (typeof metadata === "object" && metadata !== null) {
-      tpl = metadata;
     }
-    setVersionTpl(tpl);
-    setVersionFields({ ...tpl });
   }, [versionType]);
+
+  // Set initial file if provided
+  useEffect(() => {
+    if (initialFile && fileInputRef.current) {
+      const dt = new DataTransfer();
+      dt.items.add(initialFile);
+      fileInputRef.current.files = dt.files;
+    }
+  }, [initialFile]);
 
   // recommended keys
   const recommended = ["publishingDate","versionTitle","editionNumber","versionNumber"];
@@ -127,6 +229,45 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
     }
   };
 
+  // Drag and drop handlers for file input
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const pdfFile = files.find(file => file.type === 'application/pdf');
+    
+    if (pdfFile) {
+      setFileError("");
+      setFile(pdfFile);
+      
+      // Update the file input element to show the dropped file
+      if (fileInputRef.current) {
+        const dt = new DataTransfer();
+        dt.items.add(pdfFile);
+        fileInputRef.current.files = dt.files;
+      }
+    } else if (files.length > 0) {
+      setFileError("Only PDF files are allowed");
+    }
+  };
+
+  const handleFileDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set isDragOver to false if we're leaving the drop zone entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+
   // Generate thumbnail from the uploaded PDF
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -176,7 +317,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
       return;
     }
 
-    // Prevent duplicate version by hash
+    // Prevent duplicate version by hash within the same literature entry
     let currentMetadata: any = {};
     const metadata = entry.metadata;
     if (typeof metadata === "string") {
@@ -198,7 +339,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
       }
     });
     if (existingParsed.some((v: any) => v.fileHash === fileHash)) {
-      setErrorMsg("This file/version already uploaded as a version.");
+      setErrorMsg("This file has already been uploaded as a version for this literature entry.");
       setIsSubmitting(false);
       return;
     }
@@ -233,6 +374,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
       setThumbnailUrl(null);
       setVersionFields({});
       setFileHash("");
+      setDuplicateWarning(null);
       if (onSuccess) onSuccess();
     } catch (error: any) {
       console.error(error);
@@ -249,17 +391,19 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
         <div className="bg-slate-700/30 border border-slate-600/30 rounded-lg p-4">
           <div className="flex items-center space-x-3 mb-2">
             <div className="w-2 h-4 bg-gradient-to-b from-emerald-500 to-blue-600 rounded-full"></div>
-            <h4 className="text-md font-semibold text-slate-200">Document Information</h4>
+            <h4 className="text-md font-semibold text-slate-200">{entry.type || "Document"}</h4>
           </div>
           <div className="space-y-2 text-sm">
             <div>
               <span className="text-slate-400">Title:</span>
               <span className="text-slate-200 ml-2">{entry.title}</span>
             </div>
-            <div>
-              <span className="text-slate-400">Document ID:</span>
-              <span className="text-slate-300 ml-2 font-mono text-xs">{entry.documentId}</span>
-            </div>
+            {entry.authors && (
+              <div>
+                <span className="text-slate-400">Authors:</span>
+                <span className="text-slate-200 ml-2">{entry.authors}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -271,15 +415,35 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* File input */}
-            <div>
-              <input
-                type="file"
-                accept=".pdf"
-                ref={fileInputRef}
-                onChange={handleFileInputChange}
-                className="w-full px-3 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-              />
+            {/* File input with drag-and-drop */}
+            <div 
+              className="space-y-2"
+              onDrop={handleFileDrop}
+              onDragOver={handleFileDragOver}
+              onDragLeave={handleFileDragLeave}
+            >
+              <div className={`border-2 border-dashed rounded-lg p-4 transition-all duration-200 ${
+                isDragOver 
+                  ? "border-indigo-400 bg-indigo-500/10 scale-105" 
+                  : isGlobalDrag
+                    ? "border-emerald-400 bg-emerald-500/5 animate-pulse"
+                    : "border-slate-600/50 hover:border-slate-500/50"
+              }`}>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  ref={fileInputRef}
+                  onChange={handleFileInputChange}
+                  className="w-full px-3 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                />
+                <p className="text-xs text-slate-400 text-center mt-2">
+                  {isDragOver 
+                    ? "Drop your PDF file here" 
+                    : isGlobalDrag 
+                      ? "Drag your file here to upload" 
+                      : "Or drag and drop a PDF file here"}
+                </p>
+              </div>
               {fileError && (
                 <div className="mt-2 bg-red-950/20 border border-red-900/20 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
@@ -288,17 +452,46 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
                   </div>
                 </div>
               )}
+              {duplicateWarning?.exists && (
+                <div className="mt-2 bg-amber-950/20 border border-amber-900/20 rounded-lg p-3">
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <div>
+                      <p className="text-amber-400 text-sm font-medium">⚠️ Duplicate File Detected</p>
+                      <p className="text-amber-300 text-xs mt-1">
+                        This file already exists in: <strong>"{duplicateWarning.literatureTitle}"</strong>
+                      </p>
+                      <p className="text-amber-300 text-xs mt-1">
+                        Uploading the same file multiple times may create unnecessary duplicates.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {file && (
                 <div className="mt-2 bg-emerald-950/20 border border-emerald-900/20 rounded-lg p-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                    <p className="text-emerald-400 text-sm">
-                      {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                      <p className="text-emerald-400 text-sm">
+                        {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFile(null);
+                        setFileError("");
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
+                      className="p-1 text-emerald-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                      title="Remove file"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  {fileHash && (
-                    <p className="text-slate-400 text-xs mt-1 font-mono">Hash: {fileHash}</p>
-                  )}
                 </div>
               )}
             </div>

@@ -4,9 +4,10 @@ import { LiteratureExtended } from '../../types/deepRecall/strapi/literatureType
 
 interface LiteratureCardSlimProps {
   literature: LiteratureExtended;
+  onClick?: () => void;
 }
 
-const LiteratureCardSlim: React.FC<LiteratureCardSlimProps> = ({ literature }) => {
+const LiteratureCardSlim: React.FC<LiteratureCardSlimProps> = ({ literature, onClick }) => {
   const { 
     title, 
     authors: rawAuthors, 
@@ -33,13 +34,23 @@ const LiteratureCardSlim: React.FC<LiteratureCardSlimProps> = ({ literature }) =
   };
 
   return (
-    <div className="group relative bg-slate-800/20 backdrop-blur-sm border border-slate-700/30 rounded-lg p-3 hover:border-slate-600/50 hover:bg-slate-800/40 transition-all duration-200">
+    <div 
+      className="group relative bg-slate-800/20 backdrop-blur-sm border border-slate-700/30 rounded-lg p-3 hover:border-slate-600/50 hover:bg-slate-800/40 transition-all duration-200 cursor-pointer"
+      onClick={onClick}
+    >
       {/* Type indicator */}
       <div className={`absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b ${getTypeColor(type)} opacity-60 rounded-l-lg`}></div>
       
       <div className="flex items-center space-x-4 pl-3">
         {/* Type icon */}
-        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getTypeColor(type)} opacity-20 flex items-center justify-center flex-shrink-0`}>
+        <div 
+          className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getTypeColor(type)} opacity-20 flex items-center justify-center flex-shrink-0 hover:opacity-30 hover:scale-105 transition-all duration-200 cursor-pointer`}
+          onClick={(e) => {
+            e.stopPropagation();
+            // TODO: Handle type icon click (placeholder)
+            console.log('Type icon clicked for literature:', title);
+          }}
+        >
           <div className={`w-2 h-2 rounded-full bg-gradient-to-br ${getTypeColor(type)}`}></div>
         </div>
 

@@ -20,9 +20,11 @@ const getLatestThumbnail = (versions?: VersionExtended[]): string | null => {
 interface LiteratureCardProps {
   literature: LiteratureExtended;
   showThumbnail?: boolean;
+  onClick?: () => void;
+  onPdfPreview?: () => void;
 }
 
-const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbnail = true }) => {
+const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbnail = true, onClick, onPdfPreview }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Destructure known and custom metadata from the literature
@@ -63,7 +65,10 @@ const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbn
   const latestThumbnail = getLatestThumbnail(versions);
 
   return (
-    <div className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-5 hover:border-slate-600/50 transition-all duration-300 hover:shadow-xl hover:shadow-black/20">
+    <div 
+      className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-5 hover:border-slate-600/50 transition-all duration-300 hover:shadow-xl hover:shadow-black/20 cursor-pointer"
+      onClick={onClick}
+    >
       {/* Type indicator */}
       <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r opacity-60 rounded-t-xl ${getTypeColor(type)}`}></div>
       
@@ -205,7 +210,14 @@ const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbn
 
         {/* Right thumbnail */}
         {showThumbnail && (
-          <div className="w-32 h-40 flex-shrink-0">
+          <div 
+            className="w-32 h-40 flex-shrink-0 hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Open PDF preview modal
+              onPdfPreview?.();
+            }}
+          >
             {latestThumbnail ? (
               <div className="w-full h-full bg-slate-700/30 rounded-lg overflow-hidden border border-slate-600/30">
                 <img
@@ -215,7 +227,7 @@ const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbn
                 />
               </div>
             ) : (
-              <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type)} opacity-20 rounded-lg flex items-center justify-center group-hover:opacity-30 transition-opacity border border-slate-600/30`}>
+              <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type)} opacity-20 rounded-lg flex items-center justify-center hover:opacity-30 transition-opacity border border-slate-600/30`}>
                 <div className="text-center">
                   <svg className="w-8 h-8 text-slate-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />

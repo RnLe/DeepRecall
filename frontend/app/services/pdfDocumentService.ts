@@ -29,6 +29,8 @@ export class PdfDocumentService {
   private renderingQueue: Set<number> = new Set();
   private maxCachedPages = 15; // Slightly increased for window-based rendering
   private currentUrl: string | null = null;
+  private loadingPromise: Promise<PDFDocumentProxy> | null = null;
+  private isDestroying = false;
   
   /**
    * Load a PDF document from URL
@@ -36,34 +38,50 @@ export class PdfDocumentService {
   async loadDocument(url: string): Promise<PDFDocumentProxy> {
     try {
       // If same URL is already loaded, return existing document
-      if (this.currentUrl === url && this.document) {
+      if (this.currentUrl === url && this.document && !this.isDestroying) {
         console.log('PDF already loaded, reusing:', url);
         return this.document;
       }
       
+      // If already loading the same URL, wait for that promise
+      if (this.loadingPromise && this.currentUrl === url) {
+        console.log('PDF already loading, waiting for completion:', url);
+        return await this.loadingPromise;
+      }
+      
       // Cleanup previous document first
-      this.cleanup();
+      await this.cleanup();
       
       this.currentUrl = url;
+      this.isDestroying = false;
       
-      const loadingTask = pdfjs.getDocument({
-        url,
-        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/cmaps/',
-        cMapPacked: true,
-        standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/standard_fonts/',
-        disableAutoFetch: false,
-        disableStream: false,
-        disableRange: false,
-      });
+      this.loadingPromise = this.performLoad(url);
+      const document = await this.loadingPromise;
       
-      this.document = await loadingTask.promise;
+      this.document = document;
+      this.loadingPromise = null;
       
-      return this.document;
+      return document;
     } catch (error) {
       this.currentUrl = null;
+      this.loadingPromise = null;
       console.error('Failed to load PDF document:', error);
       throw new Error(`PDF loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+  
+  private async performLoad(url: string): Promise<PDFDocumentProxy> {
+    const loadingTask = pdfjs.getDocument({
+      url,
+      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/cmaps/',
+      cMapPacked: true,
+      standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/standard_fonts/',
+      disableAutoFetch: false,
+      disableStream: false,
+      disableRange: false,
+    });
+    
+    return await loadingTask.promise;
   }
   
   /**
@@ -90,8 +108,8 @@ export class PdfDocumentService {
    * Get a specific page with LRU cache management
    */
   async getPage(pageNumber: number): Promise<PDFPageProxy> {
-    if (!this.document) {
-      throw new Error('No document loaded');
+    if (!this.document || this.isDestroying) {
+      throw new Error('No document loaded or document is being destroyed');
     }
     
     // Check if page number is valid
@@ -119,11 +137,21 @@ export class PdfDocumentService {
     
     try {
       const page = await this.document.getPage(pageNumber);
+      
+      // Check again if we're still valid after async operation
+      if (this.isDestroying) {
+        page.cleanup();
+        throw new Error('PDF document was closed while loading page');
+      }
+      
       this.pages.set(pageNumber, page);
       return page;
     } catch (error) {
       // Handle transport destroyed errors gracefully
-      if (error instanceof Error && error.message.includes('Transport destroyed')) {
+      if (error instanceof Error && (
+        error.message.includes('Transport destroyed') ||
+        error.message.includes('worker is being destroyed')
+      )) {
         throw new Error('PDF document was closed while loading page');
       }
       throw error;
@@ -158,13 +186,27 @@ export class PdfDocumentService {
     // Prevent multiple renders of the same page
     const renderKey = pageNumber;
     if (this.renderingQueue.has(renderKey)) {
+      // Wait for existing render to complete
+      while (this.renderingQueue.has(renderKey) && !this.isDestroying) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
       return;
+    }
+    
+    if (this.isDestroying) {
+      throw new Error('PDF service is being destroyed');
     }
     
     this.renderingQueue.add(renderKey);
     
     try {
       const page = await this.getPage(pageNumber);
+      
+      // Check again after async operation
+      if (this.isDestroying) {
+        throw new Error('PDF service was destroyed during render');
+      }
+      
       const viewport = page.getViewport({ scale, rotation });
       
       // Set canvas dimensions
@@ -189,8 +231,8 @@ export class PdfDocumentService {
       const renderTask = page.render(renderContext);
       
       // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Render timeout')), 10000);
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error('Render timeout')), 15000);
       });
       
       await Promise.race([renderTask.promise, timeoutPromise]);
@@ -325,8 +367,18 @@ export class PdfDocumentService {
   /**
    * Cleanup resources
    */
-  cleanup(): void {
+  async cleanup(): Promise<void> {
     console.log('Cleaning up PDF document service');
+    
+    this.isDestroying = true;
+    
+    // Wait for any pending rendering to complete
+    const pendingRenders = Array.from(this.renderingQueue);
+    if (pendingRenders.length > 0) {
+      console.log('Waiting for pending renders to complete:', pendingRenders);
+      // Give renders a chance to complete, but don't wait forever
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
     
     // Clear all cached pages
     this.pages.forEach(page => {
@@ -341,7 +393,7 @@ export class PdfDocumentService {
     
     if (this.document) {
       try {
-        this.document.destroy();
+        await this.document.destroy();
       } catch (error) {
         console.warn('Error destroying document:', error);
       }
@@ -349,6 +401,8 @@ export class PdfDocumentService {
     }
     
     this.currentUrl = null;
+    this.loadingPromise = null;
+    this.isDestroying = false;
   }
   
   /**

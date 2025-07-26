@@ -1,11 +1,12 @@
 // literatureCardL.tsx
 
-import React from "react";
+import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteLiterature, updateLiterature } from "../../api/literatureService";
 import { LiteratureExtended, Literature } from "../../types/deepRecall/strapi/literatureTypes";
 import { VersionExtended } from "../../types/deepRecall/strapi/versionTypes";
 import { prefixStrapiUrl } from "../../helpers/getStrapiMedia";
+import PdfPreviewModal from "./pdfPreviewModal";
 
 /**
  * Helper: Compute the difference in whole days between the supplied date and now.
@@ -82,6 +83,7 @@ const handleAuthorClick = (author: any) => {
 interface LiteratureCardLProps {
   literature: LiteratureExtended;
   className?: string;
+  onClick?: () => void;
 }
 
 /**
@@ -92,8 +94,11 @@ interface LiteratureCardLProps {
 const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
   literature,
   className = "",
+  onClick,
 }) => {
   const queryClient = useQueryClient();
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<VersionExtended | null>(null);
 
   const delLitMutation = useMutation<void, Error, string>({
     mutationFn: deleteLiterature,
@@ -179,7 +184,10 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
   };
 
   return (
-    <div className={`group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6 hover:border-slate-600/50 transition-all duration-300 hover:shadow-lg hover:shadow-black/10 ${className}`}>
+    <div 
+      className={`group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6 hover:border-slate-600/50 transition-all duration-300 hover:shadow-lg hover:shadow-black/10 cursor-pointer ${className}`}
+      onClick={onClick}
+    >
       {/* Type indicator */}
       <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r opacity-60 rounded-t-xl ${getTypeColor(type || '')}`}></div>
       
@@ -197,7 +205,10 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
             </div>
             <button
               className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
-              onClick={handleRemoveLiterature}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemoveLiterature();
+              }}
             >
               Remove Literature
             </button>
@@ -243,7 +254,23 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
         </div>
 
         {/* Thumbnail - right side with square-like shape */}
-        <div className="w-32 h-40 flex-shrink-0 flex items-center justify-center rounded-xl overflow-hidden">
+        <div 
+          className="w-32 h-40 flex-shrink-0 flex items-center justify-center rounded-xl overflow-hidden hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Open PDF preview with latest version
+            if (versions && versions.length > 0) {
+              const latestVersion = versions.slice().sort((a, b) => {
+                const timeA = a.publishingDate ? new Date(a.publishingDate).getTime() : 0;
+                const timeB = b.publishingDate ? new Date(b.publishingDate).getTime() : 0;
+                return timeB - timeA;
+              })[0];
+              setSelectedVersion(latestVersion);
+              setIsPdfPreviewOpen(true);
+            }
+          }}
+        >
           {latestThumbnail ? (
             <img
               src={latestThumbnail}
@@ -251,7 +278,7 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
               className="object-cover w-full h-full rounded-xl"
             />
           ) : (
-            <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type || '')} opacity-20 rounded-xl flex items-center justify-center`}>
+            <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type || '')} opacity-20 rounded-xl flex items-center justify-center hover:opacity-30 transition-opacity`}>
               <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
@@ -289,6 +316,18 @@ const LiteratureCardL: React.FC<LiteratureCardLProps> = ({
           ))}
         </div>
       </div>
+      
+      {/* PDF Preview Modal */}
+      {isPdfPreviewOpen && (
+        <PdfPreviewModal
+          literature={literature}
+          isOpen={isPdfPreviewOpen}
+          onClose={() => {
+            setIsPdfPreviewOpen(false);
+            setSelectedVersion(null);
+          }}
+        />
+      )}
     </div>
   );
 };

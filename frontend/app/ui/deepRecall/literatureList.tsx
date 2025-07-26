@@ -5,8 +5,14 @@ import { useLiterature, useLiteratureTypes } from '../../customHooks/useLiteratu
 import LiteratureCardM from './literatureCardM';
 import LiteratureCardCompact from './literatureCardCompact';
 import LiteratureCardSlim from './literatureCardSlim';
-import { LiteratureType } from '../../types/deepRecall/strapi/literatureTypes';
+import LiteratureDetailModal from './literatureDetailModal';
+import EditLiteratureModal from './editLiteratureModal';
+import AddVersionModal from './addVersionModal';
+import CreateLiteratureModal from './createLiteratureModal';
+import PdfPreviewModal from './pdfPreviewModal';
+import { LiteratureType, LiteratureExtended } from '../../types/deepRecall/strapi/literatureTypes';
 import { groupLiteraturesByType } from '@/app/helpers/groupLiterature';
+import { LayoutGrid, List, Rows3, Search, X, Plus } from 'lucide-react';
 
 interface LiteratureListProps {
   className?: string;
@@ -30,6 +36,78 @@ export default function LiteratureList({ className }: LiteratureListProps) {
   const [sortBy, setSortBy] = useState<SortMode>('title');
   const [groupBy, setGroupBy] = useState<GroupMode>('type');
   const [showThumbnails, setShowThumbnails] = useState(true);
+
+  // Modal state
+  const [selectedLiterature, setSelectedLiterature] = useState<LiteratureExtended | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddVersionModalOpen, setIsAddVersionModalOpen] = useState(false);
+  const [isCreateLiteratureModalOpen, setIsCreateLiteratureModalOpen] = useState(false);
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
+
+  // Handlers for modal
+  const handleLiteratureClick = (literature: LiteratureExtended) => {
+    setSelectedLiterature(literature);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedLiterature(null);
+  };
+
+  const handleEditLiterature = () => {
+    setIsDetailModalOpen(false);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedLiterature(null);
+  };
+
+  const handleSaveLiterature = (updatedData: Partial<LiteratureExtended>) => {
+    // TODO: Implement save functionality
+    console.log('Save literature:', updatedData);
+    setIsEditModalOpen(false);
+    setSelectedLiterature(null);
+  };
+
+  const handleAddVersion = (file?: File) => {
+    setIsDetailModalOpen(false);
+    setIsAddVersionModalOpen(true);
+    setDroppedFile(file || null);
+  };
+
+  const handleCloseAddVersionModal = () => {
+    setIsAddVersionModalOpen(false);
+    setSelectedLiterature(null);
+    setDroppedFile(null);
+  };
+
+  const handleCreateVersion = (versionData: any) => {
+    // Version creation is handled by the VersionForm component via API calls
+    // After success, this callback is triggered
+    setIsAddVersionModalOpen(false);
+    setDroppedFile(null);
+  };
+
+  const handleCreateLiterature = () => {
+    // Literature creation is handled by the LiteratureForm component via API calls
+    // The form will automatically update the literature query on success
+    setIsCreateLiteratureModalOpen(false);
+  };
+
+  const handlePdfPreviewOpen = (literature: LiteratureExtended) => {
+    setSelectedLiterature(literature);
+    setIsPdfPreviewOpen(true);
+  };
+
+  const handlePdfPreviewClose = () => {
+    setIsPdfPreviewOpen(false);
+    setSelectedLiterature(null);
+  };
 
   // Filter and sort literature
   const filteredAndSortedLiterature = useMemo(() => {
@@ -130,12 +208,12 @@ export default function LiteratureList({ className }: LiteratureListProps) {
   const renderLiteratureCard = (item: any) => {
     switch (viewMode) {
       case 'compact':
-        return <LiteratureCardCompact key={item.documentId} literature={item} />;
+        return <LiteratureCardCompact key={item.documentId} literature={item} onClick={() => handleLiteratureClick(item)} />;
       case 'slim':
-        return <LiteratureCardSlim key={item.documentId} literature={item} />;
+        return <LiteratureCardSlim key={item.documentId} literature={item} onClick={() => handleLiteratureClick(item)} />;
       case 'rich':
       default:
-        return <LiteratureCardM key={item.documentId} literature={item} showThumbnail={showThumbnails} />;
+        return <LiteratureCardM key={item.documentId} literature={item} showThumbnail={showThumbnails} onClick={() => handleLiteratureClick(item)} onPdfPreview={() => handlePdfPreviewOpen(item)} />;
     }
   };
 
@@ -157,14 +235,19 @@ export default function LiteratureList({ className }: LiteratureListProps) {
               </>
             )}
           </div>
+          <button
+            onClick={() => setIsCreateLiteratureModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="text-sm font-medium">New Literature</span>
+          </button>
         </div>
 
         {/* Search bar */}
-        <div className="relative mb-4">
+        <div className="relative mb-6">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <Search className="h-5 w-5 text-slate-400" />
           </div>
           <input
             type="text"
@@ -178,95 +261,147 @@ export default function LiteratureList({ className }: LiteratureListProps) {
               onClick={() => setSearchTerm('')}
               className="absolute inset-y-0 right-0 pr-3 flex items-center"
             >
-              <svg className="h-5 w-5 text-slate-400 hover:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-5 w-5 text-slate-400 hover:text-slate-300" />
             </button>
           )}
         </div>
 
         {/* View and Filter Controls */}
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* View Mode Toggle */}
+        <div className="flex items-center gap-4">
+          {/* View Mode Section */}
           <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-slate-400">View:</label>
-            <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
-              {(['rich', 'compact', 'slim'] as ViewMode[]).map((mode) => (
+            <span className="text-xs font-medium text-slate-400 whitespace-nowrap">View:</span>
+            <div className="flex bg-slate-800/50 rounded-lg p-0.5 border border-slate-700/50">
+              <button
+                onClick={() => setViewMode('rich')}
+                className={`flex items-center justify-center p-1.5 rounded-md transition-all duration-200 ${
+                  viewMode === 'rich'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+                title="Rich View"
+              >
+                <Rows3 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('compact')}
+                className={`flex items-center justify-center p-1.5 rounded-md transition-all duration-200 ${
+                  viewMode === 'compact'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+                title="Grid View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('slim')}
+                className={`flex items-center justify-center p-1.5 rounded-md transition-all duration-200 ${
+                  viewMode === 'slim'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+                title="List View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Thumbnail Toggle (only for rich view) */}
+            {viewMode === 'rich' && (
+              <button
+                onClick={() => setShowThumbnails(!showThumbnails)}
+                className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                  showThumbnails
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 border border-slate-600/50'
+                }`}
+                title="Toggle Thumbnails"
+              >
+                Thumbs
+              </button>
+            )}
+          </div>
+
+          {/* Type Filter */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-medium text-slate-400 whitespace-nowrap">Type:</span>
+            <div className="flex bg-slate-800/30 border border-slate-700/50 rounded-lg p-0.5 gap-1">
+              <button
+                onClick={() => setSelectedType(null)}
+                className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                  !selectedType
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50'
+                }`}
+              >
+                All
+              </button>
+              {literatureTypes?.slice(0, 4).map((type: LiteratureType) => (
                 <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                    viewMode === mode
+                  key={type.documentId}
+                  onClick={() => setSelectedType(type.name)}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                    selectedType === type.name
                       ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
+                      : 'bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50'
                   }`}
                 >
-                  {mode === 'rich' ? 'Rich' : mode === 'compact' ? 'Grid' : 'List'}
+                  {capitalizeFirstLetter(type.name)}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Thumbnail Toggle (only for rich view) */}
-          {viewMode === 'rich' && (
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-slate-400">Thumbnails:</label>
+          {/* Sort Options */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-medium text-slate-400 whitespace-nowrap">Sort:</span>
+            <div className="flex bg-slate-800/30 border border-slate-700/50 rounded-lg p-0.5 gap-1">
+              {[
+                { value: 'title', label: 'Title' },
+                { value: 'type', label: 'Type' },
+                { value: 'authors', label: 'Authors' },
+                { value: 'date', label: 'Updated' }
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setSortBy(option.value as SortMode)}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                    sortBy === option.value
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Group Options */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-medium text-slate-400 whitespace-nowrap">Group:</span>
+            <div className="flex bg-slate-800/30 border border-slate-700/50 rounded-lg p-0.5 gap-1">
               <button
-                onClick={() => setShowThumbnails(!showThumbnails)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                  showThumbnails
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-700/50 text-slate-400 hover:text-slate-200'
+                onClick={() => setGroupBy('none')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                  groupBy === 'none'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50'
                 }`}
               >
-                {showThumbnails ? 'On' : 'Off'}
+                None
+              </button>
+              <button
+                onClick={() => setGroupBy('type')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                  groupBy === 'type'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50'
+                }`}
+              >
+                By Type
               </button>
             </div>
-          )}
-
-          {/* Type Filter */}
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-slate-400">Type:</label>
-            <select
-              value={selectedType || ''}
-              onChange={(e) => setSelectedType(e.target.value || null)}
-              className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-            >
-              <option value="">All Types</option>
-              {literatureTypes?.map((type: LiteratureType) => (
-                <option key={type.documentId} value={type.name}>
-                  {capitalizeFirstLetter(type.name)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Sort Control */}
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-slate-400">Sort:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortMode)}
-              className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-            >
-              <option value="title">Title</option>
-              <option value="type">Type</option>
-              <option value="authors">Authors</option>
-              <option value="date">Last Updated</option>
-            </select>
-          </div>
-
-          {/* Group Control */}
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-slate-400">Group:</label>
-            <select
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as GroupMode)}
-              className="px-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-            >
-              <option value="none">None</option>
-              <option value="type">By Type</option>
-            </select>
           </div>
 
           {/* Clear Filters */}
@@ -276,9 +411,9 @@ export default function LiteratureList({ className }: LiteratureListProps) {
                 setSearchTerm('');
                 setSelectedType(null);
               }}
-              className="px-3 py-1.5 bg-slate-700/50 text-slate-300 text-sm rounded-lg hover:bg-slate-600/50 transition-colors"
+              className="ml-auto px-3 py-1.5 bg-slate-700/50 text-slate-300 text-xs font-medium rounded-lg hover:bg-slate-600/50 transition-colors border border-slate-600/50 whitespace-nowrap"
             >
-              Clear Filters
+              Clear
             </button>
           )}
         </div>
@@ -328,6 +463,54 @@ export default function LiteratureList({ className }: LiteratureListProps) {
             );
           })}
         </div>
+      )}
+
+      {/* Literature Detail Modal */}
+      {selectedLiterature && (
+        <LiteratureDetailModal
+          literature={selectedLiterature}
+          isOpen={isDetailModalOpen}
+          onClose={handleCloseModal}
+          onEdit={handleEditLiterature}
+          onAddVersion={handleAddVersion}
+        />
+      )}
+
+      {/* Edit Literature Modal */}
+      {selectedLiterature && (
+        <EditLiteratureModal
+          literature={selectedLiterature}
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
+          onSave={handleSaveLiterature}
+        />
+      )}
+
+      {/* Add Version Modal */}
+      {selectedLiterature && (
+        <AddVersionModal
+          literature={selectedLiterature}
+          isOpen={isAddVersionModalOpen}
+          onClose={handleCloseAddVersionModal}
+          onAddVersion={handleCreateVersion}
+          initialFile={droppedFile || undefined}
+        />
+      )}
+
+      {/* Create Literature Modal */}
+      <CreateLiteratureModal
+        isOpen={isCreateLiteratureModalOpen}
+        onClose={() => setIsCreateLiteratureModalOpen(false)}
+        onCreateLiterature={handleCreateLiterature}
+      />
+
+      {/* PDF Preview Modal */}
+      {selectedLiterature && (
+        <PdfPreviewModal
+          literature={selectedLiterature}
+          isOpen={isPdfPreviewOpen}
+          onClose={handlePdfPreviewClose}
+        />
       )}
     </div>
   );
