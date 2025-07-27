@@ -47,7 +47,7 @@ export default async function LocaleLayout({
     <Providers locale={locale} messages={messages} isLoggedIn={isLoggedIn}>
       <div className="h-screen w-screen flex flex-col">
           <TopNav isLoggedIn={isLoggedIn} />
-          <div className="flex-1 overflow-auto bg-gray-900 text-gray-100">
+          <div className="flex-1 overflow-hidden bg-gray-900 text-gray-100">
               {children}
           </div>
       </div>

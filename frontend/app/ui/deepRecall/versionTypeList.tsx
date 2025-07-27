@@ -112,9 +112,10 @@ const VersionTypeList: React.FC<VersionTypeListProps> = ({
   }
 
   return (
-    <div className={`p-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className={`flex flex-col h-full ${className}`}>
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 p-6 pb-0">
+        <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
           <h3 className="text-xl font-bold text-slate-100">Version Types</h3>
@@ -131,9 +132,11 @@ const VersionTypeList: React.FC<VersionTypeListProps> = ({
           <span className="text-sm font-medium">New Type</span>
         </button>
       </div>
+      </div>
 
-      {/* Version Type Cards */}
-      <div className="space-y-4">
+      {/* Scrollable Version Type Cards */}
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="space-y-4">
         {types?.map((vt: VersionType) => {
           const ext = transformVersion(vt);
           const displayName = vt.name
@@ -279,6 +282,7 @@ const VersionTypeList: React.FC<VersionTypeListProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

@@ -52,6 +52,51 @@ export interface LiteratureType extends StrapiResponse {
 }
 
 /**
+ * Utility functions for version year display
+ */
+
+/**
+ * Gets the display year(s) for a literature item based on its versions and type.
+ * For papers: Returns the year of the version with the lowest edition/version number.
+ * For other types: Returns a year range if multiple versions, single year if one version.
+ */
+export const getDisplayYear = (literature: LiteratureExtended): string | null => {
+  if (!literature.versions || literature.versions.length === 0) {
+    return null;
+  }
+
+  const versionsWithDates = literature.versions.filter(v => v.publishingDate);
+  if (versionsWithDates.length === 0) {
+    return null;
+  }
+
+  const isPaper = literature.type.toLowerCase() === 'paper';
+
+  if (isPaper) {
+    // For papers, get the version with the lowest edition/version number
+    const sortedVersions = versionsWithDates.sort((a, b) => {
+      const aNum = a.editionNumber ?? a.versionNumber ?? 999;
+      const bNum = b.editionNumber ?? b.versionNumber ?? 999;
+      return aNum - bNum;
+    });
+    const earliestVersion = sortedVersions[0];
+    return new Date(earliestVersion.publishingDate!).getFullYear().toString();
+  } else {
+    // For other types, show range if multiple versions
+    if (versionsWithDates.length === 1) {
+      return new Date(versionsWithDates[0].publishingDate!).getFullYear().toString();
+    } else {
+      const years = versionsWithDates
+        .map(v => new Date(v.publishingDate!).getFullYear())
+        .sort((a, b) => a - b);
+      const minYear = years[0];
+      const maxYear = years[years.length - 1];
+      return minYear === maxYear ? minYear.toString() : `${minYear}-${maxYear}`;
+    }
+  }
+};
+
+/**
  * Transforms a Literature object by parsing its metadata JSON string,
  * extracting supported fields, and separating custom fields.
  */
@@ -74,11 +119,11 @@ export const transformLiterature = (lit: Literature): LiteratureExtended => {
     }
   }
 
-  // Extract supported literature fields.
-  const { subtitle, publisher, authors, journal, doi, versionsAreEqual, ...customMetadata } = metadataObj;
+  // Extract supported literature fields and exclude versions from customMetadata.
+  const { subtitle, publisher, authors, journal, doi, versionsAreEqual, versions, ...customMetadata } = metadataObj;
 
   // Transform versions stored in metadata.
-  const rawVersions = Array.isArray(metadataObj.versions) ? metadataObj.versions : [];
+  const rawVersions = Array.isArray(versions) ? versions : [];
   const transformedVersions = rawVersions.map(transformVersion);
 
   return {

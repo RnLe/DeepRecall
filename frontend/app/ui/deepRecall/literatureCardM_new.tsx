@@ -156,6 +156,63 @@ const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbn
             </div>
           )}
 
+          {/* Version metadata sections */}
+          {versions && versions.length > 0 && (
+            <div className="space-y-3 mb-3">
+              {versions.length === 1 ? (
+                /* Single version - show metadata directly */
+                Object.keys(versions[0].customMetadata).length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-sm text-slate-400">Version Details:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(versions[0].customMetadata).map(([key, value]) => (
+                        <div
+                          key={key}
+                          className="px-2 py-1 bg-slate-700/30 border border-slate-600/30 rounded text-xs text-slate-300"
+                        >
+                          <span className="text-slate-400">{key}:</span> {String(value)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ) : (
+                /* Multiple versions - show as list */
+                <div className="space-y-2">
+                  <span className="text-sm text-slate-400">Versions ({versions.length}):</span>
+                  <div className="space-y-2">
+                    {versions.map((version, index) => (
+                      <div key={version.documentId || index} className="bg-slate-700/20 rounded-lg p-3 border border-slate-600/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-slate-300">
+                            {version.versionTitle || version.name || `Version ${index + 1}`}
+                          </span>
+                          {version.publishingDate && (
+                            <span className="text-xs text-slate-400">
+                              {new Date(version.publishingDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        {Object.keys(version.customMetadata).length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(version.customMetadata).map(([key, value]) => (
+                              <div
+                                key={key}
+                                className="px-1.5 py-0.5 bg-slate-600/30 rounded text-xs text-slate-300"
+                              >
+                                <span className="text-slate-400">{key}:</span> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Custom literature metadata (non-version, non-core fields) */}
           {Object.keys(safeCustomMetadata).length > 0 && (
             <div className="border-t border-slate-700/30 pt-3">

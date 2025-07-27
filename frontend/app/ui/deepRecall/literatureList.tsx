@@ -35,7 +35,6 @@ export default function LiteratureList({ className }: LiteratureListProps) {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortMode>('title');
   const [groupBy, setGroupBy] = useState<GroupMode>('type');
-  const [showThumbnails, setShowThumbnails] = useState(true);
 
   // Modal state
   const [selectedLiterature, setSelectedLiterature] = useState<LiteratureExtended | null>(null);
@@ -208,19 +207,19 @@ export default function LiteratureList({ className }: LiteratureListProps) {
   const renderLiteratureCard = (item: any) => {
     switch (viewMode) {
       case 'compact':
-        return <LiteratureCardCompact key={item.documentId} literature={item} onClick={() => handleLiteratureClick(item)} />;
+        return <LiteratureCardCompact key={item.documentId} literature={item} onClick={() => handleLiteratureClick(item)} onPdfPreview={() => handlePdfPreviewOpen(item)} />;
       case 'slim':
-        return <LiteratureCardSlim key={item.documentId} literature={item} onClick={() => handleLiteratureClick(item)} />;
+        return <LiteratureCardSlim key={item.documentId} literature={item} onClick={() => handleLiteratureClick(item)} onPdfPreview={() => handlePdfPreviewOpen(item)} />;
       case 'rich':
       default:
-        return <LiteratureCardM key={item.documentId} literature={item} showThumbnail={showThumbnails} onClick={() => handleLiteratureClick(item)} onPdfPreview={() => handlePdfPreviewOpen(item)} />;
+        return <LiteratureCardM key={item.documentId} literature={item} showThumbnail={true} onClick={() => handleLiteratureClick(item)} onPdfPreview={() => handlePdfPreviewOpen(item)} />;
     }
   };
 
   return (
-    <div className={`p-6 ${className}`}>
-      {/* Header with Controls */}
-      <div className="mb-6">
+    <div className={`flex flex-col h-full ${className}`}>
+      {/* Fixed Header with Controls */}
+      <div className="flex-shrink-0 p-6 pb-0">
         {/* Title and stats */}
         <div className="flex items-center space-x-3 mb-6">
           <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-600 rounded-full"></div>
@@ -267,7 +266,7 @@ export default function LiteratureList({ className }: LiteratureListProps) {
         </div>
 
         {/* View and Filter Controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 mb-6">
           {/* View Mode Section */}
           <div className="flex items-center space-x-2">
             <span className="text-xs font-medium text-slate-400 whitespace-nowrap">View:</span>
@@ -306,20 +305,6 @@ export default function LiteratureList({ className }: LiteratureListProps) {
                 <List className="w-4 h-4" />
               </button>
             </div>
-            {/* Thumbnail Toggle (only for rich view) */}
-            {viewMode === 'rich' && (
-              <button
-                onClick={() => setShowThumbnails(!showThumbnails)}
-                className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                  showThumbnails
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 border border-slate-600/50'
-                }`}
-                title="Toggle Thumbnails"
-              >
-                Thumbs
-              </button>
-            )}
           </div>
 
           {/* Type Filter */}
@@ -419,9 +404,10 @@ export default function LiteratureList({ className }: LiteratureListProps) {
         </div>
       </div>
 
-      {/* Literature Content */}
-      {totalCount === 0 ? (
-        <div className="text-center py-12">
+      {/* Scrollable Literature Content */}
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        {totalCount === 0 ? (
+          <div className="text-center py-12">
           <div className="w-16 h-16 bg-slate-700/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -464,6 +450,7 @@ export default function LiteratureList({ className }: LiteratureListProps) {
           })}
         </div>
       )}
+      </div>
 
       {/* Literature Detail Modal */}
       {selectedLiterature && (

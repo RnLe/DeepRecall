@@ -1,12 +1,13 @@
 // literatureCardCompact.tsx
 import React from 'react';
-import { LiteratureExtended } from '../../types/deepRecall/strapi/literatureTypes';
+import { LiteratureExtended, getDisplayYear } from '../../types/deepRecall/strapi/literatureTypes';
 import { VersionExtended } from '../../types/deepRecall/strapi/versionTypes';
 import { prefixStrapiUrl } from '../../helpers/getStrapiMedia';
 
 interface LiteratureCardCompactProps {
   literature: LiteratureExtended;
   onClick?: () => void;
+  onPdfPreview?: () => void;
 }
 
 /**
@@ -22,7 +23,7 @@ const getLatestThumbnail = (versions?: VersionExtended[]): string | null => {
   return sorted[0].thumbnailUrl ? prefixStrapiUrl(sorted[0].thumbnailUrl) : null;
 };
 
-const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literature, onClick }) => {
+const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literature, onClick, onPdfPreview }) => {
   const { 
     title, 
     authors: rawAuthors, 
@@ -32,8 +33,8 @@ const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literatur
 
   // Ensure authors is always an array
   const authors = Array.isArray(rawAuthors) ? rawAuthors : rawAuthors ? [String(rawAuthors)] : [];
-  const versionCount = versions?.length || 0;
   const latestThumbnail = getLatestThumbnail(versions);
+  const displayYear = getDisplayYear(literature);
 
   // Type color mapping
   const getTypeColor = (type: string) => {
@@ -59,17 +60,15 @@ const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literatur
       {/* Top section with type info and thumbnail */}
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center space-x-2 flex-1 min-w-0 mr-3">
-          <div className={`w-2 h-2 rounded-full bg-gradient-to-br ${getTypeColor(type)} shadow-sm`}></div>
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wider truncate">{type}</span>
         </div>
         
-        {/* Top-right thumbnail "sticker" */}
+        {/* Top-right thumbnail with A4 ratio */}
         <div 
-          className="w-16 h-12 flex-shrink-0 rounded-md overflow-hidden hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
+          className="w-16 h-20 flex-shrink-0 rounded-md overflow-hidden hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
-            // TODO: Handle thumbnail click (placeholder)
-            console.log('Thumbnail clicked for literature:', title);
+            onPdfPreview?.();
           }}
         >
           {latestThumbnail ? (
@@ -92,6 +91,7 @@ const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literatur
       <div className="flex-1 flex flex-col">
         {title && (
           <h3 className="text-sm font-bold text-slate-100 leading-tight mb-2 group-hover:text-white transition-colors line-clamp-2">
+            {displayYear && <span className="text-slate-400 mr-1">({displayYear})</span>}
             {title}
           </h3>
         )}
@@ -104,14 +104,6 @@ const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literatur
             </p>
           </div>
         )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-700/30">
-          <span className="text-xs text-slate-500">
-            {versionCount} ver{versionCount !== 1 ? 's' : ''}
-          </span>
-          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-60"></div>
-        </div>
       </div>
     </div>
   );

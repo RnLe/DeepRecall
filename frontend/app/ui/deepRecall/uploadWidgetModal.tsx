@@ -169,7 +169,7 @@ const UploadWidgetModal: React.FC<UploadWidgetModalProps> = ({ className }) => {
 
   return (
     <>
-      <div className={`${className}`}>
+      <div className={`flex flex-col h-full ${className}`}>
         <VersionTypeList 
           onCreateVersionType={handleCreateVersionType}
           onCreateEntry={handleCreateEntry}
