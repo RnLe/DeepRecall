@@ -96,19 +96,14 @@ const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbn
 
           {/* Authors */}
           {authors.length > 0 && (
-            <div className="flex items-center space-x-2 mb-3">
-              <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start space-x-2 mb-3">
+              <svg className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <div className="flex flex-wrap gap-1">
-                {authors.map((author, index) => (
-                  <span
-                    key={index}
-                    className="text-sm text-slate-300 bg-slate-700/30 px-2 py-1 rounded-md"
-                  >
-                    {author}
-                  </span>
-                ))}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-slate-300 line-clamp-2">
+                  {authors.slice(0, 6).join(', ')}{authors.length > 6 ? ` +${authors.length - 6}` : ''}
+                </p>
               </div>
             </div>
           )}

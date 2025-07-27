@@ -151,8 +151,57 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
         const tpl = typeof versionType.versionMetadata === 'string' 
           ? JSON.parse(versionType.versionMetadata)
           : versionType.versionMetadata;
-        setVersionTpl({ ...tpl });
-        setVersionFields({ ...tpl });
+        
+        // Remove literatureTypes field from the form (it's used internally for linking)
+        if (tpl.literatureTypes !== undefined) {
+          delete tpl.literatureTypes;
+        }
+        
+        // Extract default values from the metadata structure
+        const extractedTpl: Record<string, any> = {};
+        const initialFields: Record<string, any> = {};
+        
+        Object.entries(tpl).forEach(([key, value]) => {
+          if (value && typeof value === 'object' && 'default_value' in value) {
+            extractedTpl[key] = value.default_value;
+            // For version creation, we want empty fields for user input
+            // Only keep actual defaults for non-user-input fields
+            if (Array.isArray(value.default_value)) {
+              initialFields[key] = []; // Empty array for user input
+            } else if (typeof value.default_value === 'number') {
+              // For edition/version numbers, start at 1 instead of 0
+              const isVersionOrEdition = key.toLowerCase().includes('version') || key.toLowerCase().includes('edition');
+              initialFields[key] = isVersionOrEdition ? 1 : 0;
+            } else {
+              initialFields[key] = ""; // Empty string for text fields
+            }
+          } else if (value && typeof value === 'object' && 'default' in value) {
+            // Handle old structure with 'default' key
+            extractedTpl[key] = value.default;
+            if (Array.isArray(value.default)) {
+              initialFields[key] = [];
+            } else if (typeof value.default === 'number') {
+              const isVersionOrEdition = key.toLowerCase().includes('version') || key.toLowerCase().includes('edition');
+              initialFields[key] = isVersionOrEdition ? 1 : 0;
+            } else {
+              initialFields[key] = "";
+            }
+          } else {
+            // Fallback for very old structure
+            extractedTpl[key] = value;
+            if (Array.isArray(value)) {
+              initialFields[key] = [];
+            } else if (typeof value === 'number') {
+              const isVersionOrEdition = key.toLowerCase().includes('version') || key.toLowerCase().includes('edition');
+              initialFields[key] = isVersionOrEdition ? 1 : 0;
+            } else {
+              initialFields[key] = "";
+            }
+          }
+        });
+        
+        setVersionTpl(extractedTpl);
+        setVersionFields(initialFields);
       } catch (e) {
         console.error("Error parsing versionMetadata:", e);
         setVersionTpl({});
@@ -180,25 +229,109 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
     const baseClassName = "w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200";
     
     if (key === "publishingDate") {
-      return <input 
-        type="date" 
-        value={versionFields[key]||""}
-        onChange={e=>setVersionFields(f=>({...f,[key]:e.target.value}))}
-        className={baseClassName}
-      />;
+      // Get current date for defaults
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+      const currentDay = currentDate.getDate();
+      
+      // Parse existing date value if any
+      const existingDate = versionFields[key] || "";
+      let selectedYear = currentYear;
+      let selectedMonth = currentMonth;
+      let selectedDay = currentDay;
+      
+      if (existingDate) {
+        const dateParts = existingDate.split('-');
+        if (dateParts.length === 3) {
+          selectedYear = parseInt(dateParts[0]) || currentYear;
+          selectedMonth = parseInt(dateParts[1]) || currentMonth;
+          selectedDay = parseInt(dateParts[2]) || currentDay;
+        }
+      }
+      
+      // Generate options
+      const years = Array.from({length: 50}, (_, i) => currentYear - i); // Current year to 50 years ago
+      const months = [
+        { value: 1, label: "January" }, { value: 2, label: "February" }, { value: 3, label: "March" },
+        { value: 4, label: "April" }, { value: 5, label: "May" }, { value: 6, label: "June" },
+        { value: 7, label: "July" }, { value: 8, label: "August" }, { value: 9, label: "September" },
+        { value: 10, label: "October" }, { value: 11, label: "November" }, { value: 12, label: "December" }
+      ];
+      
+      // Calculate days in selected month/year
+      const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+      const days = Array.from({length: daysInMonth}, (_, i) => i + 1);
+      
+      const updateDate = (newYear: number, newMonth: number, newDay: number) => {
+        // Ensure day is valid for the month/year combination
+        const maxDays = new Date(newYear, newMonth, 0).getDate();
+        const validDay = Math.min(newDay, maxDays);
+        
+        const dateString = `${newYear}-${String(newMonth).padStart(2, '0')}-${String(validDay).padStart(2, '0')}`;
+        setVersionFields(f => ({...f, [key]: dateString}));
+      };
+      
+      return (
+        <div className="grid grid-cols-3 gap-2">
+          {/* Day Dropdown */}
+          <select
+            value={selectedDay}
+            onChange={e => updateDate(selectedYear, selectedMonth, parseInt(e.target.value))}
+            className={baseClassName}
+          >
+            {days.map(day => (
+              <option key={day} value={day}>{day}</option>
+            ))}
+          </select>
+          
+          {/* Month Dropdown */}
+          <select
+            value={selectedMonth}
+            onChange={e => updateDate(selectedYear, parseInt(e.target.value), selectedDay)}
+            className={baseClassName}
+          >
+            {months.map(month => (
+              <option key={month.value} value={month.value}>{month.label}</option>
+            ))}
+          </select>
+          
+          {/* Year Dropdown */}
+          <select
+            value={selectedYear}
+            onChange={e => updateDate(parseInt(e.target.value), selectedMonth, selectedDay)}
+            className={baseClassName}
+          >
+            {years.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </div>
+      );
     }
-    if (typeof value === "number") {
+    // Check if the template value is a number or if the current field value is a number
+    if (typeof value === "number" || (!isNaN(Number(value)) && value !== "")) {
+      // For edition/version numbers, ensure minimum value is 1
+      const isVersionOrEdition = key.toLowerCase().includes('version') || key.toLowerCase().includes('edition');
+      const minValue = isVersionOrEdition ? 1 : 0;
+      const currentValue = versionFields[key] || minValue;
+      
       return <input 
         type="number" 
-        value={versionFields[key]||0}
-        onChange={e=>setVersionFields(f=>({...f,[key]:Number(e.target.value)}))}
+        min={minValue}
+        value={Math.max(currentValue, minValue)}
+        onChange={e => {
+          const newValue = Math.max(Number(e.target.value), minValue);
+          setVersionFields(f => ({...f, [key]: newValue}));
+        }}
         className={baseClassName}
-        placeholder="Enter number..."
+        placeholder={`Enter number (min: ${minValue})...`}
       />;
     }
-    if (Array.isArray(value)) {
+    // Check if template value is an array (dropdown options)
+    if (Array.isArray(value) && value.length > 0) {
       return <select 
-        value={versionFields[key]||""}
+        value={versionFields[key] || ""}
         onChange={e=>setVersionFields(f=>({...f,[key]:e.target.value}))}
         className={baseClassName}
       >
@@ -206,9 +339,10 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
         {value.map((opt:any,i)=> <option key={i} value={opt}>{opt}</option>)}
       </select>;
     }
+    // Default to text input for everything else
     return <input 
       type="text" 
-      value={versionFields[key]||""}
+      value={versionFields[key] || ""}
       onChange={e=>setVersionFields(f=>({...f,[key]:e.target.value}))}
       className={baseClassName}
       placeholder="Enter text..."
@@ -346,7 +480,7 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
 
     try {
       const uploadedFile    = await uploadFile(file);
-      const uploadedThumb   = thumbnail ? await uploadFile(thumbnail) : { url: "" };
+      const uploadedThumb   = thumbnail ? await uploadFile(thumbnail) : { url: "", id: 0 };
 
       // bundle all version data into a single JSON field
       const newVersion = {
@@ -355,6 +489,8 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
           name: entry.type,
           fileUrl: uploadedFile.url,
           thumbnailUrl: uploadedThumb.url,
+          fileId: uploadedFile.id, // Store the Strapi file ID for deletion
+          thumbnailId: uploadedThumb.id || undefined, // Store thumbnail ID if exists
           fileHash,
         })
       };
@@ -401,7 +537,9 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
             {entry.authors && (
               <div>
                 <span className="text-slate-400">Authors:</span>
-                <span className="text-slate-200 ml-2">{entry.authors}</span>
+                <span className="text-slate-200 ml-2">
+                  {Array.isArray(entry.authors) ? entry.authors.join(", ") : entry.authors}
+                </span>
               </div>
             )}
           </div>

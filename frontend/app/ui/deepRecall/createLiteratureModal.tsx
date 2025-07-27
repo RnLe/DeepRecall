@@ -5,6 +5,7 @@ import { X, Upload, Plus, BookOpen } from 'lucide-react';
 import { LiteratureType } from '../../types/deepRecall/strapi/literatureTypes';
 import { useLiteratureTypes } from '../../customHooks/useLiterature';
 import LiteratureForm from './literatureForm';
+import EnhancedLiteratureForm from './enhancedLiteratureForm';
 
 interface CreateLiteratureModalProps {
   isOpen: boolean;
@@ -29,6 +30,13 @@ const CreateLiteratureModal: React.FC<CreateLiteratureModalProps> = ({
     setShowLiteratureForm(true);
   };
 
+  const handleClose = () => {
+    // Reset all state when closing
+    setShowLiteratureForm(false);
+    setSelectedLiteratureType(null);
+    onClose();
+  };
+
   const handleBack = () => {
     setShowLiteratureForm(false);
     setSelectedLiteratureType(null);
@@ -36,9 +44,7 @@ const CreateLiteratureModal: React.FC<CreateLiteratureModalProps> = ({
 
   const handleLiteratureSuccess = () => {
     onCreateLiterature?.();
-    onClose();
-    setShowLiteratureForm(false);
-    setSelectedLiteratureType(null);
+    handleClose();
   };
 
   return (
@@ -61,7 +67,7 @@ const CreateLiteratureModal: React.FC<CreateLiteratureModalProps> = ({
             </h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-all duration-200"
           >
             <X className="w-5 h-5" />
@@ -142,7 +148,7 @@ const CreateLiteratureModal: React.FC<CreateLiteratureModalProps> = ({
             /* Literature Form */
             <div className="p-6">
               {selectedLiteratureType && (
-                <LiteratureForm
+                <EnhancedLiteratureForm
                   literatureType={selectedLiteratureType}
                   onSuccess={handleLiteratureSuccess}
                   onCancel={handleBack}

@@ -14,6 +14,8 @@ export interface SupportedLiteratureFields {
   journal?: string;
   doi?: string;
   versionsAreEqual?: boolean;
+  icon?: string; // Lucide icon name for the literature type
+  linkedVersionType?: string; // Single version type name this literature type is linked to
 }
 
 /**
@@ -120,7 +122,7 @@ export const transformLiterature = (lit: Literature): LiteratureExtended => {
   }
 
   // Extract supported literature fields and exclude versions from customMetadata.
-  const { subtitle, publisher, authors, journal, doi, versionsAreEqual, versions, ...customMetadata } = metadataObj;
+  const { subtitle, publisher, authors, journal, doi, versionsAreEqual, icon, linkedVersionType, versions, ...customMetadata } = metadataObj;
 
   // Transform versions stored in metadata.
   const rawVersions = Array.isArray(versions) ? versions : [];
@@ -134,6 +136,8 @@ export const transformLiterature = (lit: Literature): LiteratureExtended => {
     journal,
     doi,
     versionsAreEqual,
+    icon,
+    linkedVersionType,
     customMetadata,
     versions: transformedVersions,
   };

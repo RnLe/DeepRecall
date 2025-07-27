@@ -11,6 +11,7 @@ export interface SupportedVersionFields {
   versionTitle?: string;
   editionNumber?: number;
   versionNumber?: number;
+  literatureTypes?: string[]; // Array of literature type names this version type supports
 }
 
 /**
@@ -21,6 +22,8 @@ export interface VersionExtended extends VersionType, SupportedVersionFields {
   thumbnailUrl: string;
   customMetadata: DynamicMetadata;
   fileHash: string;
+  fileId?: number; // Strapi file ID for the PDF file
+  thumbnailId?: number; // Strapi file ID for the thumbnail image
 }
 
 /**
@@ -52,7 +55,7 @@ export const transformVersion = (version: VersionType): VersionExtended => {
     }
   }
   
-  const { fileUrl, thumbnailUrl, publishingDate, versionTitle, editionNumber, versionNumber, fileHash, ...customMetadata } = metadataObj;
+  const { fileUrl, thumbnailUrl, publishingDate, versionTitle, editionNumber, versionNumber, fileHash, literatureTypes, fileId, thumbnailId, ...customMetadata } = metadataObj;
   return {
     ...version,
     fileUrl,
@@ -62,6 +65,9 @@ export const transformVersion = (version: VersionType): VersionExtended => {
     editionNumber,
     versionNumber,
     fileHash,
+    literatureTypes,
+    fileId,
+    thumbnailId,
     customMetadata,
   };
 };

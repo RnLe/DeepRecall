@@ -221,6 +221,29 @@ export const updateLiteratureType = async (
 };
 
 /**
+ * Deletes an existing literature type.
+ */
+export const deleteLiteratureType = async (id: string): Promise<void> => {
+  const response = await fetch(
+    `http://localhost:1337/api/literature-types/${id}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_TOKEN}`,
+      },
+    }
+  );
+  if (!response.ok) {
+    const errorBody = await response.json();
+    console.error("API Error", response.status, errorBody);
+    throw new Error(
+      `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
+    );
+  }
+};
+
+/**
  * Fetch version types.
  */
 export const fetchVersionTypes = async (): Promise<VersionType[]> => {
@@ -306,5 +329,26 @@ export const deleteVersionType = async (id: string): Promise<void> => {
     throw new Error(
       `API Error: ${response.status} - ${JSON.stringify(errorBody)}`
     );
+  }
+};
+
+/**
+ * Creates both a literature type and its corresponding version type simultaneously.
+ */
+export const createMergedLiteratureType = async (payload: {
+  literatureType: Omit<LiteratureType, "documentId">;
+  versionType: Omit<VersionType, "documentId">;
+}): Promise<{ literatureType: LiteratureType; versionType: VersionType }> => {
+  try {
+    // Create literature type first
+    const literatureType = await createLiteratureType(payload.literatureType);
+    
+    // Then create the corresponding version type
+    const versionType = await createVersionType(payload.versionType);
+    
+    return { literatureType, versionType };
+  } catch (error) {
+    console.error("Failed to create merged literature type:", error);
+    throw error;
   }
 };

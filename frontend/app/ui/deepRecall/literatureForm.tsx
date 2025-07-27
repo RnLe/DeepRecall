@@ -24,6 +24,7 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
   const [additionalFields, setAdditionalFields] = useState<Record<string, any>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingAuthor, setEditingAuthor] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Whenever the literatureType changes, parse its metadata template.
@@ -40,10 +41,35 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
       if (template.versions !== undefined) {
         delete template.versions;
       }
-      // initialize array fields with empty string to ensure <select> gets a scalar value
+      // Exclude icon and versionsAreEqual fields from the form
+      if (template.icon !== undefined) {
+        delete template.icon;
+      }
+      if (template.versionsAreEqual !== undefined) {
+        delete template.versionsAreEqual;
+      }
+      // initialize fields with proper empty values for user input
       const initFields: Record<string, any> = {};
       Object.entries(template).forEach(([k, v]) => {
-        initFields[k] = Array.isArray(v) ? "" : v;
+        // Handle the metadata structure: { field: { default_value: actualValue } }
+        if (v && typeof v === 'object' && 'default_value' in v) {
+          // For literature creation, we want empty fields for user input
+          // Exception: keep actual default values for configuration fields
+          if (k === 'versionsAreEqual' || k === 'icon') {
+            initFields[k] = (v as any).default_value;
+          } else if ((v as any).field_type === 'array') {
+            initFields[k] = []; // Empty array for authors, etc.
+          } else {
+            initFields[k] = ""; // Empty string for user input
+          }
+        } else {
+          // Fallback for old structure - always use empty values for user input
+          if (k === 'versionsAreEqual' || k === 'icon') {
+            initFields[k] = v; // Keep config values
+          } else {
+            initFields[k] = Array.isArray(v) ? [] : "";
+          }
+        }
       });
       setAdditionalFields(initFields);
     } catch (err) {
@@ -80,6 +106,42 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
         </div>
       );
     }
+    
+    // Handle authors field specially as an array input
+    if (key === "authors") {
+      const currentValue = Array.isArray(additionalFields[key]) 
+        ? additionalFields[key].join(", ") 
+        : additionalFields[key] || "";
+      
+      return (
+        <input
+          type="text"
+          value={currentValue}
+          onChange={(e) => {
+            const inputValue = e.target.value;
+            // Keep the raw string value for immediate display
+            // Only convert to array when there are actual commas or on blur
+            handleAdditionalFieldChange(key, inputValue);
+          }}
+          onBlur={(e) => {
+            // On blur, convert the string to a proper array
+            const inputValue = e.target.value;
+            if (inputValue.trim() === "") {
+              handleAdditionalFieldChange(key, []);
+            } else {
+              const authorsArray = inputValue
+                .split(",")
+                .map(author => author.trim())
+                .filter(author => author.length > 0);
+              handleAdditionalFieldChange(key, authorsArray);
+            }
+          }}
+          placeholder="Enter authors separated by commas (e.g., John Doe, Jane Smith)"
+          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+        />
+      );
+    }
+    
     if (Array.isArray(value)) {
       return (
         <select
@@ -123,8 +185,16 @@ const LiteratureForm: React.FC<LiteratureFormProps> = ({
 
     try {
       // Build metadata by merging the template (as modifiable additionalFields)
-      // Versions are not included since they belong in metadata.
+      // Ensure authors field is properly converted to array if it's a string
       const metadataPayload = { ...additionalFields };
+      
+      // Handle authors field specially - convert string to array if needed
+      if (metadataPayload.authors && typeof metadataPayload.authors === 'string') {
+        metadataPayload.authors = metadataPayload.authors
+          .split(",")
+          .map(author => author.trim())
+          .filter(author => author.length > 0);
+      }
 
       const payload: Omit<Literature, "documentId"> = {
         title,

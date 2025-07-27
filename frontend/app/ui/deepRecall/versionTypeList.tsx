@@ -3,6 +3,7 @@ import { useVersionTypes, useLiterature } from "../../customHooks/useLiterature"
 import { transformVersion, VersionType } from "../../types/deepRecall/strapi/versionTypes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteVersionType } from "../../api/literatureService";
+import VersionTypeEditModal from "./versionTypeEditModal";
 import { Plus, Edit3, Calendar, Type, Hash, ToggleLeft, List, Clock, FileText, Users, BookOpen, Link, GitMerge } from 'lucide-react';
 
 export interface VersionTypeListProps {
@@ -19,7 +20,7 @@ const VersionTypeList: React.FC<VersionTypeListProps> = ({
   const { data: types, isLoading, error } = useVersionTypes();
   const { data: literatures } = useLiterature();
   const queryClient = useQueryClient();
-  const [editModalOpen, setEditModalOpen] = useState<string | null>(null);
+  const [editingVersionType, setEditingVersionType] = useState<VersionType | null>(null);
   
   const delMutation = useMutation<void, Error, string>({
     mutationFn: deleteVersionType,
@@ -198,7 +199,7 @@ const VersionTypeList: React.FC<VersionTypeListProps> = ({
                     <Plus className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setEditModalOpen(vt.documentId!)}
+                    onClick={() => setEditingVersionType(vt)}
                     className="flex items-center justify-center w-8 h-8 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-colors shadow-sm"
                     title="Edit Version Type"
                   >
@@ -246,41 +247,13 @@ const VersionTypeList: React.FC<VersionTypeListProps> = ({
         })}
       </div>
 
-      {/* Edit Modal Placeholder */}
-      {editModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-100">Edit Version Type</h3>
-              <button
-                onClick={() => setEditModalOpen(null)}
-                className="text-slate-400 hover:text-slate-200"
-              >
-                <span className="sr-only">Close</span>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="text-slate-300 text-sm mb-6">
-              Editing functionality will be implemented here.
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setEditModalOpen(null)}
-                className="px-4 py-2 text-slate-400 hover:text-slate-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setEditModalOpen(null)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Version Type Edit Modal */}
+      {editingVersionType && (
+        <VersionTypeEditModal
+          versionType={editingVersionType}
+          isOpen={true}
+          onClose={() => setEditingVersionType(null)}
+        />
       )}
       </div>
     </div>
