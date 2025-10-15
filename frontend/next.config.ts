@@ -1,24 +1,23 @@
-import { NextConfig } from 'next';
+import { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export', // Enable static export for Capacitor
   images: {
     unoptimized: true, // Required for static export
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '200mb',
+      bodySizeLimit: "200mb",
     },
   },
-  serverExternalPackages: ['pino'],
+  serverExternalPackages: ["pino"],
   // Disable features that don't work with static export
   trailingSlash: true,
   // Configure asset prefix for mobile apps
-  assetPrefix: process.env.NODE_ENV === 'production' ? '.' : '',
+  assetPrefix: process.env.NODE_ENV === "production" ? "." : "",
   turbopack: {
     resolveAlias: {
       canvas: "./empty-module.ts",
-    }
+    },
   },
   // Webpack fallback for production builds
   webpack(config) {
@@ -29,7 +28,7 @@ const nextConfig: NextConfig = {
     };
     config.experiments = {
       asyncWebAssembly: true,
-      layers: true,            // optional but apparently recommended for module federation in rust
+      layers: true, // optional but apparently recommended for module federation in rust
     };
     return config;
   },

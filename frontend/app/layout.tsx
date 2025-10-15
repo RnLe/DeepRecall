@@ -1,66 +1,26 @@
-// root layout
-
-import { HighlightInit } from '@highlight-run/next/client'
-
-import React from "react"
-
-// Import the global css file in app/ui/global.css
-import "../src/ui/global.css"
-import "./styles/capacitor-mobile.css"
-
-// Import components
-import TopNav from '@/src/ui/topnav';
+import type { Metadata } from "next";
 import { Providers } from "./providers";
+import "./globals.css";
 
-// Import logger
-import logger from '@/src/logger';
+export const metadata: Metadata = {
+  title: "DeepRecall",
+  description: "Read once. Remember for years.",
+};
 
-// Misc
-
-export const metadata = {
-  title: 'DeepRecall',
-  description: 'DeepRecall - Supercharge your PDF reading and learning',
-}
-
-export default function RootLayout({ children }) {
-    // Control variables
-    const highlightEnabled = false;
-    
-    // Logging
-    logger.trace('Calling RootLayout');
-    logger.info('Highlight enabled: %s', highlightEnabled);
-
-    // For static sites, we assume user is not logged in initially
-    // Authentication should be handled client-side
-    const isLoggedIn = false;
-
-    // Return the layout
-    return (
-    <>
-      {highlightEnabled && (
-        <HighlightInit
-          projectId={'4d7ywy1d'}
-          serviceName="deepRecall-nextjs-frontend"
-          tracingOrigins
-          networkRecording={{
-            enabled: true,
-            recordHeadersAndBody: true,
-            urlBlocklist: [],
-          }}
-        />
-      )}
-      <html lang="en">
-        <body>
-          <Providers isLoggedIn={isLoggedIn}>
-            <div className="h-screen w-screen flex flex-col">
-              <TopNav isLoggedIn={isLoggedIn} />
-              <div className="flex-1 overflow-hidden bg-gray-900 text-gray-100">
-                {children}
-              </div>
-            </div>
-          </Providers>
-        </body>
-      </html>
-    </>
-  )
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="antialiased">
+        <Providers>
+          <div className="min-h-screen bg-gray-950 text-gray-100">
+            {children}
+          </div>
+        </Providers>
+      </body>
+    </html>
+  );
 }
