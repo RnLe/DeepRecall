@@ -55,23 +55,27 @@ Visit http://localhost:3000
 ## Next Steps
 
 ### 1. Backend (SQLite + CAS)
+
 - [ ] Setup Drizzle + better-sqlite3
 - [ ] Implement `/api/files` (query blobs table)
 - [ ] Implement `/api/scan` (hash files, insert to DB)
 - [ ] Implement `/api/blob/:hash` (stream file by hash)
 
 ### 2. PDF Viewer
+
 - [ ] PDF.js worker setup
 - [ ] Canvas rendering with page cache
 - [ ] SVG overlay layer (normalized coords)
 - [ ] Annotation tools (highlight, rect, note)
 
 ### 3. Card Generation
+
 - [ ] Annotation → card proposals
 - [ ] Card editor
 - [ ] Save to Dexie
 
 ### 4. Review Loop
+
 - [ ] FSRS integration
 - [ ] Daily queue
 - [ ] Keyboard grading
@@ -87,7 +91,8 @@ Visit http://localhost:3000
 
 ## Dependencies
 
-Core stack (11 packages):
+Core stack:
+
 - Next.js 15 + React 19
 - TanStack Query (server cache)
 - Zustand (UI state)

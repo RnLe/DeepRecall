@@ -1,33 +1,33 @@
-# Use Node.js 22 image as the base
+# Use Node.js 22 Alpine for smaller image size
 FROM node:22-alpine
 
-# Install build dependencies for Alpine (required for canvas and other native modules)
-RUN apk add --no-cache \
-    python3 \
-    py3-pip \
-    make \
-    g++ \
-    cairo-dev \
-    pango-dev \
-    libjpeg-turbo-dev \
-    giflib-dev \
-    librsvg-dev
+# Set CI environment for pnpm (non-interactive mode)
+ENV CI=true
 
-# Set the working directory inside the container (subsequent instructions will be executed in this directory)
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Set working directory
 WORKDIR /app/
 
-# Copy package files for dependency installation
-COPY package*.json ./
+# Copy entrypoint to root (won't be overwritten by volume mount)
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-# Install pnpm globally and install dependencies
-RUN npm install -g pnpm
+# Copy package files
+COPY package*.json .npmrc ./
+
+# Install dependencies (will be overridden by volume mount in dev)
 RUN pnpm install
 
-# Copy the rest of the application
+# Copy application files
 COPY . .
 
-# Expose the port used by Next.js
+# Expose Next.js port
 EXPOSE 3000
 
-# Set the command to start the Next.js development server
+# Entrypoint ensures dependencies exist in mounted volume
+ENTRYPOINT ["/bin/sh", "/docker-entrypoint.sh"]
+
+# Start Next.js dev server
 CMD ["pnpm", "run", "dev"]

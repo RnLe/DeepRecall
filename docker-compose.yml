@@ -7,9 +7,11 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app/
-      # Prevent the node_modules and .next directories from being copied to the container. 
+      # Prevent node_modules and .next from being overwritten by host
       - /app/node_modules
       - /app/.next
+      # Persist SQLite database
+      - ./data:/app/data
 
   python:
     build:

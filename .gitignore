@@ -4,3 +4,8 @@
 # Ignore installation folders in all directories
 **/.next/
 **/node_modules/
+**/.pnpm-store/
+
+# Database files
+data/
+**/drizzle/
