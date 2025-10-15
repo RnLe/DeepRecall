@@ -20,7 +20,11 @@ export default function RootLayout({
           <div className="min-h-screen bg-gray-950 text-gray-100">
             <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur">
               <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
-                <Link href="/" className="font-bold text-xl">
+                <Link
+                  href="/"
+                  className="font-bold text-xl flex items-center gap-2"
+                >
+                  <img src="/favicon.ico" alt="" className="w-8 h-8" />
                   DeepRecall
                 </Link>
                 <div className="flex gap-4 text-sm">

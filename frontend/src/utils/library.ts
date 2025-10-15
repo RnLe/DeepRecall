@@ -1,0 +1,404 @@
+/**
+ * Type utilities and helper functions for library entities
+ * Common operations that span multiple entity types
+ */
+
+import type {
+  Work,
+  Version,
+  Asset,
+  Activity,
+  Collection,
+  LibraryEntity,
+  WorkExtended,
+  VersionExtended,
+  AssetExtended,
+} from "@/src/schema/library";
+
+// ============================================================================
+// Entity type utilities
+// ============================================================================
+
+/**
+ * Extract entity kind from discriminated union
+ */
+export type EntityKind = LibraryEntity["kind"];
+
+/**
+ * Map entity kind to entity type
+ */
+export type EntityTypeMap = {
+  work: Work;
+  version: Version;
+  asset: Asset;
+  activity: Activity;
+  collection: Collection;
+};
+
+/**
+ * Type guard to check if an entity is of a specific kind
+ */
+export function isEntityOfKind<K extends EntityKind>(
+  entity: LibraryEntity,
+  kind: K
+): entity is EntityTypeMap[K] {
+  return entity.kind === kind;
+}
+
+// ============================================================================
+// Display utilities
+// ============================================================================
+
+/**
+ * Get a human-readable display name for an entity
+ */
+export function getEntityDisplayName(entity: LibraryEntity): string {
+  switch (entity.kind) {
+    case "work":
+      return entity.title;
+    case "version":
+      return (
+        entity.versionTitle ||
+        `Version ${entity.versionNumber || entity.edition || ""}`
+      );
+    case "asset":
+      return entity.filename;
+    case "activity":
+      return entity.title;
+    case "collection":
+      return entity.name;
+  }
+}
+
+/**
+ * Get a human-readable type label for an entity
+ */
+export function getEntityTypeLabel(entity: LibraryEntity): string {
+  switch (entity.kind) {
+    case "work":
+      return entity.workType.charAt(0).toUpperCase() + entity.workType.slice(1);
+    case "version":
+      return "Version";
+    case "asset":
+      return "File";
+    case "activity":
+      return (
+        entity.activityType.charAt(0).toUpperCase() +
+        entity.activityType.slice(1)
+      );
+    case "collection":
+      return "Collection";
+  }
+}
+
+// ============================================================================
+// Work helpers
+// ============================================================================
+
+/**
+ * Get primary author(s) for a work (first N authors)
+ */
+export function getPrimaryAuthors(work: Work, maxAuthors: number = 3): string {
+  if (work.authors.length === 0) {
+    return "Unknown Author";
+  }
+
+  if (work.authors.length <= maxAuthors) {
+    return work.authors.map((a) => a.name).join(", ");
+  }
+
+  const firstAuthors = work.authors
+    .slice(0, maxAuthors)
+    .map((a) => a.name)
+    .join(", ");
+  return `${firstAuthors}, et al.`;
+}
+
+/**
+ * Get a citation-style string for a work
+ * Format: "Author(s) (Year). Title."
+ */
+export function getCitationString(work: WorkExtended): string {
+  const authors = getPrimaryAuthors(work, 2);
+  const year = getDisplayYearForWork(work);
+  const yearStr = year ? ` (${year})` : "";
+  return `${authors}${yearStr}. ${work.title}.`;
+}
+
+/**
+ * Get display year for a work (from its versions)
+ * Public wrapper for UI components
+ */
+export function getDisplayYear(work: WorkExtended): string | null {
+  return getDisplayYearForWork(work);
+}
+
+/**
+ * Get display year for a work (from its versions)
+ * Internal implementation
+ */
+function getDisplayYearForWork(work: WorkExtended): string | null {
+  if (!work.versions || work.versions.length === 0) {
+    return null;
+  }
+
+  const versionsWithYears = work.versions.filter((v) => v.year);
+  if (versionsWithYears.length === 0) {
+    return null;
+  }
+
+  // For papers, get earliest version; for others, show range
+  const isPaper = work.workType === "paper";
+
+  if (isPaper) {
+    const sortedVersions = versionsWithYears.sort((a, b) => {
+      const aNum = a.versionNumber ?? 999;
+      const bNum = b.versionNumber ?? 999;
+      return aNum - bNum;
+    });
+    return sortedVersions[0].year!.toString();
+  } else {
+    if (versionsWithYears.length === 1) {
+      return versionsWithYears[0].year!.toString();
+    } else {
+      const years = versionsWithYears.map((v) => v.year!).sort((a, b) => a - b);
+      const minYear = years[0];
+      const maxYear = years[years.length - 1];
+      return minYear === maxYear ? minYear.toString() : `${minYear}-${maxYear}`;
+    }
+  }
+}
+
+// ============================================================================
+// Version helpers
+// ============================================================================
+
+/**
+ * Get a full display name for a version (including work title if needed)
+ */
+export function getVersionFullName(version: VersionExtended): string {
+  const versionLabel =
+    version.versionTitle ||
+    version.edition ||
+    `v${version.versionNumber || "?"}`;
+
+  if (version.work) {
+    return `${version.work.title} (${versionLabel})`;
+  }
+
+  return versionLabel;
+}
+
+/**
+ * Get publication info string for a version
+ * Format: "Publisher, Year" or "Journal Vol(Issue), Year"
+ */
+export function getPublicationInfo(version: Version): string {
+  const parts: string[] = [];
+
+  if (version.journal) {
+    let journalStr = version.journal;
+    if (version.volume) {
+      journalStr += ` ${version.volume}`;
+      if (version.issue) {
+        journalStr += `(${version.issue})`;
+      }
+    }
+    parts.push(journalStr);
+  } else if (version.publisher) {
+    parts.push(version.publisher);
+  }
+
+  if (version.year) {
+    parts.push(version.year.toString());
+  }
+
+  return parts.join(", ");
+}
+
+// ============================================================================
+// Asset helpers
+// ============================================================================
+
+/**
+ * Format file size for display
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 B";
+
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const k = 1024;
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
+}
+
+/**
+ * Get file extension from filename
+ */
+export function getFileExtension(filename: string): string {
+  const parts = filename.split(".");
+  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : "";
+}
+
+/**
+ * Check if asset is a PDF
+ */
+export function isPDF(asset: Asset): boolean {
+  return (
+    asset.mime === "application/pdf" ||
+    getFileExtension(asset.filename) === "pdf"
+  );
+}
+
+/**
+ * Get a full display name for an asset (including version/work if available)
+ */
+export function getAssetFullName(asset: AssetExtended): string {
+  const parts: string[] = [];
+
+  if (asset.work) {
+    parts.push(asset.work.title);
+  }
+
+  if (asset.version) {
+    const versionLabel =
+      asset.version.edition || `v${asset.version.versionNumber || "?"}`;
+    parts.push(`(${versionLabel})`);
+  }
+
+  if (asset.role !== "main") {
+    parts.push(`[${asset.role}]`);
+  }
+
+  parts.push(`- ${asset.filename}`);
+
+  return parts.join(" ");
+}
+
+// ============================================================================
+// Activity helpers
+// ============================================================================
+
+/**
+ * Check if an activity is currently active
+ */
+export function isActivityActive(activity: Activity): boolean {
+  const now = new Date().toISOString();
+  return (
+    !!activity.startsAt &&
+    activity.startsAt <= now &&
+    (!activity.endsAt || activity.endsAt >= now)
+  );
+}
+
+/**
+ * Check if an activity is upcoming
+ */
+export function isActivityUpcoming(activity: Activity): boolean {
+  const now = new Date().toISOString();
+  return !!activity.startsAt && activity.startsAt > now;
+}
+
+/**
+ * Check if an activity is past
+ */
+export function isActivityPast(activity: Activity): boolean {
+  const now = new Date().toISOString();
+  return !!activity.endsAt && activity.endsAt < now;
+}
+
+/**
+ * Get activity duration in days
+ */
+export function getActivityDuration(activity: Activity): number | null {
+  if (!activity.startsAt || !activity.endsAt) {
+    return null;
+  }
+
+  const start = new Date(activity.startsAt);
+  const end = new Date(activity.endsAt);
+  const diffMs = end.getTime() - start.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}
+
+/**
+ * Format activity date range for display
+ */
+export function formatActivityDateRange(activity: Activity): string {
+  const formatDate = (isoDate: string) => {
+    const date = new Date(isoDate);
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  if (activity.startsAt && activity.endsAt) {
+    return `${formatDate(activity.startsAt)} - ${formatDate(activity.endsAt)}`;
+  } else if (activity.startsAt) {
+    return `From ${formatDate(activity.startsAt)}`;
+  } else if (activity.endsAt) {
+    return `Until ${formatDate(activity.endsAt)}`;
+  }
+
+  return "No dates set";
+}
+
+// ============================================================================
+// Collection helpers
+// ============================================================================
+
+/**
+ * Get count of items in a collection (from extended data)
+ */
+export function getCollectionItemCount(collection: {
+  works?: Work[];
+  versions?: Version[];
+  activities?: Activity[];
+}): number {
+  return (
+    (collection.works?.length || 0) +
+    (collection.versions?.length || 0) +
+    (collection.activities?.length || 0)
+  );
+}
+
+// ============================================================================
+// Sorting utilities
+// ============================================================================
+
+/**
+ * Compare function for sorting works by title
+ */
+export function compareWorksByTitle(a: Work, b: Work): number {
+  return a.title.localeCompare(b.title);
+}
+
+/**
+ * Compare function for sorting works by creation date (newest first)
+ */
+export function compareWorksByDate(a: Work, b: Work): number {
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
+/**
+ * Compare function for sorting versions by year (newest first)
+ */
+export function compareVersionsByYear(a: Version, b: Version): number {
+  const aYear = a.year || 0;
+  const bYear = b.year || 0;
+  return bYear - aYear;
+}
+
+/**
+ * Compare function for sorting activities by start date (earliest first)
+ */
+export function compareActivitiesByDate(a: Activity, b: Activity): number {
+  const aDate = a.startsAt || a.endsAt || "9999";
+  const bDate = b.startsAt || b.endsAt || "9999";
+  return aDate.localeCompare(bDate);
+}

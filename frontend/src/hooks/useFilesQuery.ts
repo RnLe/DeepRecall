@@ -22,7 +22,7 @@ export function useFilesQuery() {
 
 export function useScanMutation() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/scan", { method: "POST" });
@@ -31,9 +31,22 @@ export function useScanMutation() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      // Invalidate files list after scan completes
+    onSuccess: (data) => {
+      // Invalidate all file/blob queries after scan completes
       queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["blobs"] });
+      queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+
+      // Log scan results
+      console.log("Scan completed:", data);
+      if (data.newFiles > 0) console.log(`  ✨ ${data.newFiles} new files`);
+      if (data.editedFiles > 0)
+        console.warn(`  ⚠️  ${data.editedFiles} edited files`);
+      if (data.relocatedFiles > 0)
+        console.log(`  📦 ${data.relocatedFiles} relocated files`);
+      if (data.missingFiles > 0)
+        console.error(`  ❌ ${data.missingFiles} missing files`);
     },
   });
 }

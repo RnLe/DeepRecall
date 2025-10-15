@@ -38,6 +38,10 @@ async function scanDirectory(dirPath: string): Promise<string[]> {
         const subFiles = await scanDirectory(fullPath);
         results.push(...subFiles);
       } else if (entry.isFile()) {
+        // Skip Zone.Identifier files created by Windows
+        if (entry.name.endsWith(":Zone.Identifier")) {
+          continue;
+        }
         // Accept all files, not just PDFs
         results.push(fullPath);
       }
@@ -110,6 +114,7 @@ async function processFile(filePath: string): Promise<boolean> {
         mtime_ms: stats.mtimeMs,
         created_ms: Date.now(),
         filename,
+        health: "healthy",
       })
       .onConflictDoUpdate({
         target: blobs.hash,
@@ -119,6 +124,7 @@ async function processFile(filePath: string): Promise<boolean> {
           mtime_ms: stats.mtimeMs,
           // Don't update created_ms on conflict - keep original
           filename,
+          health: "healthy",
         },
       });
 
@@ -148,38 +154,180 @@ async function processFile(filePath: string): Promise<boolean> {
 
 /**
  * Scan the library directory and update the database
- * @returns object with scan statistics
+ * Detects: new files, edited files (same path, different hash), removed files
+ * @returns object with detailed scan statistics
  */
 export async function scanLibrary(): Promise<{
   scanned: number;
   processed: number;
   failed: number;
+  newFiles: number;
+  editedFiles: number;
+  missingFiles: number;
+  relocatedFiles: number;
 }> {
   console.log("Starting library scan...");
 
+  const db = getDB();
   const libraryPath = getLibraryPath();
-  const files = await scanDirectory(libraryPath);
 
+  // Get all existing blobs and paths from database
+  const existingBlobs = await db.select().from(blobs).all();
+  const existingPaths = await db.select().from(paths).all();
+
+  // Create maps for efficient lookups
+  const pathToHash = new Map(existingPaths.map((p) => [p.path, p.hash]));
+  const hashToBlob = new Map(existingBlobs.map((b) => [b.hash, b]));
+
+  // Track what we find during scan (this is the "mark" - not persisted to DB)
+  const scannedPaths = new Set<string>();
+  const scannedHashes = new Set<string>();
+  const processedHashes = new Set<string>(); // Hashes we've updated/confirmed as healthy
+
+  // Scan filesystem
+  const files = await scanDirectory(libraryPath);
   console.log(`Found ${files.length} files`);
 
   let processed = 0;
   let failed = 0;
+  let newFiles = 0;
+  let editedFiles = 0;
+  let relocatedFiles = 0;
 
+  // Process all files found on disk
   for (const file of files) {
-    const success = await processFile(file);
-    if (success) {
+    scannedPaths.add(file);
+
+    try {
+      const stats = await stat(file);
+      const hash = await hashFile(file);
+      scannedHashes.add(hash);
+      const mime = getMimeType(file);
+      const filename = path.basename(file);
+
+      const oldHash = pathToHash.get(file);
+      const isNewPath = !pathToHash.has(file);
+      const isNewHash = !hashToBlob.has(hash);
+
+      // Determine file status
+      if (isNewPath && isNewHash) {
+        // Completely new file
+        newFiles++;
+        console.log(`NEW: ${filename}`);
+      } else if (!isNewPath && oldHash !== hash) {
+        // Same path, different hash = file was edited
+        editedFiles++;
+        console.log(`EDITED: ${filename} (hash changed)`);
+      } else if (isNewPath && !isNewHash) {
+        // New path, existing hash = file was relocated/copied
+        relocatedFiles++;
+        console.log(`RELOCATED: ${filename}`);
+      }
+
+      // Insert or update blob metadata
+      await db
+        .insert(blobs)
+        .values({
+          hash,
+          size: stats.size,
+          mime,
+          mtime_ms: stats.mtimeMs,
+          created_ms: Date.now(),
+          filename,
+          health: "healthy",
+        })
+        .onConflictDoUpdate({
+          target: blobs.hash,
+          set: {
+            size: stats.size,
+            mime,
+            mtime_ms: stats.mtimeMs,
+            filename,
+            health: "healthy", // Reset to healthy if file is found
+          },
+        });
+
+      // Mark this hash as processed (found and healthy)
+      processedHashes.add(hash);
+
+      // Insert or update path mapping
+      await db
+        .insert(paths)
+        .values({
+          hash,
+          path: file,
+        })
+        .onConflictDoUpdate({
+          target: paths.path,
+          set: {
+            hash,
+          },
+        });
+
       processed++;
-    } else {
+    } catch (error) {
+      console.error(`Failed to process ${file}:`, error);
       failed++;
     }
   }
 
+  // PHASE 2: Check remaining database entries that weren't found during filesystem scan
+  // This handles: a) files deleted from disk, b) files moved to new locations
+  console.log("\n=== Phase 2: Checking database entries ===");
+  let missingFiles = 0;
+
+  // Check all paths in the database
+  for (const existingPath of existingPaths) {
+    if (!scannedPaths.has(existingPath.path)) {
+      // This path was not found during the filesystem scan
+      const blob = hashToBlob.get(existingPath.hash);
+
+      if (scannedHashes.has(existingPath.hash)) {
+        // Hash exists at a different path = file was relocated/copied
+        console.log(
+          `RELOCATED: ${blob?.filename || existingPath.hash.slice(0, 16)} (old path: ${existingPath.path})`
+        );
+        // Only update health to "relocated" if it wasn't already marked healthy
+        if (!processedHashes.has(existingPath.hash)) {
+          await db
+            .update(blobs)
+            .set({ health: "relocated" })
+            .where(eq(blobs.hash, existingPath.hash));
+        }
+      } else {
+        // Hash not found anywhere = file is completely missing
+        missingFiles++;
+        console.log(
+          `MISSING: ${blob?.filename || existingPath.hash.slice(0, 16)} (was at: ${existingPath.path})`
+        );
+        await db
+          .update(blobs)
+          .set({ health: "missing" })
+          .where(eq(blobs.hash, existingPath.hash));
+      }
+
+      // Remove the old path mapping (path no longer exists)
+      await db.delete(paths).where(eq(paths.path, existingPath.path));
+    }
+  }
+
+  console.log(
+    `\nPhase 2 complete: Found ${existingPaths.length - scannedPaths.size} stale paths`
+  );
+
   console.log(`Scan complete: ${processed} processed, ${failed} failed`);
+  console.log(
+    `  New: ${newFiles}, Edited: ${editedFiles}, Relocated: ${relocatedFiles}, Missing: ${missingFiles}`
+  );
 
   return {
     scanned: files.length,
     processed,
     failed,
+    newFiles,
+    editedFiles,
+    missingFiles,
+    relocatedFiles,
   };
 }
 
@@ -206,6 +354,7 @@ export async function listFilesWithPaths() {
       mtime_ms: blobs.mtime_ms,
       created_ms: blobs.created_ms,
       filename: blobs.filename,
+      health: blobs.health,
       path: paths.path,
     })
     .from(blobs)

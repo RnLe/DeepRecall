@@ -15,6 +15,7 @@ export const BlobSchema = z.object({
   created_ms: z.number(),
   filename: z.string().nullable(),
   path: z.string().nullable(), // Optional, for admin view with joins
+  health: z.enum(["healthy", "missing", "modified", "relocated"]).optional(),
 });
 
 export type Blob = z.infer<typeof BlobSchema>;

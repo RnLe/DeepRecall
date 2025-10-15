@@ -2,38 +2,26 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Database, FileText, HardDrive, RefreshCw, Trash2 } from "lucide-react";
-import { BlobSchema, type Blob } from "@/src/schema/files";
-import { z } from "zod";
-import { useState, useEffect } from "react";
+import type { BlobWithMetadata } from "../api/library/blobs/route";
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
-  const [newHashes, setNewHashes] = useState<Set<string>>(new Set());
 
-  // Fetch raw blobs from database
+  // Fetch raw blobs from database (with paths and health status)
   const {
     data: blobs,
     isLoading,
     error,
   } = useQuery({
     queryKey: ["admin", "blobs"],
-    queryFn: async (): Promise<Blob[]> => {
-      const response = await fetch("/api/admin/blobs");
+    queryFn: async (): Promise<BlobWithMetadata[]> => {
+      const response = await fetch("/api/library/blobs");
       if (!response.ok) {
         throw new Error("Failed to fetch blobs");
       }
-      const json = await response.json();
-      return z.array(BlobSchema).parse(json);
+      return response.json();
     },
   });
-
-  // Track existing hashes on initial load
-  useEffect(() => {
-    if (blobs && newHashes.size === 0) {
-      // Initialize with all current hashes (none are "new" on first load)
-      setNewHashes(new Set(blobs.map((b) => b.hash)));
-    }
-  }, [blobs]);
 
   // Rescan mutation
   const rescanMutation = useMutation({
@@ -45,30 +33,26 @@ export default function AdminPage() {
       return response.json();
     },
     onSuccess: () => {
-      // Remember which hashes existed before rescan
-      const oldHashes = new Set(blobs?.map((b) => b.hash) || []);
-
       // Refetch blobs
       queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+    },
+  });
 
-      // After a short delay, update the "seen" hashes to include any new ones
-      setTimeout(() => {
-        const currentBlobs =
-          queryClient.getQueryData<Blob[]>(["admin", "blobs"]) || [];
-        currentBlobs.forEach((blob) => {
-          if (!oldHashes.has(blob.hash)) {
-            // This is a new file - DON'T add to newHashes yet (so it shows as new)
-            console.log("New file detected:", blob.filename);
-          } else {
-            // This is an old file - make sure it's in newHashes
-            setNewHashes((prev) => {
-              const updated = new Set(prev);
-              updated.add(blob.hash);
-              return updated;
-            });
-          }
-        });
-      }, 500);
+  // Delete single blob mutation
+  const deleteBlobMutation = useMutation({
+    mutationFn: async (hash: string) => {
+      const response = await fetch(`/api/admin/blobs/${hash}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Delete failed");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
     },
   });
 
@@ -82,8 +66,8 @@ export default function AdminPage() {
       return response.json();
     },
     onSuccess: () => {
-      setNewHashes(new Set());
       queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
     },
   });
 
@@ -186,7 +170,7 @@ export default function AdminPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="p-3 text-gray-400 font-medium">Status</th>
+                    <th className="p-3 text-gray-400 font-medium">Health</th>
                     <th className="p-3 text-gray-400 font-medium">Filename</th>
                     <th className="p-3 text-gray-400 font-medium">
                       Hash (SHA-256)
@@ -197,23 +181,30 @@ export default function AdminPage() {
                       Date Added
                     </th>
                     <th className="p-3 text-gray-400 font-medium">Modified</th>
+                    <th className="p-3 text-gray-400 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {blobs.map((blob) => {
-                    const isNew = !newHashes.has(blob.hash);
+                    const health = blob.health || "healthy";
+                    const healthColors = {
+                      healthy: "text-green-500",
+                      missing: "text-red-500",
+                      modified: "text-yellow-500",
+                      relocated: "text-blue-500",
+                    };
                     return (
                       <tr
-                        key={blob.hash}
-                        className="border-b border-gray-800 hover:bg-gray-900/50"
+                        key={`${blob.sha256}-${blob.path || "no-path"}`}
+                        className="group border-b border-gray-800 hover:bg-gray-900/50"
                       >
                         <td className="p-3">
-                          {isNew && (
-                            <div
-                              className="w-3 h-3 bg-orange-500 rounded-full"
-                              title="New file"
-                            />
-                          )}
+                          <span
+                            className={`text-xs font-medium uppercase ${healthColors[health as keyof typeof healthColors]}`}
+                            title={`File status: ${health}`}
+                          >
+                            {health}
+                          </span>
                         </td>
                         <td
                           className="p-3 text-sm font-medium cursor-help"
@@ -226,7 +217,7 @@ export default function AdminPage() {
                           )}
                         </td>
                         <td className="p-3 font-mono text-sm text-blue-400">
-                          {blob.hash.slice(0, 16)}...
+                          {blob.sha256.slice(0, 16)}...
                         </td>
                         <td className="p-3 text-sm">
                           {(blob.size / 1024 / 1024).toFixed(2)} MB
@@ -239,6 +230,24 @@ export default function AdminPage() {
                         </td>
                         <td className="p-3 text-sm text-gray-500">
                           {new Date(blob.mtime_ms).toLocaleString()}
+                        </td>
+                        <td className="p-3">
+                          <button
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `Delete blob ${blob.filename || blob.sha256.slice(0, 16)}?\n\nThis will remove the database entry but keep the file on disk.`
+                                )
+                              ) {
+                                deleteBlobMutation.mutate(blob.sha256);
+                              }
+                            }}
+                            disabled={deleteBlobMutation.isPending}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-500/10 rounded text-red-500 hover:text-red-400 disabled:opacity-50"
+                            title="Delete blob entry"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     );
