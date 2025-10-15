@@ -2,9 +2,9 @@
 
 import React, { useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import EditorView from '@/app/ui/deepRecall/editorView/EditorView';
-import { useLiterature } from '@/app/customHooks/useLiterature';
-import { useAppStateStore } from '@/app/stores/appStateStore';
+import EditorView from '@/src/ui/deepRecall/editorView/EditorView';
+import { useLiterature } from '@/src/customHooks/useLiterature';
+import { useAppStateStore } from '@/src/stores/appStateStore';
 
 // Import logger
 import logger from '@/src/logger';

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import LiteratureList from '@/app/ui/deepRecall/literatureList';
-import CollectionsManager from '@/app/ui/deepRecall/collectionsManager';
+import LiteratureList from '@/src/ui/deepRecall/literatureList';
+import CollectionsManager from '@/src/ui/deepRecall/collectionsManager';
 
 export default function LiteraturePage() {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);

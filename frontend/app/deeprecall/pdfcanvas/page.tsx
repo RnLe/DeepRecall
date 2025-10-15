@@ -2,7 +2,7 @@ import React from 'react';
 
 // Import logger
 import logger from '@/src/logger';
-import CanvasViewerPage from '@/app/ui/deepRecall/canvasViewerPage';
+import CanvasViewerPage from '@/src/ui/deepRecall/canvasViewerPage';
  
 export default function PDFCanvas() {
   // Logging

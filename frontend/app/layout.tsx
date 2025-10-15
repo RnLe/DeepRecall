@@ -5,11 +5,11 @@ import { HighlightInit } from '@highlight-run/next/client'
 import React from "react"
 
 // Import the global css file in app/ui/global.css
-import "./ui/global.css"
+import "../src/ui/global.css"
 import "./styles/capacitor-mobile.css"
 
 // Import components
-import TopNav from '@/app/ui/topnav';
+import TopNav from '@/src/ui/topnav';
 import { Providers } from "./providers";
 
 // Import logger
