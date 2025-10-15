@@ -12,13 +12,12 @@ WORKDIR /app/
 
 # Copy entrypoint to root (won't be overwritten by volume mount)
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# RUN chmod +x /docker-entrypoint.sh
 
 # Copy package files
 COPY package*.json .npmrc ./
 
-# Install dependencies (will be overridden by volume mount in dev)
-RUN pnpm install
+# No need to install dependencies here; done in entrypoint to ensure native bindings are built
 
 # Copy application files
 COPY . .

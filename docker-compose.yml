@@ -13,14 +13,14 @@ services:
       # Persist SQLite database
       - ./data:/app/data
 
-  python:
-    build:
-      context: ./python
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - USE_CUDA=true
-    volumes:
-      - ./python/:/app/
-    runtime: nvidia
+  # python:
+  #   build:
+  #     context: ./python
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - USE_CUDA=true
+  #   volumes:
+  #     - ./python/:/app/
+  #   runtime: nvidia
