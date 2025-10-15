@@ -12,7 +12,7 @@ WORKDIR /app/
 
 # Copy entrypoint to root (won't be overwritten by volume mount)
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-# RUN chmod +x /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Copy package files
 COPY package*.json .npmrc ./

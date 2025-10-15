@@ -14,7 +14,8 @@ export const blobs = sqliteTable("blobs", {
   size: integer("size").notNull(),
   mime: text("mime").notNull(),
   mtime_ms: integer("mtime_ms").notNull(), // last modified time in milliseconds
-  page_count: integer("page_count"), // optional, for PDFs
+  created_ms: integer("created_ms").notNull(), // timestamp when added to database
+  filename: text("filename"), // optional, original filename
 });
 
 /**

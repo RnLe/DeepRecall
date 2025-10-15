@@ -5,10 +5,8 @@
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    // DB initialization happens lazily on first API call via getDB()
-    // This avoids loading the native module during instrumentation
-    console.log(
-      "🚀 DeepRecall server starting (DB will initialize on first use)..."
-    );
+    // Initialize server (directories and DB)
+    const { initializeServer } = await import("./src/server/init");
+    await initializeServer();
   }
 }

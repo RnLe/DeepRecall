@@ -24,7 +24,7 @@ let _sqlite: Database.Database | null = null;
 export function getDB(): BetterSQLite3Database<typeof schema> {
   if (_db) return _db;
 
-  console.log("🔧 Initializing SQLite database...");
+  console.log("Initializing SQLite database...");
 
   // Lazy import of native module
   const Database = require("better-sqlite3");
@@ -55,9 +55,9 @@ export function getDB(): BetterSQLite3Database<typeof schema> {
     migrate(drizzleDb, {
       migrationsFolder: path.join(process.cwd(), "drizzle"),
     });
-    console.log("✅ Database initialized and migrated");
+    console.log("Database initialized and migrated");
   } catch (error) {
-    console.error("❌ Database migration failed:", error);
+    console.error("Database migration failed:", error);
     // Don't throw - let the app start, migrations might already be applied
   }
 
@@ -87,9 +87,9 @@ export function initDB() {
     migrate(dbInstance, {
       migrationsFolder: path.join(process.cwd(), "drizzle"),
     });
-    console.log("✅ Database initialized");
+    console.log("Database initialized");
   } catch (error) {
-    console.error("❌ Database initialization failed:", error);
+    console.error("Database initialization failed:", error);
     throw error;
   }
 }

@@ -18,7 +18,11 @@ export default function LibraryPage() {
           <div>
             <h1 className="text-4xl font-bold">Library</h1>
             <p className="text-gray-400 mt-2">
-              Your PDF collection
+              Your literature collection (files from the database)
+            </p>
+            <p className="text-xs text-gray-600 mt-1">
+              Note: Full library with metadata will come later. This currently
+              shows raw database blobs.
             </p>
           </div>
           <button
@@ -47,7 +51,8 @@ export default function LibraryPage() {
 
         {files && files.length === 0 && (
           <div className="text-center py-12 text-gray-400">
-            No files found. Add PDFs to your library folder and click "Scan Library".
+            No files found. Add PDFs to your library folder and click "Scan
+            Library".
           </div>
         )}
 
@@ -56,18 +61,26 @@ export default function LibraryPage() {
             {files.map((file) => (
               <div
                 key={file.sha256}
-                className="p-4 bg-gray-900 border border-gray-800 rounded-lg hover:border-blue-500 transition-colors cursor-pointer"
+                className="p-4 bg-gray-900 border border-gray-800 rounded-lg hover:border-blue-500 transition-colors cursor-pointer group"
               >
                 <div className="flex items-start gap-3">
-                  <FileText className="w-8 h-8 text-blue-400 flex-shrink-0" />
+                  <FileText className="w-8 h-8 text-blue-400 flex-shrink-0 group-hover:text-blue-300 transition-colors" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-sm">
+                    <p
+                      className="font-medium text-sm mb-1 text-gray-200 truncate"
+                      title={file.filename || file.sha256}
+                    >
+                      {file.filename || "Untitled"}
+                    </p>
+                    <p className="text-xs text-gray-500 font-mono truncate mb-2">
                       {file.sha256.slice(0, 16)}...
                     </p>
-                    <div className="text-xs text-gray-500 space-y-1 mt-2">
+                    <div className="text-xs text-gray-500 space-y-1">
                       <p>{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                      <p>{file.mime}</p>
-                      {file.page_count && <p>{file.page_count} pages</p>}
+                      <p>{file.mime.split("/")[1].toUpperCase()}</p>
+                      <p className="text-gray-600">
+                        {new Date(file.mtime_ms).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
                 </div>
