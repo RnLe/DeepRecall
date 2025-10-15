@@ -10,6 +10,9 @@ import { updateLiterature } from "../../api/literatureService";
 import { uploadFile } from "../../api/uploadFile";
 import { renderPdfPageToImage, dataURLtoFile } from "../../helpers/pdfThumbnail";
 import { useLiterature } from "../../customHooks/useLiterature";
+import PdfTextExtractionModal from "./pdfTextExtractionModal";
+import PdfThumbnailSelector from './pdfThumbnailSelector';
+import * as pdfjs from 'pdfjs-dist';
 
 // Compute MD5 hash of a file
 function computeMD5(file: File): Promise<string> {
@@ -42,6 +45,9 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isGlobalDrag, setIsGlobalDrag] = useState(false);
+
+  // Text extraction modal state
+  const [showTextExtractionModal, setShowTextExtractionModal] = useState(false);
 
   // Get all literature for duplicate checking
   const { data: allLiterature } = useLiterature();
@@ -404,24 +410,82 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
 
   // Generate thumbnail from the uploaded PDF
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [selectedThumbnailPage, setSelectedThumbnailPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+
   useEffect(() => {
     if (file) {
-      renderPdfPageToImage(file, 1, 0.5)
-        .then((url) => {
+      // First, get the total number of pages
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const typedArray = new Uint8Array(reader.result as ArrayBuffer);
+          const pdf = await pdfjs.getDocument(typedArray).promise;
+          setTotalPages(pdf.numPages);
+          
+          // Generate thumbnail for the selected page
+          const url = await renderPdfPageToImage(file, selectedThumbnailPage, 0.5);
           setThumbnailUrl(url);
           const thumbFile = dataURLtoFile(url, "thumbnail.png");
           setThumbnail(thumbFile);
-        })
-        .catch((err) => {
-          console.error("Error generating thumbnail", err);
+        } catch (err) {
+          console.error("Error processing PDF", err);
           setThumbnailUrl(null);
           setThumbnail(null);
-        });
+          setTotalPages(0);
+        }
+      };
+      reader.readAsArrayBuffer(file);
     } else {
       setThumbnailUrl(null);
       setThumbnail(null);
+      setTotalPages(0);
     }
-  }, [file]);
+  }, [file, selectedThumbnailPage]);
+
+  // Thumbnail handling functions for PdfThumbnailSelector
+
+  const handleThumbnailUpload = async (thumbnailFile: File | null) => {
+    setThumbnail(thumbnailFile);
+  };
+
+  const handleThumbnailUrlUpdate = (url: string | null) => {
+    setThumbnailUrl(url);
+  };
+
+  const handlePageChange = (page: number) => {
+    setSelectedThumbnailPage(page);
+  };
+
+  // Text extraction functions
+  const getExtractionFields = () => {
+    const fields: Array<{ key: string; label: string; value: any }> = [];
+    
+    Object.entries(versionFields).forEach(([key, value]) => {
+      fields.push({
+        key,
+        label: key.replace(/([A-Z])/g, ' $1').trim(),
+        value
+      });
+    });
+
+    return fields;
+  };
+
+  const handleFieldUpdate = (key: string, value: string) => {
+    setVersionFields(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleTextExtraction = (extractedData: Record<string, string>) => {
+    // Apply extracted text to form fields
+    Object.entries(extractedData).forEach(([fieldName, value]) => {
+      if (versionFields.hasOwnProperty(fieldName)) {
+        handleFieldUpdate(fieldName, value);
+      }
+    });
+    
+    setShowTextExtractionModal(false);
+  };
 
   // Error and submitting states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -492,6 +556,10 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
           fileId: uploadedFile.id, // Store the Strapi file ID for deletion
           thumbnailId: uploadedThumb.id || undefined, // Store thumbnail ID if exists
           fileHash,
+          // Cache file metadata to avoid future fetches
+          fileSize: file.size, // File size in bytes
+          totalPages: totalPages, // Number of pages in PDF
+          fileName: file.name, // Original filename
         })
       };
 
@@ -635,24 +703,52 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
             </div>
 
             {/* Thumbnail preview */}
-            <div className="flex items-center justify-center h-48 bg-slate-700/30 border border-slate-600/30 rounded-lg">
-              {thumbnailUrl ? (
-                <img 
-                  src={thumbnailUrl} 
-                  alt="PDF Thumbnail" 
-                  className="max-h-full max-w-full object-contain rounded"
-                />
-              ) : (
-                <div className="text-center text-slate-500">
-                  <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-sm">PDF Preview</p>
-                </div>
-              )}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3">
+                <label className="text-sm font-medium text-slate-300">
+                  Thumbnail
+                </label>
+              </div>
+              <PdfThumbnailSelector
+                file={file}
+                onThumbnailChange={handleThumbnailUpload}
+                onThumbnailUrlChange={handleThumbnailUrlUpdate}
+                selectedPage={selectedThumbnailPage}
+                onPageChange={handlePageChange}
+                className="border border-slate-600/50 rounded-lg"
+              />
             </div>
           </div>
         </div>
+
+        {/* Text Extraction Section */}
+        {file && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-1 h-4 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full"></div>
+                <h4 className="text-md font-semibold text-slate-200">Extract Information</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTextExtractionModal(true)}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Extract Text from PDF</span>
+              </button>
+            </div>
+            
+            <div className="bg-slate-700/20 border border-slate-600/30 rounded-lg p-4">
+              <p className="text-slate-400 text-sm">
+                Use the text extraction tool to automatically fill form fields by selecting text from your PDF.
+                This helps ensure accurate data entry and saves time.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Core Fields Section */}
         {recKeys.length > 0 && (
@@ -737,6 +833,15 @@ const VersionForm: React.FC<VersionFormProps> = ({ versionType, entry, className
           </button>
         </div>
       </form>
+
+      {/* PDF Text Extraction Modal */}
+      <PdfTextExtractionModal
+        file={file}
+        isOpen={showTextExtractionModal}
+        onClose={() => setShowTextExtractionModal(false)}
+        fields={getExtractionFields()}
+        onFieldUpdate={handleFieldUpdate}
+      />
     </div>
   );
 };

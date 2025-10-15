@@ -70,6 +70,8 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
   const [textLines, setTextLines] = useState<TextItem[][]>([]);
   const [textSections, setTextSections] = useState<TextItem[][][]>([]);
   const [selectionMode, setSelectionMode] = useState<'sections' | 'lines' | 'selection'>('sections');
+  const [showYearSelector, setShowYearSelector] = useState<Record<string, boolean>>({});
+  const [authorSelectionMode, setAuthorSelectionMode] = useState<'add' | 'replace'>('add'); // Add/Replace toggle
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -346,20 +348,33 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
           return;
         }
         
-        // Calculate scale to fit the preview area properly
-        const containerWidth = 800; // Fixed width for the preview container
-        const containerHeight = 600; // Fixed height for the preview container
-        
         // Get the page's default viewport (scale 1.0)
         const defaultViewport = page.getViewport({ scale: 1.0 });
+        
+        // Calculate available space in the container
+        const containerElement = pdfContainerRef.current;
+        if (!containerElement) {
+          console.error('PDF container ref not available');
+          return;
+        }
+        
+        // Get actual container dimensions minus padding
+        const containerRect = containerElement.getBoundingClientRect();
+        const containerWidth = containerRect.width - 32; // Subtract padding (2 * 16px)
+        const containerHeight = containerRect.height - 32; // Subtract padding
         
         // Calculate scale to fit container while maintaining aspect ratio
         const scaleX = containerWidth / defaultViewport.width;
         const scaleY = containerHeight / defaultViewport.height;
-        const baseScale = Math.min(scaleX, scaleY, 1.5); // Cap at 1.5 for performance
+        
+        // Use the smaller scale to ensure the PDF fits within the container
+        // Also apply a reasonable default scale for better readability
+        const baseScale = Math.min(scaleX, scaleY, 1.2); // Cap at 1.2 for better default size
         const scale = baseScale * zoomLevel; // Apply zoom
         
-        console.log('Calculated scale:', scale, 'base:', baseScale, 'zoom:', zoomLevel, 'from viewport:', defaultViewport.width, 'x', defaultViewport.height);
+        console.log('Container dimensions:', containerWidth, 'x', containerHeight);
+        console.log('PDF dimensions:', defaultViewport.width, 'x', defaultViewport.height);
+        console.log('Calculated scale:', scale, 'base:', baseScale, 'zoom:', zoomLevel);
         
         // Get the scaled viewport
         const viewport = page.getViewport({ scale });
@@ -467,6 +482,25 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
     };
   }, [currentPage, isPdfLoaded, totalPages, zoomLevel]);
 
+  // Helper function to format dates to a more human-readable form
+  const formatHumanDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    const daySuffix = (d: number) => {
+      if (d > 3 && d < 21) return 'th';
+      switch (d % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+    return `${day}${daySuffix(day)} of ${month}, ${year}`;
+  };
+
   // Extract dates from text using intelligent parsing
   const extractDatesFromText = (text: string): ExtractedDate[] => {
     const dates: ExtractedDate[] = [];
@@ -491,17 +525,14 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
       { regex: /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{4}\b/gi, format: 'Month YYYY', confidence: 'medium' as const },
       // Year only: 2023 (but be more selective)
       { regex: /\b(19|20)\d{2}\b/g, format: 'YYYY', confidence: 'medium' as const },
-      // Short year: 23, 01/23, 12/23
-      { regex: /\b(\d{1,2})[\/\-](\d{2})\b/g, format: 'MM/YY', confidence: 'low' as const },
-      // Partial dates with just month/day: 12/25, 25.12
-      { regex: /\b(\d{1,2})[\/\.](\d{1,2})\b/g, format: 'MM/DD', confidence: 'low' as const },
     ];
 
     datePatterns.forEach((pattern, index) => {
       let match;
       while ((match = pattern.regex.exec(cleanText)) !== null) {
-        const originalText = match[0];
-        let actualConfidence = pattern.confidence;
+        let parsedDate = '';
+        let originalText = match[0];
+        let confidence = pattern.confidence as 'high' | 'medium' | 'low';
         
         // Enhanced filtering for year-only patterns
         if (pattern.format === 'YYYY') {
@@ -524,80 +555,134 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
           
           // If it's just a bare year without date context, lower confidence
           if (!/(date|year|publish|copyright|©)/i.test(context)) {
-            actualConfidence = 'low';
+            confidence = 'low';
           }
         }
-
-        // Try to parse and validate the date
-        let parsedDate = '';
         
         try {
-          let dateToParseDate: Date;
-          
-          if (pattern.format === 'YYYY') {
-            // For year-only, create January 1st of that year
-            dateToParseDate = new Date(parseInt(originalText), 0, 1);
-            parsedDate = `${originalText}-01-01`;
+          if (pattern.format === 'YYYY-MM-DD') {
+            parsedDate = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+          } else if (pattern.format === 'MM/DD/YYYY') {
+            parsedDate = `${match[3]}-${match[1].padStart(2, '0')}-${match[2].padStart(2, '0')}`;
+          } else if (pattern.format === 'DD/MM/YYYY') {
+            parsedDate = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+          } else if (pattern.format === 'Month DD, YYYY' || pattern.format === 'DD Month YYYY') {
+            // Fix timezone issue by creating date in UTC to avoid off-by-one errors
+            const dateObj = new Date(originalText + ' UTC');
+            if (!isNaN(dateObj.getTime())) {
+              parsedDate = dateObj.toISOString().split('T')[0];
+            } else {
+              // Fallback: manual parsing to avoid timezone issues
+              const parts = originalText.match(/(\d{1,2})\s*(?:of\s+)?(\w+)[,\s]*(\d{4})/i) || originalText.match(/(\w+)\s+(\d{1,2})[,\s]*(\d{4})/i);
+              if (parts) {
+                const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+                const monthIndex = monthNames.findIndex(m => m.startsWith(parts[2].toLowerCase().substring(0, 3)));
+                if (monthIndex >= 0) {
+                  parsedDate = `${parts[3]}-${(monthIndex + 1).toString().padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                } else {
+                  parsedDate = originalText;
+                  confidence = 'low';
+                }
+              } else {
+                parsedDate = originalText;
+                confidence = 'low';
+              }
+            }
           } else if (pattern.format === 'Month YYYY') {
-            dateToParseDate = new Date(originalText);
-            if (!isNaN(dateToParseDate.getTime())) {
-              parsedDate = dateToParseDate.toISOString().split('T')[0];
+            // Fix timezone issue for month-year dates
+            const dateObj = new Date(originalText + ' 01 UTC');
+            if (!isNaN(dateObj.getTime())) {
+              parsedDate = dateObj.toISOString().split('T')[0];
             } else {
-              parsedDate = originalText;
-              actualConfidence = 'low';
+              // Fallback parsing
+              const parts = originalText.match(/(\w+)\s+(\d{4})/i);
+              if (parts) {
+                const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+                const monthIndex = monthNames.findIndex(m => m.startsWith(parts[1].toLowerCase().substring(0, 3)));
+                if (monthIndex >= 0) {
+                  parsedDate = `${parts[2]}-${(monthIndex + 1).toString().padStart(2, '0')}-01`;
+                } else {
+                  parsedDate = originalText;
+                  confidence = 'low';
+                }
+              } else {
+                parsedDate = originalText;
+                confidence = 'low';
+              }
             }
-          } else if (pattern.format === 'MM/DD' || pattern.format === 'MM/YY') {
-            // For partial dates, assume current year or add 20 prefix for 2-digit years
-            const parts = originalText.split(/[\/\.-]/);
-            if (pattern.format === 'MM/YY') {
-              const year = parseInt(parts[1]) < 50 ? 2000 + parseInt(parts[1]) : 1900 + parseInt(parts[1]);
-              dateToParseDate = new Date(year, parseInt(parts[0]) - 1, 1);
-              parsedDate = `${year}-${parts[0].padStart(2, '0')}-01`;
-            } else {
-              const currentYear = new Date().getFullYear();
-              dateToParseDate = new Date(currentYear, parseInt(parts[0]) - 1, parseInt(parts[1]));
-              parsedDate = `${currentYear}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-            }
-            actualConfidence = 'low'; // Always low confidence for partial dates
-          } else {
-            dateToParseDate = new Date(originalText);
-            if (!isNaN(dateToParseDate.getTime()) && dateToParseDate.getFullYear() > 1900 && dateToParseDate.getFullYear() < 2100) {
-              parsedDate = dateToParseDate.toISOString().split('T')[0];
-            } else {
-              parsedDate = originalText;
-              actualConfidence = 'low';
-            }
+          } else if (pattern.format === 'YYYY') {
+            parsedDate = `${match[0]}-01-01`;
           }
-        } catch (error) {
+        } catch {
           parsedDate = originalText;
-          actualConfidence = 'low';
+          confidence = 'low';
         }
-
-        // Avoid duplicate entries
-        const isDuplicate = dates.some(d => 
-          d.originalText === originalText || 
-          d.parsedDate === parsedDate
-        );
         
-        if (!isDuplicate) {
+        if (!dates.some(d => d.parsedDate === parsedDate)) {
           dates.push({
             id: `date-${Date.now()}-${index}-${Math.random()}`,
             originalText,
             parsedDate,
-            confidence: actualConfidence,
+            confidence,
             format: pattern.format
           });
         }
       }
     });
+    
+    return dates.slice(0, 10);
+  };
 
-    // Sort by confidence and limit results
-    return dates
-      .sort((a, b) => {
-        const confidenceOrder = { high: 3, medium: 2, low: 1 };
-        return confidenceOrder[b.confidence] - confidenceOrder[a.confidence];
-      })
-      .slice(0, 5);
+  // State for date selection
+  const [pageDates, setPageDates] = useState<ExtractedDate[]>([]);
+  const [pickedDate, setPickedDate] = useState<ExtractedDate | null>(null);
+  const [pickedYear, setPickedYear] = useState<string | null>(null);
+
+  // Extract all dates from the page text when page changes
+  useEffect(() => {
+    if (!isPdfLoaded || !textItems.length) {
+      setPageDates([]);
+      return;
+    }
+    const pageText = textItems.map(t => t.str).join(' ');
+    setPageDates(extractDatesFromText(pageText));
+  }, [textItems, isPdfLoaded, currentPage]);
+
+  // Handle picking a date from the extracted dates
+  const handlePickDate = (date: ExtractedDate) => {
+    setPickedDate(date);
+    setPickedYear(null);
+    // Update field value
+    const dateField = fields.find(f => f.key.toLowerCase().includes('date') || f.key.toLowerCase().includes('publish'));
+    if (dateField) {
+      onFieldUpdate(dateField.key, date.parsedDate);
+    }
+  };
+
+  // Handle picking a year
+  const handlePickYear = (year: string) => {
+    if (!year) return;
+    
+    setPickedYear(year);
+    setPickedDate(null);
+    const selectedDate = `${year}-01-01`;
+    
+    // Create a picked date object for consistency
+    const pickedDateObj: ExtractedDate = {
+      id: `year-pick-${Date.now()}-${Math.random()}`,
+      originalText: year,
+      parsedDate: selectedDate,
+      confidence: 'high',
+      format: 'Year Selection'
+    };
+    setPickedDate(pickedDateObj);
+    
+    // Update field value for any date field that's currently selected
+    const dateField = fields.find(f => f.key.toLowerCase().includes('date') || f.key.toLowerCase().includes('publish')) || 
+                     fields.find(f => selectedField === f.key && (f.key.toLowerCase().includes('date') || f.key.toLowerCase().includes('publish')));
+    if (dateField) {
+      onFieldUpdate(dateField.key, selectedDate);
+    }
   };
 
   // Handle date extraction for date fields
@@ -670,98 +755,49 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
       onFieldUpdate(dateField.key, newValue);
     }
   };
-  const extractAuthorsFromText = (text: string): Author[] => {
-    // Clean the text first
-    let cleanText = text
-      // Remove common prefixes and suffixes
-      .replace(/^(authors?:?\s*)/i, '')
-      .replace(/\s*(et\s+al\.?|and\s+others?)\s*$/i, '')
-      // Remove "and" at the end of the list (e.g., "Smith, Jones, and Brown" -> "Smith, Jones, Brown")
-      .replace(/,?\s+and\s*$/i, '')
-      // Remove footnote markers and affiliations (numbers, asterisks, superscripts)
-      .replace(/[\d\*\†\‡\§\¶\#]+/g, '')
-      // Remove common separators that aren't part of names
-      .replace(/[\(\)\[\]]/g, '')
-      // Fix missing spaces between concatenated names (e.g., "ClarenceAugustine" -> "Clarence Augustine")
-      // Look for lowercase followed by uppercase (common when line breaks remove spaces)
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      // Fix cases where multiple capital letters are stuck together inappropriately
-      .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
-      // Normalize whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
 
-    // Split by common author separators, including "and"
-    const authorCandidates = cleanText
-      .split(/[,;]|\sand\s|\s&\s/)
-      .map(author => author.trim())
-      .filter(author => author.length > 0);
-
-    const authors: Author[] = [];
+  // Handle year selection for date fields
+  const handleYearSelection = (fieldKey: string, year: string) => {
+    if (!year) return;
     
-    authorCandidates.forEach(candidate => {
-      // Clean each candidate
-      const cleanCandidate = candidate
-        // Remove "and" from the beginning of individual names
-        .replace(/^and\s+/i, '')
-        // Remove leading/trailing punctuation except hyphens in names
-        .replace(/^[^\w\u00C0-\u017F\u0100-\u024F\u1E00-\u1EFF-]+|[^\w\u00C0-\u017F\u0100-\u024F\u1E00-\u1EFF-]+$/g, '')
-        .trim();
-
-      // Validate if it looks like a name (has at least 2 parts, reasonable length)
-      if (cleanCandidate.length >= 3 && 
-          cleanCandidate.length <= 60 && 
-          /^[\w\u00C0-\u017F\u0100-\u024F\u1E00-\u1EFF\s.-]+$/.test(cleanCandidate) &&
-          cleanCandidate.split(/\s+/).length >= 2) {
-        
-        authors.push({
-          id: `author-${Date.now()}-${Math.random()}`,
-          name: cleanCandidate
-        });
-      }
-    });
-
-    return authors;
+    // Set date to January 1st of the selected year
+    const selectedDate = `${year}-01-01`;
+    
+    // Create a new extracted date entry
+    const newDate: ExtractedDate = {
+      id: `year-${Date.now()}-${Math.random()}`,
+      originalText: year,
+      parsedDate: selectedDate,
+      confidence: 'high',
+      format: 'Year Selection'
+    };
+    
+    // Replace existing extracted dates with the new year-based date
+    setExtractedDates([newDate]);
+    
+    // Update the field
+    onFieldUpdate(fieldKey, selectedDate);
+    
+    // Hide the year selector
+    setShowYearSelector(prev => ({ ...prev, [fieldKey]: false }));
+    
+    // Clear any warnings
+    setFieldWarnings(prev => ({ ...prev, [fieldKey]: '' }));
   };
 
-  // Handle author extraction for author fields
-  const handleAuthorExtraction = (text: string, fieldKey: string) => {
-    const authors = extractAuthorsFromText(text);
-    setExtractedAuthors(authors);
-    
-    // Generate warnings for unusual formats
-    const warnings: string[] = [];
-    
-    if (authors.length === 0) {
-      warnings.push('No valid authors detected. Check if names are properly separated.');
-    } else {
-      // Check if authors seem to be properly comma-separated
-      const hasCommas = text.includes(',');
-      const hasMultipleWords = authors.some(a => a.name.split(/\s+/).length < 2);
-      
-      if (!hasCommas && authors.length > 1) {
-        warnings.push('Authors may not be properly comma-separated.');
-      }
-      
-      if (hasMultipleWords) {
-        warnings.push('Some entries may be incomplete names or affiliations.');
-      }
-      
-      // Check for unusual characters that might indicate formatting issues
-      if (text.match(/[0-9\*\†\‡\§\¶\#]{3,}/)) {
-        warnings.push('Text contains many numbers/symbols. Verify author extraction.');
-      }
+  // Toggle year selector for a field
+  const toggleYearSelector = (fieldKey: string) => {
+    setShowYearSelector(prev => ({ ...prev, [fieldKey]: !prev[fieldKey] }));
+  };
+
+  // Generate year options (current year back to 1900)
+  const generateYearOptions = (): string[] => {
+    const currentYear = new Date().getFullYear();
+    const years: string[] = [];
+    for (let year = currentYear; year >= 1900; year--) {
+      years.push(year.toString());
     }
-    
-    // Update warnings
-    setFieldWarnings(prev => ({
-      ...prev,
-      [fieldKey]: warnings.length > 0 ? warnings.join(' ') : ''
-    }));
-    
-    // Update the field with author names
-    const authorNames = authors.map(a => a.name).join(', ');
-    onFieldUpdate(fieldKey, authorNames);
+    return years;
   };
 
   // Handle adding a new author manually
@@ -802,6 +838,72 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
       onFieldUpdate(authorField.key, authorNames);
     }
   };
+
+  // Extract authors from text using intelligent parsing
+  const extractAuthorsFromText = (text: string): Author[] => {
+    let cleanText = text
+      .replace(/^(authors?:?\s*)/i, '')
+      .replace(/\s*(et\s+al\.?|and\s+others?)\s*$/i, '')
+      .replace(/,?\s+and\s*$/i, '')
+      .replace(/[\d\*\†\‡\§\¶\#]+/g, '')
+      .replace(/[\(\)\[\]]/g, '')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Split by common separators, including & and "and"
+    const authorCandidates = cleanText
+      .split(/[,;]|(?:\s+and\s+)|(?:\s*&\s*)/)
+      .map(author => author.trim())
+      .filter(author => author.length > 0);
+
+    const authors: Author[] = [];
+    authorCandidates.forEach(candidate => {
+      const cleanCandidate = candidate
+        .replace(/^and\s+/i, '')
+        .replace(/^[^\w\u00C0-\u017F-]+|[^\w\u00C0-\u017F-]+$/g, '')
+        .trim();
+      if (
+        cleanCandidate.length >= 3 &&
+        cleanCandidate.length <= 60 &&
+        /^[\w\u00C0-\u017F\s.&'-]+$/.test(cleanCandidate) &&
+        cleanCandidate.split(/\s+/).length >= 2
+      ) {
+        authors.push({
+          id: `author-${Date.now()}-${Math.random()}`,
+          name: cleanCandidate
+        });
+      }
+    });
+    return authors;
+  };
+
+  // Handle author extraction for author fields
+  const handleAuthorExtraction = (text: string, fieldKey: string) => {
+    const newAuthors = extractAuthorsFromText(text);
+    setExtractedAuthors(prev => {
+      if (authorSelectionMode === 'add') {
+        // Add new authors, avoid duplicates
+        const names = new Set(prev.map(a => a.name));
+        return [...prev, ...newAuthors.filter(a => !names.has(a.name))];
+      } else {
+        // Replace
+        return newAuthors;
+      }
+    });
+    // Update field with all authors
+    const authorField = fields.find(f => f.key.toLowerCase().includes('author'));
+    if (authorField) {
+      const allAuthors = authorSelectionMode === 'add' 
+        ? [...extractedAuthors, ...newAuthors.filter(a => !extractedAuthors.some(ea => ea.name === a.name))]
+        : newAuthors;
+      const authorNames = allAuthors.map(a => a.name).join(', ');
+      onFieldUpdate(authorField.key, authorNames);
+    }
+  };
+
+  // Handle text selection
   const handleTextSelection = () => {
     if (!selectedField) return;
 
@@ -1003,6 +1105,8 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
       setExtractedDates([]);
     }
     
+    // Clear year selector state and warnings
+    setShowYearSelector(prev => ({ ...prev, [fieldKey]: false }));
     setFieldWarnings(prev => ({
       ...prev,
       [fieldKey]: ''
@@ -1095,276 +1199,262 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div 
         ref={modalRef}
-        className="bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-6xl h-[90vh] shadow-2xl flex flex-col"
+        className="bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-[1400px] h-[90vh] shadow-2xl flex"
         onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/50">
-          <div className="flex items-center space-x-4">
-            <h2 className="text-xl font-bold text-slate-100">Extract Text from PDF</h2>
-            <div className="text-sm text-slate-400">
-              Page {currentPage} of {totalPages}
-            </div>
+        {/* Left Sidebar - Fields */}
+        <div className="w-[380px] border-r border-slate-700/50 p-4 overflow-y-auto flex flex-col">
+          {/* Selection Mode Toggle */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-200">Fields to Fill</h3>
+            <button
+              onClick={() => setShowSelectionHistory(!showSelectionHistory)}
+              className={`p-2 rounded-lg transition-all duration-200 ${
+                showSelectionHistory 
+                  ? 'bg-blue-600/20 text-blue-400' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              }`}
+              title="Toggle selection history"
+            >
+              <Clock className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={handleClose}
-            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-all duration-200"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 flex overflow-hidden">
-          
-          {/* Fields Sidebar */}
-          <div className="w-[480px] border-r border-slate-700/50 p-4 overflow-y-auto flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-200">Fields to Fill</h3>
-              <button
-                onClick={() => setShowSelectionHistory(!showSelectionHistory)}
-                className={`p-2 rounded-lg transition-all duration-200 ${
-                  showSelectionHistory 
-                    ? 'bg-blue-600/20 text-blue-400' 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                }`}
-                title="Toggle selection history"
-              >
-                <Clock className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 space-y-3">
-              {fields.map((field) => {
-                const isAuthorField = field.key.toLowerCase().includes('author');
-                const isDateField = field.key.toLowerCase().includes('date') || 
-                                   field.key.toLowerCase().includes('publish') ||
-                                   field.key.toLowerCase().includes('year');
-                const isSelected = selectedField === field.key;
-                const hasWarning = fieldWarnings[field.key];
-                const isEditingText = editingTextField === field.key;
-                const formattedLabel = formatFieldLabel(field.label);
-                
-                return (
-                  <div
-                    key={field.key}
-                    onClick={() => setSelectedField(field.key)}
-                    className={`p-3 rounded-xl border transition-all duration-200 cursor-pointer group ${
-                      isSelected
-                        ? 'bg-gradient-to-br from-blue-900/40 to-blue-800/20 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                        : 'bg-slate-700/20 border-slate-600/30 hover:border-slate-500/50 hover:bg-slate-700/30'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <div className={`text-sm font-medium transition-colors ${
-                          isSelected ? 'text-blue-200' : 'text-slate-300 group-hover:text-slate-200'
-                        }`}>
-                          {formattedLabel}
-                        </div>
-                        {hasWarning && (
-                          <div title={hasWarning}>
-                            <AlertTriangle className="w-4 h-4 text-amber-400" />
-                          </div>
-                        )}
+          {/* Author Add/Replace Toggle */}
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-xs text-slate-400">Author Selection Mode:</span>
+            <button
+              className={`px-2 py-1 rounded text-xs font-medium ${authorSelectionMode === 'add' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}
+              onClick={() => setAuthorSelectionMode(authorSelectionMode === 'add' ? 'replace' : 'add')}
+              title={authorSelectionMode === 'add' ? 'Switch to Replace' : 'Switch to Add'}
+            >
+              {authorSelectionMode === 'add' ? 'Add Authors' : 'Replace Authors'}
+            </button>
+          </div>
+          <div className="flex-1 space-y-3">
+            {fields.map((field) => {
+              const isAuthorField = field.key.toLowerCase().includes('author');
+              const isDateField = field.key.toLowerCase().includes('date') || 
+                                 field.key.toLowerCase().includes('publish') ||
+                                 field.key.toLowerCase().includes('year');
+              const isSelected = selectedField === field.key;
+              const hasWarning = fieldWarnings[field.key];
+              const isEditingText = editingTextField === field.key;
+              const formattedLabel = formatFieldLabel(field.label);
+              
+              return (
+                <div
+                  key={field.key}
+                  onClick={() => setSelectedField(field.key)}
+                  className={`p-3 rounded-xl border transition-all duration-200 cursor-pointer group ${
+                    isSelected
+                      ? 'bg-gradient-to-br from-blue-900/40 to-blue-800/20 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : 'bg-slate-700/20 border-slate-600/30 hover:border-slate-500/50 hover:bg-slate-700/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <div className={`text-sm font-medium transition-colors ${
+                        isSelected ? 'text-blue-200' : 'text-slate-300 group-hover:text-slate-200'
+                      }`}>
+                        {formattedLabel}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {isSelected && (
-                          <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                            <Check className="w-4 h-4 text-blue-400" />
-                          </div>
-                        )}
-                        {!isAuthorField && !isDateField && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingTextField(isEditingText ? null : field.key);
-                            }}
-                            className={`p-1.5 rounded-lg transition-all duration-200 ${
-                              isEditingText 
-                                ? 'text-blue-400 bg-blue-600/20'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 opacity-0 group-hover:opacity-100'
-                            }`}
-                            title={`${isEditingText ? 'Finish' : 'Edit'} ${formattedLabel}`}
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                        )}
+                      {hasWarning && (
+                        <div title={hasWarning}>
+                          <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {isSelected && (
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                          <Check className="w-4 h-4 text-blue-400" />
+                        </div>
+                      )}
+                      {!isAuthorField && !isDateField && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleResetField(field.key);
-                            setEditingTextField(null);
+                            setEditingTextField(isEditingText ? null : field.key);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100"
-                          title={`Reset ${formattedLabel}`}
+                          className={`p-1.5 rounded-lg transition-all duration-200 ${
+                            isEditingText 
+                              ? 'text-blue-400 bg-blue-600/20'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 opacity-0 group-hover:opacity-100'
+                          }`}
+                          title={`${isEditingText ? 'Finish' : 'Edit'} ${formattedLabel}`}
                         >
-                          <RotateCcw className="w-3 h-3" />
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleResetField(field.key);
+                          setEditingTextField(null);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100"
+                        title={`Reset ${formattedLabel}`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Warning Display */}
+                  {hasWarning && (
+                    <div className="mb-2 p-2 bg-amber-900/20 border border-amber-600/30 rounded text-xs text-amber-300">
+                      {hasWarning}
+                    </div>
+                  )}
+
+                  {/* Author Tag Display */}
+                  {isAuthorField && extractedAuthors.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1">
+                        {extractedAuthors.map((author) => (
+                          <div
+                            key={author.id}
+                            className="inline-flex items-center bg-blue-600/20 text-blue-300 px-2 py-1 rounded-md text-xs border border-blue-500/30 group/tag"
+                          >
+                            {editingAuthor === author.id ? (
+                              <input
+                                type="text"
+                                value={author.name}
+                                onChange={(e) => handleEditAuthor(author.id, e.target.value)}
+                                onBlur={() => setEditingAuthor(null)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') setEditingAuthor(null);
+                                }}
+                                className="bg-transparent border-none outline-none text-blue-300 min-w-0 w-full"
+                                autoFocus
+                              />
+                            ) : (
+                              <>
+                                <span 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingAuthor(author.id);
+                                  }}
+                                  className="cursor-pointer hover:text-blue-200"
+                                >
+                                  {author.name}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveAuthor(author.id);
+                                  }}
+                                  className="ml-1 text-blue-400 hover:text-red-400 opacity-0 group-hover/tag:opacity-100 transition-opacity"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddAuthor();
+                          }}
+                          className="inline-flex items-center text-slate-400 hover:text-blue-400 px-2 py-1 rounded-md text-xs border border-slate-600/30 hover:border-blue-500/30 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
-
-                    {/* Warning Display */}
-                    {hasWarning && (
-                      <div className="mb-2 p-2 bg-amber-900/20 border border-amber-600/30 rounded text-xs text-amber-300">
-                        {hasWarning}
-                      </div>
-                    )}
-
-                    {/* Author Tag Display */}
-                    {isAuthorField && extractedAuthors.length > 0 ? (
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                          {extractedAuthors.map((author) => (
-                            <div
-                              key={author.id}
-                              className="inline-flex items-center bg-blue-600/20 text-blue-300 px-2 py-1 rounded-md text-xs border border-blue-500/30 group/tag"
+                  ) : isDateField ? (
+                    <div>
+                      {/* Date Picker Area */}
+                      <div className="mb-2">
+                        <div className="font-medium text-xs text-slate-400 mb-1">Pick a date:</div>
+                        <div className="flex gap-2">
+                          {/* Year Dropdown */}
+                          <div>
+                            <select
+                              className="bg-slate-700 border border-slate-600/50 rounded text-xs text-slate-200 px-2 py-1"
+                              value={pickedYear || ''}
+                              onChange={e => handlePickYear(e.target.value)}
                             >
-                              {editingAuthor === author.id ? (
-                                <input
-                                  type="text"
-                                  value={author.name}
-                                  onChange={(e) => handleEditAuthor(author.id, e.target.value)}
-                                  onBlur={() => setEditingAuthor(null)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') setEditingAuthor(null);
-                                  }}
-                                  className="bg-transparent border-none outline-none text-blue-300 min-w-0 w-full"
-                                  autoFocus
-                                />
-                              ) : (
-                                <>
-                                  <span 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingAuthor(author.id);
-                                    }}
-                                    className="cursor-pointer hover:text-blue-200"
-                                  >
-                                    {author.name}
-                                  </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveAuthor(author.id);
-                                    }}
-                                    className="ml-1 text-blue-400 hover:text-red-400 opacity-0 group-hover/tag:opacity-100 transition-opacity"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddAuthor();
-                            }}
-                            className="inline-flex items-center text-slate-400 hover:text-blue-400 px-2 py-1 rounded-md text-xs border border-slate-600/30 hover:border-blue-500/30 transition-colors"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : isDateField && extractedDates.length > 0 ? (
-                      /* Date Display */
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1">
-                          {extractedDates.map((date) => (
-                            <div
-                              key={date.id}
-                              className={`inline-flex items-center px-2 py-1 rounded-md text-xs border group/tag ${
-                                date.confidence === 'high' 
-                                  ? 'bg-green-600/20 text-green-300 border-green-500/30' 
-                                  : date.confidence === 'medium'
-                                  ? 'bg-yellow-600/20 text-yellow-300 border-yellow-500/30'
-                                  : 'bg-red-600/20 text-red-300 border-red-500/30'
-                              }`}
-                            >
-                              <Calendar className="w-3 h-3 mr-1" />
-                              {editingDate === date.id ? (
-                                <input
-                                  type="date"
-                                  value={date.parsedDate}
-                                  onChange={(e) => handleEditDate(date.id, e.target.value)}
-                                  onBlur={() => setEditingDate(null)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') setEditingDate(null);
-                                  }}
-                                  className="bg-transparent border-none outline-none text-current min-w-0 w-full"
-                                  autoFocus
-                                />
-                              ) : (
-                                <>
-                                  <span 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingDate(date.id);
-                                    }}
-                                    className="cursor-pointer hover:opacity-80"
-                                    title={`Original: ${date.originalText} (${date.format})`}
-                                  >
-                                    {date.parsedDate}
-                                  </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveDate(date.id);
-                                    }}
-                                    className="ml-1 hover:text-red-400 opacity-0 group-hover/tag:opacity-100 transition-opacity"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddDate();
-                            }}
-                            className="inline-flex items-center text-slate-400 hover:text-green-400 px-2 py-1 rounded-md text-xs border border-slate-600/30 hover:border-green-500/30 transition-colors"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : !isAuthorField && !isDateField ? (
-                      /* Regular field display */
-                      <div>
-                        {isEditingText ? (
-                          <textarea
-                            value={typeof field.value === 'string' ? field.value : JSON.stringify(field.value) || ''}
-                            onChange={(e) => onFieldUpdate(field.key, e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            onBlur={() => setEditingTextField(null)}
-                            className="w-full bg-slate-800/60 border border-blue-500/50 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all duration-200 resize-none"
-                            rows={3}
-                            placeholder="Type here..."
-                            autoFocus
-                          />
-                        ) : (
-                          <div className={`text-xs transition-colors ${
-                            isSelected ? 'text-slate-300' : 'text-slate-400'
-                          }`}>
-                            {field.value ? (
-                              <div className="truncate">
-                                {typeof field.value === 'string' ? field.value.split('\n')[0] : JSON.stringify(field.value)}
-                              </div>
-                            ) : (
-                              <div className="italic">
-                                {isSelected ? "Select text or click pencil to edit..." : "Empty"}
-                              </div>
-                            )}
+                              <option value="">Year...</option>
+                              {generateYearOptions().map(year => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </select>
                           </div>
-                        )}
+                          {/* Extracted Dates */}
+                          <div className="flex flex-wrap gap-1">
+                            {pageDates.map(date => (
+                              <button
+                                key={date.id}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handlePickDate(date);
+                                }}
+                                className={`px-2 py-1 rounded text-xs border transition-colors ${
+                                  pickedDate?.id === date.id
+                                    ? 'bg-blue-600 text-white border-blue-500'
+                                    : 'bg-slate-700 text-slate-200 border-slate-600 hover:bg-blue-700 hover:text-white'
+                                }`}
+                                title={date.originalText}
+                              >
+                                {formatHumanDate(date.parsedDate)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      /* Special field placeholders */
+                      {/* Picked Date Area */}
+                      <div className="mt-2">
+                        <div className="font-medium text-xs text-slate-400 mb-1">Selected date:</div>
+                        <div className="flex gap-2 items-center">
+                          {pickedDate ? (
+                            <span className="px-2 py-1 rounded bg-blue-600/20 text-blue-300 border border-blue-500/30 text-xs">
+                              {formatHumanDate(pickedDate.parsedDate)}
+                            </span>
+                          ) : pickedYear ? (
+                            <span className="px-2 py-1 rounded bg-blue-600/20 text-blue-300 border border-blue-500/30 text-xs">
+                              {pickedYear}
+                            </span>
+                          ) : (
+                            <span className="italic text-slate-400 text-xs">None selected</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : !isAuthorField && !isDateField ? (
+                    /* Regular field display */
+                    <div>
+                      {isEditingText ? (
+                        <textarea
+                          value={typeof field.value === 'string' ? field.value : JSON.stringify(field.value) || ''}
+                          onChange={(e) => onFieldUpdate(field.key, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onBlur={() => setEditingTextField(null)}
+                          className="w-full bg-slate-800/60 border border-blue-500/50 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all duration-200 resize-none"
+                          rows={3}
+                          placeholder="Type here..."
+                          autoFocus
+                        />
+                      ) : (
+                        <div className={`text-xs transition-colors ${
+                          isSelected ? 'text-slate-300' : 'text-slate-400'
+                        }`}>
+                          {field.value ? (
+                            <div className="truncate">
+                              {typeof field.value === 'string' ? field.value.split('\n')[0] : JSON.stringify(field.value)}
+                            </div>
+                          ) : (
+                            <div className="italic">
+                              {isSelected ? "Select text or click pencil to edit..." : "Empty"}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
                       <div className={`text-xs italic transition-colors ${
                         isSelected ? 'text-slate-300' : 'text-slate-400'
                       }`}>
@@ -1373,328 +1463,396 @@ const PdfTextExtractionModal: React.FC<PdfTextExtractionModalProps> = ({
                           (isAuthorField ? "No authors extracted" : "No dates extracted")
                         }
                       </div>
-                    )}
-
-                    {/* Hidden textarea for editing when field is selected */}
-                    {isSelected && !isAuthorField && !isDateField && !isEditingText && (
-                      <textarea
-                        value={typeof field.value === 'string' ? field.value : JSON.stringify(field.value) || ''}
-                        onChange={(e) => onFieldUpdate(field.key, e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full mt-2 bg-slate-800/60 border border-blue-500/50 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all duration-200 resize-none"
-                        rows={3}
-                        placeholder="Select text or type here..."
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Selection History at Bottom */}
-            {showSelectionHistory && recentSelections.length > 0 && (
-              <div className="mt-4 p-3 bg-slate-800/40 border border-slate-600/30 rounded-lg">
-                <h4 className="text-sm font-medium text-slate-300 mb-3">Recent Selections</h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {recentSelections.map((selection) => (
-                    <button
-                      key={selection.id}
-                      onClick={() => handleAddRecentSelection(selection)}
-                      disabled={!selectedField}
-                      className="w-full text-left p-2 text-xs text-slate-400 bg-slate-700/30 hover:bg-slate-600/40 rounded border border-slate-600/20 hover:border-slate-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Plus className="w-3 h-3 text-slate-500 group-hover:text-blue-400 transition-colors" />
-                        <span className="truncate group-hover:text-slate-300 transition-colors">
-                          {selection.text}
-                        </span>
-                      </div>
-                      {selection.fieldKey && (
-                        <div className="text-xs text-slate-500 mt-1">
-                          From: {fields.find(f => f.key === selection.fieldKey)?.label}
+                      
+                      {/* Year Selector for empty date fields */}
+                      {isDateField && isSelected && (
+                        <div className="mt-2 flex items-center space-x-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleYearSelector(field.key);
+                            }}
+                            className="inline-flex items-center text-slate-400 hover:text-blue-400 px-2 py-1 rounded-md text-xs border border-slate-600/30 hover:border-blue-500/30 transition-colors"
+                            title="Select year only"
+                          >
+                            <Calendar className="w-3 h-3 mr-1" />
+                            Select Year
+                          </button>
                         </div>
                       )}
-                    </button>
-                  ))}
+                      
+                      {/* Year Selector Dropdown for empty fields */}
+                      {isDateField && showYearSelector[field.key] && (
+                        <div className="mt-2 p-3 bg-slate-800/60 border border-slate-600/30 rounded-lg">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Calendar className="w-4 h-4 text-blue-400" />
+                            <span className="text-sm text-slate-300">Select Publication Year</span>
+                          </div>
+                          <select
+                            onChange={(e) => handleYearSelection(field.key, e.target.value)}
+                            className="w-full bg-slate-700 border border-slate-600/50 rounded text-sm text-slate-200 px-2 py-1 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                            defaultValue=""
+                          >
+                            <option value="">Select a year...</option>
+                            {generateYearOptions().map((year) => (
+                              <option key={year} value={year}>
+                                {year}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-slate-400 mt-1">
+                            This will set the date to January 1st of the selected year.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hidden textarea for editing when field is selected */}
+                  {isSelected && !isAuthorField && !isDateField && !isEditingText && (
+                    <textarea
+                      value={typeof field.value === 'string' ? field.value : JSON.stringify(field.value) || ''}
+                      onChange={(e) => onFieldUpdate(field.key, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full mt-2 bg-slate-800/60 border border-blue-500/50 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all duration-200 resize-none"
+                      rows={3}
+                      placeholder="Select text or type here..."
+                    />
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
 
-          {/* PDF Viewer */}
-          <div className="flex-1 flex flex-col">
-            
-            {/* Page Navigation */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
+          {/* Selection History at Bottom */}
+          {showSelectionHistory && recentSelections.length > 0 && (
+            <div className="mt-4 p-3 bg-slate-800/40 border border-slate-600/30 rounded-lg">
+              <h4 className="text-sm font-medium text-slate-300 mb-3">Recent Selections</h4>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {recentSelections.map((selection) => (
+                  <button
+                    key={selection.id}
+                    onClick={() => handleAddRecentSelection(selection)}
+                    disabled={!selectedField}
+                    className="w-full text-left p-2 text-xs text-slate-400 bg-slate-700/30 hover:bg-slate-600/40 rounded border border-slate-600/20 hover:border-slate-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Plus className="w-3 h-3 text-slate-500 group-hover:text-blue-400 transition-colors" />
+                      <span className="truncate group-hover:text-slate-300 transition-colors">
+                        {selection.text}
+                      </span>
+                    </div>
+                    {selection.fieldKey && (
+                      <div className="text-xs text-slate-500 mt-1">
+                        From: {fields.find(f => f.key === selection.fieldKey)?.label}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Center - PDF Viewer (Full Height) */}
+        <div 
+          ref={pdfContainerRef}
+          className="flex-1 overflow-auto bg-gradient-to-br from-gray-50 to-gray-100"
+          style={{ cursor: 'grab' }}
+        >
+          <div className="flex justify-center items-center min-h-full p-4">
+            <div 
+              className="relative bg-white shadow-xl border border-gray-200 rounded-lg overflow-hidden"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+              }}
+            >
+              {selectedField && (
+                <div className="absolute top-0 left-0 right-0 z-10 bg-blue-600/90 text-white px-3 py-1 text-xs font-medium">
+                  Selecting for: {formatFieldLabel(fields.find(f => f.key === selectedField)?.label || '')}
+                  <span className="ml-2 text-blue-200">
+                    ({selectionMode === 'sections' ? 'Click sections' : selectionMode === 'lines' ? 'Click lines' : 'Drag to select'})
+                  </span>
+                </div>
+              )}
+              
+              <canvas 
+                ref={canvasRef} 
+                className="block"
+                style={{ 
+                  cursor: selectedField ? (selectionMode === 'sections' || selectionMode === 'lines' ? 'pointer' : 'crosshair') : 'default',
+                  display: 'block',
+                  opacity: isLoading ? 0.5 : 1,
+                  transition: 'opacity 0.2s, transform 0.2s',
+                  transform: `scale(${zoomLevel})`,
+                  transformOrigin: 'center center',
+                  marginTop: selectedField ? '24px' : '0'
+                }}
+              />
+              
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="relative">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                      <div className="absolute inset-0 animate-ping rounded-full h-8 w-8 border-b-2 border-blue-300 opacity-30"></div>
+                    </div>
+                    <span className="text-slate-600 text-sm font-medium">Loading page {currentPage}...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Zoom hint */}
+              {!isLoading && !selectedField && (
+                <div className="absolute bottom-4 right-4 bg-black/60 text-white px-3 py-1 rounded text-xs backdrop-blur-sm">
+                  Ctrl + Scroll to zoom
+                </div>
+              )}
+              
+              {/* Text overlay for selection */}
+              {selectedField && pageViewport && !isLoading && (
+                <div 
+                  ref={overlayRef}
+                  className="absolute inset-0"
+                  style={{ 
+                    pointerEvents: 'auto',
+                    userSelect: selectionMode === 'selection' ? 'text' : 'none',
+                    background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.03) 0%, rgba(147, 51, 234, 0.03) 100%)',
+                    marginTop: selectedField ? '24px' : '0',
+                    transform: `scale(${zoomLevel})`,
+                    transformOrigin: 'top left'
+                  }}
+                  onMouseUp={selectionMode === 'selection' ? handleTextSelection : undefined}
+                >
+                  {selectionMode === 'sections' ? (
+                    textSections.map((section, sectionIndex) => (
+                      <div
+                        key={`section-${sectionIndex}`}
+                        className={`absolute border-2 border-blue-500 bg-blue-500 bg-opacity-20 rounded cursor-pointer transition-opacity duration-200 ${
+                          hoveredSection === sectionIndex ? 'opacity-100' : 'opacity-50'
+                        }`}
+                        style={{
+                          left: `${Math.min(...section.flatMap(line => line.map(item => item.x)))}px`,
+                          top: `${Math.min(...section.flatMap(line => line.map(item => item.y - (item.fontSize * 0.8))))}px`,
+                          width: `${Math.max(...section.flatMap(line => line.map(item => item.x + item.width))) - Math.min(...section.flatMap(line => line.map(item => item.x)))}px`,
+                          height: `${Math.max(...section.flatMap(line => line.map(item => item.y))) - Math.min(...section.flatMap(line => line.map(item => item.y - (item.fontSize * 0.8))))}px`,
+                        }}
+                        onMouseEnter={() => setHoveredSection(sectionIndex)}
+                        onMouseLeave={() => setHoveredSection(null)}
+                        onClick={() => handleSectionClick(sectionIndex)}
+                      />
+                    ))
+                  ) : selectionMode === 'lines' ? (
+                    textLines.map((line, lineIndex) => (
+                      <div
+                        key={`line-${lineIndex}`}
+                        className={`absolute border border-green-400 bg-green-400 rounded cursor-pointer transition-all duration-200 ${
+                          hoveredLine === lineIndex ? 'opacity-100 border-2 border-green-500 bg-green-500 bg-opacity-25' : 'opacity-40 bg-opacity-10 hover:opacity-60'
+                        }`}
+                        style={{
+                          left: `${Math.min(...line.map(item => item.x))}px`,
+                          top: `${Math.min(...line.map(item => item.y - (item.fontSize * 0.8)))}px`,
+                          width: `${Math.max(...line.map(item => item.x + item.width)) - Math.min(...line.map(item => item.x))}px`,
+                          height: `${Math.max(...line.map(item => item.y)) - Math.min(...line.map(item => item.y - (item.fontSize * 0.8)))}px`,
+                        }}
+                        onMouseEnter={() => setHoveredLine(lineIndex)}
+                        onMouseLeave={() => setHoveredLine(null)}
+                        onClick={() => handleLineClick(lineIndex)}
+                        title={line.map(item => item.str).join(' ')}
+                      />
+                    ))
+                  ) : (
+                    /* Traditional text selection overlay */
+                    textItems.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          position: 'absolute',
+                          left: `${item.x}px`,
+                          top: `${item.y - item.fontSize * 0.8}px`,
+                          width: `${item.width}px`,
+                          height: `${item.fontSize}px`,
+                          fontSize: `${item.fontSize}px`,
+                          lineHeight: `${item.fontSize}px`,
+                          color: 'transparent',
+                          background: 'linear-gradient(90deg, rgba(255, 235, 59, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%)',
+                          cursor: 'text',
+                          border: '1px solid rgba(255, 193, 7, 0.2)',
+                          borderRadius: '2px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'visible',
+                          transition: 'all 0.15s ease',
+                          WebkitUserSelect: 'text',
+                          MozUserSelect: 'text',
+                          msUserSelect: 'text',
+                          userSelect: 'text',
+                        }}
+                        className="hover:shadow-sm hover:bg-opacity-25"
+                        title={item.str}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(90deg, rgba(255, 235, 59, 0.25) 0%, rgba(255, 193, 7, 0.2) 100%)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 193, 7, 0.4)';
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(90deg, rgba(255, 235, 59, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 193, 7, 0.2)';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        <span style={{ 
+                          color: 'transparent',
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          WebkitUserSelect: 'text',
+                          MozUserSelect: 'text',
+                          msUserSelect: 'text',
+                          userSelect: 'text',
+                        }}>
+                          {item.str}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar - Controls */}
+        <div className="w-[260px] border-l border-slate-700/50 p-4 flex flex-col space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-100">PDF Controls</h2>
+            <button
+              onClick={handleClose}
+              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-all duration-200"
+              title="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Page Navigation */}
+          <div className="border-t border-slate-700/50 pt-4">
+            <h3 className="text-sm font-medium text-slate-300 mb-3">Page Navigation</h3>
+            <div className="space-y-3">
+              <div className="text-sm text-slate-400 text-center">
+                Page {currentPage} of {totalPages}
+              </div>
+              
               <div className="flex items-center space-x-2">
                 <button
                   onClick={goToPreviousPage}
                   disabled={currentPage <= 1}
-                  className="flex items-center space-x-2 px-3 py-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  <span>Previous</span>
+                  <span>Prev</span>
                 </button>
 
                 <button
                   onClick={goToNextPage}
                   disabled={currentPage >= totalPages}
-                  className="flex items-center space-x-2 px-3 py-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-
-              <div className="flex items-center space-x-4">
-                <div className="text-slate-300 font-medium">
-                  Page {currentPage} of {totalPages}
-                </div>
-                
-                {/* Selection Mode Toggle */}
-                <div className="flex items-center space-x-2 bg-slate-800/50 rounded-lg p-1">
-                  <button
-                    onClick={() => setSelectionMode('sections')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-all duration-200 ${
-                      selectionMode === 'sections'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                    title="Click entire sections to select"
-                  >
-                    Sections
-                  </button>
-                  <button
-                    onClick={() => setSelectionMode('lines')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-all duration-200 ${
-                      selectionMode === 'lines'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                    title="Click entire lines to select"
-                  >
-                    Lines
-                  </button>
-                  <button
-                    onClick={() => setSelectionMode('selection')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-all duration-200 ${
-                      selectionMode === 'selection'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                    title="Select text by dragging"
-                  >
-                    Selection
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleZoomOut}
-                  disabled={zoomLevel <= 0.5}
-                  className="p-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Zoom out (Ctrl+Scroll)"
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-                
-                <button
-                  onClick={handleZoomReset}
-                  className="px-3 py-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors text-sm font-medium min-w-[60px]"
-                  title="Reset zoom"
-                >
-                  {Math.round(zoomLevel * 100)}%
-                </button>
-                
-                <button
-                  onClick={handleZoomIn}
-                  disabled={zoomLevel >= 3}
-                  className="p-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Zoom in (Ctrl+Scroll)"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-              </div>
             </div>
-
-            {/* PDF Content */}
-            <div 
-              ref={pdfContainerRef}
-              className="flex-1 overflow-auto p-4 bg-gradient-to-br from-gray-50 to-gray-100"
-              style={{ cursor: 'grab' }}
-            >
-              <div className="flex justify-center">
-                <div 
-                  className="relative inline-block bg-white shadow-xl border border-gray-200 rounded-lg overflow-hidden"
-                >
-                  {selectedField && (
-                    <div className="absolute top-0 left-0 right-0 z-10 bg-blue-600/90 text-white px-3 py-1 text-xs font-medium">
-                      Selecting for: {formatFieldLabel(fields.find(f => f.key === selectedField)?.label || '')}
-                      <span className="ml-2 text-blue-200">
-                        ({selectionMode === 'sections' ? 'Click sections' : selectionMode === 'lines' ? 'Click lines' : 'Drag to select'})
-                      </span>
-                    </div>
-                  )}
-                  
-                  <canvas 
-                    ref={canvasRef} 
-                    className="block"
-                    style={{ 
-                      cursor: selectedField ? (selectionMode === 'sections' || selectionMode === 'lines' ? 'pointer' : 'crosshair') : 'default',
-                      display: 'block',
-                      maxWidth: '100%',
-                      height: 'auto',
-                      opacity: isLoading ? 0.5 : 1,
-                      transition: 'opacity 0.2s, transform 0.2s',
-                      transform: `scale(${zoomLevel}) ${selectedField ? 'scale(1.02)' : 'scale(1)'}`,
-                      transformOrigin: 'center top',
-                      marginTop: selectedField ? '24px' : '0'
-                    }}
-                  />
-                  
-                  {isLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm">
-                      <div className="flex flex-col items-center space-y-3">
-                        <div className="relative">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                          <div className="absolute inset-0 animate-ping rounded-full h-8 w-8 border-b-2 border-blue-300 opacity-30"></div>
-                        </div>
-                        <span className="text-slate-600 text-sm font-medium">Loading page {currentPage}...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Zoom hint */}
-                  {!isLoading && !selectedField && (
-                    <div className="absolute bottom-4 right-4 bg-black/60 text-white px-3 py-1 rounded text-xs backdrop-blur-sm">
-                      Ctrl + Scroll to zoom
-                    </div>
-                  )}
-                  
-                  {/* Text overlay for selection */}
-                  {selectedField && pageViewport && !isLoading && (
-                    <div 
-                      ref={overlayRef}
-                      className="absolute inset-0"
-                      style={{ 
-                        pointerEvents: 'auto',
-                        userSelect: selectionMode === 'selection' ? 'text' : 'none',
-                        background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.03) 0%, rgba(147, 51, 234, 0.03) 100%)',
-                        marginTop: selectedField ? '24px' : '0',
-                        transform: `scale(${zoomLevel})`,
-                        transformOrigin: 'top left'
-                      }}
-                      onMouseUp={selectionMode === 'selection' ? handleTextSelection : undefined}
-                    >
-                      {selectionMode === 'sections' ? (
-                        textSections.map((section, sectionIndex) => (
-                          <div
-                            key={`section-${sectionIndex}`}
-                            className={`absolute border-2 border-blue-500 bg-blue-500 bg-opacity-20 rounded cursor-pointer transition-opacity duration-200 ${
-                              hoveredSection === sectionIndex ? 'opacity-100' : 'opacity-50'
-                            }`}
-                            style={{
-                              left: `${Math.min(...section.flatMap(line => line.map(item => item.x)))}px`,
-                              top: `${Math.min(...section.flatMap(line => line.map(item => item.y - (item.fontSize * 0.8))))}px`,
-                              width: `${Math.max(...section.flatMap(line => line.map(item => item.x + item.width))) - Math.min(...section.flatMap(line => line.map(item => item.x)))}px`,
-                              height: `${Math.max(...section.flatMap(line => line.map(item => item.y))) - Math.min(...section.flatMap(line => line.map(item => item.y - (item.fontSize * 0.8))))}px`,
-                            }}
-                            onMouseEnter={() => setHoveredSection(sectionIndex)}
-                            onMouseLeave={() => setHoveredSection(null)}
-                            onClick={() => handleSectionClick(sectionIndex)}
-                          />
-                        ))
-                      ) : selectionMode === 'lines' ? (
-                        textLines.map((line, lineIndex) => (
-                          <div
-                            key={`line-${lineIndex}`}
-                            className={`absolute border border-green-500 bg-green-500 bg-opacity-15 rounded cursor-pointer transition-all duration-200 ${
-                              hoveredLine === lineIndex ? 'opacity-100 border-2 bg-opacity-25' : 'opacity-0 hover:opacity-60'
-                            }`}
-                            style={{
-                              left: `${Math.min(...line.map(item => item.x))}px`,
-                              top: `${Math.min(...line.map(item => item.y - (item.fontSize * 0.8)))}px`,
-                              width: `${Math.max(...line.map(item => item.x + item.width)) - Math.min(...line.map(item => item.x))}px`,
-                              height: `${Math.max(...line.map(item => item.y)) - Math.min(...line.map(item => item.y - (item.fontSize * 0.8)))}px`,
-                            }}
-                            onMouseEnter={() => setHoveredLine(lineIndex)}
-                            onMouseLeave={() => setHoveredLine(null)}
-                            onClick={() => handleLineClick(lineIndex)}
-                            title={line.map(item => item.str).join(' ')}
-                          />
-                        ))
-                      ) : (
-                        /* Traditional text selection overlay */
-                        textItems.map((item, index) => (
-                          <div
-                            key={index}
-                            style={{
-                              position: 'absolute',
-                              left: `${item.x}px`,
-                              top: `${item.y - item.fontSize * 0.8}px`,
-                              width: `${item.width}px`,
-                              height: `${item.fontSize}px`,
-                              fontSize: `${item.fontSize}px`,
-                              lineHeight: `${item.fontSize}px`,
-                              color: 'transparent',
-                              background: 'linear-gradient(90deg, rgba(255, 235, 59, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%)',
-                              cursor: 'text',
-                              border: '1px solid rgba(255, 193, 7, 0.2)',
-                              borderRadius: '2px',
-                              whiteSpace: 'nowrap',
-                              overflow: 'visible',
-                              transition: 'all 0.15s ease',
-                              WebkitUserSelect: 'text',
-                              MozUserSelect: 'text',
-                              msUserSelect: 'text',
-                              userSelect: 'text',
-                            }}
-                            className="hover:shadow-sm hover:bg-opacity-25"
-                            title={item.str}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'linear-gradient(90deg, rgba(255, 235, 59, 0.25) 0%, rgba(255, 193, 7, 0.2) 100%)';
-                              e.currentTarget.style.borderColor = 'rgba(255, 193, 7, 0.4)';
-                              e.currentTarget.style.transform = 'scale(1.02)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'linear-gradient(90deg, rgba(255, 235, 59, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%)';
-                              e.currentTarget.style.borderColor = 'rgba(255, 193, 7, 0.2)';
-                              e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                          >
-                            <span style={{ 
-                              color: 'transparent',
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              WebkitUserSelect: 'text',
-                              MozUserSelect: 'text',
-                              msUserSelect: 'text',
-                              userSelect: 'text',
-                            }}>
-                              {item.str}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end space-x-3 p-6 border-t border-slate-700/50">
-          <button
-            onClick={handleClose}
-            className="px-4 py-2 text-slate-400 hover:text-slate-200 transition-colors"
-          >
-            Done
-          </button>
+          {/* Selection Mode */}
+          <div className="border-t border-slate-700/50 pt-4">
+            <h3 className="text-sm font-medium text-slate-300 mb-3">Selection Mode</h3>
+            <div className="flex flex-col space-y-1 bg-slate-800/50 rounded-lg p-1">
+              <button
+                onClick={() => setSelectionMode('sections')}
+                className={`px-3 py-2 text-sm font-medium rounded transition-all duration-200 text-left ${
+                  selectionMode === 'sections'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+                title="Click entire sections to select"
+              >
+                Sections
+              </button>
+              <button
+                onClick={() => setSelectionMode('lines')}
+                className={`px-3 py-2 text-sm font-medium rounded transition-all duration-200 text-left ${
+                  selectionMode === 'lines'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+                title="Click entire lines to select"
+              >
+                Lines
+              </button>
+              <button
+                onClick={() => setSelectionMode('selection')}
+                className={`px-3 py-2 text-sm font-medium rounded transition-all duration-200 text-left ${
+                  selectionMode === 'selection'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+                title="Select text by dragging"
+              >
+                Text Selection
+              </button>
+            </div>
+          </div>
+
+          {/* Zoom Controls */}
+          <div className="border-t border-slate-700/50 pt-4">
+            <h3 className="text-sm font-medium text-slate-300 mb-3">Zoom</h3>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 0.5}
+                className="p-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Zoom out (Ctrl+Scroll)"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              
+              <button
+                onClick={handleZoomReset}
+                className="flex-1 px-3 py-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors text-sm font-medium"
+                title="Reset zoom"
+              >
+                {Math.round(zoomLevel * 100)}%
+              </button>
+              
+              <button
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 3}
+                className="p-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Zoom in (Ctrl+Scroll)"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mt-2 text-center">
+              Ctrl + Scroll to zoom
+            </p>
+          </div>
+
+          {/* Spacer to push Done button to bottom */}
+          <div className="flex-1"></div>
+
+          {/* Done Button */}
+          <div className="border-t border-slate-700/50 pt-4">
+            <button
+              onClick={handleClose}
+              className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </div>

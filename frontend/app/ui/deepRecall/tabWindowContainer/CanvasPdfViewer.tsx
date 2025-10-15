@@ -21,6 +21,7 @@ export interface CanvasPdfViewerHandle {
 interface CanvasPdfViewerProps {
   pdfUrl: string;
   onLoadSuccess: (info: { numPages: number }) => void;
+  onDocumentReady?: () => void; // New callback for when document is fully ready for restoration
   annotationMode: AnnotationMode;
   annotations: Annotation[];
   selectedId: string | null;
@@ -38,6 +39,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
   ({
     pdfUrl,
     onLoadSuccess,
+    onDocumentReady,
     annotationMode,
     annotations,
     selectedId,
@@ -146,6 +148,11 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
               setVisiblePages(initialWindow);
               loadedUrlRef.current = pdfUrl;
               onLoadSuccess({ numPages: pages });
+              
+              // Notify that document is ready for position restoration
+              setTimeout(() => {
+                onDocumentReady?.();
+              }, 100); // Small delay to ensure all state updates are complete
             }
             return;
           }
@@ -214,6 +221,11 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
                 initialWindow.add(page);
               }
               setVisiblePages(initialWindow);          onLoadSuccess({ numPages: pages });
+              
+              // Notify that document is ready for position restoration
+              setTimeout(() => {
+                onDocumentReady?.();
+              }, 100); // Small delay to ensure all state updates are complete
 
         } catch (error) {
           console.error('Failed to load PDF:', error);
@@ -1187,6 +1199,7 @@ const CanvasPdfViewer = forwardRef<CanvasPdfViewerHandle, CanvasPdfViewerProps>(
               pageNumber={pageNumber}
               zoom={zoom}
               isVisible={isPageVisible}
+              annotationMode={annotationMode}
               onPageRendered={(pageNumber: number, width: number, height: number) => {
                 // Store base dimensions (without zoom applied)
                 const baseWidth = width / zoom;

@@ -14,3 +14,9 @@ backend/public/uploads/
 
 *.wav
 *.mp3
+
+# Capacitor build files
+frontend/out/
+frontend/ios/
+frontend/android/
+frontend/.capacitor/

@@ -174,7 +174,7 @@ export class PdfDocumentService {
   }
   
   /**
-   * Render a page to canvas
+   * Render a page to canvas with optional text layer
    */
   async renderPageToCanvas(
     pageNumber: number,
@@ -229,16 +229,191 @@ export class PdfDocumentService {
       };
       
       const renderTask = page.render(renderContext);
-      
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise<void>((_, reject) => {
         setTimeout(() => reject(new Error('Render timeout')), 15000);
       });
-      
-      await Promise.race([renderTask.promise, timeoutPromise]);
+      // Race between render task and timeout, but ignore render cancellations
+      try {
+        await Promise.race([renderTask.promise, timeoutPromise]);
+      } catch (error) {
+        if (error instanceof Error && (
+          error.message.includes('Rendering cancelled') ||
+          error.message.includes('Render timeout')
+        )) {
+          console.warn(`Render issue for page ${pageNumber}: ${error.message}`);
+        } else {
+          throw error;
+        }
+      }
       
     } finally {
       this.renderingQueue.delete(renderKey);
+    }
+  }
+
+  /**
+   * Get text content for a page
+   */
+  async getPageTextContent(pageNumber: number) {
+    const page = await this.getPage(pageNumber);
+    return await page.getTextContent();
+  }
+
+  /**
+   * Render text layer to a container element with proper coordinate transformation and font properties
+   */
+  async renderTextLayer(
+    pageNumber: number,
+    textLayerDiv: HTMLDivElement,
+    scale: number = 1
+  ): Promise<void> {
+    try {
+      const page = await this.getPage(pageNumber);
+      const viewport = page.getViewport({ scale });
+      const textContent = await page.getTextContent();
+      
+      // Clear existing text layer
+      textLayerDiv.innerHTML = '';
+      
+      // Set up the text layer container
+      textLayerDiv.style.position = 'absolute';
+      textLayerDiv.style.left = '0';
+      textLayerDiv.style.top = '0';
+      textLayerDiv.style.width = `${viewport.width}px`;
+      textLayerDiv.style.height = `${viewport.height}px`;
+      textLayerDiv.style.overflow = 'hidden';
+      textLayerDiv.style.pointerEvents = 'auto';
+      textLayerDiv.style.userSelect = 'text';
+      
+      // Process all text items with proper font properties
+      const textItems = textContent.items;
+      
+      for (let i = 0; i < textItems.length; i++) {
+        const textItem = textItems[i] as any;
+        
+        if (!textItem.str || textItem.str.trim() === '') continue;
+        if (!textItem.transform || textItem.transform.length < 6) continue;
+        
+        const span = document.createElement('span');
+        span.style.position = 'absolute';
+        span.style.whiteSpace = 'pre';
+        span.style.pointerEvents = 'auto';
+        span.style.userSelect = 'text';
+        span.style.color = 'transparent';
+        span.style.cursor = 'text';
+        span.style.lineHeight = '1';
+        span.style.margin = '0';
+        span.style.padding = '0';
+        span.textContent = textItem.str;
+        
+        // Get transform matrix: [scaleX, skewY, skewX, scaleY, translateX, translateY]
+        const [scaleX, skewY, skewX, scaleY, translateX, translateY] = textItem.transform;
+        
+        // Use PDF.js proper coordinate transformation
+        const x = translateX;
+        const y = translateY;
+        
+        // Transform coordinates using viewport - this handles all coordinate system conversion
+        const point = viewport.convertToViewportPoint(x, y);
+        
+        // Calculate font size properly
+        const fontSize = Math.abs(scaleY);
+        const scaledFontSize = fontSize * scale;
+        
+        // Position the text span
+        span.style.left = `${point[0]}px`;
+        span.style.top = `${point[1] - scaledFontSize}px`; // Subtract font size to align baseline
+        span.style.fontSize = `${scaledFontSize}px`;
+        
+        // Extract and apply font properties from the text item itself
+        let fontFamily = 'serif'; // Default fallback
+        let fontWeight = 'normal';
+        let fontStyle = 'normal';
+        
+        // PDF.js text items have font information in the fontName property
+        if (textItem.fontName) {
+          const fontName = textItem.fontName.toLowerCase();
+          
+          console.log(`Font for "${textItem.str}": ${textItem.fontName}`);
+          
+          // Determine font family based on PDF font name
+          if (fontName.includes('helvetica') || fontName.includes('arial')) {
+            fontFamily = 'Arial, Helvetica, sans-serif';
+          } else if (fontName.includes('times') || fontName.includes('roman')) {
+            fontFamily = 'Times, "Times New Roman", serif';
+          } else if (fontName.includes('courier') || fontName.includes('mono')) {
+            fontFamily = 'Courier, "Courier New", monospace';
+          } else if (fontName.includes('sans')) {
+            fontFamily = 'Arial, Helvetica, sans-serif';
+          } else {
+            // For other fonts, try to use a similar web font
+            fontFamily = 'serif';
+          }
+          
+          // Determine font weight
+          if (fontName.includes('bold')) {
+            fontWeight = 'bold';
+          } else if (fontName.includes('light')) {
+            fontWeight = '300';
+          } else if (fontName.includes('medium')) {
+            fontWeight = '500';
+          } else if (fontName.includes('black') || fontName.includes('heavy')) {
+            fontWeight = '900';
+          }
+          
+          // Determine font style
+          if (fontName.includes('italic') || fontName.includes('oblique')) {
+            fontStyle = 'italic';
+          }
+        }
+        
+        // Check if the text item has additional font properties
+        if (textItem.dir) {
+          // Handle text direction if available
+        }
+        
+        // Check for width information to help with font scaling
+        if (textItem.width) {
+          // Calculate character width for better font matching
+          const charWidth = textItem.width / textItem.str.length;
+          // You could use this to adjust letter-spacing if needed
+        }
+        
+        // Apply font properties
+        span.style.fontFamily = fontFamily;
+        span.style.fontWeight = fontWeight;
+        span.style.fontStyle = fontStyle;
+        
+        // Handle horizontal text direction and scaling
+        if (scaleX < 0) {
+          span.style.transform = 'scaleX(-1)';
+          span.style.transformOrigin = 'left center';
+        } else if (Math.abs(scaleX) !== 1 && Math.abs(scaleX) !== Math.abs(scaleY)) {
+          // Handle text scaling for more accurate size matching
+          const scaleXFactor = Math.abs(scaleX) / Math.abs(scaleY);
+          span.style.transform = `scaleX(${scaleXFactor})`;
+          span.style.transformOrigin = 'left center';
+        }
+        
+        textLayerDiv.appendChild(span);
+      }
+      
+    } catch (error) {
+      console.error(`Failed to render text layer for page ${pageNumber}:`, error);
+      
+      // Add minimal error indicator
+      textLayerDiv.innerHTML = '';
+      const errorDiv = document.createElement('div');
+      errorDiv.style.position = 'absolute';
+      errorDiv.style.top = '10px';
+      errorDiv.style.left = '10px';
+      errorDiv.style.background = 'red';
+      errorDiv.style.color = 'white';
+      errorDiv.style.padding = '5px';
+      errorDiv.style.fontSize = '12px';
+      errorDiv.textContent = `Text Layer Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      textLayerDiv.appendChild(errorDiv);
     }
   }
   

@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Link } from '@/src/i18n/routing';
-import { useTranslations, useLocale } from 'next-intl';
+import Link from 'next/link';
 
 interface TopNavProps {
     isLoggedIn: boolean;
@@ -19,9 +18,6 @@ export default function TopNav({ isLoggedIn }: TopNavProps) {
                     </li>
                     <li>
                         <Link href="/conversate" className="hover:underline">Conversate</Link>
-                    </li>
-                    <li>
-                        <Link href="/meepStudio" className="hover:underline">Meep Studio</Link>
                     </li>
                     <li className="relative group">
                         <button className="flex items-center hover:underline focus:outline-none">

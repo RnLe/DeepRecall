@@ -1,13 +1,18 @@
 // literatureCardSlim.tsx
 import React from 'react';
-import { LiteratureExtended, getDisplayYear } from '../../types/deepRecall/strapi/literatureTypes';
+import { LiteratureExtended, getDisplayYear, isLiteratureRead, isLiteratureFavorite } from '../../types/deepRecall/strapi/literatureTypes';
 import { VersionExtended } from '../../types/deepRecall/strapi/versionTypes';
 import { prefixStrapiUrl } from '../../helpers/getStrapiMedia';
+import { Glasses, Star, CheckSquare, Square } from 'lucide-react';
 
 interface LiteratureCardSlimProps {
   literature: LiteratureExtended;
   onClick?: () => void;
   onPdfPreview?: () => void;
+  isSelectionMode?: boolean;
+  isMultiSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: () => void;
 }
 
 /**
@@ -23,7 +28,15 @@ const getLatestThumbnail = (versions?: VersionExtended[]): string | null => {
   return sorted[0].thumbnailUrl ? prefixStrapiUrl(sorted[0].thumbnailUrl) : null;
 };
 
-const LiteratureCardSlim: React.FC<LiteratureCardSlimProps> = ({ literature, onClick, onPdfPreview }) => {
+const LiteratureCardSlim: React.FC<LiteratureCardSlimProps> = ({ 
+  literature, 
+  onClick, 
+  onPdfPreview, 
+  isSelectionMode = false,
+  isMultiSelectMode = false,
+  isSelected = false,
+  onToggleSelection
+}) => {
   const { 
     title, 
     authors: rawAuthors, 
@@ -52,9 +65,40 @@ const LiteratureCardSlim: React.FC<LiteratureCardSlimProps> = ({ literature, onC
 
   return (
     <div 
-      className="group relative bg-slate-800/20 backdrop-blur-sm border border-slate-700/30 rounded-lg p-3 hover:border-slate-600/50 hover:bg-slate-800/40 transition-all duration-200 cursor-pointer"
+      className={`group relative backdrop-blur-sm rounded-lg p-3 transition-all duration-200 cursor-pointer ${
+        isMultiSelectMode && isSelected
+          ? 'bg-blue-800/30 border-2 border-blue-500/60 hover:border-blue-400 hover:bg-blue-800/40'
+          : isSelectionMode 
+            ? 'bg-emerald-800/20 border-2 border-emerald-500/60 hover:border-emerald-400 hover:bg-emerald-800/30' 
+            : 'bg-slate-800/20 border border-slate-700/30 hover:border-slate-600/50 hover:bg-slate-800/40'
+      }`}
       onClick={onClick}
     >
+      {/* Multi-select checkbox */}
+      {isMultiSelectMode && (
+        <div 
+          className="absolute top-2 right-2 z-10 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelection?.();
+          }}
+        >
+          {isSelected ? (
+            <CheckSquare className="w-5 h-5 text-blue-500" />
+          ) : (
+            <Square className="w-5 h-5 text-slate-400 hover:text-slate-300" />
+          )}
+        </div>
+      )}
+      
+      {/* Add to collection indicator */}
+      {isSelectionMode && !isMultiSelectMode && (
+        <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center z-10">
+          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </div>
+      )}
       {/* Type indicator */}
       <div className={`absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b ${getTypeColor(type)} opacity-60 rounded-l-lg`}></div>
       
@@ -113,8 +157,17 @@ const LiteratureCardSlim: React.FC<LiteratureCardSlimProps> = ({ literature, onC
         </div>
 
         {/* Actions */}
-        <div className="flex items-center space-x-3 flex-shrink-0">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full opacity-60"></div>
+        <div className="flex items-center space-x-2 flex-shrink-0">
+          {isLiteratureRead(literature) && (
+            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+              <Glasses className="w-2.5 h-2.5 text-white" />
+            </div>
+          )}
+          {isLiteratureFavorite(literature) && (
+            <div className="w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center">
+              <Star className="w-2.5 h-2.5 text-white fill-current" />
+            </div>
+          )}
         </div>
       </div>
     </div>

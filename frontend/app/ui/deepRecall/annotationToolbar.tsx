@@ -41,7 +41,8 @@ const ToolBtn: React.FC<{
 );
 
 const AnnotationToolbar: React.FC<Props> = ({ mode, setMode }) => {
-  useGlobalCursor(mode);
+  // Remove global cursor override to allow individual canvas cursor control
+  // useGlobalCursor(mode);
 
   const toggle = (m: AnnotationMode) => setMode(mode === m ? "none" : m);
 

@@ -75,3 +75,4 @@ services:
       - USE_CUDA=true
     volumes:
       - ./python/:/app/
+    runtime: nvidia

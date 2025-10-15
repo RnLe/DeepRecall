@@ -6,12 +6,25 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build:export": "next build && next export",
+    "build:capacitor": "next build && next export && npx cap copy && npx cap sync",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "cap:init": "npx cap init",
+    "cap:add:ios": "npx cap add ios",
+    "cap:copy": "npx cap copy",
+    "cap:sync": "npx cap sync",
+    "cap:open:ios": "npx cap open ios"
   },
   "dependencies": {
     "@apollo/client": "^3.0.0",
+    "@capacitor/app": "^7.0.1",
+    "@capacitor/core": "^7.1.2",
+    "@capacitor/filesystem": "^7.0.1",
+    "@capacitor/haptics": "^7.0.1",
+    "@capacitor/ios": "^7.1.2",
+    "@capacitor/preferences": "^7.0.1",
     "@formatjs/intl-localematcher": "^0.5.10",
     "@google-cloud/local-auth": "^2.1.0",
     "@highlight-run/next": "^7.6.12",
@@ -21,6 +34,7 @@
     "autoprefixer": "10.4.20",
     "axios": "^1.4.0",
     "bcrypt": "^5.1.1",
+    "canvas": "^3.1.2",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
     "googleapis": "^105.0.0",
@@ -47,6 +61,7 @@
     "react-konva": "^19.0.3",
     "react-markdown": "^10.1.0",
     "react-modal": "^3.16.1",
+    "react-pdf": "^10.0.1",
     "react-redux": "^9.0.0",
     "react-rnd": "^10.5.2",
     "reactflow": "^11.11.4",
@@ -61,6 +76,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@tailwindcss/typography": "^0.5.16",
     "@types/bcrypt": "^5.0.2",

@@ -549,6 +549,35 @@ export interface ApiCardTypeCardType extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiCollectionCollection extends Struct.CollectionTypeSchema {
+  collectionName: 'collections';
+  info: {
+    displayName: 'Collection';
+    pluralName: 'collections';
+    singularName: 'collection';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::collection.collection'
+    > &
+      Schema.Attribute.Private;
+    metadata: Schema.Attribute.JSON;
+    publishedAt: Schema.Attribute.DateTime;
+    title: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiColorSchemeColorScheme extends Struct.CollectionTypeSchema {
   collectionName: 'color_schemes';
   info: {
@@ -1133,6 +1162,7 @@ declare module '@strapi/strapi' {
       'api::annotation.annotation': ApiAnnotationAnnotation;
       'api::author.author': ApiAuthorAuthor;
       'api::card-type.card-type': ApiCardTypeCardType;
+      'api::collection.collection': ApiCollectionCollection;
       'api::color-scheme.color-scheme': ApiColorSchemeColorScheme;
       'api::deck.deck': ApiDeckDeck;
       'api::knowledge-pack.knowledge-pack': ApiKnowledgePackKnowledgePack;

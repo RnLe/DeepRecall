@@ -1,15 +1,16 @@
-import { signOut } from "@/auth"
+'use client';
+
 import { Button } from "./buttons"
  
 export function SignOut() {
+  const handleSignOut = () => {
+    // TODO: Implement client-side authentication
+    alert('Authentication needs to be implemented for static builds');
+  };
+
   return (
-    <form
-      action={async () => {
-        "use server"
-        await signOut({ redirectTo: "/" })
-      }}
-    >
-      <Button>Sign Out</Button>
-    </form>
-  )
+    <div>
+      <Button onClick={handleSignOut}>Sign Out (Not Implemented)</Button>
+    </div>
+  );
 }

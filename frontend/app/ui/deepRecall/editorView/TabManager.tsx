@@ -18,6 +18,7 @@ interface Props {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   taskModelMap: Record<string, string>;
+  initialFileHash?: string | null;
 }
 
 const TabManager: React.FC<Props> = ({
@@ -29,6 +30,7 @@ const TabManager: React.FC<Props> = ({
   sidebarOpen,
   onToggleSidebar,
   taskModelMap,
+  initialFileHash,
 }) => {
   const active = tabs.find((t) => t.documentId === activeTabId);
 
@@ -86,6 +88,7 @@ const TabManager: React.FC<Props> = ({
       colorMap={colorMap}
       sidebarOpen={sidebarOpen}
       onToggleSidebar={onToggleSidebar}
+      initialFileHash={initialFileHash}
     />
   );
 };

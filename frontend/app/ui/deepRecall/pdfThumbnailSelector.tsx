@@ -3,24 +3,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Upload, X } from 'lucide-react';
 import { pdfDocumentService } from '../../services/pdfDocumentService';
+import { MediaFile } from '../../types/strapiTypes';
+import { getStrapiMedia } from '../../helpers/getStrapiMedia';
 
 interface PdfThumbnailSelectorProps {
   file: File | null;
+  mediaFile?: MediaFile; // Optional MediaFile for edit mode
   onThumbnailChange: (thumbnail: File | null) => void;
   onThumbnailUrlChange: (url: string | null) => void;
   selectedPage?: number;
   onPageChange?: (page: number) => void;
   onCustomImageDrop?: (file: File) => void;
+  initialThumbnailUrl?: string | null;
   className?: string;
 }
 
 const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
   file,
+  mediaFile,
   onThumbnailChange,
   onThumbnailUrlChange,
   selectedPage = 1,
   onPageChange,
   onCustomImageDrop,
+  initialThumbnailUrl = null,
   className = ""
 }) => {
   const [totalPages, setTotalPages] = useState(0);
@@ -32,6 +38,7 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
     compressedSize: string;
   } | null>(null);
   const [useCustomThumbnail, setUseCustomThumbnail] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isDragOverThumbnail, setIsDragOverThumbnail] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,17 +46,32 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
   // Load PDF and get total pages
   useEffect(() => {
     const loadPdf = async () => {
-      if (!file) {
+      // Determine the PDF source: File object or MediaFile URL
+      let pdfSource: string | null = null;
+      let shouldRevoke = false;
+      
+      if (file) {
+        // Create object URL from File
+        pdfSource = URL.createObjectURL(file);
+        shouldRevoke = true;
+      } else if (mediaFile) {
+        // Use MediaFile URL
+        pdfSource = getStrapiMedia(mediaFile);
+      }
+      
+      if (!pdfSource) {
         setTotalPages(0);
-        setThumbnailUrl(null);
-        onThumbnailUrlChange(null);
+        // Only clear thumbnail if no initial thumbnail URL is provided
+        if (!initialThumbnailUrl) {
+          setThumbnailUrl(null);
+          onThumbnailUrlChange(null);
+        }
         return;
       }
 
       try {
         setIsLoading(true);
-        const fileUrl = URL.createObjectURL(file);
-        const document = await pdfDocumentService.loadDocument(fileUrl);
+        const document = await pdfDocumentService.loadDocument(pdfSource);
         const info = pdfDocumentService.getDocumentInfo();
         setTotalPages(info.numPages);
       } catch (error) {
@@ -57,6 +79,10 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
         setTotalPages(0);
       } finally {
         setIsLoading(false);
+        // Clean up object URL if we created one
+        if (shouldRevoke && pdfSource) {
+          URL.revokeObjectURL(pdfSource);
+        }
       }
     };
 
@@ -67,12 +93,29 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
         URL.revokeObjectURL(thumbnailUrl);
       }
     };
-  }, [file]);
+  }, [file, mediaFile, initialThumbnailUrl]);
+
+  // Handle initial thumbnail URL for edit mode
+  useEffect(() => {
+    if (!file && initialThumbnailUrl) {
+      setThumbnailUrl(initialThumbnailUrl);
+      onThumbnailUrlChange(initialThumbnailUrl);
+      setIsEditMode(true); // We're in edit mode with an existing thumbnail
+      setUseCustomThumbnail(false); // Start with original thumbnail, not custom
+    } else {
+      setIsEditMode(false);
+    }
+  }, [initialThumbnailUrl, file, onThumbnailUrlChange]);
 
   // Generate thumbnail when page changes
   useEffect(() => {
     const generateThumbnail = async () => {
-      if (!file || totalPages === 0 || !canvasRef.current || useCustomThumbnail) return;
+      if ((!file && !mediaFile) || totalPages === 0 || !canvasRef.current || useCustomThumbnail) return;
+      
+      // In edit mode, only generate if we don't have a thumbnail (i.e., after reset)
+      if (isEditMode && thumbnailUrl && !thumbnailUrl.startsWith('blob:')) {
+        return; // Don't regenerate if we have the original thumbnail URL
+      }
 
       try {
         setIsLoading(true);
@@ -87,7 +130,7 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
         canvas.toBlob((blob) => {
           if (blob) {
             const url = URL.createObjectURL(blob);
-            if (thumbnailUrl) {
+            if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
               URL.revokeObjectURL(thumbnailUrl);
             }
             setThumbnailUrl(url);
@@ -108,7 +151,7 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
     };
 
     generateThumbnail();
-  }, [selectedPage, totalPages, file, useCustomThumbnail]);
+  }, [selectedPage, totalPages, file, mediaFile, useCustomThumbnail, isEditMode]); // Remove thumbnailUrl from dependencies to prevent infinite loop
 
   // Handle custom thumbnail upload
   const handleCustomThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,14 +275,26 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    // Clear the custom thumbnail URL and regenerate from PDF
-    if (thumbnailUrl) {
-      URL.revokeObjectURL(thumbnailUrl);
-      setThumbnailUrl(null);
+    
+    // In edit mode, enable page selection by clearing the initial thumbnail
+    if (isEditMode) {
+      // Clear the existing thumbnail URL to trigger regeneration
+      if (thumbnailUrl) {
+        URL.revokeObjectURL(thumbnailUrl);
+        setThumbnailUrl(null);
+      }
+      onThumbnailChange(null); // Clear custom thumbnail file
+      // The useEffect for thumbnail generation will pick this up and regenerate based on selectedPage
+    } else {
+      // Clear the custom thumbnail URL and regenerate from PDF (create mode)
+      if (thumbnailUrl) {
+        URL.revokeObjectURL(thumbnailUrl);
+        setThumbnailUrl(null);
+      }
     }
   };
 
-  if (!file) {
+  if (!file && !initialThumbnailUrl) {
     return (
       <div className={`flex items-center justify-center h-48 bg-slate-700/30 border border-slate-600/30 rounded-lg ${className}`}>
         <div className="text-center text-slate-500">
@@ -291,10 +346,11 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
           </div>
         </div>
 
-        {/* Page Navigation (only show for PDF thumbnails) */}
-        {totalPages > 1 && !useCustomThumbnail && (
+        {/* Page Navigation (only show for PDF thumbnails and when not showing original in edit mode) */}
+        {totalPages > 1 && !useCustomThumbnail && !(isEditMode && thumbnailUrl && !thumbnailUrl.startsWith('blob:')) && (
           <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 bg-black/60 rounded-lg px-3 py-1">
             <button
+              type="button"
               onClick={goToPreviousPage}
               disabled={selectedPage <= 1}
               className="p-1 text-white disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-white/20 rounded"
@@ -307,6 +363,7 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
             </span>
             
             <button
+              type="button"
               onClick={goToNextPage}
               disabled={selectedPage >= totalPages}
               className="p-1 text-white disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-white/20 rounded"
@@ -341,6 +398,7 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
               className="hidden"
             />
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center space-x-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
             >
@@ -348,14 +406,15 @@ const PdfThumbnailSelector: React.FC<PdfThumbnailSelectorProps> = ({
               <span>Custom</span>
             </button>
 
-            {/* Switch back to generated thumbnail */}
-            {useCustomThumbnail && (
+            {/* Switch back to generated/original thumbnail */}
+            {(useCustomThumbnail || (isEditMode && customThumbnail)) && (
               <button
+                type="button"
                 onClick={switchToGeneratedThumbnail}
                 className="flex items-center space-x-1 px-2 py-1 text-xs bg-slate-600 text-white rounded hover:bg-slate-700 transition-colors"
               >
                 <X className="w-3 h-3" />
-                <span>Reset</span>
+                <span>{isEditMode ? "Restore" : "Reset"}</span>
               </button>
             )}
           </div>

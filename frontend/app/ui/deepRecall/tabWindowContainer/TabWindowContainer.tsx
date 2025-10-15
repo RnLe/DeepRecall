@@ -1,7 +1,7 @@
 // -----------------------------------------------
 // Imports: React, icons, components, hooks, types, APIs
 // -----------------------------------------------
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,6 +28,8 @@ import { AiTasks, AiTaskKey, fieldByTask } from "@/app/api/openAI/promptTypes";
 import MarkdownResponseModal from "../MarkdownResponseModal";
 import { executeOpenAIRequest } from "@/app/api/openAI/openAIService";
 import { useCanvasPdfViewerStore } from "@/app/stores/canvasPdfViewerStore";
+import { updateVersionAnnotationCount } from "@/app/services/versionService";
+import { useAppStateStore } from "@/app/stores/appStateStore";
 
 // -----------------------------------------------
 // Type & Utility Definitions
@@ -44,6 +46,7 @@ interface Props {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   setAnnotationMode: (mode: AnnotationMode) => void;
+  initialFileHash?: string | null;
 }
 
 // -----------------------------------------------
@@ -56,18 +59,91 @@ const TabWindowContainer: React.FC<Props> = ({
   sidebarOpen,
   onToggleSidebar,
   setAnnotationMode,
+  initialFileHash,
 }) => {
   // ───── Store state ─────
-  const { currentPage, numPages, zoom, jumpToPage, setZoom, setNumPages, reset, isScrollingProgrammatically } = useCanvasPdfViewerStore();
+  const { currentPage, numPages, zoom, jumpToPage, setZoom, setNumPages, reset, isScrollingProgrammatically, setCurrentPage } = useCanvasPdfViewerStore();
+  const { saveCurrentTabPosition, restoreTabPosition, getActiveTab } = useAppStateStore();
 
   // ───── Derived constants from props & literature ─────
   const litId = activeLiterature.documentId!;              // Unique literature identifier
-  const version = activeLiterature.versions[0];            // Use first version
+  
+  // Select the appropriate version based on initialFileHash if provided, otherwise use first version
+  const version = initialFileHash 
+    ? activeLiterature.versions.find(v => v.fileHash === initialFileHash) || activeLiterature.versions[0]
+    : activeLiterature.versions[0];
+    
   const pdfId = version.fileHash ?? "";                  // File hash for annotations
   const pdfUrl = version.fileUrl ?? "";                  // PDF source URL
 
-  // Remove the reset effect - let CanvasPdfViewer handle document changes
-  // This was causing unnecessary resets
+  // ───── Position restoration state ─────
+  const [hasRestoredPosition, setHasRestoredPosition] = useState(false);
+  
+  // ───── Document ready callback ─────
+  const handleDocumentReady = useCallback(() => {
+    // Only restore position once per document load
+    if (!hasRestoredPosition) {
+      const activeTab = getActiveTab();
+      if (activeTab && activeTab.literatureId === litId) {
+        const savedPosition = restoreTabPosition(activeTab.id);
+        
+        if (savedPosition && (savedPosition.currentPage || savedPosition.zoom)) {
+          console.log('TabWindowContainer: Document ready, restoring saved position:', savedPosition);
+          
+          // Step 1: Apply saved zoom first if it exists
+          if (savedPosition.zoom && Math.abs(savedPosition.zoom - zoom) > 0.05) {
+            console.log('TabWindowContainer: Restoring zoom from', zoom, 'to', savedPosition.zoom);
+            setZoom(savedPosition.zoom);
+            
+            // Step 2: Apply saved page after zoom has been applied
+            if (savedPosition.currentPage && savedPosition.currentPage !== currentPage && savedPosition.currentPage > 0) {
+              setTimeout(() => {
+                console.log('TabWindowContainer: Restoring page from', currentPage, 'to', savedPosition.currentPage);
+                jumpToPage(savedPosition.currentPage!);
+                
+                // Step 3: Restore scroll position after page navigation and rendering
+                if (savedPosition.scrollPosition !== undefined && savedPosition.scrollPosition > 0) {
+                  setTimeout(() => {
+                    const scrollContainer = document.querySelector('.h-full.overflow-y-auto') as HTMLElement;
+                    if (scrollContainer) {
+                      scrollContainer.scrollTop = savedPosition.scrollPosition!;
+                      console.log('TabWindowContainer: Restored scroll position to:', savedPosition.scrollPosition);
+                    }
+                  }, 300); // Allow time for page rendering after navigation
+                }
+              }, 200); // Allow time for zoom to be applied
+            }
+          } else if (savedPosition.currentPage && savedPosition.currentPage !== currentPage && savedPosition.currentPage > 0) {
+            // No zoom change needed, just apply page navigation
+            console.log('TabWindowContainer: Restoring page from', currentPage, 'to', savedPosition.currentPage);
+            jumpToPage(savedPosition.currentPage!);
+            
+            // Restore scroll position after page navigation
+            if (savedPosition.scrollPosition !== undefined && savedPosition.scrollPosition > 0) {
+              setTimeout(() => {
+                const scrollContainer = document.querySelector('.h-full.overflow-y-auto') as HTMLElement;
+                if (scrollContainer) {
+                  scrollContainer.scrollTop = savedPosition.scrollPosition!;
+                  console.log('TabWindowContainer: Restored scroll position to:', savedPosition.scrollPosition);
+                }
+              }, 200); // Allow time for page rendering
+            }
+          }
+          
+          setHasRestoredPosition(true);
+        }
+      }
+    }
+  }, [hasRestoredPosition, getActiveTab, restoreTabPosition, litId, setZoom, jumpToPage, zoom, currentPage]);
+  
+  // ───── Effect to reset position restoration flag when PDF URL changes ─────
+  useEffect(() => {
+    // Reset position restoration flag when PDF URL changes
+    if (pdfUrl) {
+      console.log('TabWindowContainer: PDF URL changed, resetting position restoration flag');
+      setHasRestoredPosition(false);
+    }
+  }, [pdfUrl]);
 
   // ───── Viewer References ─────
   const viewerRef = useRef<CanvasPdfViewerHandle>(null);         // Ref to PDF viewer instance
@@ -142,6 +218,10 @@ const TabWindowContainer: React.FC<Props> = ({
     if (!confirm("Are you sure you want to delete all selected annotations? This action cannot be undone.")) {
       return;
     }
+    
+    // Since each mutateDelete call will decrement by 1,
+    // we don't need to manually update the version count here.
+    // The useAnnotations hook will handle it for each deletion.
     for (const id of Array.from(multiSet)) {
       const ann = annotations.find((x) => x.documentId === id);
       if (ann?.extra?.imageFileId) {
@@ -149,6 +229,7 @@ const TabWindowContainer: React.FC<Props> = ({
       }
       await mutateDelete(id);
     }
+    
     setMultiSet(new Set());
   };
 
@@ -350,6 +431,46 @@ const TabWindowContainer: React.FC<Props> = ({
     }
   };
 
+  // ───── Effect to save current position to app store ─────
+  useEffect(() => {
+    // Save current PDF position to the app store for this tab
+    // Use a debounced approach to avoid saving too frequently
+    const savePosition = () => {
+      const scrollContainer = document.querySelector('.h-full.overflow-y-auto') as HTMLElement;
+      const scrollPosition = scrollContainer?.scrollTop || 0;
+      
+      saveCurrentTabPosition({
+        currentPage,
+        zoom,
+        scrollPosition,
+      });
+    };
+
+    // Debounce the save operation to avoid excessive updates
+    const timeoutId = setTimeout(savePosition, 500);
+    return () => clearTimeout(timeoutId);
+  }, [currentPage, zoom, saveCurrentTabPosition]);
+
+    // ───── Effect to save current position to app store ─────
+  useEffect(() => {
+    // Save current PDF position to the app store for this tab
+    // Use a debounced approach to avoid saving too frequently
+    const savePosition = () => {
+      const scrollContainer = document.querySelector('.h-full.overflow-y-auto') as HTMLElement;
+      const scrollPosition = scrollContainer?.scrollTop || 0;
+      
+      saveCurrentTabPosition({
+        currentPage,
+        zoom,
+        scrollPosition,
+      });
+    };
+
+    // Debounce the save operation to avoid excessive updates
+    const timeoutId = setTimeout(savePosition, 500);
+    return () => clearTimeout(timeoutId);
+  }, [currentPage, zoom, saveCurrentTabPosition]);
+
   // ───── Effect to scroll when jumping to page programmatically ─────
   useEffect(() => {
     const unsubscribe = useCanvasPdfViewerStore.subscribe(
@@ -453,6 +574,7 @@ const TabWindowContainer: React.FC<Props> = ({
             onLoadSuccess={({ numPages }) => {
               setNumPages(numPages);
             }}
+            onDocumentReady={handleDocumentReady}
             annotationMode={annotationMode}
             annotations={showAnnotations ? annotations : []}
             selectedId={selId}

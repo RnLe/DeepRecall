@@ -11,12 +11,14 @@ interface CreateLiteratureModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateLiterature?: () => void;
+  initialPdfFile?: File | null;
 }
 
 const CreateLiteratureModal: React.FC<CreateLiteratureModalProps> = ({
   isOpen,
   onClose,
-  onCreateLiterature
+  onCreateLiterature,
+  initialPdfFile
 }) => {
   const [selectedLiteratureType, setSelectedLiteratureType] = useState<LiteratureType | null>(null);
   const [showLiteratureForm, setShowLiteratureForm] = useState(false);
@@ -152,6 +154,7 @@ const CreateLiteratureModal: React.FC<CreateLiteratureModalProps> = ({
                   literatureType={selectedLiteratureType}
                   onSuccess={handleLiteratureSuccess}
                   onCancel={handleBack}
+                  initialPdfFile={initialPdfFile}
                 />
               )}
             </div>

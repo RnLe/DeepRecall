@@ -16,6 +16,7 @@ export interface SupportedLiteratureFields {
   versionsAreEqual?: boolean;
   icon?: string; // Lucide icon name for the literature type
   linkedVersionType?: string; // Single version type name this literature type is linked to
+  collections?: string[]; // Array of collection names this literature belongs to
 }
 
 /**
@@ -99,6 +100,44 @@ export const getDisplayYear = (literature: LiteratureExtended): string | null =>
 };
 
 /**
+ * Checks if any version of a literature item is marked as read.
+ */
+export const isLiteratureRead = (literature: LiteratureExtended): boolean => {
+  if (!literature.versions || literature.versions.length === 0) {
+    return false;
+  }
+  
+  return literature.versions.some(version => version.read);
+};
+
+/**
+ * Checks if any version of a literature item is marked as favorite.
+ */
+export const isLiteratureFavorite = (literature: LiteratureExtended): boolean => {
+  if (!literature.versions || literature.versions.length === 0) {
+    return false;
+  }
+  
+  return literature.versions.some(version => version.favorite);
+};
+
+/**
+ * Gets the earliest read date among all versions of a literature item.
+ */
+export const getLiteratureReadDate = (literature: LiteratureExtended): string | null => {
+  if (!literature.versions || literature.versions.length === 0) {
+    return null;
+  }
+  
+  const readDates = literature.versions
+    .filter(version => version.read)
+    .map(version => version.read!)
+    .sort();
+  
+  return readDates.length > 0 ? readDates[0] : null;
+};
+
+/**
  * Transforms a Literature object by parsing its metadata JSON string,
  * extracting supported fields, and separating custom fields.
  */
@@ -122,7 +161,7 @@ export const transformLiterature = (lit: Literature): LiteratureExtended => {
   }
 
   // Extract supported literature fields and exclude versions from customMetadata.
-  const { subtitle, publisher, authors, journal, doi, versionsAreEqual, icon, linkedVersionType, versions, ...customMetadata } = metadataObj;
+  const { subtitle, publisher, authors, journal, doi, versionsAreEqual, icon, linkedVersionType, collections, versions, ...customMetadata } = metadataObj;
 
   // Transform versions stored in metadata.
   const rawVersions = Array.isArray(versions) ? versions : [];
@@ -138,6 +177,7 @@ export const transformLiterature = (lit: Literature): LiteratureExtended => {
     versionsAreEqual,
     icon,
     linkedVersionType,
+    collections,
     customMetadata,
     versions: transformedVersions,
   };

@@ -21,16 +21,28 @@ import {
   Tags,
   Eye,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  ExternalLink
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { LiteratureExtended, getDisplayYear } from '../../types/deepRecall/strapi/literatureTypes';
 import { VersionExtended } from '../../types/deepRecall/strapi/versionTypes';
+import { Annotation, annotationTypes as importedAnnotationTypes } from '../../types/deepRecall/strapi/annotationTypes';
 import { prefixStrapiUrl } from '../../helpers/getStrapiMedia';
 import { useAnnotations } from '../../customHooks/useAnnotations';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateLiterature } from '../../api/literatureService';
 import { deleteAnnotation } from '../../api/annotationService';
 import { deleteFile } from '../../api/uploadFile';
+import EditVersionModal from './editVersionModal';
+import LiteratureAnnotationList, { SortMode, ViewMode } from './literatureAnnotationList';
+import AnnotationControls from './annotationControls';
+import AnnotationViewModal from './annotationViewModal';
+import { 
+  ImagePreviewModal, 
+  DescriptionPreviewModal, 
+  NotesPreviewModal 
+} from './annotationPreviewModals';
 
 interface LiteratureDetailModalProps {
   literature: LiteratureExtended;
@@ -47,14 +59,40 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
   onEdit,
   onAddVersion
 }) => {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAnnotationType, setSelectedAnnotationType] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'type' | 'title'>('date');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState<SortMode>('date');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [isDragOver, setIsDragOver] = useState(false);
   const [isGlobalDrag, setIsGlobalDrag] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [versionToDelete, setVersionToDelete] = useState<VersionExtended | null>(null);
+  const [versionToEdit, setVersionToEdit] = useState<VersionExtended | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Preview modal states
+  const [imagePreview, setImagePreview] = useState<{ isOpen: boolean; imageUrl: string; annotation: Annotation | null }>({
+    isOpen: false,
+    imageUrl: '',
+    annotation: null
+  });
+  const [descriptionPreview, setDescriptionPreview] = useState<{ isOpen: boolean; content: string; annotation: Annotation | null }>({
+    isOpen: false,
+    content: '',
+    annotation: null
+  });
+  const [notesPreview, setNotesPreview] = useState<{ isOpen: boolean; content: string; annotation: Annotation | null }>({
+    isOpen: false,
+    content: '',
+    annotation: null
+  });
+
+  // Annotation view modal state
+  const [annotationViewModal, setAnnotationViewModal] = useState<{ isOpen: boolean; annotation: Annotation | null }>({
+    isOpen: false,
+    annotation: null
+  });
 
   const queryClient = useQueryClient();
 
@@ -69,17 +107,53 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
       // No versions available
       setSelectedVersionId(null);
     }
-  }, [isOpen, literature.versions, selectedVersionId]);
+  }, [isOpen, literature.versions]); // Removed selectedVersionId to prevent re-render loop
 
   // Reset modal state when closing
   useEffect(() => {
     if (!isOpen) {
       setSelectedVersionId(null);
       setVersionToDelete(null);
+      setVersionToEdit(null);
+      setIsEditModalOpen(false);
       setSearchTerm('');
       setSelectedAnnotationType('all');
+      setImagePreview({ isOpen: false, imageUrl: '', annotation: null });
+      setDescriptionPreview({ isOpen: false, content: '', annotation: null });
+      setNotesPreview({ isOpen: false, content: '', annotation: null });
+      setAnnotationViewModal({ isOpen: false, annotation: null });
     }
   }, [isOpen]);
+
+  // Handler functions for annotation interactions
+  const handleAnnotationClick = (annotation: Annotation) => {
+    setAnnotationViewModal({ isOpen: true, annotation });
+  };
+
+  const handleImagePreview = (imageUrl: string, annotation: Annotation) => {
+    setImagePreview({ isOpen: true, imageUrl, annotation });
+  };
+
+  const handleDescriptionPreview = (description: string, annotation: Annotation) => {
+    setDescriptionPreview({ isOpen: true, content: description, annotation });
+  };
+
+  const handleNotesPreview = (notes: string, annotation: Annotation) => {
+    setNotesPreview({ isOpen: true, content: notes, annotation });
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedAnnotationType('all');
+    setSortBy('date');
+  };
+
+  const handleOpenInPdfViewer = () => {
+    if (selectedVersion && selectedVersion.fileHash) {
+      // Navigate to PDF viewer with the selected literature version
+      router.push(`/deeprecall/pdfviewer?file=${encodeURIComponent(selectedVersion.fileHash)}&literature=${encodeURIComponent(literature.documentId || '')}`);
+    }
+  };
 
   // Get annotations for the selected version
   const selectedVersion = selectedVersionId 
@@ -88,11 +162,18 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
 
   const { 
     annotations = [], 
-    isLoading: annotationsLoading 
+    isLoading: annotationsLoading,
+    updateAnnotation
   } = useAnnotations(
     literature.documentId || '', 
-    selectedVersion?.documentId || ''
+    selectedVersion?.fileHash || ''
   );
+
+  // Wrapper function to match the expected interface for the annotation view modal
+  const handleUpdateAnnotation = async (annotation: Annotation) => {
+    if (!annotation.documentId) return;
+    await updateAnnotation({ documentId: annotation.documentId, ann: annotation });
+  };
 
   // Helper function to extract file ID from Strapi URL
   const extractFileId = (url: string): number | null => {
@@ -118,7 +199,7 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
 
       try {
         // 1. Delete all annotations linked to this version
-        const versionAnnotations = annotations.filter(ann => ann.pdfId === versionToDelete.documentId);
+        const versionAnnotations = annotations.filter(ann => ann.pdfId === versionToDelete.fileHash);
         for (const annotation of versionAnnotations) {
           if (annotation.documentId) {
             await deleteAnnotation(annotation.documentId);
@@ -210,7 +291,16 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
 
   // Helper function to get file size in a human-readable format
   const getFileSize = (version: VersionExtended): string => {
-    // Check if file size is stored in custom metadata
+    // Use cached file size in version metadata (preferred approach)
+    if (version.fileSize) {
+      const bytes = version.fileSize;
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    }
+    
+    // Legacy: Check if file size is stored in custom metadata (for old versions)
     if (version.customMetadata?.fileSize) {
       const bytes = version.customMetadata.fileSize;
       if (bytes < 1024) return `${bytes} B`;
@@ -227,18 +317,34 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
     return "Unknown size";
   };
 
+  // Helper function to get page count
+  const getPageCount = (version: VersionExtended): string => {
+    if (version.totalPages) {
+      return `${version.totalPages} page${version.totalPages !== 1 ? 's' : ''}`;
+    }
+    return "Unknown pages";
+  };
+
   // Helper function to get annotation count for a version
   const getAnnotationCount = (versionId: string): number => {
-    if (!selectedVersion || selectedVersion.documentId !== versionId) {
-      // For non-selected versions, we don't have the data loaded
-      // We could fetch it separately or show a placeholder
-      return 0;
+    const version = literature.versions.find(v => v.documentId === versionId);
+    if (!version) return 0;
+    
+    // Only return accurate count for the selected version (since we only fetch annotations for selected version)
+    if (selectedVersion && selectedVersion.documentId === versionId) {
+      return annotations.length;
     }
-    return annotations.length;
+    
+    // For non-selected versions, we don't have the data loaded
+    // Return 0 for now (this is a known limitation for performance reasons)
+    return 0;
   };
 
   // Get annotation count for the version to be deleted
   const getAnnotationCountForVersion = (versionId: string): number => {
+    const version = literature.versions.find(v => v.documentId === versionId);
+    if (!version) return 0;
+    
     // This is for the deletion modal - we need to show accurate count
     // If it's the selected version, use current annotations
     if (selectedVersion && selectedVersion.documentId === versionId) {
@@ -332,23 +438,7 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
   };
 
   // Real annotation types from the annotation system
-  const annotationTypes = [
-    'all',
-    'Equation',
-    'Plot', 
-    'Illustration',
-    'Theorem',
-    'Statement',
-    'Definition',
-    'Figure',
-    'Table',
-    'Exercise',
-    'Problem',
-    'Abstract',
-    'Calculation',
-    'Other',
-    'Recipe'
-  ];
+  const annotationTypes = ['all', ...importedAnnotationTypes];
 
   // Drag and drop handlers for PDF files
   const handleDragOver = (e: React.DragEvent) => {
@@ -419,6 +509,16 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
           </div>
           
           <div className="flex items-center space-x-3">
+            {selectedVersion && (
+              <button
+                onClick={handleOpenInPdfViewer}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2 text-sm font-medium"
+                title="Open in PDF Viewer"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Open in PDF Viewer</span>
+              </button>
+            )}
             <button
               onClick={onEdit}
               className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-all duration-200"
@@ -547,11 +647,6 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
                                     {version.editionNumber ? `Ed. ${version.editionNumber}` : `v${version.versionNumber}`}
                                   </span>
                                 )}
-                                {isSelected && (
-                                  <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded">
-                                    Selected
-                                  </span>
-                                )}
                               </div>
                               <div className="flex items-center space-x-4 text-xs text-slate-400">
                                 <span>
@@ -560,7 +655,11 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
                                 <span>•</span>
                                 <span>{annotationCount} annotation{annotationCount !== 1 ? 's' : ''}</span>
                                 <span>•</span>
-                                <span>{getFileSize(version)}</span>
+                                <span className="flex items-center space-x-1">
+                                  <span>{getFileSize(version)}</span>
+                                  <span>•</span>
+                                  <span>{getPageCount(version)}</span>
+                                </span>
                               </div>
                             </div>
                             
@@ -601,8 +700,8 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
                                 title="Edit Version"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  // TODO: Implement edit functionality
-                                  console.log('Edit version:', version);
+                                  setVersionToEdit(version);
+                                  setIsEditModalOpen(true);
                                 }}
                               >
                                 <Edit className="w-3 h-3" />
@@ -635,7 +734,7 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
             
             {versions.length > 0 ? (
               <>
-                {/* Annotations Header & Controls */}
+                {/* Annotations Header */}
                 <div className="p-6 border-b border-slate-700/50">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -643,187 +742,57 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
                         <Tags className="w-5 h-5 mr-2" />
                         Annotations
                       </h3>
-                      {selectedVersion && (
-                        <p className="text-sm text-slate-400 mt-1">
-                          Showing annotations for: {selectedVersion.versionTitle || `Version ${selectedVersion.versionNumber || selectedVersion.editionNumber || '1'}`}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-slate-400">
-                        {annotations.length} annotation{annotations.length !== 1 ? 's' : ''}
-                      </span>
-                      <button
-                        onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                        className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-all duration-200"
-                        title={`Switch to ${viewMode === 'grid' ? 'list' : 'grid'} view`}
-                      >
-                        {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid className="w-4 h-4" />}
-                      </button>
                     </div>
                   </div>
                   
-                  {/* Search and Filters */}
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Search annotations..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-                      />
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center space-x-2">
-                        <Filter className="w-4 h-4 text-slate-400" />
-                        <select
-                          value={selectedAnnotationType}
-                          onChange={(e) => setSelectedAnnotationType(e.target.value)}
-                          className="px-3 py-1 bg-slate-800/50 border border-slate-700/50 rounded text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                        >
-                          {annotationTypes.map(type => (
-                            <option key={type} value={type}>
-                              {type === 'all' ? 'All Types' : type}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <SortAsc className="w-4 h-4 text-slate-400" />
-                        <select
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value as 'date' | 'type' | 'title')}
-                          className="px-3 py-1 bg-slate-800/50 border border-slate-700/50 rounded text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                        >
-                          <option value="date">Sort by Date</option>
-                          <option value="type">Sort by Type</option>
-                          <option value="title">Sort by Title</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Annotation Controls */}
+                  <AnnotationControls
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    selectedType={selectedAnnotationType}
+                    onTypeChange={setSelectedAnnotationType}
+                    sortBy={sortBy}
+                    onSortChange={setSortBy}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    totalCount={annotations.length}
+                    filteredCount={annotations.filter(annotation => {
+                      const matchesSearch = !searchTerm || 
+                        annotation.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        annotation.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        annotation.textContent?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        annotation.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        annotation.type?.toLowerCase().includes(searchTerm.toLowerCase());
+                      const matchesType = selectedAnnotationType === 'all' || annotation.type === selectedAnnotationType;
+                      return matchesSearch && matchesType;
+                    }).length}
+                    availableTypes={['all', ...importedAnnotationTypes]}
+                    onResetFilters={handleResetFilters}
+                  />
                 </div>
 
                 {/* Annotations Content */}
-                <div className="flex-1 p-6 overflow-y-auto">
-                  {annotationsLoading ? (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 bg-slate-700/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                        <Tags className="w-8 h-8 text-slate-400" />
-                      </div>
-                      <h3 className="text-lg font-medium text-slate-300 mb-2">Loading Annotations...</h3>
-                    </div>
-                  ) : annotations.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 bg-slate-700/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Tags className="w-8 h-8 text-slate-400" />
-                      </div>
-                      <h3 className="text-lg font-medium text-slate-300 mb-2">No Annotations Yet</h3>
-                      <p className="text-slate-500 mb-4">
-                        {selectedVersion 
-                          ? `No annotations found for "${selectedVersion.versionTitle || 'this version'}". Start annotating to see them here.`
-                          : 'Annotations will appear here once you start annotating the PDFs in this literature.'
-                        }
-                      </p>
-                      <button className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200">
-                        Open PDF Viewer
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-4'}>
-                      {annotations
-                        .filter(annotation => {
-                          // Filter by search term
-                          const matchesSearch = !searchTerm || 
-                            annotation.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            annotation.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            annotation.textContent?.toLowerCase().includes(searchTerm.toLowerCase());
-                          
-                          // Filter by annotation type
-                          const matchesType = selectedAnnotationType === 'all' || annotation.type === selectedAnnotationType;
-                          
-                          return matchesSearch && matchesType;
-                        })
-                        .sort((a, b) => {
-                          switch (sortBy) {
-                            case 'title':
-                              return (a.title || '').localeCompare(b.title || '');
-                            case 'type':
-                              return a.type.localeCompare(b.type);
-                            case 'date':
-                              return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
-                            default:
-                              return 0;
-                          }
-                        })
-                        .map((annotation) => (
-                          <div key={annotation.documentId} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 hover:border-slate-600/50 transition-colors">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <span className="text-xs font-medium text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">
-                                    {annotation.type}
-                                  </span>
-                                  {annotation.page && (
-                                    <span className="text-xs text-slate-400">
-                                      Page {annotation.page}
-                                    </span>
-                                  )}
-                                </div>
-                                {annotation.title && (
-                                  <h4 className="text-sm font-medium text-slate-200 truncate">
-                                    {annotation.title}
-                                  </h4>
-                                )}
-                              </div>
-                              <div className="flex-shrink-0 ml-3">
-                                <div 
-                                  className="w-3 h-3 rounded-full"
-                                  style={{ backgroundColor: annotation.color || '#64748b' }}
-                                  title="Annotation color"
-                                />
-                              </div>
-                            </div>
-                            
-                            {annotation.description && (
-                              <p className="text-sm text-slate-300 mb-2 max-h-10 overflow-hidden">
-                                {annotation.description}
-                              </p>
-                            )}
-                            
-                            {annotation.textContent && (
-                              <div className="text-xs text-slate-400 bg-slate-700/30 rounded p-2 mb-2 max-h-12 overflow-hidden">
-                                "{annotation.textContent}"
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center justify-between text-xs text-slate-500">
-                              <span>
-                                {annotation.createdAt ? new Date(annotation.createdAt).toLocaleDateString() : 'No date'}
-                              </span>
-                              <div className="flex items-center space-x-2">
-                                {annotation.annotation_tags && annotation.annotation_tags.length > 0 && (
-                                  <span className="flex items-center space-x-1">
-                                    <Tags className="w-3 h-3" />
-                                    <span>{annotation.annotation_tags.length}</span>
-                                  </span>
-                                )}
-                                <button 
-                                  className="text-slate-400 hover:text-slate-200 transition-colors"
-                                  title="View annotation"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-6">
+                    <LiteratureAnnotationList
+                      annotations={annotations}
+                      selectedVersion={selectedVersion}
+                      isLoading={annotationsLoading}
+                      searchTerm={searchTerm}
+                      onSearchChange={setSearchTerm}
+                      selectedType={selectedAnnotationType}
+                      onTypeChange={setSelectedAnnotationType}
+                      sortBy={sortBy}
+                      onSortChange={setSortBy}
+                      viewMode={viewMode}
+                      onViewModeChange={setViewMode}
+                      onAnnotationClick={handleAnnotationClick}
+                      onImagePreview={handleImagePreview}
+                      onDescriptionPreview={handleDescriptionPreview}
+                      onNotesPreview={handleNotesPreview}
+                      availableTypes={['all', ...importedAnnotationTypes]}
+                    />
+                  </div>
                 </div>
               </>
             ) : (
@@ -967,6 +936,54 @@ const LiteratureDetailModal: React.FC<LiteratureDetailModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Edit Version Modal */}
+      <EditVersionModal
+        version={versionToEdit}
+        literature={literature}
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setVersionToEdit(null);
+        }}
+        onSuccess={() => {
+          // Modal will close via onClose, no additional action needed
+        }}
+      />
+
+      {/* Annotation Preview Modals */}
+      <ImagePreviewModal
+        isOpen={imagePreview.isOpen}
+        onClose={() => setImagePreview({ isOpen: false, imageUrl: '', annotation: null })}
+        imageUrl={imagePreview.imageUrl}
+        annotation={imagePreview.annotation!}
+      />
+
+      <DescriptionPreviewModal
+        isOpen={descriptionPreview.isOpen}
+        onClose={() => setDescriptionPreview({ isOpen: false, content: '', annotation: null })}
+        content={descriptionPreview.content}
+        annotation={descriptionPreview.annotation!}
+      />
+
+      <NotesPreviewModal
+        isOpen={notesPreview.isOpen}
+        onClose={() => setNotesPreview({ isOpen: false, content: '', annotation: null })}
+        content={notesPreview.content}
+        annotation={notesPreview.annotation!}
+      />
+
+      {/* Annotation View Modal */}
+      <AnnotationViewModal
+        annotation={annotationViewModal.annotation}
+        isOpen={annotationViewModal.isOpen}
+        onClose={() => setAnnotationViewModal({ isOpen: false, annotation: null })}
+        annotations={annotations}
+        colorMap={{}}
+        literature={literature}
+        selectedVersion={selectedVersion}
+        updateAnnotation={handleUpdateAnnotation}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { signIn } from "@/auth"
+'use client';
 
 import { Button } from "./buttons"
 
@@ -7,15 +7,19 @@ interface SignInProps {
 }
 
 export default function SignIn({ className }: SignInProps) {
+  const handleSignIn = () => {
+    // TODO: Implement client-side authentication
+    alert('Authentication needs to be implemented for static builds');
+  };
+
   return (
-    <form
-      action={async () => {
-        "use server"
-        await signIn("github", { redirectTo: "/" })
-      }}
-      className={className}
-    >
-      <Button className="align-middle flex items-center w-full bg-gray-800 text-center" type="submit">Sign In with GitHub</Button>
-    </form>
-  )
+    <div className={className}>
+      <Button 
+        className="align-middle flex items-center w-full bg-gray-800 text-center" 
+        onClick={handleSignIn}
+      >
+        Sign In (Not Implemented)
+      </Button>
+    </div>
+  );
 } 

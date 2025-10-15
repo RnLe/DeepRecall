@@ -1,13 +1,18 @@
 // literatureCardCompact.tsx
 import React from 'react';
-import { LiteratureExtended, getDisplayYear } from '../../types/deepRecall/strapi/literatureTypes';
+import { LiteratureExtended, getDisplayYear, isLiteratureRead, isLiteratureFavorite } from '../../types/deepRecall/strapi/literatureTypes';
 import { VersionExtended } from '../../types/deepRecall/strapi/versionTypes';
 import { prefixStrapiUrl } from '../../helpers/getStrapiMedia';
+import { Glasses, Star, CheckSquare, Square } from 'lucide-react';
 
 interface LiteratureCardCompactProps {
   literature: LiteratureExtended;
   onClick?: () => void;
   onPdfPreview?: () => void;
+  isSelectionMode?: boolean;
+  isMultiSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: () => void;
 }
 
 /**
@@ -23,7 +28,15 @@ const getLatestThumbnail = (versions?: VersionExtended[]): string | null => {
   return sorted[0].thumbnailUrl ? prefixStrapiUrl(sorted[0].thumbnailUrl) : null;
 };
 
-const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literature, onClick, onPdfPreview }) => {
+const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ 
+  literature, 
+  onClick, 
+  onPdfPreview, 
+  isSelectionMode = false,
+  isMultiSelectMode = false,
+  isSelected = false,
+  onToggleSelection
+}) => {
   const { 
     title, 
     authors: rawAuthors, 
@@ -51,9 +64,40 @@ const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literatur
 
   return (
     <div 
-      className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 hover:border-slate-600/50 transition-all duration-300 hover:shadow-lg hover:shadow-black/10 aspect-[4/3] flex flex-col cursor-pointer"
+      className={`group relative backdrop-blur-sm rounded-xl p-4 transition-all duration-300 aspect-[4/3] flex flex-col cursor-pointer ${
+        isMultiSelectMode && isSelected
+          ? 'bg-blue-800/30 border-2 border-blue-500/60 hover:border-blue-400 hover:bg-blue-800/40 shadow-lg shadow-blue-500/20'
+          : isSelectionMode 
+            ? 'bg-emerald-800/20 border-2 border-emerald-500/60 hover:border-emerald-400 hover:bg-emerald-800/30 shadow-lg shadow-emerald-500/20' 
+            : 'bg-slate-800/40 border border-slate-700/50 hover:border-slate-600/50 hover:shadow-lg hover:shadow-black/10'
+      }`}
       onClick={onClick}
     >
+      {/* Multi-select checkbox */}
+      {isMultiSelectMode && (
+        <div 
+          className="absolute top-2 left-2 z-10 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelection?.();
+          }}
+        >
+          {isSelected ? (
+            <CheckSquare className="w-5 h-5 text-blue-500" />
+          ) : (
+            <Square className="w-5 h-5 text-slate-400 hover:text-slate-300" />
+          )}
+        </div>
+      )}
+      
+      {/* Add to collection indicator */}
+      {isSelectionMode && !isMultiSelectMode && (
+        <div className="absolute top-2 left-2 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center z-10">
+          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </div>
+      )}
       {/* Type indicator */}
       <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r opacity-60 rounded-t-xl ${getTypeColor(type)}`}></div>
       
@@ -64,26 +108,42 @@ const LiteratureCardCompact: React.FC<LiteratureCardCompactProps> = ({ literatur
         </div>
         
         {/* Top-right thumbnail with A4 ratio */}
-        <div 
-          className="w-16 h-20 flex-shrink-0 rounded-md overflow-hidden hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPdfPreview?.();
-          }}
-        >
-          {latestThumbnail ? (
-            <img
-              src={latestThumbnail}
-              alt={`${title} thumbnail`}
-              className="object-cover w-full h-full rounded-md"
-            />
-          ) : (
-            <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type)} opacity-20 rounded-md flex items-center justify-center hover:opacity-30 transition-opacity`}>
-              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-          )}
+        <div className="relative">
+          <div 
+            className="w-16 h-20 flex-shrink-0 rounded-md overflow-hidden hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPdfPreview?.();
+            }}
+          >
+            {latestThumbnail ? (
+              <img
+                src={latestThumbnail}
+                alt={`${title} thumbnail`}
+                className="object-cover w-full h-full rounded-md"
+              />
+            ) : (
+              <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type)} opacity-20 rounded-md flex items-center justify-center hover:opacity-30 transition-opacity`}>
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+            )}
+          </div>
+          
+          {/* Status icons - positioned on top right of thumbnail */}
+          <div className="absolute -top-1 -right-1 flex flex-col gap-0.5">
+            {isLiteratureRead(literature) && (
+              <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center shadow-sm">
+                <Glasses className="w-2 h-2 text-white" />
+              </div>
+            )}
+            {isLiteratureFavorite(literature) && (
+              <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center shadow-sm">
+                <Star className="w-2 h-2 text-white fill-current" />
+              </div>
+            )}
+          </div>
         </div>
       </div>
       

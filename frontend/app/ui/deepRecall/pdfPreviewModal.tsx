@@ -1,11 +1,15 @@
 // pdfPreviewModal.tsx
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ExternalLink, ChevronLeft, ChevronRight, Type, Square, BookOpen, Clock, Eye, FileText, StickyNote, Tags as TagsIcon, Image as ImageIcon, Sigma } from 'lucide-react';
 import { LiteratureExtended } from '../../types/deepRecall/strapi/literatureTypes';
 import { VersionExtended } from '../../types/deepRecall/strapi/versionTypes';
+import { Annotation, AnnotationType } from '../../types/deepRecall/strapi/annotationTypes';
 import { prefixStrapiUrl } from '../../helpers/getStrapiMedia';
 import { pdfDocumentService } from '../../services/pdfDocumentService';
+import { useAnnotations } from '../../customHooks/useAnnotations';
+import { agoTimeToString } from '../../helpers/timesToString';
+import AnnotationViewModal from './annotationViewModal';
 
 interface PdfPreviewModalProps {
   literature: LiteratureExtended;
@@ -14,22 +18,25 @@ interface PdfPreviewModalProps {
   onClose: () => void;
 }
 
-interface Annotation {
-  id: string;
-  pageNumber: number;
-  content: string;
-  author: string;
-  timestamp: string;
-}
+// Color mapping for annotation types
+const TYPE_COLORS: Record<AnnotationType, string> = {
+  "Equation": "#f59e0b",
+  "Plot": "#10b981", 
+  "Illustration": "#8b5cf6",
+  "Theorem": "#ef4444",
+  "Statement": "#06b6d4",
+  "Definition": "#84cc16",
+  "Figure": "#f97316",
+  "Table": "#6366f1",
+  "Exercise": "#ec4899",
+  "Abstract": "#14b8a6",
+  "Problem": "#f87171",
+  "Calculation": "#fbbf24",
+  "Other": "#64748b",
+  "Recipe": "#a855f7"
+};
 
-// Mock annotations for now - replace with real data later
-const mockAnnotations: Annotation[] = [
-  { id: '1', pageNumber: 1, content: 'Important concept introduced here', author: 'John Doe', timestamp: '2025-01-15' },
-  { id: '2', pageNumber: 1, content: 'Key methodology explained', author: 'Jane Smith', timestamp: '2025-01-16' },
-  { id: '3', pageNumber: 3, content: 'Results section begins', author: 'John Doe', timestamp: '2025-01-17' },
-  { id: '4', pageNumber: 5, content: 'Critical finding highlighted', author: 'Alice Johnson', timestamp: '2025-01-18' },
-  { id: '5', pageNumber: 7, content: 'Discussion of limitations', author: 'Bob Wilson', timestamp: '2025-01-19' },
-];
+const DEFAULT_COLOR = "#64748b";
 
 const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
   literature,
@@ -67,6 +74,40 @@ const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
   const [modalWidth, setModalWidth] = useState<number>(1000); // Default fallback width
   const [retryCount, setRetryCount] = useState<number>(0); // Track retry attempts
 
+  // Annotation view modal state
+  const [annotationViewModal, setAnnotationViewModal] = useState<{ isOpen: boolean; annotation: Annotation | null }>({
+    isOpen: false,
+    annotation: null
+  });
+
+  // Get annotations for the selected version
+  const { 
+    annotations = [], 
+    isLoading: annotationsLoading,
+    updateAnnotation
+  } = useAnnotations(
+    literature.documentId || literature.title || '', // Fallback to title if documentId is missing
+    selectedVersion?.fileHash || ''
+  );
+
+  // Wrapper function to match the expected interface for the annotation view modal
+  const handleUpdateAnnotation = async (annotation: Annotation) => {
+    if (!annotation.documentId) return;
+    await updateAnnotation({ documentId: annotation.documentId, ann: annotation });
+  };
+
+  const getAnnotationColor = (annotation: Annotation): string => {
+    return annotation.color || 
+           TYPE_COLORS[annotation.type as AnnotationType] || 
+           DEFAULT_COLOR;
+  };
+
+  const formatRelativeTime = (dateStr?: string) => {
+    if (!dateStr) return 'Unknown time';
+    const timestamp = new Date(dateStr).getTime() / 1000;
+    return agoTimeToString(timestamp);
+  };
+
   // Handle click outside to close modal
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -94,6 +135,13 @@ const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);
+
+  // Reset annotation modal when main modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAnnotationViewModal({ isOpen: false, annotation: null });
+    }
+  }, [isOpen]);
 
   // Measure modal width for responsive sizing
   useEffect(() => {
@@ -231,14 +279,14 @@ const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
 
   // Get annotations for visible pages
   const visibleAnnotations = useMemo(() => {
-    return mockAnnotations.filter(annotation => 
-      visiblePages.includes(annotation.pageNumber)
+    return annotations.filter(annotation => 
+      visiblePages.includes(annotation.page || 0)
     );
-  }, [visiblePages]);
+  }, [annotations, visiblePages]);
 
   // Get annotations for specific page (for highlighting)
   const getPageAnnotations = (pageNumber: number) => {
-    return mockAnnotations.filter(annotation => annotation.pageNumber === pageNumber);
+    return annotations.filter(annotation => annotation.page === pageNumber);
   };
 
   // Load PDF file from URL - REMOVED, now handled by document service
@@ -412,6 +460,7 @@ const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
   }
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
       <div 
         ref={modalRef}
@@ -606,14 +655,51 @@ const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                       {isValidPage && (
                         <>
                           {renderedPages[pageNum] ? (
-                            <img
-                              src={renderedPages[pageNum]}
-                              alt={`Page ${pageNum}`}
-                              className="w-full h-full object-contain rounded-lg"
-                              style={{
-                                imageRendering: 'crisp-edges',
-                              }}
-                            />
+                            <>
+                              <img
+                                src={renderedPages[pageNum]}
+                                alt={`Page ${pageNum}`}
+                                className="w-full h-full object-contain rounded-lg"
+                                style={{
+                                  imageRendering: 'crisp-edges',
+                                }}
+                              />
+                              
+                              {/* Annotation overlays */}
+                              {getPageAnnotations(pageNum).map((annotation) => {
+                                if (!annotation.extra?.bounds && annotation.mode === 'rectangle') {
+                                  // Use the coordinate system for annotations
+                                  const color = getAnnotationColor(annotation);
+                                  const containerRect = { width: pageContainerWidth, height: finalContainerHeight };
+                                  
+                                  // Calculate scaled position - this is a rough approximation
+                                  // In a real implementation, you'd need the actual PDF page dimensions
+                                  const scaleX = containerRect.width / (annotation.width ? 800 : 1); // Fallback page width
+                                  const scaleY = containerRect.height / (annotation.height ? 1200 : 1); // Fallback page height
+                                  
+                                  const left = (annotation.x || 0) * scaleX;
+                                  const top = (annotation.y || 0) * scaleY;
+                                  const width = (annotation.width || 100) * scaleX;
+                                  const height = (annotation.height || 100) * scaleY;
+                                  
+                                  return (
+                                    <div
+                                      key={`overlay-${annotation.documentId}`}
+                                      className="absolute pointer-events-none border-2 rounded"
+                                      style={{
+                                        left: `${left}px`,
+                                        top: `${top}px`,
+                                        width: `${width}px`,
+                                        height: `${height}px`,
+                                        borderColor: color,
+                                        backgroundColor: `${color}15`,
+                                      }}
+                                    />
+                                  );
+                                }
+                                return null;
+                              })}
+                            </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-slate-100 rounded-lg">
                               {isLoading ? (
@@ -671,30 +757,96 @@ const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
               Annotations {getHighlightedPage() ? `(Page ${getHighlightedPage()})` : '(Visible Pages)'}
             </h3>
             
-            <div className="flex-1 space-y-3 overflow-y-auto min-h-0">
-              {(getHighlightedPage() ? highlightedAnnotations : visibleAnnotations).map((annotation) => (
-                <div
-                  key={annotation.id}
-                  className={`p-3 rounded-lg transition-colors ${
-                    getHighlightedPage() === annotation.pageNumber
-                      ? 'bg-yellow-500/10 border border-yellow-500/30'
-                      : 'bg-slate-700/30 border border-slate-600/30'
-                  }`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="text-xs text-slate-400">
-                      Page {annotation.pageNumber} • {annotation.author}
+            <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
+              {(getHighlightedPage() ? highlightedAnnotations : visibleAnnotations).map((annotation) => {
+                const color = getAnnotationColor(annotation);
+                
+                return (
+                  <div
+                    key={annotation.documentId}
+                    className={`flex items-center space-x-3 p-3 hover:bg-slate-800/30 rounded transition-colors cursor-pointer group ${
+                      getHighlightedPage() === annotation.page
+                        ? 'bg-yellow-500/10 border border-yellow-500/30'
+                        : 'bg-slate-700/30 border border-slate-600/30'
+                    }`}
+                    onClick={() => setAnnotationViewModal({ isOpen: true, annotation })}
+                  >
+                    {/* Type indicator */}
+                    <div className="flex-shrink-0">
+                      {annotation.mode === "text" ? (
+                        <Type size={14} style={{ color }} />
+                      ) : (
+                        <Square size={14} style={{ color }} />
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 flex items-center space-x-3">
+                      {annotation.title ? (
+                        <span className="text-sm text-slate-200 truncate font-medium">
+                          {annotation.title}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500 italic">
+                          {annotation.type} annotation
+                        </span>
+                      )}
+                      {annotation.page && (
+                        <span className="text-xs text-slate-500 flex-shrink-0">
+                          p.{annotation.page}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Features indicator */}
+                    <div className="flex items-center space-x-1 flex-shrink-0">
+                      {annotation.description && (
+                        <div className="p-0.5 text-slate-500" title="Has description">
+                          <FileText size={12} />
+                        </div>
+                      )}
+                      {annotation.notes && (
+                        <div className="p-0.5 text-slate-500" title="Has notes">
+                          <StickyNote size={12} />
+                        </div>
+                      )}
+                      {annotation.extra?.imageUrl && (
+                        <div className="p-0.5 text-slate-500" title="Has image">
+                          <ImageIcon size={12} />
+                        </div>
+                      )}
+                      {annotation.solutions && annotation.solutions.length > 0 && (
+                        <span className="text-slate-500" title={`${annotation.solutions.length} solution(s)`}>
+                          <Sigma size={12} />
+                        </span>
+                      )}
+                      {annotation.annotation_tags && annotation.annotation_tags.length > 0 && (
+                        <span className="text-slate-500" title={`${annotation.annotation_tags.length} tag(s)`}>
+                          <TagsIcon size={12} />
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Date */}
+                    <span className="text-xs text-slate-500 flex-shrink-0">
+                      {formatRelativeTime(annotation.createdAt)}
                     </span>
-                    <span className="text-xs text-slate-500">{annotation.timestamp}</span>
+
+                    {/* Action */}
+                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Eye size={12} className="text-slate-400" />
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-200">{annotation.content}</p>
-                </div>
-              ))}
+                );
+              })}
               
               {(getHighlightedPage() ? highlightedAnnotations : visibleAnnotations).length === 0 && (
                 <div className="text-slate-400 text-sm text-center py-8">
-                  No annotations found for {getHighlightedPage() ? `page ${getHighlightedPage()}` : 'visible pages'}
+                  {annotationsLoading ? (
+                    "Loading annotations..."
+                  ) : (
+                    `No annotations found for ${getHighlightedPage() ? `page ${getHighlightedPage()}` : 'visible pages'}`
+                  )}
                 </div>
               )}
             </div>
@@ -706,6 +858,20 @@ const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
         
       </div>
     </div>
+
+    {/* Annotation View Modal */}
+    {annotationViewModal.isOpen && (
+      <AnnotationViewModal
+        annotation={annotationViewModal.annotation}
+        isOpen={annotationViewModal.isOpen}
+        onClose={() => setAnnotationViewModal({ isOpen: false, annotation: null })}
+        annotations={annotations}
+        literature={literature}
+        selectedVersion={selectedVersion}
+        updateAnnotation={handleUpdateAnnotation}
+      />
+    )}
+    </>
   );
 };
 

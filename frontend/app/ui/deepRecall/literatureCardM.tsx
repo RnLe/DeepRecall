@@ -1,8 +1,9 @@
 // literatureCardM.tsx
 import React from 'react';
-import { LiteratureExtended, getDisplayYear } from '../../types/deepRecall/strapi/literatureTypes';
+import { LiteratureExtended, getDisplayYear, isLiteratureRead, isLiteratureFavorite } from '../../types/deepRecall/strapi/literatureTypes';
 import { VersionExtended } from '../../types/deepRecall/strapi/versionTypes';
 import { prefixStrapiUrl } from '../../helpers/getStrapiMedia';
+import { Glasses, Star } from 'lucide-react';
 
 /**
  * Helper: Returns the thumbnail URL from the version with the most recent publishingDate.
@@ -151,54 +152,79 @@ const LiteratureCardM: React.FC<LiteratureCardProps> = ({ literature, showThumbn
             </div>
           )}
 
-          {/* Custom literature metadata (non-version, non-core fields) */}
-          {Object.keys(safeCustomMetadata).length > 0 && (
-            <div className="border-t border-slate-700/30 pt-3">
-              <div className="space-y-2">
-                <span className="text-sm text-slate-400">Custom Fields:</span>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(safeCustomMetadata).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="px-2 py-1 bg-slate-700/30 border border-slate-600/30 rounded text-xs text-slate-300"
-                    >
-                      <span className="text-slate-400">{key}:</span> {String(value)}
+          {/* Version statistics */}
+          {versions && versions.length > 0 && (
+            <div className="border-t border-slate-700/50 pt-3">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                <span>Versions: {versions.length}</span>
+                <span>
+                  {versions.reduce((total, version) => 
+                    total + (typeof version.annotationCount === 'number' ? version.annotationCount : 0), 0
+                  )} annotations
+                </span>
+              </div>
+              {versions.length <= 3 && (
+                <div className="space-y-1">
+                  {versions.map((version, index) => (
+                    <div key={version.documentId || index} className="flex justify-between items-center text-xs">
+                      <span className="text-slate-300 truncate">
+                        {version.versionTitle || `Version ${index + 1}`}
+                      </span>
+                      <span className="text-slate-400 ml-2">
+                        {typeof version.annotationCount === 'number' ? version.annotationCount : '0'} annotations
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Right thumbnail */}
         {showThumbnail && (
-          <div 
-            className="w-32 h-40 flex-shrink-0 hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Open PDF preview modal
-              onPdfPreview?.();
-            }}
-          >
-            {latestThumbnail ? (
-              <div className="w-full h-full bg-slate-700/30 rounded-lg overflow-hidden border border-slate-600/30">
-                <img
-                  src={latestThumbnail}
-                  alt={`${title} thumbnail`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type)} opacity-20 rounded-lg flex items-center justify-center hover:opacity-30 transition-opacity border border-slate-600/30`}>
-                <div className="text-center">
-                  <svg className="w-8 h-8 text-slate-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                  <span className="text-xs text-slate-500 font-medium">Preview</span>
+          <div className="relative">
+            <div 
+              className="w-32 h-40 flex-shrink-0 hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open PDF preview modal
+                onPdfPreview?.();
+              }}
+            >
+              {latestThumbnail ? (
+                <div className="w-full h-full bg-slate-700/30 rounded-lg overflow-hidden border border-slate-600/30">
+                  <img
+                    src={latestThumbnail}
+                    alt={`${title} thumbnail`}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className={`w-full h-full bg-gradient-to-br ${getTypeColor(type)} opacity-20 rounded-lg flex items-center justify-center hover:opacity-30 transition-opacity border border-slate-600/30`}>
+                  <div className="text-center">
+                    <svg className="w-8 h-8 text-slate-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <span className="text-xs text-slate-500 font-medium">Preview</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Status icons - positioned on top right of thumbnail */}
+            <div className="absolute -top-2 -right-2 flex flex-col gap-1">
+              {isLiteratureRead(literature) && (
+                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                  <Glasses className="w-2.5 h-2.5 text-white" />
+                </div>
+              )}
+              {isLiteratureFavorite(literature) && (
+                <div className="w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center shadow-lg">
+                  <Star className="w-2.5 h-2.5 text-white fill-current" />
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -6,7 +6,8 @@ import {
   transformLiterature,
   LiteratureExtended,
 } from "../types/deepRecall/strapi/literatureTypes";
-import { VersionType } from "../types/deepRecall/strapi/versionTypes";
+import { VersionType, VersionExtended } from "../types/deepRecall/strapi/versionTypes";
+import { fetchVersionFiles } from "./mediaService";
 
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const BASE_URL = "http://localhost:1337/api/literatures";
@@ -15,11 +16,15 @@ const BASE_URL = "http://localhost:1337/api/literatures";
  * Fetches literature entries.
  * The function populates all nested relations (including authors, metadata, versions, etc.).
  *
+ * @param includeFiles Whether to fetch full MediaFile data for PDFs and thumbnails
  * @returns An array of extended Literature objects.
  */
-export const fetchLiteratures = async (): Promise<LiteratureExtended[]> => {
+export const fetchLiteratures = async (includeFiles: boolean = false): Promise<LiteratureExtended[]> => {
   const params = new URLSearchParams();
   params.append("populate", "*");
+  // Set pagination to get all items (Strapi defaults to 25 items max)
+  params.append("pagination[pageSize]", "1000"); // Set a high limit to get all items
+  params.append("pagination[page]", "1");
 
   const response = await fetch(`${BASE_URL}?${params.toString()}`, {
     headers: { Authorization: `Bearer ${API_TOKEN}` },
@@ -35,7 +40,63 @@ export const fetchLiteratures = async (): Promise<LiteratureExtended[]> => {
 
   const json = await response.json();
   // Transform each entry using our transformer function.
-  return json.data.map((lit: Literature) => transformLiterature(lit));
+  const literatures = json.data.map((lit: Literature) => transformLiterature(lit));
+
+  // Debug logging: Check first literature and its versions for annotation counts
+  if (literatures.length > 0) {
+    const firstLit = literatures[0];
+    console.log("DEBUG: First literature:", {
+      title: firstLit.title,
+      versionsCount: firstLit.versions?.length || 0,
+      firstVersion: firstLit.versions?.[0] ? {
+        documentId: firstLit.versions[0].documentId,
+        annotationCount: firstLit.versions[0].annotationCount,
+        versionMetadata: firstLit.versions[0].customMetadata
+      } : null
+    });
+  }
+
+  // Optionally enhance with full file data
+  if (includeFiles) {
+    return enhanceLiteraturesWithFiles(literatures);
+  }
+
+  return literatures;
+};
+
+/**
+ * Enhances literature entries with full MediaFile data for versions.
+ * This is done as a separate step to avoid slowing down the initial load.
+ */
+export const enhanceLiteraturesWithFiles = async (literatures: LiteratureExtended[]): Promise<LiteratureExtended[]> => {
+  const enhancedLiteratures = await Promise.all(
+    literatures.map(async (literature) => {
+      const enhancedVersions = await Promise.all(
+        literature.versions.map(async (version) => {
+          if (version.fileId || version.thumbnailId) {
+            const { pdfFile, thumbnailFile } = await fetchVersionFiles(version.fileId, version.thumbnailId);
+            
+            return {
+              ...version,
+              pdfFile: pdfFile || undefined,
+              thumbnailFile: thumbnailFile || undefined,
+              // Extract additional metadata from MediaFile if available
+              fileSize: pdfFile?.size || version.fileSize,
+              fileName: pdfFile?.name || version.fileName,
+            } as VersionExtended;
+          }
+          return version;
+        })
+      );
+
+      return {
+        ...literature,
+        versions: enhancedVersions,
+      };
+    })
+  );
+
+  return enhancedLiteratures;
 };
 
 /**

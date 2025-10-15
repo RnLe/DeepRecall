@@ -106,3 +106,48 @@ export async function deleteAnnotation(documentId: string): Promise<void> {
     );
   }
 }
+
+// Fetch annotation counts for multiple pdfIds efficiently
+export async function fetchAnnotationCounts(
+  literatureId: string,
+  pdfIds: string[]
+): Promise<Record<string, number>> {
+  if (pdfIds.length === 0) {
+    return {};
+  }
+
+  const params = new URLSearchParams();
+  params.append("filters[literatureId][$eq]", literatureId);
+  
+  // Filter by multiple pdfIds using $in operator
+  pdfIds.forEach((pdfId, index) => {
+    params.append(`filters[pdfId][$in][${index}]`, pdfId);
+  });
+
+  // We only need the count, not the full data
+  params.append("pagination[pageSize]", "1000");
+  
+  const res = await fetch(`${BASE_URL}?${params.toString()}`, {
+    headers: jsonHeaders,
+  });
+
+  if (!res.ok) throw new Error(`Fetch annotation counts failed: ${res.status}`);
+
+  const json = await res.json();
+  const annotations = json.data || [];
+  
+  // Count annotations per pdfId
+  const counts: Record<string, number> = {};
+  pdfIds.forEach(pdfId => {
+    counts[pdfId] = 0;
+  });
+  
+  annotations.forEach((annotation: any) => {
+    const pdfId = annotation.pdfId;
+    if (pdfId && counts.hasOwnProperty(pdfId)) {
+      counts[pdfId]++;
+    }
+  });
+  
+  return counts;
+}

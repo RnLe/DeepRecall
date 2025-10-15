@@ -17,6 +17,7 @@ interface EnhancedLiteratureFormProps {
   className?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
+  initialPdfFile?: File | null;
 }
 
 interface Author {
@@ -38,15 +39,21 @@ function computeMD5(file: File): Promise<string> {
   });
 }
 
-const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
-  literatureType,
-  className,
-  onSuccess,
-  onCancel,
+// Stable initial values to prevent unnecessary re-renders
+const EMPTY_ADDITIONAL_FIELDS = {};
+const EMPTY_VERSION_FIELDS = {};
+const EMPTY_ARRAY = [];
+
+const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({ 
+  literatureType, 
+  className, 
+  onSuccess, 
+  onCancel, 
+  initialPdfFile 
 }) => {
   // Literature form state
   const [title, setTitle] = useState("");
-  const [additionalFields, setAdditionalFields] = useState<Record<string, any>>({});
+  const [additionalFields, setAdditionalFields] = useState<Record<string, any>>(EMPTY_ADDITIONAL_FIELDS);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -56,11 +63,12 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [selectedThumbnailPage, setSelectedThumbnailPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const [fileError, setFileError] = useState<string>("");
   const [isDragOver, setIsDragOver] = useState(false);
   
   // Version form state
-  const [versionFields, setVersionFields] = useState<Record<string, any>>({});
+  const [versionFields, setVersionFields] = useState<Record<string, any>>(EMPTY_VERSION_FIELDS);
   const [matchingVersionType, setMatchingVersionType] = useState<VersionType | null>(null);
   
   // Text extraction modal state
@@ -77,8 +85,9 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
 
   // Find matching version type
   useEffect(() => {
-    if (versionTypes && literatureType.name) {
-      const matchingType = versionTypes.find(vt => vt.name.toLowerCase() === literatureType.name.toLowerCase());
+    if (versionTypes && literatureType?.name) {
+      const literatureTypeName = literatureType.name;
+      const matchingType = versionTypes.find(vt => vt.name.toLowerCase() === literatureTypeName.toLowerCase());
       setMatchingVersionType(matchingType || null);
       
       if (matchingType) {
@@ -96,7 +105,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
           Object.entries(tpl).forEach(([key, value]) => {
             if (value && typeof value === 'object' && 'default_value' in value) {
               if (Array.isArray((value as any).default_value)) {
-                initialFields[key] = [];
+                initialFields[key] = EMPTY_ARRAY;
               } else if (typeof (value as any).default_value === 'number') {
                 const isVersionOrEdition = key.toLowerCase().includes('version') || key.toLowerCase().includes('edition');
                 initialFields[key] = isVersionOrEdition ? 1 : 0;
@@ -105,7 +114,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
               }
             } else if (value && typeof value === 'object' && 'default' in value) {
               if (Array.isArray((value as any).default)) {
-                initialFields[key] = [];
+                initialFields[key] = EMPTY_ARRAY;
               } else if (typeof (value as any).default === 'number') {
                 const isVersionOrEdition = key.toLowerCase().includes('version') || key.toLowerCase().includes('edition');
                 initialFields[key] = isVersionOrEdition ? 1 : 0;
@@ -121,7 +130,46 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
         }
       }
     }
-  }, [versionTypes, literatureType.name]);
+  }, [versionTypes, literatureType?.name]); // Use optional chaining and only depend on the name
+
+  // Initialize PDF file if provided
+  useEffect(() => {
+    if (initialPdfFile) {
+      setPdfFile(initialPdfFile);
+      setShowPdfSection(true);
+      
+      // Update the file input element to show the dropped file
+      if (fileInputRef.current) {
+        const dt = new DataTransfer();
+        dt.items.add(initialPdfFile);
+        fileInputRef.current.files = dt.files;
+      }
+    }
+  }, [initialPdfFile]);
+
+  // Process PDF to get page count when file changes
+  useEffect(() => {
+    if (pdfFile) {
+      // Get the total number of pages using the same approach as versionForm
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const pdfjsLib = await import('pdfjs-dist');
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+          
+          const typedArray = new Uint8Array(reader.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument(typedArray).promise;
+          setTotalPages(pdf.numPages);
+        } catch (error) {
+          console.error('Error processing PDF:', error);
+          setTotalPages(0);
+        }
+      };
+      reader.readAsArrayBuffer(pdfFile);
+    } else {
+      setTotalPages(0);
+    }
+  }, [pdfFile]);
 
   // Parse literature type metadata
   useEffect(() => {
@@ -145,7 +193,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
           if (k === 'versionsAreEqual' || k === 'icon') {
             initFields[k] = (v as any).default_value;
           } else if ((v as any).field_type === 'array') {
-            initFields[k] = [];
+            initFields[k] = EMPTY_ARRAY;
           } else {
             initFields[k] = "";
           }
@@ -153,16 +201,16 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
           if (k === 'versionsAreEqual' || k === 'icon') {
             initFields[k] = v;
           } else {
-            initFields[k] = Array.isArray(v) ? [] : "";
+            initFields[k] = Array.isArray(v) ? EMPTY_ARRAY : "";
           }
         }
       });
       setAdditionalFields(initFields);
     } catch (err) {
-      setAdditionalFields({});
+      setAdditionalFields(EMPTY_ADDITIONAL_FIELDS);
       console.error("Error parsing literature type metadata:", err);
     }
-  }, [literatureType]);
+  }, [literatureType.typeMetadata]); // Only depend on the specific property that matters
 
   // Mutations
   const createLiteratureMutation = useMutation<
@@ -171,7 +219,10 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
     Omit<Literature, "documentId">
   >({
     mutationFn: createLiterature,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
+    onSuccess: (data) => {
+      console.log("✅ Literature created successfully:", data.title);
+      queryClient.invalidateQueries({ queryKey: ["literature"] });
+    },
     onError: (error: Error) => {
       console.error("Failed to create literature:", error);
     },
@@ -183,7 +234,10 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
     { documentId: string; data: Partial<Literature> }
   >({
     mutationFn: ({ documentId, data }) => updateLiterature(documentId, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["literature"] }),
+    onSuccess: (data) => {
+      console.log("✅ Literature updated successfully:", data.title);
+      queryClient.invalidateQueries({ queryKey: ["literature"] });
+    },
     onError: (error: Error) => {
       console.error("Failed to update literature:", error);
     },
@@ -207,7 +261,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
   };
 
   const handleAddAuthor = () => {
-    const currentAuthors = Array.isArray(additionalFields.authors) ? additionalFields.authors : [];
+    const currentAuthors = Array.isArray(additionalFields.authors) ? additionalFields.authors : EMPTY_ARRAY;
     const authorsObjects = convertAuthorsArrayToObjects(currentAuthors);
     const newAuthor: Author = {
       id: `author-${Date.now()}-${Math.random()}`,
@@ -219,7 +273,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
   };
 
   const handleEditAuthor = (authorId: string, newName: string) => {
-    const currentAuthors = Array.isArray(additionalFields.authors) ? additionalFields.authors : [];
+    const currentAuthors = Array.isArray(additionalFields.authors) ? additionalFields.authors : EMPTY_ARRAY;
     const authorsObjects = convertAuthorsArrayToObjects(currentAuthors);
     const updatedAuthors = authorsObjects.map(author => 
       author.id === authorId ? { ...author, name: newName } : author
@@ -228,7 +282,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
   };
 
   const handleRemoveAuthor = (authorId: string) => {
-    const currentAuthors = Array.isArray(additionalFields.authors) ? additionalFields.authors : [];
+    const currentAuthors = Array.isArray(additionalFields.authors) ? additionalFields.authors : EMPTY_ARRAY;
     const authorsObjects = convertAuthorsArrayToObjects(currentAuthors);
     const updatedAuthors = authorsObjects.filter(author => author.id !== authorId);
     handleAdditionalFieldChange('authors', updatedAuthors.map(a => a.name));
@@ -335,7 +389,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
     } else if (key === 'authors') {
       // Special handling for authors field - convert comma-separated string to array
       if (value.trim() === '') {
-        handleAdditionalFieldChange(key, []);
+        handleAdditionalFieldChange(key, EMPTY_ARRAY);
       } else {
         const authorsArray = value
           .split(',')
@@ -381,7 +435,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
     
     // Handle authors field specially with tag display
     if (key === "authors") {
-      const currentAuthors = Array.isArray(additionalFields[key]) ? additionalFields[key] : [];
+      const currentAuthors = Array.isArray(additionalFields[key]) ? additionalFields[key] : EMPTY_ARRAY;
       const authorsObjects = convertAuthorsArrayToObjects(currentAuthors);
       
       if (authorsObjects.length > 0) {
@@ -566,6 +620,10 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
             fileId: uploadedFile.id,
             thumbnailId: uploadedThumb.id || undefined,
             fileHash,
+            // Cache file metadata to avoid future fetches
+            fileSize: pdfFile.size, // File size in bytes
+            totalPages: totalPages, // Number of pages in PDF
+            fileName: pdfFile.name, // Original filename
           })
         };
 
@@ -598,6 +656,7 @@ const EnhancedLiteratureForm: React.FC<EnhancedLiteratureFormProps> = ({
       setPdfFile(null);
       setThumbnail(null);
       setThumbnailUrl(null);
+      setTotalPages(0);
       setShowPdfSection(false);
       
       if (onSuccess) onSuccess();
