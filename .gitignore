@@ -1,22 +1,6 @@
 # Ignore sensitive files
-trace
+**/.env
 
 # Ignore installation folders in all directories
-.next/
+**/.next/
 **/node_modules/
-playground/
-assets/
-
-avatars/
-conversations/
-
-backend/public/uploads/
-
-*.wav
-*.mp3
-
-# Capacitor build files
-frontend/out/
-frontend/ios/
-frontend/android/
-frontend/.capacitor/
