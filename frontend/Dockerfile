@@ -17,7 +17,7 @@ RUN apk add --no-cache \
 WORKDIR /app/
 
 # Copy package files for dependency installation
-COPY package*.json pnpm-lock.yaml ./
+COPY package*.json ./
 
 # Install pnpm globally and install dependencies
 RUN npm install -g pnpm
