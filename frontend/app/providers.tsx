@@ -26,15 +26,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Initialize default presets on app startup
+ * Preset system ready indicator
+ * Note: Default presets are NOT auto-initialized
+ * Users must manually click "Initialize Defaults" in PresetManager
  */
 function PresetInitializer() {
-  const initializePresets = useInitializePresets();
-  const initializedRef = useRef(false);
-
   useEffect(() => {
-    // Preset initialization disabled - users will create their own presets
-    console.log("ℹ️ Preset system ready - users can create custom presets");
+    console.log(
+      "ℹ️ Preset system ready - use PresetManager to initialize defaults"
+    );
   }, []);
 
   return null;

@@ -10,6 +10,7 @@ import { BookOpen, Star, Users, Calendar, FileText } from "lucide-react";
 import type { WorkExtended } from "@/src/schema/library";
 import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
 import { useDeleteWork } from "@/src/hooks/useLibrary";
+import { usePresets } from "@/src/hooks/usePresets";
 import { useState } from "react";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
@@ -26,8 +27,22 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
   const versionCount = work.versions?.length || 0;
 
   const deleteWorkMutation = useDeleteWork();
+  const allPresets = usePresets();
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
+
+  // Find the preset for this work
+  const preset = work.presetId
+    ? allPresets?.find((p) => p.id === work.presetId)
+    : null;
+
+  // Debug preset loading
+  if (work.presetId && !preset && allPresets) {
+    console.warn(
+      `Work "${work.title}" has presetId ${work.presetId} but preset not found. Available presets:`,
+      allPresets.map((p) => ({ id: p.id, name: p.name }))
+    );
+  }
 
   const handleDelete = async () => {
     await deleteWorkMutation.mutateAsync(work.id);
@@ -65,36 +80,52 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
     const blobData = e.dataTransfer.getData("application/x-deeprecall-blob");
     const assetId = e.dataTransfer.getData("application/x-asset-id");
 
-    if (blobData) {
+    if (assetId) {
+      // Handle existing asset being linked - update its versionId
+      import("@/src/repo/assets")
+        .then(async ({ getAsset }) => {
+          const asset = await getAsset(assetId);
+          if (!asset) {
+            throw new Error("Asset not found");
+          }
+
+          // Get the first version of this work, or create one
+          const { createVersion } = await import("@/src/repo/versions");
+          const { db } = await import("@/src/db/dexie");
+          let versionId: string;
+
+          if (work.versions && work.versions.length > 0) {
+            versionId = work.versions[0].id;
+          } else {
+            // Create a new version
+            const newVersion = await createVersion({
+              kind: "version",
+              workId: work.id,
+              versionNumber: 1,
+              favorite: false,
+            });
+            versionId = newVersion.id;
+          }
+
+          // Update the asset to link it to this version (use raw Dexie update)
+          await db.assets.update(asset.id, {
+            versionId: versionId,
+            updatedAt: new Date().toISOString(),
+          });
+
+          console.log("✅ Asset linked to work successfully!");
+        })
+        .catch((error) => {
+          console.error("Failed to link asset to work:", error);
+          alert("Failed to link asset to work");
+        });
+    } else if (blobData) {
       try {
         const blob = JSON.parse(blobData) as BlobWithMetadata;
         setDroppedBlob(blob);
       } catch (error) {
         console.error("Failed to parse dropped blob data:", error);
       }
-    } else if (assetId) {
-      import("@/src/repo/assets")
-        .then(({ getAsset }) => getAsset(assetId))
-        .then((asset) => {
-          if (!asset) {
-            throw new Error("Asset not found");
-          }
-          const pseudoBlob: BlobWithMetadata = {
-            sha256: asset.sha256,
-            filename: asset.filename,
-            size: asset.bytes,
-            mime: asset.mime,
-            pageCount: asset.pageCount,
-            mtime_ms: Date.now(),
-            created_ms: Date.now(),
-            path: null,
-          };
-          setDroppedBlob(pseudoBlob);
-        })
-        .catch((error) => {
-          console.error("Failed to fetch asset data:", error);
-          alert("Failed to link asset to work");
-        });
     }
   };
 
@@ -138,10 +169,30 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
 
         {/* Content - Bottom */}
         <div className="p-3">
-          {/* Title */}
-          <h3 className="font-semibold text-sm text-neutral-100 leading-snug mb-1 pr-8 line-clamp-2">
-            {work.title}
-          </h3>
+          {/* Preset Label + Title */}
+          <div className="mb-1 pr-8">
+            {preset && (
+              <span
+                className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded mr-2"
+                style={{
+                  backgroundColor: preset.color
+                    ? `${preset.color}20`
+                    : "rgba(148, 163, 184, 0.2)",
+                  color: preset.color || "#94a3b8",
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  borderColor: preset.color
+                    ? `${preset.color}40`
+                    : "rgba(148, 163, 184, 0.4)",
+                }}
+              >
+                {preset.name}
+              </span>
+            )}
+            <h3 className="inline font-semibold text-sm text-neutral-100 leading-snug line-clamp-2">
+              {work.title}
+            </h3>
+          </div>
 
           {/* Authors and Year */}
           <div className="flex items-center gap-1.5 text-xs text-neutral-400 mb-2">

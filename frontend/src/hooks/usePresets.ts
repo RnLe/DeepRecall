@@ -6,7 +6,14 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as presetRepo from "@/src/repo/presets";
-import { initializePresets } from "@/src/repo/presets.init";
+import {
+  initializePresets,
+  resetSystemPresets,
+  resetDefaultPresetsByName,
+  getMissingDefaultPresets,
+  resetSinglePresetByName,
+  getDefaultPresetsStatus,
+} from "@/src/repo/presets.init";
 import type { Preset, PresetTarget } from "@/src/schema/presets";
 
 // ============================================================================
@@ -133,6 +140,68 @@ export function useInitializePresets() {
       return initializePresets();
     },
   });
+}
+
+/**
+ * Hook to reset all system presets to defaults
+ */
+export function useResetSystemPresets() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      return resetSystemPresets();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+    },
+  });
+}
+
+/**
+ * Hook to reset specific default presets by name
+ */
+export function useResetDefaultPresets() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (names?: readonly string[]) => {
+      return resetDefaultPresetsByName(names);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+    },
+  });
+}
+
+/**
+ * Hook to check which default presets are missing
+ */
+export function useMissingDefaultPresets() {
+  return useLiveQuery(() => getMissingDefaultPresets(), []);
+}
+
+/**
+ * Hook to reset a single preset by name
+ */
+export function useResetSinglePreset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (name: string) => {
+      return resetSinglePresetByName(name);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+    },
+  });
+}
+
+/**
+ * Hook to get status of all default presets
+ */
+export function useDefaultPresetsStatus() {
+  return useLiveQuery(() => getDefaultPresetsStatus(), []);
 }
 
 // ============================================================================

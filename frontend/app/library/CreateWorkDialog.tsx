@@ -103,22 +103,29 @@ export function CreateWorkDialog({
         authors = coreFields.authors as { name: string }[];
       }
 
-      // Add preset ID to metadata so we know which preset was used
-      metadata._presetId = selectedPreset.id;
-      metadata._presetName = selectedPreset.name;
-
       // Create Work + Version (no Asset - user can add files later)
+      const workData = {
+        kind: "work" as const,
+        title: (coreFields.title as string) || "Untitled",
+        subtitle: coreFields.subtitle as string | undefined,
+        authors,
+        workType: (coreFields.workType as any) || "other",
+        topics: (coreFields.topics as string[]) || [],
+        favorite: false,
+        presetId: selectedPreset.id,
+        metadata,
+      };
+
+      console.log(
+        "Creating work with preset:",
+        selectedPreset.name,
+        "presetId:",
+        selectedPreset.id
+      );
+      console.log("Work data:", workData);
+
       await createWorkMutation.mutateAsync({
-        work: {
-          kind: "work" as const,
-          title: (coreFields.title as string) || "Untitled",
-          subtitle: coreFields.subtitle as string | undefined,
-          authors,
-          workType: (coreFields.workType as any) || "other",
-          topics: (coreFields.topics as string[]) || [],
-          favorite: false,
-          metadata,
-        },
+        work: workData,
         version: {
           versionNumber: 1,
           label: "Original",

@@ -7,7 +7,6 @@ import {
   useCreateEdge,
 } from "@/src/hooks/useLibrary";
 import { useQueryClient } from "@tanstack/react-query";
-import { WorkCard } from "./WorkCard";
 import { WorkCardDetailed } from "./WorkCardDetailed";
 import { WorkCardCompact } from "./WorkCardCompact";
 import { WorkCardList } from "./WorkCardList";
@@ -18,6 +17,7 @@ import { LibraryRightSidebar } from "./LibraryRightSidebar";
 import { CreateWorkDialog } from "./CreateWorkDialog";
 import { CreateActivityDialog } from "./CreateActivityDialog";
 import { ActivityBanner } from "./ActivityBanner";
+import { TemplateLibrary } from "./TemplateLibrary";
 import { BookOpen, Link2 } from "lucide-react";
 import type {
   WorkType,
@@ -32,6 +32,7 @@ import * as activityRepo from "@/src/repo/activities";
 import * as edgeRepo from "@/src/repo/edges";
 import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
 import type { BlobWithMetadata } from "@/src/schema/blobs";
+import { useTemplateLibraryUI } from "@/src/stores/template-library-ui";
 
 export default function LibraryPage() {
   const works = useWorksExtended();
@@ -68,6 +69,9 @@ export default function LibraryPage() {
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
   const [isDraggingOverLibrary, setIsDraggingOverLibrary] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
+
+  // Template Library UI state from Zustand
+  const openTemplateLibrary = useTemplateLibraryUI((state) => state.openModal);
 
   const handleCreateWorkWithPreset = (presetId: string) => {
     setPreselectedPresetId(presetId);
@@ -381,6 +385,7 @@ export default function LibraryPage() {
               workCount={works?.length || 0}
               onCreateActivity={() => setIsCreateActivityDialogOpen(true)}
               onCreateWork={() => setIsCreateDialogOpen(true)}
+              onOpenTemplates={openTemplateLibrary}
             />
           </div>
         </div>
@@ -577,6 +582,9 @@ export default function LibraryPage() {
           onCancel={() => setLinkingBlob(null)}
         />
       )}
+
+      {/* Template Library Modal */}
+      <TemplateLibrary />
     </div>
   );
 }

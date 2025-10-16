@@ -736,3 +736,31 @@ export function useRemoveFromCollection() {
     },
   });
 }
+
+// ============================================================================
+// Preset Usage Tracking
+// ============================================================================
+
+/**
+ * Hook to count how many entities use a specific preset
+ */
+export function usePresetUsageCount(presetId: string | undefined) {
+  return useLiveQuery(async () => {
+    if (!presetId) return { works: 0, versions: 0, assets: 0, total: 0 };
+
+    const db = (await import("@/src/db/dexie")).db;
+
+    const [works, versions, assets] = await Promise.all([
+      db.works.where("presetId").equals(presetId).count(),
+      db.versions.where("presetId").equals(presetId).count(),
+      db.assets.where("presetId").equals(presetId).count(),
+    ]);
+
+    return {
+      works,
+      versions,
+      assets,
+      total: works + versions + assets,
+    };
+  }, [presetId]);
+}

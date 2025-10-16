@@ -14,7 +14,7 @@ const now = new Date().toISOString();
 export const PAPER_PRESET: Preset = {
   id: uuidv4(),
   kind: "preset",
-  name: "Research Paper",
+  name: "Paper",
   description: "Academic research paper or conference publication",
   icon: "FileText",
   color: "#3b82f6",
@@ -166,7 +166,7 @@ export const TEXTBOOK_PRESET: Preset = {
 export const THESIS_PRESET: Preset = {
   id: uuidv4(),
   kind: "preset",
-  name: "Thesis/Dissertation",
+  name: "Thesis",
   description: "PhD thesis, Master's thesis, or dissertation",
   icon: "GraduationCap",
   color: "#06b6d4",
@@ -270,31 +270,31 @@ export const THESIS_PRESET: Preset = {
 };
 
 /**
- * Course Notes preset
+ * Script preset (lecture scripts, course materials)
  */
-export const NOTES_PRESET: Preset = {
+export const SCRIPT_PRESET: Preset = {
   id: uuidv4(),
   kind: "preset",
-  name: "Course Notes",
-  description: "Lecture notes, course materials, or study notes",
-  icon: "StickyNote",
-  color: "#eab308",
+  name: "Script",
+  description: "Lecture script, course materials, or teaching notes",
+  icon: "FileText",
+  color: "#10b981",
   targetEntity: "work",
   isSystem: true,
   coreFieldConfig: {
-    title: { required: true, placeholder: "Course name or topic" },
+    title: { required: true, placeholder: "Script or course name" },
     subtitle: { required: false },
-    authors: { required: false, helpText: "Instructor or note-taker" },
+    authors: { required: false, helpText: "Instructor or author" },
     workType: { required: true, defaultValue: "notes", hidden: true },
     topics: { required: false },
   },
   customFields: [
     {
-      key: "courseName",
-      label: "Course Name/Number",
+      key: "courseCode",
+      label: "Course Code",
       type: "text",
       required: false,
-      placeholder: "PHYS 101, CS 224N, etc.",
+      placeholder: "PHYS 101, MATH 201, etc.",
       group: "Course",
       order: 0,
     },
@@ -308,39 +308,108 @@ export const NOTES_PRESET: Preset = {
       order: 1,
     },
     {
-      key: "instructor",
-      label: "Instructor",
+      key: "institution",
+      label: "Institution",
       type: "text",
       required: false,
-      placeholder: "Prof. Jane Doe",
+      placeholder: "University name",
       group: "Course",
       order: 2,
     },
     {
-      key: "completeness",
-      label: "Completeness",
-      type: "select",
+      key: "lectureNumber",
+      label: "Lecture Number",
+      type: "text",
       required: false,
-      helpText: "How complete are these notes?",
-      options: [
-        { value: "draft", label: "📝 Draft/Incomplete" },
-        { value: "partial", label: "📄 Partial" },
-        { value: "complete", label: "✅ Complete" },
-        { value: "reviewed", label: "🌟 Reviewed/Polished" },
-      ],
-      group: "Status",
+      placeholder: "Lecture 1, Week 3, etc.",
+      group: "Content",
       order: 3,
     },
   ],
   formLayout: "single-column",
   fieldOrder: [
     "title",
-    "courseName",
+    "courseCode",
     "semester",
-    "instructor",
+    "institution",
+    "lectureNumber",
     "topics",
-    "completeness",
   ],
+  createdAt: now,
+  updatedAt: now,
+};
+
+/**
+ * Slides preset (presentation slides)
+ */
+export const SLIDES_PRESET: Preset = {
+  id: uuidv4(),
+  kind: "preset",
+  name: "Slides",
+  description: "Presentation slides, talk, or seminar",
+  icon: "Presentation",
+  color: "#f59e0b",
+  targetEntity: "work",
+  isSystem: true,
+  coreFieldConfig: {
+    title: { required: true, placeholder: "Presentation title" },
+    subtitle: { required: false },
+    authors: { required: false, helpText: "Presenter or speaker" },
+    workType: { required: true, defaultValue: "slides", hidden: true },
+    topics: { required: false },
+  },
+  customFields: [
+    {
+      key: "event",
+      label: "Event/Conference",
+      type: "text",
+      required: false,
+      placeholder: "Conference name, seminar series, etc.",
+      group: "Context",
+      order: 0,
+    },
+    {
+      key: "date",
+      label: "Presentation Date",
+      type: "date",
+      required: false,
+      helpText: "When the presentation was given",
+      group: "Context",
+      order: 1,
+    },
+    {
+      key: "location",
+      label: "Location",
+      type: "text",
+      required: false,
+      placeholder: "City, venue, or online",
+      group: "Context",
+      order: 2,
+    },
+    {
+      key: "duration",
+      label: "Duration",
+      type: "text",
+      required: false,
+      placeholder: "30 min, 1 hour, etc.",
+      helpText: "Presentation length",
+      group: "Metadata",
+      order: 3,
+    },
+    {
+      key: "videoUrl",
+      label: "Video Recording",
+      type: "url",
+      required: false,
+      placeholder: "https://...",
+      helpText: "Link to recorded presentation",
+      validation: { url: true },
+      group: "Resources",
+      order: 4,
+    },
+  ],
+  formLayout: "two-column",
+  fieldOrder: ["title", "authors", "event", "date", "location", "topics"],
   createdAt: now,
   updatedAt: now,
 };
@@ -352,5 +421,17 @@ export const DEFAULT_PRESETS: Preset[] = [
   PAPER_PRESET,
   TEXTBOOK_PRESET,
   THESIS_PRESET,
-  NOTES_PRESET,
+  SCRIPT_PRESET,
+  SLIDES_PRESET,
 ];
+
+/**
+ * Default preset names for easy lookup
+ */
+export const DEFAULT_PRESET_NAMES = [
+  "Paper",
+  "Textbook",
+  "Thesis",
+  "Script",
+  "Slides",
+] as const;

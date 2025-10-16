@@ -96,6 +96,9 @@ export const WorkSchema = z.object({
   // User flags
   favorite: z.boolean().default(false),
 
+  // Preset reference (which template was used to create this)
+  presetId: Id.optional(),
+
   // Flexible metadata (custom fields from presets)
   metadata: z.record(z.string(), z.unknown()).optional(),
 
@@ -146,6 +149,9 @@ export const VersionSchema = z.object({
   // User flags
   read: ISODate.optional(), // When marked as read
   favorite: z.boolean().default(false),
+
+  // Preset reference (which template was used to create this)
+  presetId: Id.optional(),
 
   // Flexible metadata (custom fields from presets)
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -224,6 +230,9 @@ export const AssetSchema = z.object({
 
   // Thumbnail (optional; stored as data URL or separate blob hash)
   thumbnailUrl: z.string().optional(),
+
+  // Preset reference (which template was used to create this)
+  presetId: Id.optional(),
 
   // Flexible metadata (custom fields from presets)
   metadata: z.record(z.string(), z.unknown()).optional(),

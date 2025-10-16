@@ -98,11 +98,7 @@ export async function deletePreset(id: string): Promise<void> {
     throw new Error(`Preset ${id} not found`);
   }
 
-  // Don't allow deleting system presets
-  if (existing.isSystem) {
-    throw new Error("Cannot delete system preset");
-  }
-
+  // Allow deleting all presets (including system/default ones)
   await db.presets.delete(id);
 }
 

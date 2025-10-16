@@ -13,12 +13,14 @@ interface LibraryHeaderProps {
   workCount: number;
   onCreateWork?: () => void;
   onCreateActivity?: () => void;
+  onOpenTemplates?: () => void;
 }
 
 export function LibraryHeader({
   workCount,
   onCreateWork,
   onCreateActivity,
+  onOpenTemplates,
 }: LibraryHeaderProps) {
   const scanMutation = useScanMutation();
   const { data: blobStats } = useBlobStats();
@@ -68,6 +70,66 @@ export function LibraryHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {onOpenTemplates && (
+            <button
+              onClick={onOpenTemplates}
+              className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm rounded-lg transition-colors border border-neutral-700 hover:border-neutral-600"
+              title="Manage work templates"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              Templates
+            </button>
+          )}
+
+          <button
+            onClick={async () => {
+              if (
+                confirm(
+                  "⚠️ This will DELETE ALL DATA in your library (works, versions, assets, activities, collections, presets, annotations, and cards). This cannot be undone!\n\nAre you sure?"
+                )
+              ) {
+                try {
+                  const { db } = await import("@/src/db/dexie");
+                  await db.delete();
+                  alert("Database cleared! Reloading page...");
+                  window.location.reload();
+                } catch (error) {
+                  console.error("Failed to clear database:", error);
+                  alert("Failed to clear database. Check console for details.");
+                }
+              }
+            }}
+            className="flex items-center gap-2 px-3 py-2 bg-rose-900/50 hover:bg-rose-800/50 text-rose-300 text-sm rounded-lg transition-colors border border-rose-700/50 hover:border-rose-600"
+            title="Clear entire database"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            Clear DB
+          </button>
+
           <button
             onClick={handleScan}
             disabled={scanMutation.isPending}
