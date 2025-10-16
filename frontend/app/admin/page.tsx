@@ -1,8 +1,16 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Database, FileText, HardDrive, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Database,
+  FileText,
+  HardDrive,
+  RefreshCw,
+  Trash2,
+  Network,
+} from "lucide-react";
 import type { BlobWithMetadata } from "../api/library/blobs/route";
+import Link from "next/link";
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
@@ -276,6 +284,50 @@ export default function AdminPage() {
             <li>
               This is for debugging - users will interact with the library, not
               this
+            </li>
+          </ul>
+        </div>
+
+        {/* Link to Graph Visualization */}
+        <div className="mt-12 pt-8 border-t border-gray-800">
+          <Link href="/admin/graph">
+            <div className="p-6 bg-gray-900 border border-gray-800 rounded-lg hover:border-gray-700 transition-colors cursor-pointer">
+              <div className="flex items-center gap-4">
+                <Network className="w-8 h-8 text-blue-400" />
+                <div>
+                  <h3 className="text-xl font-bold">
+                    Data Graph Visualization
+                  </h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Interactive force-directed graph of all local Dexie data
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        <div className="mt-8 p-4 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-400">
+          <p className="font-semibold mb-2">📊 Graph Visualization</p>
+          <ul className="space-y-1 ml-4 list-disc">
+            <li>
+              Shows <strong>local Dexie data</strong> (browser IndexedDB) - not
+              server blobs
+            </li>
+            <li>
+              Visualizes the Asset mental model: Works → Versions → Assets
+            </li>
+            <li>
+              <strong>Unlinked Assets</strong> (red) have no versionId and no
+              edges
+            </li>
+            <li>
+              Activities and Collections link to Works/Assets via "contains"
+              edges (dashed lines)
+            </li>
+            <li>
+              Drag nodes to reposition • Scroll to zoom • Live updates on data
+              changes
             </li>
           </ul>
         </div>

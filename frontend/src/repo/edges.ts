@@ -1,6 +1,22 @@
 /**
  * Repository for Edge entities (relations between entities)
  * Encapsulates all Dexie operations for Edges
+ *
+ * MENTAL MODEL: Edges connect entities with typed relations
+ *
+ * For Assets specifically:
+ * - Assets can be linked to Versions via versionId field (parent-child)
+ * - Assets can also be linked to Activities/Collections via "contains" edges
+ * - When an Asset has no versionId AND no edges, it's "unlinked"
+ * - Creating/deleting "contains" edges changes Asset linking state
+ *
+ * Edge structure:
+ * - fromId: Source entity (e.g., Activity ID)
+ * - toId: Target entity (e.g., Asset ID)
+ * - relation: Type of connection (e.g., "contains")
+ *
+ * Common pattern for Assets in Activities:
+ *   Edge { fromId: activityId, toId: assetId, relation: "contains" }
  */
 
 import { db } from "@/src/db/dexie";

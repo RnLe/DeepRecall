@@ -1,5 +1,20 @@
 /**
  * Zod schemas for library/blob API responses
+ *
+ * MENTAL MODEL: Blobs are raw files stored on the server (CAS)
+ *
+ * Blob: Server-side file storage
+ * - Lives in server SQLite database (blobs table)
+ * - Content-addressed by sha256 hash
+ * - Immutable (rename-proof)
+ * - Source of truth for raw file data
+ * - Accessed via /api/library/blobs and /api/blob/:hash
+ *
+ * vs Asset: Client-side metadata entity (see schema/library.ts)
+ * - Lives in browser IndexedDB (Dexie)
+ * - References Blob via sha256
+ * - Has semantic meaning (role, part of Work/Activity)
+ * - Can be linked/unlinked from entities
  */
 
 import { z } from "zod";

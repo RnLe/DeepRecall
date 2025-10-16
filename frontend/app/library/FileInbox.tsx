@@ -24,8 +24,8 @@ import type { Asset } from "@/src/schema/library";
 
 export function FileInbox() {
   const queryClient = useQueryClient();
-  const { data: newFiles } = useOrphanedBlobs(); // Never touched blobs
-  const { data: unlinkedAssets } = useUnlinkedAssets(); // Created but unlinked assets
+  const { data: newFiles } = useOrphanedBlobs(); // Never touched blobs (React Query)
+  const unlinkedAssets = useUnlinkedAssets(); // Created but unlinked assets (useLiveQuery)
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
   const [isNewFilesCollapsed, setIsNewFilesCollapsed] = useState(false);
   const [isUnlinkedCollapsed, setIsUnlinkedCollapsed] = useState(false);
@@ -255,8 +255,8 @@ export function FileInbox() {
           blob={linkingBlob}
           onSuccess={() => {
             setLinkingBlob(null);
-            // Invalidate queries to refresh the lists
-            queryClient.invalidateQueries({ queryKey: ["unlinkedAssets"] });
+            // Invalidate orphanedBlobs (React Query for server data)
+            // Note: unlinkedAssets uses useLiveQuery, so it updates automatically
             queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
             queryClient.invalidateQueries({ queryKey: ["files"] });
           }}

@@ -128,9 +128,12 @@ export function ActivityBanner({
     if (workId) {
       onDropWork(activity.id, workId);
     } else if (blobId) {
+      // Blob: Create Asset from blob, then link to Activity
       onDropBlob(activity.id, blobId);
     } else if (assetId) {
-      // Assets are already created, just need to link them
+      // Asset: Already exists in Dexie, just create edge to link it
+      // This creates: Edge { fromId: activityId, toId: assetId, relation: "contains" }
+      // After linking, Asset will no longer appear in "Unlinked Assets"
       onDropAsset(activity.id, assetId);
     }
   };

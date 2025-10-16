@@ -1,9 +1,24 @@
 /**
- * React Query hooks for blobs (server-side file storage)
- * Bridges server CAS with client library schema
+ * Hooks for blobs (server-side file storage) and assets (client-side metadata)
+ *
+ * MENTAL MODEL:
+ * - Blobs: Raw files stored on server (CAS); identified by sha256 hash
+ *   → Source of truth: Server SQLite database
+ *   → Queried via: React Query (remote data)
+ *
+ * - Assets: Metadata entities in Dexie that reference blobs via sha256
+ *   → Source of truth: Browser IndexedDB (Dexie)
+ *   → Queried via: useLiveQuery (local durable data)
+ *   → Can be:
+ *     1. Linked to Version (has versionId) - part of a Work
+ *     2. Standalone but linked (no versionId, has edges) - in Activities/Collections
+ *     3. Unlinked (no versionId, no edges) - needs linking
+ *
+ * This file bridges server CAS (blobs) with client library schema (assets)
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLiveQuery } from "dexie-react-hooks";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 import {
   BlobsResponseSchema,
@@ -62,6 +77,9 @@ export function useBlobMetadata(hash: string | undefined) {
 
 /**
  * Get blobs that have no corresponding Assets in Dexie (orphaned blobs)
+ * These are "New Files" that have never been processed into the library
+ *
+ * MENTAL MODEL: Blobs exist on server, but no Asset entity created yet in Dexie
  */
 export async function getOrphanedBlobs(): Promise<BlobWithMetadata[]> {
   const blobs = await fetchBlobs();
@@ -73,6 +91,7 @@ export async function getOrphanedBlobs(): Promise<BlobWithMetadata[]> {
 
 /**
  * Hook to get orphaned blobs (blobs without assets) - "New Files / Inbox"
+ * Uses React Query because blobs are remote data (server CAS)
  */
 export function useOrphanedBlobs() {
   return useQuery({
@@ -83,55 +102,58 @@ export function useOrphanedBlobs() {
 }
 
 /**
- * Get unlinked standalone assets (assets with no versionId and not in any edges)
- */
-export async function getUnlinkedAssets(): Promise<Asset[]> {
-  // Get all standalone assets (no versionId)
-  const standaloneAssets = await db.assets
-    .filter((asset) => !asset.versionId)
-    .toArray();
-
-  // Get all edges to find which assets are linked
-  const edges = await db.edges.toArray();
-  const linkedAssetIds = new Set(
-    edges
-      .filter((edge) => edge.relation === "contains")
-      .map((edge) => edge.toId)
-  );
-
-  // Filter to only assets that are NOT in any edges
-  return standaloneAssets.filter((asset) => !linkedAssetIds.has(asset.id));
-}
-
-/**
  * Hook to get unlinked standalone assets - "Unlinked Assets"
+ *
+ * MENTAL MODEL: Assets that exist in Dexie but are not connected to anything:
+ * - No versionId (not part of any Work/Version)
+ * - No edges with relation="contains" (not in any Activity/Collection)
+ *
+ * These Assets represent "data" that can be moved around and linked.
+ * They reference blobs (raw files) via sha256, but have their own lifecycle.
+ *
+ * Uses useLiveQuery (not React Query) because Assets are local durable data in Dexie.
+ * This ensures the UI automatically updates when edges are created/deleted.
  */
 export function useUnlinkedAssets() {
-  return useQuery({
-    queryKey: ["unlinkedAssets"],
-    queryFn: getUnlinkedAssets,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-}
+  return useLiveQuery(async () => {
+    // Get all standalone assets (no versionId)
+    const standaloneAssets = await db.assets
+      .filter((asset) => !asset.versionId)
+      .toArray();
 
-/**
- * Get Assets that reference blobs that no longer exist on server
- */
-export async function getOrphanedAssets(): Promise<Asset[]> {
-  const blobs = await fetchBlobs();
-  const blobHashes = new Set(blobs.map((b) => b.sha256));
-  const assets = await db.assets.toArray();
+    // Get all edges to find which assets are linked via "contains" relation
+    // (Activities and Collections use "contains" edges to link to Assets)
+    const edges = await db.edges.toArray();
+    const linkedAssetIds = new Set(
+      edges
+        .filter((edge) => edge.relation === "contains")
+        .map((edge) => edge.toId)
+    );
 
-  return assets.filter((asset) => !blobHashes.has(asset.sha256));
+    // Filter to only assets that are NOT in any edges
+    return standaloneAssets.filter((asset) => !linkedAssetIds.has(asset.id));
+  }, []);
 }
 
 /**
  * Hook to get orphaned assets (assets without blobs)
+ *
+ * MENTAL MODEL: Assets that reference blobs that no longer exist on server.
+ * This can happen if files are deleted from the data directory.
+ * Assets are "data" entities separate from blobs; they may outlive the blob.
+ *
+ * Note: This needs React Query because it queries server blobs (remote data)
  */
 export function useOrphanedAssets() {
   return useQuery({
     queryKey: ["orphanedAssets"],
-    queryFn: getOrphanedAssets,
+    queryFn: async (): Promise<Asset[]> => {
+      const blobs = await fetchBlobs();
+      const blobHashes = new Set(blobs.map((b) => b.sha256));
+      const assets = await db.assets.toArray();
+
+      return assets.filter((asset) => !blobHashes.has(asset.sha256));
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

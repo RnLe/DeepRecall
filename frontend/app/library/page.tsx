@@ -85,13 +85,13 @@ export default function LibraryPage() {
       setIsDraggingOverLibrary(false);
       setDragCounter(0);
     };
-    
-    document.addEventListener('dragend', cleanup);
-    document.addEventListener('drop', cleanup);
-    
+
+    document.addEventListener("dragend", cleanup);
+    document.addEventListener("drop", cleanup);
+
     return () => {
-      document.removeEventListener('dragend', cleanup);
-      document.removeEventListener('drop', cleanup);
+      document.removeEventListener("dragend", cleanup);
+      document.removeEventListener("drop", cleanup);
     };
   }, []);
 
@@ -154,7 +154,7 @@ export default function LibraryPage() {
       // Link the asset to the activity
       await edgeRepo.addToActivity(activityId, asset.id);
 
-      // Refresh activities and queries
+      // Refresh activities
       const extended = await activityRepo.getActivityExtended(activityId);
       if (extended) {
         setEnrichedActivities((prev) =>
@@ -162,9 +162,9 @@ export default function LibraryPage() {
         );
       }
 
-      // Invalidate queries to update UI
+      // Invalidate orphanedBlobs (React Query for server data)
+      // Note: unlinkedAssets uses useLiveQuery now, so it updates automatically
       queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
-      queryClient.invalidateQueries({ queryKey: ["unlinkedAssets"] });
     } catch (error) {
       console.error("Failed to link blob to activity:", error);
       alert("Failed to link file to activity");
@@ -179,7 +179,7 @@ export default function LibraryPage() {
       // Asset already exists, just link it to the activity
       await edgeRepo.addToActivity(activityId, assetId);
 
-      // Refresh activities and queries
+      // Refresh activities
       const extended = await activityRepo.getActivityExtended(activityId);
       if (extended) {
         setEnrichedActivities((prev) =>
@@ -187,8 +187,7 @@ export default function LibraryPage() {
         );
       }
 
-      // Invalidate queries to update UI
-      queryClient.invalidateQueries({ queryKey: ["unlinkedAssets"] });
+      // Note: unlinkedAssets uses useLiveQuery, so it updates automatically when edges change
     } catch (error) {
       console.error("Failed to link asset to activity:", error);
       alert("Failed to link asset to activity");
@@ -228,8 +227,7 @@ export default function LibraryPage() {
         );
       }
 
-      // Invalidate queries to show asset in unlinked section
-      queryClient.invalidateQueries({ queryKey: ["unlinkedAssets"] });
+      // Note: unlinkedAssets uses useLiveQuery, so it updates automatically when edges are removed
     } catch (error) {
       console.error("Failed to unlink asset from activity:", error);
       alert("Failed to unlink file from activity");
@@ -574,9 +572,7 @@ export default function LibraryPage() {
           blob={linkingBlob}
           onSuccess={() => {
             setLinkingBlob(null);
-            // Works will auto-refresh via useLiveQuery
-            // Invalidate unlinked assets to remove the newly linked asset
-            queryClient.invalidateQueries({ queryKey: ["unlinkedAssets"] });
+            // Works and unlinkedAssets will auto-refresh via useLiveQuery
           }}
           onCancel={() => setLinkingBlob(null)}
         />

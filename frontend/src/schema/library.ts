@@ -159,6 +159,28 @@ export type Version = z.infer<typeof VersionSchema>;
 
 // ============================================================================
 // Asset = concrete file bound to CAS blob by sha256
+//
+// MENTAL MODEL: Assets represent "data" that can be moved around and linked
+//
+// Asset vs Blob distinction:
+// - Blob: Raw file on server (CAS), identified by sha256
+//   → Lives in server SQLite (blobs table)
+//   → Immutable, content-addressed storage
+//   → Multiple Assets can reference the same Blob
+//
+// - Asset: Metadata entity in client Dexie that references a Blob
+//   → Lives in browser IndexedDB (assets table)
+//   → Has its own lifecycle separate from the Blob
+//   → Can be linked/unlinked from Works, Activities, Collections
+//   → Carries role, filename, and other semantic metadata
+//
+// Asset linking states:
+// 1. Version-linked: Has versionId → Part of a Work/Version
+// 2. Edge-linked: No versionId, but has "contains" edges → In Activity/Collection
+// 3. Unlinked: No versionId, no edges → Needs linking (shows in "Unlinked Assets")
+//
+// Key principle: Assets are "data entities" that outlive their connections.
+// You can unlink an Asset from a Version or Activity without deleting it.
 // ============================================================================
 
 export const AssetRoleSchema = z.enum([
@@ -177,10 +199,13 @@ export const AssetSchema = z.object({
   id: Id,
   kind: z.literal("asset"),
 
-  // Foreign key to Version (optional - can be standalone)
+  // Foreign key to Version (optional - Assets can be standalone)
+  // When set: Asset is part of a Work/Version
+  // When null: Asset is standalone, may be linked via edges (Activity/Collection)
   versionId: Id.optional(),
 
   // Join key to server CAS (blobs table)
+  // Multiple Assets can reference the same blob (e.g., same PDF in different contexts)
   sha256: z.string(),
 
   // File metadata (cached from server or extraction)

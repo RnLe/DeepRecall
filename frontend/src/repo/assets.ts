@@ -1,6 +1,21 @@
 /**
  * Repository for Asset entities
  * Encapsulates all Dexie operations for Assets
+ *
+ * MENTAL MODEL: Assets are "data entities" that can be moved around
+ *
+ * Assets represent metadata about files (blobs) in the library.
+ * They reference blobs by sha256 hash, but have their own lifecycle:
+ *
+ * - Creating an Asset: Associates a blob with metadata (filename, role, etc.)
+ * - Linking an Asset: Connects it to a Version, Activity, or Collection
+ * - Unlinking an Asset: Removes connections but keeps the Asset entity
+ * - Deleting an Asset: Removes the Asset entity (blob remains on server)
+ *
+ * Assets can be in three states:
+ * 1. Version-linked: Has versionId (part of a Work)
+ * 2. Edge-linked: No versionId, but has edges (in Activity/Collection)
+ * 3. Unlinked: No versionId, no edges (standalone, needs linking)
  */
 
 import { db } from "@/src/db/dexie";
