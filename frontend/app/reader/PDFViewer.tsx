@@ -6,12 +6,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/src/db/dexie";
 import { usePDF } from "@/src/hooks/usePDF";
 import { usePDFViewport } from "@/src/hooks/usePDFViewport";
 import { PDFPage } from "./PDFPage";
 import { AnnotationOverlay } from "./AnnotationOverlay";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { AnnotationHandlers } from "./AnnotationHandlers";
+import { PDFScrollbar } from "./PDFScrollbar";
 import type { Annotation } from "@/src/schema/annotation";
 import * as annotationRepo from "@/src/repo/annotations";
 import {
@@ -24,8 +27,9 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  ArrowLeftRight,
-  ArrowUpDown,
+  ChevronsLeftRight,
+  ChevronsUpDown,
+  RotateCcw,
 } from "lucide-react";
 
 export interface PDFViewerProps {
@@ -81,40 +85,63 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
 
   const viewport = usePDFViewport(numPages, pageHeights, 2);
 
-  // Load annotations for visible pages
-  useEffect(() => {
-    const loadAnnotations = async () => {
-      const newMap = new Map<number, Annotation[]>();
-      for (const pageNum of viewport.visiblePages) {
-        const annotations = await annotationRepo.getPageAnnotations(
-          sha256,
-          pageNum
-        );
-        if (annotations.length > 0) {
-          newMap.set(pageNum, annotations);
-        }
-      }
-      setPageAnnotations(newMap);
-    };
-    loadAnnotations();
+  // Live annotations for visible pages - updates immediately on Dexie changes
+  const liveAnnotationsByPage = useLiveQuery(async () => {
+    const map = new Map<number, Annotation[]>();
+    for (const pageNum of viewport.visiblePages) {
+      const arr = await db.annotations
+        .where("[sha256+page]")
+        .equals([sha256, pageNum])
+        .sortBy("createdAt");
+      if (arr.length > 0) map.set(pageNum, arr);
+    }
+    return map;
   }, [sha256, viewport.visiblePages]);
+
+  // Live query for ALL annotations in document (for scrollbar)
+  const allAnnotations = useLiveQuery(async () => {
+    return await db.annotations.where("sha256").equals(sha256).sortBy("page");
+  }, [sha256]);
+
+  // Update local state when live annotations change
+  useEffect(() => {
+    if (liveAnnotationsByPage) {
+      setPageAnnotations(liveAnnotationsByPage);
+    }
+  }, [liveAnnotationsByPage]);
 
   // Keep input in sync with current page
   useEffect(() => {
     setPageInput(String(viewport.currentPage));
   }, [viewport.currentPage]);
 
-  // Handle scroll events
+  // Handle scroll events with RAF for immediate cursor updates
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
+    let rafId: number | null = null;
+
     const handleScroll = () => {
-      viewport.updateScroll(container.scrollTop);
+      // Cancel any pending RAF to avoid duplicate updates
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+
+      // Update on next frame for immediate visual feedback
+      rafId = requestAnimationFrame(() => {
+        viewport.updateScroll(container.scrollTop);
+        rafId = null;
+      });
     };
 
     container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => container.removeEventListener("scroll", handleScroll);
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [viewport]);
 
   // Sync DOM scrollTop when viewport.scrollTop changes (for programmatic jumps)
@@ -265,11 +292,8 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
   // Handle annotation click
   const handleAnnotationClick = useCallback(
     (annotation: Annotation) => {
-      annotationUI.setSelectedAnnotationId(
-        annotation.id === annotationUI.selectedAnnotationId
-          ? null
-          : annotation.id
-      );
+      // Always select the annotation (don't toggle off)
+      annotationUI.setSelectedAnnotationId(annotation.id);
     },
     [annotationUI]
   );
@@ -380,23 +404,25 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
       {/* Toolbar */}
       <div className="pdf-toolbar flex items-center gap-4 p-3 bg-gray-800 border-b border-gray-700">
         {/* Left: Zoom & Fit */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={viewport.zoomOut}
             disabled={viewport.scale <= 0.5}
-            className="px-3 py-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-200 text-sm font-medium transition-colors"
+            className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-200 text-sm font-medium transition-colors"
+            title="Zoom out"
           >
             −
           </button>
 
-          <span className="text-sm w-16 text-center text-gray-300 font-medium">
+          <span className="text-sm w-12 text-center text-gray-300 font-medium">
             {Math.round(viewport.scale * 100)}%
           </span>
 
           <button
             onClick={viewport.zoomIn}
             disabled={viewport.scale >= 4}
-            className="px-3 py-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-200 text-sm font-medium transition-colors"
+            className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-200 text-sm font-medium transition-colors"
+            title="Zoom in"
           >
             +
           </button>
@@ -405,24 +431,27 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
 
           <button
             onClick={fitToWidth}
-            className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 text-gray-200 text-sm transition-colors inline-flex items-center gap-1"
+            className="p-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 text-gray-200 transition-colors"
             title="Fit to width"
           >
-            <ArrowLeftRight className="w-4 h-4" />
+            <ChevronsLeftRight className="w-4 h-4" />
           </button>
           <button
             onClick={fitToHeight}
-            className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 text-gray-200 text-sm transition-colors inline-flex items-center gap-1"
+            className="p-1.5 bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 text-gray-200 transition-colors"
             title="Fit to height"
           >
-            <ArrowUpDown className="w-4 h-4" />
+            <ChevronsUpDown className="w-4 h-4" />
           </button>
-          <button
-            onClick={viewport.resetZoom}
-            className="px-3 py-1.5 bg-purple-600 border border-purple-500 rounded hover:bg-purple-700 ml-1 text-white text-sm transition-colors"
-          >
-            Reset
-          </button>
+          {Math.round(viewport.scale * 100) !== 100 && (
+            <button
+              onClick={viewport.resetZoom}
+              className="p-1.5 bg-purple-600 border border-purple-500 rounded hover:bg-purple-700 text-white transition-colors"
+              title="Reset zoom to 100%"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Center: Page navigation */}
@@ -497,99 +526,143 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
         />
       </div>
 
-      {/* Scrollable content */}
-      <div
-        ref={containerRef}
-        className="pdf-container flex-1 overflow-auto bg-gray-900"
-        style={{ position: "relative" }}
-        onClick={(e) => {
-          // Close right sidebar if clicking on container background (the void)
-          if (
-            rightSidebarOpen &&
-            (e.target === e.currentTarget ||
+      {/* Scrollable content wrapper - relative positioning for fixed scrollbar */}
+      <div className="flex-1 relative">
+        <div
+          ref={containerRef}
+          className="pdf-container absolute inset-0 overflow-auto bg-gray-900"
+          style={{
+            scrollbarWidth: "none", // Firefox
+            msOverflowStyle: "none", // IE/Edge
+          }}
+          onClick={(e) => {
+            // Priority 1: Close context menu if open (checked via AnnotationOverlay state)
+            // Priority 2: Close right sidebar if clicking on container background (the void)
+            const hasOpenMenu = (AnnotationOverlay as any)._hasOpenMenu;
+
+            if (hasOpenMenu) {
+              // Context menu is open - don't close sidebar, just let menu handle it
+              return;
+            }
+
+            if (
+              e.target === e.currentTarget ||
               (e.target as HTMLElement).classList.contains(
                 "pdf-pages-container"
-              ))
-          ) {
-            annotationUI.setSelectedAnnotationId(null);
-            toggleRightSidebar();
-          }
-        }}
-      >
-        <div
-          className="pdf-pages-container relative mx-auto"
-          style={{
-            height: `${totalHeight}px`,
-            width: "fit-content",
-            paddingTop: "16px",
-            paddingBottom: "16px",
+              )
+            ) {
+              // Always unselect annotation
+              annotationUI.setSelectedAnnotationId(null);
+              // Close sidebar if it's open
+              if (rightSidebarOpen) {
+                toggleRightSidebar();
+              }
+            }
           }}
         >
-          {viewport.visiblePages.map((pageNumber) => {
-            const annotations = pageAnnotations.get(pageNumber) || [];
-            const cumulativeHeight = pageHeights
-              .slice(0, pageNumber - 1)
-              .reduce((sum, h) => sum + h * viewport.scale + 16, 0);
-            const pageWidth =
-              (pageWidths[pageNumber - 1] ?? 0) * viewport.scale;
-            const pageHeight =
-              (pageHeights[pageNumber - 1] ?? 0) * viewport.scale;
+          <div
+            className="pdf-pages-container relative mx-auto"
+            style={{
+              height: `${totalHeight}px`,
+              width: "fit-content",
+              paddingTop: "16px",
+              paddingBottom: "16px",
+            }}
+          >
+            {viewport.visiblePages.map((pageNumber) => {
+              const annotations = pageAnnotations.get(pageNumber) || [];
+              const cumulativeHeight = pageHeights
+                .slice(0, pageNumber - 1)
+                .reduce((sum, h) => sum + h * viewport.scale + 16, 0);
+              const pageWidth =
+                (pageWidths[pageNumber - 1] ?? 0) * viewport.scale;
+              const pageHeight =
+                (pageHeights[pageNumber - 1] ?? 0) * viewport.scale;
 
-            return (
-              <div
-                key={pageNumber}
-                className="pdf-page-wrapper relative mb-4"
-                style={{
-                  position: "absolute",
-                  top: `${cumulativeHeight + 16}px`,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                }}
-                onClick={(e) => {
-                  // Close right sidebar if clicking on page (not annotation)
-                  // Check if click target is the page wrapper or PDF canvas
-                  if (
-                    rightSidebarOpen &&
-                    (e.target === e.currentTarget ||
-                      (e.target as HTMLElement).tagName === "CANVAS")
-                  ) {
-                    annotationUI.setSelectedAnnotationId(null);
-                    toggleRightSidebar();
-                  }
-                }}
-              >
-                <AnnotationHandlers
-                  page={pageNumber}
-                  pageWidth={pageWidth}
-                  pageHeight={pageHeight}
-                  containerRef={containerRef}
+              return (
+                <div
+                  key={pageNumber}
+                  className="pdf-page-wrapper relative mb-4"
+                  style={{
+                    position: "absolute",
+                    top: `${cumulativeHeight + 16}px`,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                  }}
+                  onClick={(e) => {
+                    // Priority 1: Close context menu if open
+                    // Priority 2: Close right sidebar if clicking on page (not annotation)
+                    const hasOpenMenu = (AnnotationOverlay as any)._hasOpenMenu;
+
+                    if (hasOpenMenu) {
+                      // Context menu is open - don't close sidebar
+                      return;
+                    }
+
+                    // Check if click target is the page wrapper or PDF canvas
+                    if (
+                      e.target === e.currentTarget ||
+                      (e.target as HTMLElement).tagName === "CANVAS"
+                    ) {
+                      // Always unselect annotation
+                      annotationUI.setSelectedAnnotationId(null);
+                      // Close sidebar if it's open
+                      if (rightSidebarOpen) {
+                        toggleRightSidebar();
+                      }
+                    }
+                  }}
                 >
-                  <div className="relative shadow-lg">
-                    <PDFPage
-                      pdf={pdf}
-                      pageNumber={pageNumber}
-                      scale={viewport.scale}
-                      docId={sha256}
-                      onLoad={(w, h) => handlePageLoad(pageNumber, w, h)}
-                    />
-
-                    {/* Annotation overlay */}
-                    {pageHeights[pageNumber - 1] && (
-                      <AnnotationOverlay
-                        sha256={sha256}
-                        page={pageNumber}
-                        annotations={annotations}
-                        pageWidth={pageWidth}
-                        pageHeight={pageHeight}
-                        onAnnotationClick={handleAnnotationClick}
+                  <AnnotationHandlers
+                    page={pageNumber}
+                    pageWidth={pageWidth}
+                    pageHeight={pageHeight}
+                    containerRef={containerRef}
+                  >
+                    <div className="relative shadow-lg">
+                      <PDFPage
+                        pdf={pdf}
+                        pageNumber={pageNumber}
+                        scale={viewport.scale}
+                        docId={sha256}
+                        onLoad={(w, h) => handlePageLoad(pageNumber, w, h)}
                       />
-                    )}
-                  </div>
-                </AnnotationHandlers>
-              </div>
-            );
-          })}
+
+                      {/* Annotation overlay */}
+                      {pageHeights[pageNumber - 1] && (
+                        <AnnotationOverlay
+                          sha256={sha256}
+                          page={pageNumber}
+                          annotations={annotations}
+                          pageWidth={pageWidth}
+                          pageHeight={pageHeight}
+                          onAnnotationClick={handleAnnotationClick}
+                        />
+                      )}
+                    </div>
+                  </AnnotationHandlers>
+                </div>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Custom scrollbar with viewport indicator and annotation markers */}
+        {allAnnotations && (
+          <PDFScrollbar
+            totalHeight={totalHeight}
+            pageHeights={pageHeights.map((h) => h * viewport.scale)}
+            scrollTop={viewport.scrollTop}
+            containerHeight={viewport.containerHeight}
+            annotations={allAnnotations}
+            scale={viewport.scale}
+            onScrollTo={(scrollTop) => viewport.setScrollTop(scrollTop)}
+            onAnnotationSelect={(annotation, yOffset) => {
+              // Navigate to annotation position without selecting
+              annotationUI.navigateToPage(annotation.page, yOffset);
+            }}
+          />
+        )}
       </div>
     </div>
   );

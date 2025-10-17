@@ -64,10 +64,6 @@ export default function HomePage() {
             </div>
           </Link>
         </nav>
-
-        <footer className="text-center text-sm text-gray-600">
-          <p>A local-first study workbench for serious learners</p>
-        </footer>
       </div>
     </div>
   );

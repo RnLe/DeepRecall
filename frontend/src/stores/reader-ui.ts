@@ -175,7 +175,7 @@ export const useReaderUI = create<ReaderUIState>()(
           leftSidebarOpen: state.leftSidebarOpen,
           leftSidebarWidth: state.leftSidebarWidth,
           leftSidebarView: state.leftSidebarView,
-          rightSidebarOpen: state.rightSidebarOpen,
+          // Don't persist right sidebar state - always start closed
           rightSidebarWidth: state.rightSidebarWidth,
           // Don't persist tabs - they should be opened fresh each session
         }),

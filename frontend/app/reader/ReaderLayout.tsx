@@ -13,9 +13,7 @@ import { AnnotationEditor } from "./AnnotationEditor";
 import { TabBar } from "./TabBar";
 import {
   PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
+  ChevronRight,
   FolderOpen,
   MessageSquare,
 } from "lucide-react";
@@ -43,9 +41,17 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
   const rightResizerRef = useRef<HTMLDivElement>(null);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
+  const [annotationReloadTrigger, setAnnotationReloadTrigger] = useState(0);
 
   const activeTab = getActiveTab();
   const activeSha256 = activeTab?.assetId || null;
+
+  // Ensure Files is the default tab and right sidebar is closed on mount and page reload
+  useEffect(() => {
+    setLeftSidebarView("files");
+    // run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Left sidebar resize logic
   useEffect(() => {
@@ -100,7 +106,7 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
             className="flex-shrink-0 overflow-hidden relative flex flex-col bg-gray-900"
             style={{ width: `${leftSidebarWidth}px` }}
           >
-            {/* View Toggle */}
+            {/* View Toggle with collapse button */}
             <div className="flex border-b border-gray-700">
               <button
                 onClick={() => setLeftSidebarView("files")}
@@ -126,6 +132,14 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
                 <MessageSquare className="w-4 h-4" />
                 Annotations
               </button>
+              {/* Collapse button in header */}
+              <button
+                onClick={toggleLeftSidebar}
+                className="px-3 py-3 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                title="Hide sidebar"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Content */}
@@ -135,6 +149,10 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
               ) : (
                 <AnnotationList
                   sha256={activeSha256}
+                  reloadTrigger={annotationReloadTrigger}
+                  onAnnotationUpdated={() => {
+                    setAnnotationReloadTrigger((prev) => prev + 1);
+                  }}
                   onAnnotationClick={(ann) => {
                     // Calculate topmost Y from annotation
                     let minY = 1;
@@ -156,15 +174,6 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
                 />
               )}
             </div>
-
-            {/* Collapse button */}
-            <button
-              onClick={toggleLeftSidebar}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 p-1 bg-gray-700 hover:bg-purple-600 border border-gray-600 rounded-full transition-colors text-gray-300 hover:text-white shadow-lg"
-              title="Hide sidebar"
-            >
-              <PanelLeftClose className="w-3.5 h-3.5" />
-            </button>
           </div>
 
           {/* Left resizer */}
@@ -183,10 +192,10 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
       {!leftSidebarOpen && (
         <button
           onClick={toggleLeftSidebar}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1 bg-gray-700 hover:bg-purple-600 border border-gray-600 rounded-r-full transition-colors text-gray-300 hover:text-white shadow-lg"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 px-1.5 py-8 bg-gray-700 hover:bg-purple-600 border border-gray-600 rounded-r-lg transition-colors text-gray-300 hover:text-white shadow-lg"
           title="Show sidebar"
         >
-          <PanelLeftOpen className="w-3.5 h-3.5" />
+          <ChevronRight className="w-4 h-4" />
         </button>
       )}
 
@@ -219,28 +228,13 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
               onAnnotationDeleted={() => {
                 // Trigger reload in annotation list (handled by Dexie live query)
               }}
+              onAnnotationUpdated={() => {
+                // Trigger annotation reload in list and PDF
+                setAnnotationReloadTrigger((prev) => prev + 1);
+              }}
             />
-            {/* Collapse button */}
-            <button
-              onClick={toggleRightSidebar}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 p-1 bg-gray-700 hover:bg-purple-600 border border-gray-600 rounded-full transition-colors text-gray-300 hover:text-white shadow-lg"
-              title="Hide tools"
-            >
-              <PanelRightClose className="w-3.5 h-3.5" />
-            </button>
           </div>
         </>
-      )}
-
-      {/* Right sidebar expand button (when collapsed) */}
-      {!rightSidebarOpen && (
-        <button
-          onClick={toggleRightSidebar}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-1 bg-gray-700 hover:bg-purple-600 border border-gray-600 rounded-l-full transition-colors text-gray-300 hover:text-white shadow-lg"
-          title="Show tools"
-        >
-          <PanelRightOpen className="w-3.5 h-3.5" />
-        </button>
       )}
     </div>
   );

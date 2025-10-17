@@ -44,11 +44,14 @@ interface AnnotationEditorProps {
   sha256: string;
   /** Callback when annotation deleted */
   onAnnotationDeleted?: () => void;
+  /** Callback when annotation updated (color, kind, etc.) */
+  onAnnotationUpdated?: () => void;
 }
 
 export function AnnotationEditor({
   sha256,
   onAnnotationDeleted,
+  onAnnotationUpdated,
 }: AnnotationEditorProps) {
   const { selectedAnnotationId, setSelectedAnnotationId } = useAnnotationUI();
   const { toggleRightSidebar } = useReaderUI();
@@ -63,7 +66,7 @@ export function AnnotationEditor({
   const [color, setColor] = useState("#fbbf24");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
-  const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
+  const [isMarkdownPreview, setIsMarkdownPreview] = useState(true);
 
   // Load annotation when selected
   useEffect(() => {
@@ -83,7 +86,7 @@ export function AnnotationEditor({
           setNotes(ann.metadata?.notes || "");
           setColor(ann.metadata?.color || "#fbbf24");
           setTags(ann.metadata?.tags || []);
-          setIsMarkdownPreview(false);
+          setIsMarkdownPreview(true);
         }
       } catch (error) {
         console.error("Failed to load annotation:", error);
@@ -111,6 +114,9 @@ export function AnnotationEditor({
       // Reload annotation
       const updated = await annotationRepo.getAnnotation(annotation.id);
       if (updated) setAnnotation(updated);
+
+      // Notify parent about update
+      onAnnotationUpdated?.();
     } catch (error) {
       console.error("Failed to update annotation:", error);
     }
