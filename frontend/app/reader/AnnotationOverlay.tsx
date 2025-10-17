@@ -6,11 +6,14 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Annotation, NormalizedRect } from "@/src/schema/annotation";
 import type { AnnotationTool } from "@/src/stores/annotation-ui";
 import { useAnnotationUI } from "@/src/stores/annotation-ui";
 import { useReaderUI } from "@/src/stores/reader-ui";
 import { AnnotationContextMenu } from "./AnnotationContextMenu";
+import * as assetRepo from "@/src/repo/assets";
+import * as annotationRepo from "@/src/repo/annotations";
 import {
   Save,
   X,
@@ -24,6 +27,7 @@ import {
   Beaker,
   StickyNote,
   HelpCircle,
+  ChevronRight,
 } from "lucide-react";
 
 const ANNOTATION_KINDS: Record<string, any> = {
@@ -71,6 +75,7 @@ export function AnnotationOverlay({
   onSave,
   onCancel,
 }: AnnotationOverlayProps) {
+  const router = useRouter();
   const {
     selection,
     selectedAnnotationId,
@@ -87,6 +92,9 @@ export function AnnotationOverlay({
     x: number;
     y: number;
   } | null>(null);
+  const [dragOverAnnotationId, setDragOverAnnotationId] = useState<
+    string | null
+  >(null);
 
   // Expose menu state for parent components (e.g., PDFViewer click handling)
   useEffect(() => {
@@ -110,6 +118,52 @@ export function AnnotationOverlay({
     width: rect.width * pageWidth,
     height: rect.height * pageHeight,
   });
+
+  // Handle file drop on annotation
+  const handleFileDrop = async (annotationId: string, file: File) => {
+    try {
+      // Upload file
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append(
+        "metadata",
+        JSON.stringify({
+          role: "notes",
+          annotationId,
+          purpose: "annotation-note",
+        })
+      );
+
+      const response = await fetch("/api/library/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const { blob } = await response.json();
+
+      // Create Asset
+      const asset = await assetRepo.createNoteAsset({
+        sha256: blob.sha256,
+        filename: blob.filename,
+        bytes: blob.size,
+        mime: blob.mime,
+        annotationId,
+        title: file.name,
+        purpose: "annotation-note",
+      });
+
+      // Attach to annotation
+      await annotationRepo.attachAssetToAnnotation(annotationId, asset.id);
+
+      console.log(`Attached note to annotation: ${file.name}`);
+    } catch (error) {
+      console.error("Failed to attach note:", error);
+    }
+  };
 
   /**
    * Get top-left position for annotation metadata overlay
@@ -223,6 +277,8 @@ export function AnnotationOverlay({
         ) : null;
 
         if (annotation.data.type === "rectangle") {
+          const isDragOver = dragOverAnnotationId === annotation.id;
+
           return (
             <Fragment key={annotation.id}>
               {metadataOverlay}
@@ -237,14 +293,39 @@ export function AnnotationOverlay({
                       width={width}
                       height={height}
                       fill={color}
-                      fillOpacity={0.1}
+                      fillOpacity={isDragOver ? 0.3 : 0.1}
                       stroke={color}
-                      strokeWidth={isSelected ? 3 : 2}
-                      strokeOpacity={0.8}
+                      strokeWidth={isSelected ? 3 : isDragOver ? 3 : 2}
+                      strokeOpacity={isDragOver ? 1 : 0.8}
+                      strokeDasharray={isDragOver ? "5,5" : "0"}
                       className="transition-all hover:fill-opacity-50"
                       onMouseEnter={() => setHoveredAnnotationId(annotation.id)}
                       onMouseLeave={() => setHoveredAnnotationId(null)}
                       onClick={() => onAnnotationClick?.(annotation)}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDragOverAnnotationId(annotation.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDragOverAnnotationId(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDragOverAnnotationId(null);
+
+                        const file = e.dataTransfer.files[0];
+                        if (file) {
+                          handleFileDrop(annotation.id, file);
+                        }
+                      }}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -310,12 +391,106 @@ export function AnnotationOverlay({
                       </g>
                     );
                   })()}
+
+                {/* Chevron button for annotation details (shown when selected) */}
+                {isSelected &&
+                  annotation.data.rects[0] &&
+                  (() => {
+                    const firstRect = denormalize(annotation.data.rects[0]);
+                    // Get the bounding box of all rects
+                    const allRects = annotation.data.rects.map(denormalize);
+                    const maxX = Math.max(
+                      ...allRects.map((r) => r.x + r.width)
+                    );
+                    const minY = Math.min(...allRects.map((r) => r.y));
+                    const maxY = Math.max(
+                      ...allRects.map((r) => r.y + r.height)
+                    );
+                    const centerY = (minY + maxY) / 2;
+
+                    return (
+                      <g
+                        key="chevron-button"
+                        transform={`translate(${maxX - 4}, ${centerY - 16})`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/reader/annotation/${annotation.id}`);
+                        }}
+                        className="cursor-pointer pointer-events-auto"
+                      >
+                        <rect
+                          width={32}
+                          height={32}
+                          rx={6}
+                          fill={color}
+                          opacity={0.95}
+                          className="hover:opacity-100 transition-opacity"
+                        />
+                        <foreignObject x={4} y={4} width={24} height={24}>
+                          <div className="flex items-center justify-center w-full h-full">
+                            <ChevronRight
+                              style={{
+                                width: 20,
+                                height: 20,
+                                color: "#ffffff",
+                                strokeWidth: 2.5,
+                              }}
+                            />
+                          </div>
+                        </foreignObject>
+                      </g>
+                    );
+                  })()}
               </g>
+
+              {/* Chevron button for navigation to detail view */}
+              {isSelected &&
+                annotation.data.rects[0] &&
+                (() => {
+                  const firstRect = denormalize(annotation.data.rects[0]);
+                  const buttonSize = 32;
+                  const buttonX = firstRect.x + firstRect.width;
+                  const buttonY =
+                    firstRect.y + firstRect.height / 2 - buttonSize / 2;
+
+                  return (
+                    <g
+                      transform={`translate(${buttonX}, ${buttonY})`}
+                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/reader/annotation/${annotation.id}`);
+                      }}
+                    >
+                      <rect
+                        x={-4}
+                        y={0}
+                        width={buttonSize}
+                        height={buttonSize}
+                        fill={color}
+                        rx={4}
+                        className="hover:brightness-110 transition-all"
+                      />
+                      <foreignObject
+                        x={0}
+                        y={4}
+                        width={buttonSize - 8}
+                        height={buttonSize - 8}
+                      >
+                        <div className="flex items-center justify-center w-full h-full text-white">
+                          <ChevronRight size={20} strokeWidth={3} />
+                        </div>
+                      </foreignObject>
+                    </g>
+                  );
+                })()}
             </Fragment>
           );
         }
 
         if (annotation.data.type === "highlight") {
+          const isDragOver = dragOverAnnotationId === annotation.id;
+
           return (
             <Fragment key={annotation.id}>
               {metadataOverlay}
@@ -331,14 +506,40 @@ export function AnnotationOverlay({
                         width={width}
                         height={height}
                         fill={color}
-                        fillOpacity={isSelected ? 0.25 : 0.2}
-                        stroke="none"
+                        fillOpacity={isSelected ? 0.25 : isDragOver ? 0.3 : 0.2}
+                        stroke={isDragOver ? color : "none"}
+                        strokeWidth={isDragOver ? 2 : 0}
+                        strokeDasharray={isDragOver ? "5,5" : "0"}
                         className="transition-all hover:fill-opacity-30"
                         onMouseEnter={() =>
                           setHoveredAnnotationId(annotation.id)
                         }
                         onMouseLeave={() => setHoveredAnnotationId(null)}
                         onClick={() => onAnnotationClick?.(annotation)}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOverAnnotationId(annotation.id);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOverAnnotationId(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOverAnnotationId(null);
+
+                          const file = e.dataTransfer.files[0];
+                          if (file) {
+                            handleFileDrop(annotation.id, file);
+                          }
+                        }}
                         onContextMenu={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -359,6 +560,57 @@ export function AnnotationOverlay({
                     );
                   })
                 )}
+
+                {/* Chevron button for annotation details (shown when selected) */}
+                {isSelected &&
+                  annotation.data.ranges.length > 0 &&
+                  (() => {
+                    // Get the bounding box of all highlight rects
+                    const allRects = annotation.data.ranges.flatMap((r) =>
+                      r.rects.map(denormalize)
+                    );
+                    const maxX = Math.max(
+                      ...allRects.map((r) => r.x + r.width)
+                    );
+                    const minY = Math.min(...allRects.map((r) => r.y));
+                    const maxY = Math.max(
+                      ...allRects.map((r) => r.y + r.height)
+                    );
+                    const centerY = (minY + maxY) / 2;
+
+                    return (
+                      <g
+                        key="chevron-button"
+                        transform={`translate(${maxX - 4}, ${centerY - 16})`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/reader/annotation/${annotation.id}`);
+                        }}
+                        className="cursor-pointer pointer-events-auto"
+                      >
+                        <rect
+                          width={32}
+                          height={32}
+                          rx={6}
+                          fill={color}
+                          opacity={0.95}
+                          className="hover:opacity-100 transition-opacity"
+                        />
+                        <foreignObject x={4} y={4} width={24} height={24}>
+                          <div className="flex items-center justify-center w-full h-full">
+                            <ChevronRight
+                              style={{
+                                width: 20,
+                                height: 20,
+                                color: "#ffffff",
+                                strokeWidth: 2.5,
+                              }}
+                            />
+                          </div>
+                        </foreignObject>
+                      </g>
+                    );
+                  })()}
               </g>
             </Fragment>
           );

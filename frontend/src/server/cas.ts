@@ -3,11 +3,11 @@
  * Handles file scanning, hashing, and storage coordination
  */
 
-import { readdir, stat } from "fs/promises";
+import { readdir, stat, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getDB } from "./db";
 import { blobs, paths } from "./schema";
-import { hashFile } from "./hash";
+import { hashFile, hashBuffer } from "./hash";
 import { eq } from "drizzle-orm";
 
 /**
@@ -17,6 +17,41 @@ export function getLibraryPath(): string {
   return (
     process.env.LIBRARY_PATH || path.join(process.cwd(), "data", "library")
   );
+}
+
+/**
+ * Get storage subdirectory for a given asset role
+ * Organizes files by role for better management
+ * @param role - Asset role (notes, main, thumbnail, etc.)
+ * @param mime - MIME type for further categorization
+ * @returns absolute path to storage directory
+ */
+export function getStoragePathForRole(role: string, mime: string): string {
+  const libraryPath = getLibraryPath();
+
+  switch (role) {
+    case "notes":
+      if (mime === "text/markdown") {
+        return path.join(libraryPath, "notes", "markdown");
+      } else if (mime.startsWith("image/")) {
+        return path.join(libraryPath, "notes", "images");
+      } else if (mime === "application/pdf") {
+        return path.join(libraryPath, "notes", "pdfs");
+      }
+      return path.join(libraryPath, "notes");
+
+    case "thumbnail":
+      return path.join(libraryPath, "thumbnails", "pdf-previews");
+
+    case "supplement":
+    case "slides":
+    case "solutions":
+      return path.join(libraryPath, "supplements", role);
+
+    case "main":
+    default:
+      return path.join(libraryPath, "main");
+  }
 }
 
 /**
@@ -409,4 +444,77 @@ export async function clearDatabase(): Promise<void> {
   await db.delete(blobs);
 
   console.log("Database cleared");
+}
+
+/**
+ * Store a buffer as a new blob with organized file structure
+ * @param buffer - File content as Buffer
+ * @param filename - Original filename (for extension)
+ * @param role - Asset role for organization (default: "main")
+ * @returns Object with hash, path, and size
+ */
+export async function storeBlob(
+  buffer: Buffer,
+  filename: string,
+  role: string = "main"
+): Promise<{ hash: string; path: string; size: number }> {
+  const hash = hashBuffer(buffer);
+  const mime = getMimeType(filename);
+  const storagePath = getStoragePathForRole(role, mime);
+
+  // Ensure directory exists
+  await mkdir(storagePath, { recursive: true });
+
+  // Determine file extension
+  const ext = path.extname(filename);
+  const targetPath = path.join(storagePath, `${hash}${ext}`);
+
+  // Write file (idempotent - content-addressed)
+  await writeFile(targetPath, buffer);
+
+  const db = getDB();
+  const size = buffer.length;
+  const now = Date.now();
+
+  // Insert blob metadata
+  await db
+    .insert(blobs)
+    .values({
+      hash,
+      size,
+      mime,
+      mtime_ms: now,
+      created_ms: now,
+      filename,
+      health: "healthy",
+    })
+    .onConflictDoNothing();
+
+  // Insert path mapping
+  await db
+    .insert(paths)
+    .values({
+      hash,
+      path: targetPath,
+    })
+    .onConflictDoUpdate({
+      target: paths.path,
+      set: { hash },
+    });
+
+  return { hash, path: targetPath, size };
+}
+
+/**
+ * Create a markdown file blob from text content
+ * @param content - Markdown text content
+ * @param filename - Filename for the markdown file
+ * @returns Object with hash, path, and size
+ */
+export async function createMarkdownBlob(
+  content: string,
+  filename: string
+): Promise<{ hash: string; path: string; size: number }> {
+  const buffer = Buffer.from(content, "utf-8");
+  return storeBlob(buffer, filename, "notes");
 }

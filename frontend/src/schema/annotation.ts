@@ -82,12 +82,35 @@ export type AnnotationData = z.infer<typeof AnnotationDataSchema>;
 export const AnnotationMetadataSchema = z.object({
   title: z.string().optional(),
   kind: z.string().optional(), // Classification: equation, table, figure, definition, etc.
-  notes: z.string().optional(), // Markdown supported
+  notes: z.string().optional(), // Markdown supported (keep for backward compatibility)
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(), // Hex color
   tags: z.array(z.string()).optional(), // Simple tags (can expand to relations later)
+
+  // NEW: Attached note Assets (markdown files, images, PDFs)
+  // Array of Asset UUIDs that are attached to this annotation
+  attachedAssets: z.array(z.string().uuid()).optional(),
+
+  // NEW: Note organization groups (branches in tree view)
+  noteGroups: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string(),
+        description: z.string().optional(),
+        color: z
+          .string()
+          .regex(/^#[0-9A-Fa-f]{6}$/)
+          .optional(),
+        order: z.number().int().min(0),
+        viewMode: z.enum(["detailed", "compact", "list"]).default("compact"),
+        columns: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(1),
+        width: z.number().int().min(320).optional(), // Resizable width in pixels
+      })
+    )
+    .optional(),
 });
 
 export type AnnotationMetadata = z.infer<typeof AnnotationMetadataSchema>;

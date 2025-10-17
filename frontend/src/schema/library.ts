@@ -158,6 +158,19 @@ export type Work = z.infer<typeof WorkSchema>;
 // Assets now carry edition/publication metadata (formerly in Version entity).
 // ============================================================================
 
+/**
+ * Asset purpose - distinguishes use case within same role
+ * Enables finer granularity for organizing assets
+ */
+export const AssetPurposeSchema = z.enum([
+  "annotation-note", // Note attached to specific annotation
+  "work-note", // Note at Work level
+  "activity-note", // Note at Activity level
+  "thumbnail-preview", // Thumbnail for preview
+]);
+
+export type AssetPurpose = z.infer<typeof AssetPurposeSchema>;
+
 export const AssetRoleSchema = z.enum([
   "main",
   "supplement",
@@ -166,6 +179,7 @@ export const AssetRoleSchema = z.enum([
   "data",
   "notes",
   "exercises",
+  "thumbnail", // NEW: Auto-generated thumbnails
 ]);
 
 export type AssetRole = z.infer<typeof AssetRoleSchema>;
@@ -193,6 +207,19 @@ export const AssetSchema = z.object({
 
   // Role in the work (main text, slides, supplement, etc.)
   role: AssetRoleSchema.default("main"),
+
+  // NEW: Optional purpose for finer categorization within role
+  // Distinguishes annotation notes from work notes, thumbnails from main content, etc.
+  purpose: AssetPurposeSchema.optional(),
+
+  // NEW: For annotation notes, track parent annotation
+  // This creates a parent-child relationship: Annotation → Note Asset
+  annotationId: z.string().optional(),
+
+  // NEW: User-editable metadata for notes
+  userTitle: z.string().optional(), // User-friendly title (separate from filename)
+  userDescription: z.string().optional(), // Brief description/summary
+  noteGroup: z.string().optional(), // Group ID for note organization
 
   // Edition/version identity (for works with multiple assets)
   edition: z.string().optional(), // "3rd", "v2", "rev. 2021"

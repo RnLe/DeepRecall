@@ -15,6 +15,7 @@ import { AnnotationOverlay } from "./AnnotationOverlay";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { AnnotationHandlers } from "./AnnotationHandlers";
 import { PDFScrollbar } from "./PDFScrollbar";
+import { CreateNoteDialog } from "./CreateNoteDialog";
 import type { Annotation } from "@/src/schema/annotation";
 import * as annotationRepo from "@/src/repo/annotations";
 import {
@@ -67,6 +68,8 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
   const [pageWidths, setPageWidths] = useState<number[]>([]);
   // Page input state for editable current page
   const [pageInput, setPageInput] = useState<string>("1");
+
+  const [showCreateNoteDialog, setShowCreateNoteDialog] = useState(false);
 
   // Initialize page heights array when PDF loads
   useEffect(() => {
@@ -360,6 +363,12 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
         annotationUI.setTool("rectangle");
       } else if (e.key === "h" || e.key === "H") {
         annotationUI.setTool("highlight");
+      } else if (e.key === "n" || e.key === "N") {
+        // N: Open create note dialog for selected annotation
+        e.preventDefault();
+        if (annotationUI.selectedAnnotationId) {
+          setShowCreateNoteDialog(true);
+        }
       } else if (e.key === "Escape") {
         handleCancelAnnotation();
       } else if ((e.metaKey || e.ctrlKey) && e.key === "s") {
@@ -724,6 +733,18 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
           />
         )}
       </div>
+
+      {/* Create Note Dialog */}
+      {showCreateNoteDialog && annotationUI.selectedAnnotationId && (
+        <CreateNoteDialog
+          annotationId={annotationUI.selectedAnnotationId}
+          onClose={() => setShowCreateNoteDialog(false)}
+          onNoteCreated={() => {
+            setShowCreateNoteDialog(false);
+            // Notes will auto-reload via live query
+          }}
+        />
+      )}
     </div>
   );
 }

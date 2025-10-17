@@ -10,6 +10,7 @@ import { useAnnotationUI } from "@/src/stores/annotation-ui";
 import { useReaderUI } from "@/src/stores/reader-ui";
 import * as annotationRepo from "@/src/repo/annotations";
 import type { Annotation } from "@/src/schema/annotation";
+import type { Asset } from "@/src/schema/library";
 import { formatDate, getRelativeTime } from "@/src/utils/date";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -35,7 +36,12 @@ import {
   Beaker,
   StickyNote,
   HelpCircle,
+  Plus,
 } from "lucide-react";
+import { deleteNoteAsset } from "@/src/repo/assets";
+import { CreateNoteDialog } from "@/app/reader/CreateNoteDialog";
+import { CompactNoteItem } from "@/app/reader/CompactNoteItem";
+import { NoteDetailModal } from "@/app/reader/NoteDetailModal";
 
 const ANNOTATION_COLORS = [
   { name: "Amber", value: "#fbbf24" },
@@ -90,11 +96,18 @@ export function AnnotationEditor({
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
 
+  // Attached notes state
+  const [attachedNotes, setAttachedNotes] = useState<Asset[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<Asset | null>(null);
+
   // Load annotation when selected
   useEffect(() => {
     const loadAnnotation = async () => {
       if (!selectedAnnotationId) {
         setAnnotation(null);
+        setAttachedNotes([]);
         return;
       }
 
@@ -109,6 +122,9 @@ export function AnnotationEditor({
           setColor(ann.metadata?.color || "#fbbf24");
           setTags(ann.metadata?.tags || []);
           setIsMarkdownPreview(true);
+
+          // Load attached notes
+          loadAttachedNotes(selectedAnnotationId);
         }
       } catch (error) {
         console.error("Failed to load annotation:", error);
@@ -119,6 +135,19 @@ export function AnnotationEditor({
 
     loadAnnotation();
   }, [selectedAnnotationId]);
+
+  // Load attached note assets
+  const loadAttachedNotes = async (annotationId: string) => {
+    setNotesLoading(true);
+    try {
+      const notes = await annotationRepo.getAnnotationAssets(annotationId);
+      setAttachedNotes(notes);
+    } catch (error) {
+      console.error("Failed to load attached notes:", error);
+    } finally {
+      setNotesLoading(false);
+    }
+  };
 
   // Auto-save on changes (debounced in practice, but simple for now)
   const handleUpdate = async (updates: Partial<Annotation["metadata"]>) => {
@@ -193,6 +222,30 @@ export function AnnotationEditor({
     } catch (error) {
       console.error("Failed to copy text:", error);
     }
+  };
+
+  const handleDeleteNote = async (asset: Asset) => {
+    if (!annotation) return;
+    try {
+      await deleteNoteAsset(asset.id);
+      // Reload notes
+      await loadAttachedNotes(annotation.id);
+      // Reload annotation to update attachedAssets array
+      const updated = await annotationRepo.getAnnotation(annotation.id);
+      if (updated) setAnnotation(updated);
+    } catch (error) {
+      console.error("Failed to delete note:", error);
+    }
+  };
+
+  const handleNoteCreated = async () => {
+    if (!annotation) return;
+    setShowNoteDialog(false);
+    // Reload notes
+    await loadAttachedNotes(annotation.id);
+    // Reload annotation to update attachedAssets array
+    const updated = await annotationRepo.getAnnotation(annotation.id);
+    if (updated) setAnnotation(updated);
   };
 
   if (!selectedAnnotationId) {
@@ -457,6 +510,42 @@ export function AnnotationEditor({
           </div>
         </div>
 
+        {/* Attached Notes */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-medium text-gray-400">
+              Attached Notes
+            </label>
+            <button
+              onClick={() => setShowNoteDialog(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-purple-600 hover:bg-purple-700 rounded text-xs text-white transition-colors"
+            >
+              <Plus size={14} />
+              Add Note
+            </button>
+          </div>
+
+          {notesLoading ? (
+            <div className="flex items-center justify-center py-4 text-gray-500">
+              <div className="text-sm">Loading notes...</div>
+            </div>
+          ) : attachedNotes.length > 0 ? (
+            <div className="space-y-1">
+              {attachedNotes.map((note) => (
+                <CompactNoteItem
+                  key={note.id}
+                  asset={note}
+                  onClick={() => setSelectedNote(note)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 text-center py-4 border border-gray-700 border-dashed rounded">
+              No notes attached yet
+            </div>
+          )}
+        </div>
+
         {/* Highlight Text (if applicable) */}
         {annotation.data.type === "highlight" && (
           <div>
@@ -482,6 +571,28 @@ export function AnnotationEditor({
           </div>
         )}
       </div>
+
+      {/* Create Note Dialog */}
+      {showNoteDialog && annotation && (
+        <CreateNoteDialog
+          annotationId={annotation.id}
+          onClose={() => setShowNoteDialog(false)}
+          onNoteCreated={handleNoteCreated}
+        />
+      )}
+
+      {/* Note Detail Modal */}
+      {selectedNote && (
+        <NoteDetailModal
+          asset={selectedNote}
+          onClose={() => setSelectedNote(null)}
+          onUpdate={async () => {
+            if (annotation) {
+              await loadAttachedNotes(annotation.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

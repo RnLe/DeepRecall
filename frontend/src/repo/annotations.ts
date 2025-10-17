@@ -247,3 +247,245 @@ export async function importAnnotations(
 
   return { created, updated };
 }
+
+/* ────────────────────── Annotation Asset Attachment ────────────────────── */
+
+/**
+ * Attach an asset to an annotation
+ * @param annotationId - Annotation ID
+ * @param assetId - Asset UUID to attach
+ * @returns Updated annotation or null if not found
+ */
+export async function attachAssetToAnnotation(
+  annotationId: string,
+  assetId: string
+): Promise<Annotation | null> {
+  const annotation = await db.annotations.get(annotationId);
+  if (!annotation) return null;
+
+  const attachedAssets = annotation.metadata.attachedAssets ?? [];
+
+  // Prevent duplicates
+  if (attachedAssets.includes(assetId)) {
+    return annotation;
+  }
+
+  const updated: Annotation = {
+    ...annotation,
+    metadata: {
+      ...annotation.metadata,
+      attachedAssets: [...attachedAssets, assetId],
+    },
+    updatedAt: Date.now(),
+  };
+
+  await db.annotations.put(updated);
+  return updated;
+}
+
+/**
+ * Detach an asset from an annotation
+ * @param annotationId - Annotation ID
+ * @param assetId - Asset UUID to detach
+ * @returns Updated annotation or null if not found
+ */
+export async function detachAssetFromAnnotation(
+  annotationId: string,
+  assetId: string
+): Promise<Annotation | null> {
+  const annotation = await db.annotations.get(annotationId);
+  if (!annotation) return null;
+
+  const attachedAssets = annotation.metadata.attachedAssets ?? [];
+
+  const updated: Annotation = {
+    ...annotation,
+    metadata: {
+      ...annotation.metadata,
+      attachedAssets: attachedAssets.filter((id) => id !== assetId),
+    },
+    updatedAt: Date.now(),
+  };
+
+  await db.annotations.put(updated);
+  return updated;
+}
+
+/**
+ * Get all assets attached to an annotation
+ * @param annotationId - Annotation ID
+ * @returns Array of attached Assets
+ */
+export async function getAnnotationAssets(
+  annotationId: string
+): Promise<any[]> {
+  const annotation = await db.annotations.get(annotationId);
+  if (!annotation || !annotation.metadata.attachedAssets) {
+    return [];
+  }
+
+  const assets = await db.assets
+    .where("id")
+    .anyOf(annotation.metadata.attachedAssets)
+    .toArray();
+
+  return assets;
+}
+
+/**
+ * Get annotation with its attached assets (extended view)
+ * @param annotationId - Annotation ID
+ * @returns Annotation with assets array or null
+ */
+export async function getAnnotationWithAssets(
+  annotationId: string
+): Promise<(Annotation & { assets?: any[] }) | null> {
+  const annotation = await db.annotations.get(annotationId);
+  if (!annotation) return null;
+
+  const assets = await getAnnotationAssets(annotationId);
+
+  return {
+    ...annotation,
+    assets,
+  };
+}
+
+/**
+ * Create a note group for organizing notes within an annotation
+ */
+export async function createNoteGroup(
+  annotationId: string,
+  name: string,
+  color?: string
+): Promise<string> {
+  const annotation = await db.annotations.get(annotationId);
+  if (!annotation) {
+    throw new Error(`Annotation ${annotationId} not found`);
+  }
+
+  const groupId = crypto.randomUUID();
+  const existingGroups = annotation.metadata.noteGroups ?? [];
+  const maxOrder = existingGroups.reduce(
+    (max, g) => Math.max(max, g.order),
+    -1
+  );
+
+  const newGroup = {
+    id: groupId,
+    name,
+    color,
+    order: maxOrder + 1,
+  };
+
+  const updated = {
+    ...annotation,
+    metadata: {
+      ...annotation.metadata,
+      noteGroups: [...existingGroups, newGroup],
+    },
+    updatedAt: Date.now(),
+  };
+
+  await db.annotations.put(updated);
+  return groupId;
+}
+
+/**
+ * Update a note group (rename, change color, reorder)
+ */
+export async function updateNoteGroup(
+  annotationId: string,
+  groupId: string,
+  updates: {
+    name?: string;
+    color?: string;
+    order?: number;
+  }
+): Promise<void> {
+  const annotation = await db.annotations.get(annotationId);
+  if (!annotation) {
+    throw new Error(`Annotation ${annotationId} not found`);
+  }
+
+  const groups = annotation.metadata.noteGroups ?? [];
+  const groupIndex = groups.findIndex((g) => g.id === groupId);
+
+  if (groupIndex === -1) {
+    throw new Error(`Note group ${groupId} not found`);
+  }
+
+  const updatedGroups = [...groups];
+  updatedGroups[groupIndex] = {
+    ...updatedGroups[groupIndex],
+    ...updates,
+  };
+
+  const updated = {
+    ...annotation,
+    metadata: {
+      ...annotation.metadata,
+      noteGroups: updatedGroups,
+    },
+    updatedAt: Date.now(),
+  };
+
+  await db.annotations.put(updated);
+}
+
+/**
+ * Delete a note group (moves notes to "unsorted" by clearing their noteGroup field)
+ */
+export async function deleteNoteGroup(
+  annotationId: string,
+  groupId: string
+): Promise<void> {
+  const annotation = await db.annotations.get(annotationId);
+  if (!annotation) {
+    throw new Error(`Annotation ${annotationId} not found`);
+  }
+
+  // Remove group from annotation metadata
+  const groups = annotation.metadata.noteGroups ?? [];
+  const updatedGroups = groups.filter((g) => g.id !== groupId);
+
+  const updated = {
+    ...annotation,
+    metadata: {
+      ...annotation.metadata,
+      noteGroups: updatedGroups,
+    },
+    updatedAt: Date.now(),
+  };
+
+  await db.annotations.put(updated);
+
+  // Move all notes in this group to unsorted (clear noteGroup field)
+  const assets = await getAnnotationAssets(annotationId);
+  const notesInGroup = assets.filter((a) => a.noteGroup === groupId);
+
+  for (const note of notesInGroup) {
+    await db.assets.update(note.id, {
+      noteGroup: undefined,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+}
+
+/**
+ * Move a note to a different group (or to unsorted if groupId is undefined)
+ */
+export async function moveNoteToGroup(
+  noteId: string,
+  groupId: string | undefined
+): Promise<void> {
+  const note = await db.assets.get(noteId);
+  if (!note) {
+    throw new Error(`Note ${noteId} not found`);
+  }
+
+  await db.assets.update(noteId, {
+    noteGroup: groupId,
+    updatedAt: new Date().toISOString(),
+  });
+}

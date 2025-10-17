@@ -163,6 +163,40 @@ class DeepRecallDB extends Dexie {
           `✅ Migrated ${oldWorks.length} works, ${oldVersions.length} versions → ${oldAssets.length} assets`
         );
       });
+
+    // Version 4: Add annotation attachment support
+    this.version(4)
+      .stores({
+        // Library tables (add annotationId, purpose indexes to assets)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Annotations table (unchanged - attachedAssets is in metadata JSON)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 4 (adding annotation attachment support)"
+        );
+
+        // No data migration needed - new fields are optional
+        // Existing annotations without attachedAssets are valid
+        // Existing assets without purpose/annotationId are valid
+
+        console.log(
+          "✅ Database upgraded to v4 - annotation attachment support enabled"
+        );
+      });
   }
 }
 

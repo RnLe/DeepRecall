@@ -161,3 +161,135 @@ export async function getTotalSizeForWork(workId: string): Promise<number> {
   const assets = await listAssetsForWork(workId);
   return assets.reduce((sum, asset) => sum + asset.bytes, 0);
 }
+
+/* ────────────────────── Note Asset Functions ────────────────────── */
+
+/**
+ * Create a note asset from uploaded blob
+ * @param data - Asset creation data
+ * @returns Created Asset
+ */
+export async function createNoteAsset(data: {
+  sha256: string;
+  filename: string;
+  bytes: number;
+  mime: string;
+  purpose?: string;
+  annotationId?: string;
+  workId?: string;
+  title?: string;
+  notes?: string;
+  tags?: string[];
+}): Promise<Asset> {
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+
+  const asset: Asset = {
+    id,
+    kind: "asset",
+    sha256: data.sha256,
+    filename: data.filename,
+    bytes: data.bytes,
+    mime: data.mime,
+    role: "notes",
+    purpose: data.purpose as any,
+    annotationId: data.annotationId,
+    workId: data.workId,
+    notes: data.notes,
+    favorite: false,
+    metadata: {
+      title: data.title,
+      tags: data.tags,
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const validated = AssetSchema.parse(asset);
+  await db.assets.add(validated);
+
+  return validated;
+}
+
+/**
+ * List all note assets for an annotation
+ * @param annotationId - Annotation ID
+ * @returns Array of note Assets
+ */
+export async function listNotesForAnnotation(
+  annotationId: string
+): Promise<Asset[]> {
+  return db.assets
+    .where("annotationId")
+    .equals(annotationId)
+    .and((asset) => asset.role === "notes")
+    .toArray();
+}
+
+/**
+ * Delete a note asset and remove from annotation
+ * @param assetId - Asset ID to delete
+ */
+export async function deleteNoteAsset(assetId: string): Promise<void> {
+  const asset = await db.assets.get(assetId);
+  if (!asset || asset.role !== "notes") {
+    throw new Error("Not a note asset");
+  }
+
+  // Remove from parent annotation if exists
+  if (asset.annotationId) {
+    const annotation = await db.annotations.get(asset.annotationId);
+    if (annotation) {
+      const attachedAssets = annotation.metadata.attachedAssets ?? [];
+      const updated = {
+        ...annotation,
+        metadata: {
+          ...annotation.metadata,
+          attachedAssets: attachedAssets.filter((id) => id !== assetId),
+        },
+        updatedAt: Date.now(),
+      };
+      await db.annotations.put(updated);
+    }
+  }
+
+  // Delete the asset
+  await db.assets.delete(assetId);
+
+  // Note: Blob remains in CAS (content-addressed, may be referenced elsewhere)
+}
+
+/**
+ * Update user-editable metadata on an asset (title, description, group)
+ */
+export async function updateAssetMetadata(
+  assetId: string,
+  updates: {
+    userTitle?: string;
+    userDescription?: string;
+    noteGroup?: string;
+  }
+): Promise<void> {
+  const asset = await db.assets.get(assetId);
+  if (!asset) {
+    throw new Error(`Asset ${assetId} not found`);
+  }
+
+  const updated = {
+    ...asset,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await db.assets.put(updated);
+}
+
+/**
+ * Move a note asset to a different group
+ */
+export async function moveNoteToGroup(
+  assetId: string,
+  groupId: string | null
+): Promise<void> {
+  await updateAssetMetadata(assetId, { noteGroup: groupId ?? undefined });
+}
