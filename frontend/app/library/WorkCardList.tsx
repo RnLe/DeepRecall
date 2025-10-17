@@ -29,17 +29,16 @@ interface WorkCardListProps {
 }
 
 export function WorkCardList({ work, onClick }: WorkCardListProps) {
-  const authors = getPrimaryAuthors(work, 2);
+  const authors = getPrimaryAuthors(work, 3);
   const year = getDisplayYear(work);
-  const versionCount = work.versions?.length || 0;
+  const assetCount = work.assets?.length || 0;
 
   const deleteWorkMutation = useDeleteWork();
   const allPresets = usePresets();
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
 
-  // Get journal from first version
-  const journal = work.versions?.[0]?.journal;
+  const journal = work.journal;
 
   // Find the preset for this work
   const preset = work.presetId
@@ -83,7 +82,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
     const assetId = e.dataTransfer.getData("application/x-asset-id");
 
     if (assetId) {
-      // Handle existing asset being linked - update its versionId
+      // Handle existing asset being linked - update its workId
       import("@/src/repo/assets")
         .then(async ({ getAsset }) => {
           const asset = await getAsset(assetId);
@@ -91,27 +90,10 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
             throw new Error("Asset not found");
           }
 
-          // Get the first version of this work, or create one
-          const { createVersion } = await import("@/src/repo/versions");
+          // Update the asset to link it directly to this work (use raw Dexie update)
           const { db } = await import("@/src/db/dexie");
-          let versionId: string;
-
-          if (work.versions && work.versions.length > 0) {
-            versionId = work.versions[0].id;
-          } else {
-            // Create a new version
-            const newVersion = await createVersion({
-              kind: "version",
-              workId: work.id,
-              versionNumber: 1,
-              favorite: false,
-            });
-            versionId = newVersion.id;
-          }
-
-          // Update the asset to link it to this version (use raw Dexie update)
           await db.assets.update(asset.id, {
-            versionId: versionId,
+            workId: work.id,
             updatedAt: new Date().toISOString(),
           });
 
@@ -214,17 +196,19 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
             </div>
           )}
 
-          {/* Versions */}
+          {/* Assets */}
           <div className="flex items-center gap-1.5 text-xs text-neutral-600 flex-shrink-0">
             <FileText className="w-3 h-3" />
-            <span>{versionCount}v</span>
+            <span>
+              {assetCount} {assetCount === 1 ? "file" : "files"}
+            </span>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="hidden lg:flex items-center gap-1.5 text-xs text-neutral-500">
               <FileText className="w-3 h-3" />
-              <span>{versionCount}</span>
+              <span>{assetCount}</span>
             </div>
 
             {work.favorite && (

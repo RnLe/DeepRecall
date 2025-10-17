@@ -1,11 +1,12 @@
 /**
- * Library schema: Work → Version → Asset hierarchy
+ * Library schema: Work → Asset hierarchy (Versions removed)
  * Plus Activity (courses/projects) and Collection (curation)
  *
  * Mental model:
  * - Work = abstract intellectual identity (book/paper as a "work")
- * - Version = concrete edition/revision tied to publication event
- * - Asset = actual file bound to blob hash (sha256)
+ *   → Can have one or multiple Assets (controlled by allowMultipleAssets)
+ * - Asset = actual file bound to blob hash (sha256) with publication metadata
+ *   → Replaces the old Version concept; now Assets carry edition/publication info
  * - Activity = rich aggregate (course/project with schedule + participants)
  * - Collection = shallow grouping (curation, optionally ordered)
  * - Edge = typed relation connecting entities
@@ -86,15 +87,36 @@ export const WorkSchema = z.object({
   authors: z.array(PersonSchema).default([]),
   workType: WorkTypeSchema.default("paper"),
 
-  // Topics/tags at the Work level (not version-specific)
+  // Topics/tags at the Work level
   topics: z.array(z.string()).default([]),
+
+  // MANDATORY: Does this work allow multiple assets (e.g., multiple editions)?
+  // - true: One-to-many (e.g., textbook with multiple editions)
+  // - false: One-to-one (e.g., single paper PDF)
+  allowMultipleAssets: z.boolean(),
+
+  // Publication metadata (moved from Version)
+  year: Year.optional(),
+  publishingDate: ISODate.optional(),
+  publisher: z.string().optional(),
+  journal: z.string().optional(),
+  volume: z.string().optional(),
+  issue: z.string().optional(),
+  pages: z.string().optional(),
+  doi: z.string().optional(),
+  arxivId: z.string().optional(),
+  isbn: z.string().optional(),
+
+  // User notes
+  notes: z.string().optional(),
+
+  // User flags
+  read: ISODate.optional(), // When marked as read
+  favorite: z.boolean().default(false),
 
   // UI metadata (optional)
   icon: IconName.optional(),
   color: HexColor.optional(),
-
-  // User flags
-  favorite: z.boolean().default(false),
 
   // Preset reference (which template was used to create this)
   presetId: Id.optional(),
@@ -108,60 +130,6 @@ export const WorkSchema = z.object({
 });
 
 export type Work = z.infer<typeof WorkSchema>;
-
-// ============================================================================
-// Version = concrete edition/revision/issue
-// ============================================================================
-
-export const VersionSchema = z.object({
-  id: Id,
-  kind: z.literal("version"),
-
-  // Foreign key to Work
-  workId: Id,
-
-  // Edition/version identity
-  edition: z.string().optional(), // "3rd", "v2", "rev. 2021"
-  versionNumber: z.number().int().min(1).optional(),
-
-  // Publication metadata
-  year: Year.optional(),
-  publishingDate: ISODate.optional(), // Full date if known
-  publisher: z.string().optional(),
-
-  // Journal/conference (for papers)
-  journal: z.string().optional(),
-  volume: z.string().optional(),
-  issue: z.string().optional(),
-  pages: z.string().optional(), // "123-147"
-
-  // Academic identifiers
-  doi: z.string().optional(),
-  arxivId: z.string().optional(),
-  isbn: z.string().optional(),
-
-  // Optional title override (if version has distinct title)
-  versionTitle: z.string().optional(),
-
-  // User notes
-  notes: z.string().optional(),
-
-  // User flags
-  read: ISODate.optional(), // When marked as read
-  favorite: z.boolean().default(false),
-
-  // Preset reference (which template was used to create this)
-  presetId: Id.optional(),
-
-  // Flexible metadata (custom fields from presets)
-  metadata: z.record(z.string(), z.unknown()).optional(),
-
-  // Timestamps
-  createdAt: ISODate,
-  updatedAt: ISODate,
-});
-
-export type Version = z.infer<typeof VersionSchema>;
 
 // ============================================================================
 // Asset = concrete file bound to CAS blob by sha256
@@ -178,15 +146,16 @@ export type Version = z.infer<typeof VersionSchema>;
 //   → Lives in browser IndexedDB (assets table)
 //   → Has its own lifecycle separate from the Blob
 //   → Can be linked/unlinked from Works, Activities, Collections
-//   → Carries role, filename, and other semantic metadata
+//   → Carries role, filename, publication metadata, and other semantic metadata
 //
 // Asset linking states:
-// 1. Version-linked: Has versionId → Part of a Work/Version
-// 2. Edge-linked: No versionId, but has "contains" edges → In Activity/Collection
-// 3. Unlinked: No versionId, no edges → Needs linking (shows in "Unlinked Assets")
+// 1. Work-linked: Has workId → Part of a Work
+// 2. Edge-linked: No workId, but has "contains" edges → In Activity/Collection
+// 3. Unlinked: No workId, no edges → Needs linking (shows in "Unlinked Assets")
 //
 // Key principle: Assets are "data entities" that outlive their connections.
-// You can unlink an Asset from a Version or Activity without deleting it.
+// You can unlink an Asset from a Work or Activity without deleting it.
+// Assets now carry edition/publication metadata (formerly in Version entity).
 // ============================================================================
 
 export const AssetRoleSchema = z.enum([
@@ -205,10 +174,10 @@ export const AssetSchema = z.object({
   id: Id,
   kind: z.literal("asset"),
 
-  // Foreign key to Version (optional - Assets can be standalone)
-  // When set: Asset is part of a Work/Version
+  // Foreign key to Work (optional - Assets can be standalone)
+  // When set: Asset is part of a Work
   // When null: Asset is standalone, may be linked via edges (Activity/Collection)
-  versionId: Id.optional(),
+  workId: Id.optional(),
 
   // Join key to server CAS (blobs table)
   // Multiple Assets can reference the same blob (e.g., same PDF in different contexts)
@@ -222,8 +191,34 @@ export const AssetSchema = z.object({
   // PDF-specific (optional)
   pageCount: z.number().int().min(1).optional(),
 
-  // Role in the version (main text, slides, etc.)
+  // Role in the work (main text, slides, supplement, etc.)
   role: AssetRoleSchema.default("main"),
+
+  // Edition/version identity (for works with multiple assets)
+  edition: z.string().optional(), // "3rd", "v2", "rev. 2021"
+  versionNumber: z.number().int().min(1).optional(),
+
+  // Publication metadata (moved from Version)
+  year: Year.optional(),
+  publishingDate: ISODate.optional(),
+  publisher: z.string().optional(),
+  journal: z.string().optional(),
+  volume: z.string().optional(),
+  issue: z.string().optional(),
+  pages: z.string().optional(),
+  doi: z.string().optional(),
+  arxivId: z.string().optional(),
+  isbn: z.string().optional(),
+
+  // Optional title override (if asset/edition has distinct title)
+  assetTitle: z.string().optional(),
+
+  // User notes
+  notes: z.string().optional(),
+
+  // User flags
+  read: ISODate.optional(), // When marked as read
+  favorite: z.boolean().default(false),
 
   // For multi-part assets (e.g., script part 0, 1, 2...)
   partIndex: z.number().int().min(0).optional(),
@@ -325,10 +320,10 @@ export type Collection = z.infer<typeof CollectionSchema>;
 // ============================================================================
 
 export const RelationSchema = z.enum([
-  "contains", // A contains B (Collection→Work, Activity→Version, Version→Asset)
-  "assignedIn", // Work/Version assigned in Activity
-  "partOf", // Asset partOf Version, Version partOf Activity module
-  "cites", // Work/Version cites Work/Version
+  "contains", // A contains B (Collection→Work, Activity→Asset, Activity→Work)
+  "assignedIn", // Work/Asset assigned in Activity
+  "partOf", // Asset partOf Work, Work partOf Activity module
+  "cites", // Work cites Work
   "relatedTo", // Loose link
   "prerequisite", // Work A is prerequisite for Work B
   "references", // Generic reference link
@@ -364,7 +359,6 @@ export type Edge = z.infer<typeof EdgeSchema>;
 
 export const LibraryEntitySchema = z.discriminatedUnion("kind", [
   WorkSchema,
-  VersionSchema,
   AssetSchema,
   ActivitySchema,
   CollectionSchema,
@@ -377,26 +371,17 @@ export type LibraryEntity = z.infer<typeof LibraryEntitySchema>;
 // ============================================================================
 
 /**
- * Version with resolved Work reference
- */
-export interface VersionExtended extends Version {
-  work?: Work;
-  assets?: Asset[];
-}
-
-/**
- * Asset with resolved Version and Work references
+ * Asset with resolved Work reference
  */
 export interface AssetExtended extends Asset {
-  version?: Version;
   work?: Work;
 }
 
 /**
- * Work with resolved Versions and Assets
+ * Work with resolved Assets
  */
 export interface WorkExtended extends Work {
-  versions?: VersionExtended[];
+  assets?: Asset[];
 }
 
 /**
@@ -404,7 +389,6 @@ export interface WorkExtended extends Work {
  */
 export interface ActivityExtended extends Activity {
   works?: Work[];
-  versions?: Version[];
   assets?: Asset[];
 }
 
@@ -413,7 +397,6 @@ export interface ActivityExtended extends Activity {
  */
 export interface CollectionExtended extends Collection {
   works?: Work[];
-  versions?: Version[];
   activities?: Activity[];
 }
 
@@ -443,13 +426,6 @@ export function isWork(entity: LibraryEntity): entity is Work {
 }
 
 /**
- * Type guard for Version
- */
-export function isVersion(entity: LibraryEntity): entity is Version {
-  return entity.kind === "version";
-}
-
-/**
  * Type guard for Asset
  */
 export function isAsset(entity: LibraryEntity): entity is Asset {
@@ -471,40 +447,45 @@ export function isCollection(entity: LibraryEntity): entity is Collection {
 }
 
 // ============================================================================
-// Helper functions (port from old literatureTypes.ts)
+// Helper functions
 // ============================================================================
 
 /**
- * Gets the display year for a work based on its versions.
- * For papers: returns year of earliest version.
- * For other types: returns year range if multiple versions.
+ * Gets the display year for a work.
+ * Priority: Work's year field, then earliest asset year, then asset year range.
  */
 export function getDisplayYear(work: WorkExtended): string | null {
-  if (!work.versions || work.versions.length === 0) {
+  // First check work-level year
+  if (work.year) {
+    return work.year.toString();
+  }
+
+  // Fall back to asset years
+  if (!work.assets || work.assets.length === 0) {
     return null;
   }
 
-  const versionsWithYears = work.versions.filter((v) => v.year);
-  if (versionsWithYears.length === 0) {
+  const assetsWithYears = work.assets.filter((a) => a.year);
+  if (assetsWithYears.length === 0) {
     return null;
   }
 
   const isPaper = work.workType === "paper";
 
   if (isPaper) {
-    // For papers, get the earliest version
-    const sortedVersions = versionsWithYears.sort((a, b) => {
+    // For papers, get the earliest asset
+    const sortedAssets = assetsWithYears.sort((a, b) => {
       const aNum = a.versionNumber ?? 999;
       const bNum = b.versionNumber ?? 999;
       return aNum - bNum;
     });
-    return sortedVersions[0].year!.toString();
+    return sortedAssets[0].year!.toString();
   } else {
-    // For other types, show range if multiple versions
-    if (versionsWithYears.length === 1) {
-      return versionsWithYears[0].year!.toString();
+    // For other types, show range if multiple assets
+    if (assetsWithYears.length === 1) {
+      return assetsWithYears[0].year!.toString();
     } else {
-      const years = versionsWithYears.map((v) => v.year!).sort((a, b) => a - b);
+      const years = assetsWithYears.map((a) => a.year!).sort((a, b) => a - b);
       const minYear = years[0];
       const maxYear = years[years.length - 1];
       return minYear === maxYear ? minYear.toString() : `${minYear}-${maxYear}`;
@@ -513,42 +494,50 @@ export function getDisplayYear(work: WorkExtended): string | null {
 }
 
 /**
- * Checks if any version of a work is marked as read.
+ * Checks if a work or any of its assets is marked as read.
  */
 export function isWorkRead(work: WorkExtended): boolean {
-  if (!work.versions || work.versions.length === 0) {
+  if (work.read) {
+    return true;
+  }
+  if (!work.assets || work.assets.length === 0) {
     return false;
   }
-  return work.versions.some((v) => v.read !== undefined);
+  return work.assets.some((a) => a.read !== undefined);
 }
 
 /**
- * Checks if any version of a work is marked as favorite.
+ * Checks if a work or any of its assets is marked as favorite.
  */
 export function isWorkFavorite(work: WorkExtended): boolean {
   if (work.favorite) {
     return true;
   }
-  if (!work.versions || work.versions.length === 0) {
+  if (!work.assets || work.assets.length === 0) {
     return false;
   }
-  return work.versions.some((v) => v.favorite);
+  return work.assets.some((a) => a.favorite);
 }
 
 /**
- * Gets the earliest read date among all versions of a work.
+ * Gets the earliest read date among work and all its assets.
  */
 export function getWorkReadDate(work: WorkExtended): string | null {
-  if (!work.versions || work.versions.length === 0) {
+  const readDates: string[] = [];
+
+  if (work.read) {
+    readDates.push(work.read);
+  }
+
+  if (work.assets && work.assets.length > 0) {
+    work.assets.filter((a) => a.read).forEach((a) => readDates.push(a.read!));
+  }
+
+  if (readDates.length === 0) {
     return null;
   }
 
-  const readDates = work.versions
-    .filter((v) => v.read)
-    .map((v) => v.read!)
-    .sort();
-
-  return readDates.length > 0 ? readDates[0] : null;
+  return readDates.sort()[0];
 }
 
 /**

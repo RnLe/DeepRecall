@@ -2,16 +2,24 @@
 
 # Mental models — one-liners
 
-* **Next.js (App Router):** server-first React; routes are files; data boundaries at server actions/route handlers.
-* **Zustand:** tiny global stores; read via selectors; write via actions; slice stores to keep domains independent.
-* **TanStack Query (React Query):** cache + fetch/mutate state machine for async data; invalidation is the dial.
-* **Dexie (IndexedDB):** local, durable, structured KV/collections with transactions; browser-side database.
-* **Drizzle ORM + SQLite:** typesafe schema + queries; treat DB as an implementation detail behind a repository.
-* **pdfjs-dist:** PDF to viewports and text runs; normalized coordinates are the contract.
-* **Zod:** runtime validation + TS inference; define contracts once at the boundary.
-* **Web Crypto (SubtleCrypto):** content addressing (SHA-256) as identity; rename-proof keys.
-* **FSRS (ts-fsrs):** scheduler math; inputs are last review + rating; output is next due/interval.
-* **Zustand middlewares (persist, subscribeWithSelector):** durability and fine-grained reactions without re-render storms.
+- **Next.js (App Router):** server-first React; routes are files; data boundaries at server actions/route handlers.
+- **Zustand:** tiny global stores; read via selectors; write via actions; slice stores to keep domains independent.
+- **TanStack Query (React Query):** cache + fetch/mutate state machine for async data; invalidation is the dial.
+- **Dexie (IndexedDB):** local, durable, structured KV/collections with transactions; browser-side database.
+- **Drizzle ORM + SQLite:** typesafe schema + queries; treat DB as an implementation detail behind a repository.
+- **pdfjs-dist:** PDF to viewports and text runs; normalized coordinates are the contract.
+- **Zod:** runtime validation + TS inference; define contracts once at the boundary.
+- **Web Crypto (SubtleCrypto):** content addressing (SHA-256) as identity; rename-proof keys.
+- **FSRS (ts-fsrs):** scheduler math; inputs are last review + rating; output is next due/interval.
+- **Zustand middlewares (persist, subscribeWithSelector):** durability and fine-grained reactions without re-render storms.
+
+## Library/CMS Domain Structure
+
+- **Blob:** Minimal file object in server SQLite; for data movement between website and hard disk. Content-addressed by SHA-256.
+- **Asset:** Metadata entity in Dexie referencing a Blob; carries role, filename, semantic metadata, and publication details. Three states: (1) Work-linked (has `workId`), (2) Edge-linked (no `workId`, has "contains" edges), (3) Unlinked (standalone, needs linking). Assets are now the primary file containers under Works.
+- **Work:** Conceptual metadata container (textbook/paper identity). Not a file directly—everything derives from Assets/Blobs.
+- **Activity:** Larger container (course/project); links Works and Assets via Edges.
+- **Collection:** Curation/grouping mechanism (future feature).
 
 ---
 
@@ -22,14 +30,14 @@ File = route. Server components are default; client components opt-in. Route han
 
 **Scaling**
 
-* Keep **domain routers**: `/api/files`, `/api/blob`, `/api/scan`.
-* Encapsulate server logic in **modules** (e.g., `/server/cas`, `/server/db`) called by route handlers.
-* Use **typed request/response** with Zod at the boundary.
+- Keep **domain routers**: `/api/files`, `/api/blob`, `/api/scan`.
+- Encapsulate server logic in **modules** (e.g., `/server/cas`, `/server/db`) called by route handlers.
+- Use **typed request/response** with Zod at the boundary.
 
 **Caution**
 
-* Mixing server/client casually leads to bundle bloat. Keep heavy libs on server (sharp, better-sqlite3, pdf parsing).
-* Avoid long-running CPU in route handlers during user navigation; push scans to background endpoints and show progress via polling.
+- Mixing server/client casually leads to bundle bloat. Keep heavy libs on server (sharp, better-sqlite3, pdf parsing).
+- Avoid long-running CPU in route handlers during user navigation; push scans to background endpoints and show progress via polling.
 
 ---
 
@@ -40,16 +48,16 @@ A store is a tiny “island of truth” for **UI state** and **ephemeral domain 
 
 **Scaling**
 
-* **Slice by domain** (annotationStore, viewerStore, srsSessionStore).
-* Export **selectors** (pure getters) and **actions** (pure setters/commands).
-* Use `subscribeWithSelector` to run side-effects **outside React** (e.g., analytics, keyboard bindings) without re-renders.
-* Use `persist` middleware only for **small** durable UI prefs (theme, layout). Durable data (cards, annotations) belongs in Dexie.
+- **Slice by domain** (annotationStore, viewerStore, srsSessionStore).
+- Export **selectors** (pure getters) and **actions** (pure setters/commands).
+- Use `subscribeWithSelector` to run side-effects **outside React** (e.g., analytics, keyboard bindings) without re-renders.
+- Use `persist` middleware only for **small** durable UI prefs (theme, layout). Durable data (cards, annotations) belongs in Dexie.
 
 **Caution**
 
-* **Do not mirror server data** (e.g., lists from `/files`) inside Zustand. That’s React Query’s job.
-* Avoid “store of everything.” If a value can be derived from other sources (props, query data), don’t keep it in the store.
-* Infinite re-render traps: selectors that create new objects every render; memoize or select primitives.
+- **Do not mirror server data** (e.g., lists from `/files`) inside Zustand. That’s React Query’s job.
+- Avoid “store of everything.” If a value can be derived from other sources (props, query data), don’t keep it in the store.
+- Infinite re-render traps: selectors that create new objects every render; memoize or select primitives.
 
 ---
 
@@ -60,18 +68,18 @@ A **cache + finite-state machine** for remote/async data. Each query key owns fr
 
 **Scaling**
 
-* One **query client**; strict **key conventions**: `['files']`, `['blobHead', sha256]`, `['fts', sha256, page]`.
-* Co-locate **hooks per domain**: `useFilesQuery()`, `useScanMutation()`.
-* Use `select` to shape data **without** copying into Zustand.
-* Use `onSuccess` to **invalidate minimal keys**, not global nukes.
+- One **query client**; strict **key conventions**: `['files']`, `['blobHead', sha256]`, `['fts', sha256, page]`.
+- Co-locate **hooks per domain**: `useFilesQuery()`, `useScanMutation()`.
+- Use `select` to shape data **without** copying into Zustand.
+- Use `onSuccess` to **invalidate minimal keys**, not global nukes.
 
 **Caution**
 
-* **Zustand ↔ Query loops**: avoid writing query results into Zustand, then invalidating queries from a store subscription. Pick one source of truth:
+- **Zustand ↔ Query loops**: avoid writing query results into Zustand, then invalidating queries from a store subscription. Pick one source of truth:
+  - Remote data → **React Query only**
+  - Ephemeral/UI data → **Zustand**
 
-  * Remote data → **React Query only**
-  * Ephemeral/UI data → **Zustand**
-* Don’t cache unbounded blobs; keep large binary behind streaming endpoints.
+- Don’t cache unbounded blobs; keep large binary behind streaming endpoints.
 
 ---
 
@@ -82,15 +90,15 @@ A **local database** in the browser for **durable client data** (annotations, ca
 
 **Scaling**
 
-* One DB with multiple tables: `docmeta`, `annotations`, `cards`, `reviewlogs`.
-* Migrate with `db.version(n).upgrade(tx => …)`.
-* Write **repositories**: `annotationRepo.add()`, `cardRepo.listDue()` that hide Dexie calls.
+- One DB with multiple tables: `docmeta`, `annotations`, `cards`, `reviewlogs`.
+- Migrate with `db.version(n).upgrade(tx => …)`.
+- Write **repositories**: `annotationRepo.add()`, `cardRepo.listDue()` that hide Dexie calls.
 
 **Caution**
 
-* IndexedDB quotas vary; request persistence via StorageManager.
-* Do not store heavy images; persist only metadata and hashes; keep blobs on the server.
-* All Dexie ops are async; wrap in hooks (`useLiveQuery`) sparingly to avoid frequent re-renders.
+- IndexedDB quotas vary; request persistence via StorageManager.
+- Do not store heavy images; persist only metadata and hashes; keep blobs on the server.
+- All Dexie ops are async; wrap in hooks (`useLiveQuery`) sparingly to avoid frequent re-renders.
 
 ---
 
@@ -101,12 +109,12 @@ Schema-first, typesafe SQL. Treat it as **infrastructure**, not app state. The C
 
 **Scaling**
 
-* Keep tables tiny: `blobs`, `paths` (optionally `fts_pages`).
-* Expose only stable read APIs to the client (`/files`, `/blob/:hash`).
+- Keep tables tiny: `blobs`, `paths` (optionally `fts_pages`).
+- Expose only stable read APIs to the client (`/files`, `/blob/:hash`).
 
 **Caution**
 
-* Long scans can block a route handler if run inline. Use a separate `/scan` trigger plus background task (or chunked scanning).
+- Long scans can block a route handler if run inline. Use a separate `/scan` trigger plus background task (or chunked scanning).
 
 ---
 
@@ -117,13 +125,13 @@ A PDF “decoder” producing **pages** with viewports and optional **text runs*
 
 **Scaling**
 
-* One worker. Optionally OffscreenCanvas for render off the main thread.
-* A **page cache** (LRU of bitmaps) to navigate large docs smoothly.
+- One worker. Optionally OffscreenCanvas for render off the main thread.
+- A **page cache** (LRU of bitmaps) to navigate large docs smoothly.
 
 **Caution**
 
-* Avoid re-rendering pages when overlays change—overlays should be DOM/SVG above the canvas.
-* Text extraction is expensive; throttle.
+- Avoid re-rendering pages when overlays change—overlays should be DOM/SVG above the canvas.
+- Text extraction is expensive; throttle.
 
 ---
 
@@ -134,12 +142,12 @@ Single source of truth for **runtime validation** and **TypeScript types** at bo
 
 **Scaling**
 
-* Put schemas in `/schema`. Export both `zodSchema` and `type Schema = z.infer<typeof zodSchema>`.
-* Validate request bodies in API handlers; validate Dexie records on import/export.
+- Put schemas in `/schema`. Export both `zodSchema` and `type Schema = z.infer<typeof zodSchema>`.
+- Validate request bodies in API handlers; validate Dexie records on import/export.
 
 **Caution**
 
-* Over-zodding every internal function adds friction; limit to boundaries and persistence.
+- Over-zodding every internal function adds friction; limit to boundaries and persistence.
 
 ---
 
@@ -150,12 +158,12 @@ Single source of truth for **runtime validation** and **TypeScript types** at bo
 
 **Scaling**
 
-* One `hashBytes` helper; hex encoding as standard.
-* For annotation IDs, hash the **normalized rect list** deterministically.
+- One `hashBytes` helper; hex encoding as standard.
+- For annotation IDs, hash the **normalized rect list** deterministically.
 
 **Caution**
 
-* Browser hashing is async; batch when generating many IDs to avoid blocking the UI.
+- Browser hashing is async; batch when generating many IDs to avoid blocking the UI.
 
 ---
 
@@ -166,12 +174,12 @@ Given last review, difficulty/stability, and rating (1–4), compute next **inte
 
 **Scaling**
 
-* Wrap in `schedule(card, rating, now)`; keep scheduler pure (no I/O).
-* Store only card state + logs in Dexie; derive session view in React.
+- Wrap in `schedule(card, rating, now)`; keep scheduler pure (no I/O).
+- Store only card state + logs in Dexie; derive session view in React.
 
 **Caution**
 
-* Latency capture is valuable signal; keep it but do not let it block UI.
+- Latency capture is valuable signal; keep it but do not let it block UI.
 
 ---
 
@@ -179,26 +187,26 @@ Given last review, difficulty/stability, and rating (1–4), compute next **inte
 
 **Golden rule:**
 
-* **Server/remote** data → **React Query** (and only there).
-* **Local durable** data (annotations/cards) → **Dexie** (queried via hooks or repo functions).
-* **Ephemeral/UI** state → **Zustand**.
+- **Server/remote** data → **React Query** (and only there).
+- **Local durable** data (annotations/cards) → **Dexie** (queried via hooks or repo functions).
+- **Ephemeral/UI** state → **Zustand**.
   Each domain has **one** source of truth.
 
 **Common anti-patterns and fixes**
 
-* *Anti-pattern:* On query success, copying results into Zustand to “share them app-wide.”
-  *Fix:* Export a `useFilesQuery()` hook and read it wherever needed; or derive small bits with `select`.
-* *Anti-pattern:* A store `subscribe` that invalidates queries, whose `onSuccess` writes back to the store → ping-pong.
-  *Fix:* Only **mutations** trigger invalidations. Store subscriptions should not call invalidation; put that in UI event handlers or mutation callbacks.
+- _Anti-pattern:_ On query success, copying results into Zustand to “share them app-wide.”
+  _Fix:_ Export a `useFilesQuery()` hook and read it wherever needed; or derive small bits with `select`.
+- _Anti-pattern:_ A store `subscribe` that invalidates queries, whose `onSuccess` writes back to the store → ping-pong.
+  _Fix:_ Only **mutations** trigger invalidations. Store subscriptions should not call invalidation; put that in UI event handlers or mutation callbacks.
 
 ---
 
 ## Minimal boundaries checklist
 
-* **Remote:** `/files`, `/blob/:hash`, `/scan` → TanStack Query.
-* **Local durable:** annotations/cards/logs → Dexie repositories.
-* **UI:** selection, tool mode, page number, deck session state → Zustand slices.
-* **Crossing boundaries:** validate with Zod; identify with SHA-256; never duplicate ownership.
+- **Remote:** `/files`, `/blob/:hash`, `/scan` → TanStack Query.
+- **Local durable:** annotations/cards/logs → Dexie repositories.
+- **UI:** selection, tool mode, page number, deck session state → Zustand slices.
+- **Crossing boundaries:** validate with Zod; identify with SHA-256; never duplicate ownership.
 
 ---
 
@@ -235,9 +243,14 @@ export const useAnnotationUI = create<AnnotationUIState>()(
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
-const Files = z.array(z.object({
-  sha256: z.string(), size: z.number(), mime: z.string(), mtime_ms: z.number(),
-}));
+const Files = z.array(
+  z.object({
+    sha256: z.string(),
+    size: z.number(),
+    mime: z.string(),
+    mtime_ms: z.number(),
+  })
+);
 type Files = z.infer<typeof Files>;
 
 export function useFilesQuery() {
@@ -255,7 +268,8 @@ export function useFilesQuery() {
 export function useScanMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => (await fetch("/api/scan", { method: "POST" })).json(),
+    mutationFn: async () =>
+      (await fetch("/api/scan", { method: "POST" })).json(),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["files"] }),
   });
 }
@@ -266,7 +280,8 @@ export function useScanMutation() {
 ```ts
 import { db } from "./dexie";
 export const annotationRepo = {
-  byDoc: (sha256: string) => db.annotations.where("sha256").equals(sha256).toArray(),
+  byDoc: (sha256: string) =>
+    db.annotations.where("sha256").equals(sha256).toArray(),
   put: (ann: Annotation) => db.annotations.put(ann),
   remove: (id: string) => db.annotations.delete(id),
 };

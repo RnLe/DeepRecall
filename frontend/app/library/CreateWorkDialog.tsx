@@ -7,7 +7,7 @@
 
 import { useState, useMemo } from "react";
 import { useWorkPresets } from "@/src/hooks/usePresets";
-import { useCreateWorkWithVersionAndAsset } from "@/src/hooks/useLibrary";
+import { useCreateWorkWithAsset } from "@/src/hooks/useLibrary";
 import { PresetSelector } from "./PresetSelector";
 import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
@@ -28,7 +28,7 @@ export function CreateWorkDialog({
   onSuccess,
 }: CreateWorkDialogProps) {
   const { system: systemPresetsRaw, user: userPresetsRaw } = useWorkPresets();
-  const createWorkMutation = useCreateWorkWithVersionAndAsset();
+  const createWorkMutation = useCreateWorkWithAsset();
 
   const [step, setStep] = useState<Step>(
     preselectedPresetId ? "form" : "select"
@@ -103,7 +103,7 @@ export function CreateWorkDialog({
         authors = coreFields.authors as { name: string }[];
       }
 
-      // Create Work + Version (no Asset - user can add files later)
+      // Create Work (no Asset - user can add files later)
       const workData = {
         kind: "work" as const,
         title: (coreFields.title as string) || "Untitled",
@@ -113,6 +113,11 @@ export function CreateWorkDialog({
         topics: (coreFields.topics as string[]) || [],
         favorite: false,
         presetId: selectedPreset.id,
+        allowMultipleAssets: false,
+        year: coreFields.year as number | undefined,
+        publisher: coreFields.publisher as string | undefined,
+        doi: coreFields.doi as string | undefined,
+        isbn: coreFields.isbn as string | undefined,
         metadata,
       };
 
@@ -126,15 +131,6 @@ export function CreateWorkDialog({
 
       await createWorkMutation.mutateAsync({
         work: workData,
-        version: {
-          versionNumber: 1,
-          label: "Original",
-          year: coreFields.year as number | undefined,
-          publisher: coreFields.publisher as string | undefined,
-          doi: coreFields.doi as string | undefined,
-          isbn: coreFields.isbn as string | undefined,
-          url: coreFields.url as string | undefined,
-        },
         // Asset is optional - not provided for manually created works
       });
 

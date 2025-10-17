@@ -10,7 +10,7 @@
  *   → Source of truth: Browser IndexedDB (Dexie)
  *   → Queried via: useLiveQuery (local durable data)
  *   → Can be:
- *     1. Linked to Version (has versionId) - part of a Work
+ *     1. Linked to Work (has workId) - part of a Work
  *     2. Standalone but linked (no versionId, has edges) - in Activities/Collections
  *     3. Unlinked (no versionId, no edges) - needs linking
  *
@@ -105,7 +105,7 @@ export function useOrphanedBlobs() {
  * Hook to get unlinked standalone assets - "Unlinked Assets"
  *
  * MENTAL MODEL: Assets that exist in Dexie but are not connected to anything:
- * - No versionId (not part of any Work/Version)
+ * - No workId (not part of any Work)
  * - No edges with relation="contains" (not in any Activity/Collection)
  *
  * These Assets represent "data" that can be moved around and linked.
@@ -116,22 +116,36 @@ export function useOrphanedBlobs() {
  */
 export function useUnlinkedAssets() {
   return useLiveQuery(async () => {
-    // Get all standalone assets (no versionId)
+    // Get all standalone assets (no workId)
     const standaloneAssets = await db.assets
-      .filter((asset) => !asset.versionId)
+      .filter((asset) => !asset.workId)
       .toArray();
 
     // Get all edges to find which assets are linked via "contains" relation
     // (Activities and Collections use "contains" edges to link to Assets)
     const edges = await db.edges.toArray();
+    // Only consider edges that point to actual asset IDs to avoid false positives
+    const assetIds = new Set(
+      (await db.assets.toCollection().primaryKeys()) as string[]
+    );
     const linkedAssetIds = new Set(
       edges
-        .filter((edge) => edge.relation === "contains")
+        .filter(
+          (edge) => edge.relation === "contains" && assetIds.has(edge.toId)
+        )
         .map((edge) => edge.toId)
     );
 
     // Filter to only assets that are NOT in any edges
-    return standaloneAssets.filter((asset) => !linkedAssetIds.has(asset.id));
+    // Use a Map to deduplicate by asset.id to prevent duplicates
+    const unlinkedMap = new Map<string, Asset>();
+    for (const asset of standaloneAssets) {
+      if (!linkedAssetIds.has(asset.id)) {
+        unlinkedMap.set(asset.id, asset);
+      }
+    }
+
+    return Array.from(unlinkedMap.values());
   }, []);
 }
 
@@ -163,7 +177,7 @@ export function useOrphanedAssets() {
  */
 export async function createAssetFromBlob(
   blob: BlobWithMetadata,
-  versionId: string,
+  workId: string,
   options?: {
     role?:
       | "main"
@@ -178,7 +192,7 @@ export async function createAssetFromBlob(
 ): Promise<Asset> {
   return createAsset({
     kind: "asset",
-    versionId,
+    workId: workId,
     sha256: blob.sha256,
     filename: blob.filename || `file-${blob.sha256.substring(0, 8)}`,
     bytes: blob.size,
@@ -186,6 +200,7 @@ export async function createAssetFromBlob(
     pageCount: blob.pageCount,
     role: options?.role || "main",
     partIndex: options?.partIndex,
+    favorite: false,
   });
 }
 
@@ -198,11 +213,11 @@ export function useCreateAssetFromBlob() {
   return useMutation({
     mutationFn: ({
       blob,
-      versionId,
+      workId,
       options,
     }: {
       blob: BlobWithMetadata;
-      versionId: string;
+      workId: string;
       options?: {
         role?:
           | "main"
@@ -214,7 +229,7 @@ export function useCreateAssetFromBlob() {
           | "exercises";
         partIndex?: number;
       };
-    }) => createAssetFromBlob(blob, versionId, options),
+    }) => createAssetFromBlob(blob, workId, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });

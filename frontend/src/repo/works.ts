@@ -4,7 +4,7 @@
  */
 
 import { db } from "@/src/db/dexie";
-import type { Work, WorkExtended } from "@/src/schema/library";
+import type { Work, WorkExtended, Asset } from "@/src/schema/library";
 import { WorkSchema } from "@/src/schema/library";
 
 /**
@@ -38,7 +38,7 @@ export async function getWork(id: string): Promise<Work | undefined> {
 }
 
 /**
- * Get a Work by ID with all Versions and Assets
+ * Get a Work by ID with all Assets
  */
 export async function getWorkExtended(
   id: string
@@ -46,22 +46,11 @@ export async function getWorkExtended(
   const work = await db.works.get(id);
   if (!work) return undefined;
 
-  const versions = await db.versions.where("workId").equals(id).toArray();
-
-  // For each version, get assets
-  const versionsWithAssets = await Promise.all(
-    versions.map(async (version) => {
-      const assets = await db.assets
-        .where("versionId")
-        .equals(version.id)
-        .toArray();
-      return { ...version, assets };
-    })
-  );
+  const assets = await db.assets.where("workId").equals(id).toArray();
 
   return {
     ...work,
-    versions: versionsWithAssets,
+    assets,
   };
 }
 
@@ -80,24 +69,11 @@ export async function listWorksExtended(): Promise<WorkExtended[]> {
 
   return Promise.all(
     works.map(async (work) => {
-      const versions = await db.versions
-        .where("workId")
-        .equals(work.id)
-        .toArray();
-
-      const versionsWithAssets = await Promise.all(
-        versions.map(async (version) => {
-          const assets = await db.assets
-            .where("versionId")
-            .equals(version.id)
-            .toArray();
-          return { ...version, assets };
-        })
-      );
+      const assets = await db.assets.where("workId").equals(work.id).toArray();
 
       return {
         ...work,
-        versions: versionsWithAssets,
+        assets,
       };
     })
   );
@@ -126,19 +102,11 @@ export async function updateWork(
 }
 
 /**
- * Delete a Work and all its Versions and Assets
+ * Delete a Work and all its Assets
  */
 export async function deleteWork(id: string): Promise<void> {
-  // Get all versions for this work
-  const versions = await db.versions.where("workId").equals(id).toArray();
-
-  // Delete all assets for each version
-  for (const version of versions) {
-    await db.assets.where("versionId").equals(version.id).delete();
-  }
-
-  // Delete all versions
-  await db.versions.where("workId").equals(id).delete();
+  // Delete all assets for this work
+  await db.assets.where("workId").equals(id).delete();
 
   // Delete edges involving this work
   await db.edges.where("fromId").equals(id).delete();
@@ -192,23 +160,11 @@ export async function toggleWorkFavorite(
 }
 
 /**
- * Create a Work with its first Version and Asset in a single transaction
+ * Create a Work with its first Asset in a single transaction
  * Used when linking a blob to create a new work
  */
-export async function createWorkWithVersionAndAsset(params: {
+export async function createWorkWithAsset(params: {
   work: Omit<Work, "id" | "createdAt" | "updatedAt">;
-  version?: {
-    versionNumber?: number;
-    label?: string;
-    year?: number;
-    month?: number;
-    publisher?: string;
-    doi?: string;
-    isbn?: string;
-    arxivId?: string;
-    url?: string;
-    metadata?: Record<string, unknown>;
-  };
   asset?: {
     sha256: string;
     filename: string;
@@ -225,14 +181,13 @@ export async function createWorkWithVersionAndAsset(params: {
       | "exercises";
     metadata?: Record<string, unknown>;
   };
-}): Promise<{ work: Work; version: any; asset: any | null }> {
+}): Promise<{ work: Work; asset: Asset | null }> {
   const now = new Date().toISOString();
   const workId = crypto.randomUUID();
-  const versionId = crypto.randomUUID();
   const assetId = crypto.randomUUID();
 
-  // Import schemas
-  const { VersionSchema, AssetSchema } = await import("@/src/schema/library");
+  // Import schema
+  const { AssetSchema } = await import("@/src/schema/library");
 
   // Create Work
   const work: Work = {
@@ -243,36 +198,16 @@ export async function createWorkWithVersionAndAsset(params: {
     updatedAt: now,
   };
 
-  // Create Version
-  const version = {
-    id: versionId,
-    kind: "version" as const,
-    workId,
-    versionNumber: params.version?.versionNumber ?? 1,
-    label: params.version?.label ?? "Original",
-    year: params.version?.year,
-    month: params.version?.month,
-    publisher: params.version?.publisher,
-    doi: params.version?.doi,
-    isbn: params.version?.isbn,
-    arxivId: params.version?.arxivId,
-    url: params.version?.url,
-    metadata: params.version?.metadata,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  // Validate work and version
+  // Validate work
   const validatedWork = WorkSchema.parse(work);
-  const validatedVersion = VersionSchema.parse(version);
 
   // Conditionally create and validate asset if provided
-  let validatedAsset: any = null;
+  let validatedAsset: Asset | null = null;
   if (params.asset) {
     const asset = {
       id: assetId,
       kind: "asset" as const,
-      versionId,
+      workId,
       sha256: params.asset.sha256,
       filename: params.asset.filename,
       bytes: params.asset.bytes,
@@ -287,13 +222,10 @@ export async function createWorkWithVersionAndAsset(params: {
   }
 
   // Insert in a transaction
-  const tables = validatedAsset
-    ? [db.works, db.versions, db.assets]
-    : [db.works, db.versions];
+  const tables = validatedAsset ? [db.works, db.assets] : [db.works];
 
   await db.transaction("rw", tables, async () => {
     await db.works.add(validatedWork);
-    await db.versions.add(validatedVersion);
     if (validatedAsset) {
       await db.assets.add(validatedAsset);
     }
@@ -301,7 +233,6 @@ export async function createWorkWithVersionAndAsset(params: {
 
   return {
     work: validatedWork,
-    version: validatedVersion,
     asset: validatedAsset,
   };
 }

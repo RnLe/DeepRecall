@@ -1,5 +1,7 @@
 # Library Schema Quick Reference - Phase 2 Update
 
+> **⚠️ ARCHITECTURE NOTE:** This document describes the original design with the Version entity. The Version entity has since been removed - Assets now link directly to Works via `workId`. See `VERSION_REMOVAL_PROGRESS.md` for details on the current architecture.
+
 Quick lookup for blob integration and server-client bridge operations.
 
 ## Import Paths (Phase 2 Additions)

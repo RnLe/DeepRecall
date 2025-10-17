@@ -66,9 +66,7 @@ export function ActivityBanner({
 
   const works = activity.works || [];
   const assets = activity.assets || [];
-  const versions = activity.versions || [];
-  const hasContent =
-    works.length > 0 || assets.length > 0 || versions.length > 0;
+  const hasContent = works.length > 0 || assets.length > 0;
 
   const colorClass =
     ACTIVITY_TYPE_COLORS[activity.activityType] ||
@@ -127,14 +125,14 @@ export function ActivityBanner({
 
     if (workId) {
       onDropWork(activity.id, workId);
-    } else if (blobId) {
-      // Blob: Create Asset from blob, then link to Activity
-      onDropBlob(activity.id, blobId);
     } else if (assetId) {
-      // Asset: Already exists in Dexie, just create edge to link it
-      // This creates: Edge { fromId: activityId, toId: assetId, relation: "contains" }
-      // After linking, Asset will no longer appear in "Unlinked Assets"
+      // Prefer linking existing Assets by ID when available
+      // This avoids accidentally creating a duplicate Asset from the same blob
+      // Edge: { fromId: activityId, toId: assetId, relation: "contains" }
       onDropAsset(activity.id, assetId);
+    } else if (blobId) {
+      // Fallback: Blob dropped (e.g., from New Files inbox) → create Asset then link
+      onDropBlob(activity.id, blobId);
     }
   };
 
@@ -278,9 +276,10 @@ export function ActivityBanner({
                       }}
                     />
                   )}
+                  {/* Remove Work button positioned with its center at the card's corner */}
                   <button
                     onClick={() => onUnlinkWork(activity.id, work.id)}
-                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded opacity-0 group-hover/work:opacity-100 transition-opacity hover:bg-red-600 z-10"
+                    className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-red-600 text-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover/work:opacity-100 transition-all hover:bg-red-500 z-10"
                     title="Remove from activity"
                   >
                     <X className="w-3.5 h-3.5" />

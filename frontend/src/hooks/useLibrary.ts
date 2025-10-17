@@ -7,18 +7,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLiveQuery } from "dexie-react-hooks";
 import type {
   Work,
-  Version,
   Asset,
   Activity,
   Collection,
   WorkExtended,
-  VersionExtended,
   AssetExtended,
   ActivityExtended,
   CollectionExtended,
 } from "@/src/schema/library";
 import * as workRepo from "@/src/repo/works";
-import * as versionRepo from "@/src/repo/versions";
 import * as assetRepo from "@/src/repo/assets";
 import * as activityRepo from "@/src/repo/activities";
 import * as collectionRepo from "@/src/repo/collections";
@@ -107,14 +104,14 @@ export function useCreateWork() {
 }
 
 /**
- * Mutation to create a work with its first version and asset
+ * Mutation to create a work with its first asset
  * Used when linking a blob to a new work
  */
-export function useCreateWorkWithVersionAndAsset() {
+export function useCreateWorkWithAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: workRepo.createWorkWithVersionAndAsset,
+    mutationFn: workRepo.createWorkWithAsset,
     onSuccess: () => {
       // Invalidate both works and orphaned blobs queries
       queryClient.invalidateQueries({ queryKey: ["works"] });
@@ -123,6 +120,11 @@ export function useCreateWorkWithVersionAndAsset() {
     },
   });
 }
+
+/**
+ * @deprecated Use useCreateWorkWithAsset instead
+ */
+export const useCreateWorkWithVersionAndAsset = useCreateWorkWithAsset;
 
 /**
  * Mutation to update a work
@@ -179,150 +181,9 @@ export function useToggleWorkFavorite() {
 // Versions
 // ============================================================================
 
-/**
- * Hook to get versions for a work (live query)
- */
-export function useVersionsForWork(workId: string | undefined) {
-  return useLiveQuery(
-    () => (workId ? versionRepo.listVersionsForWork(workId) : []),
-    [workId]
-  );
-}
-
-/**
- * Hook to get versions for a work with extended data (live query)
- */
-export function useVersionsExtendedForWork(workId: string | undefined) {
-  return useLiveQuery(
-    () => (workId ? versionRepo.listVersionsExtendedForWork(workId) : []),
-    [workId]
-  );
-}
-
-/**
- * Hook to get a single version (live query)
- */
-export function useVersion(id: string | undefined) {
-  return useLiveQuery(
-    () => (id ? versionRepo.getVersion(id) : undefined),
-    [id]
-  );
-}
-
-/**
- * Hook to get a single version with extended data (live query)
- */
-export function useVersionExtended(id: string | undefined) {
-  return useLiveQuery(
-    () => (id ? versionRepo.getVersionExtended(id) : undefined),
-    [id]
-  );
-}
-
-/**
- * Hook to get read versions (live query)
- */
-export function useReadVersions() {
-  return useLiveQuery(() => versionRepo.listReadVersions(), []);
-}
-
-/**
- * Hook to get favorite versions (live query)
- */
-export function useFavoriteVersions() {
-  return useLiveQuery(() => versionRepo.listFavoriteVersions(), []);
-}
-
-/**
- * Mutation to create a version
- */
-export function useCreateVersion() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: Omit<Version, "id" | "createdAt" | "updatedAt">) =>
-      versionRepo.createVersion(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["versions"] });
-    },
-  });
-}
-
-/**
- * Mutation to update a version
- */
-export function useUpdateVersion() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({
-      id,
-      updates,
-    }: {
-      id: string;
-      updates: Partial<Omit<Version, "id" | "kind" | "workId" | "createdAt">>;
-    }) => versionRepo.updateVersion(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["versions"] });
-    },
-  });
-}
-
-/**
- * Mutation to delete a version
- */
-export function useDeleteVersion() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => versionRepo.deleteVersion(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["versions"] });
-    },
-  });
-}
-
-/**
- * Mutation to mark version as read
- */
-export function useMarkVersionAsRead() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => versionRepo.markVersionAsRead(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["versions"] });
-    },
-  });
-}
-
-/**
- * Mutation to toggle version favorite
- */
-export function useToggleVersionFavorite() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => versionRepo.toggleVersionFavorite(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["versions"] });
-    },
-  });
-}
-
 // ============================================================================
 // Assets
 // ============================================================================
-
-/**
- * Hook to get assets for a version (live query)
- */
-export function useAssetsForVersion(versionId: string | undefined) {
-  return useLiveQuery(
-    () => (versionId ? assetRepo.listAssetsForVersion(versionId) : []),
-    [versionId]
-  );
-}
 
 /**
  * Hook to get assets for a work (live query)
@@ -746,21 +607,19 @@ export function useRemoveFromCollection() {
  */
 export function usePresetUsageCount(presetId: string | undefined) {
   return useLiveQuery(async () => {
-    if (!presetId) return { works: 0, versions: 0, assets: 0, total: 0 };
+    if (!presetId) return { works: 0, assets: 0, total: 0 };
 
     const db = (await import("@/src/db/dexie")).db;
 
-    const [works, versions, assets] = await Promise.all([
+    const [works, assets] = await Promise.all([
       db.works.where("presetId").equals(presetId).count(),
-      db.versions.where("presetId").equals(presetId).count(),
       db.assets.where("presetId").equals(presetId).count(),
     ]);
 
     return {
       works,
-      versions,
       assets,
-      total: works + versions + assets,
+      total: works + assets,
     };
   }, [presetId]);
 }

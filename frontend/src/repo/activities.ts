@@ -57,13 +57,11 @@ export async function getActivityExtended(
 
   // Resolve entities
   const works = await db.works.where("id").anyOf(entityIds).toArray();
-  const versions = await db.versions.where("id").anyOf(entityIds).toArray();
   const assets = await db.assets.where("id").anyOf(entityIds).toArray();
 
   return {
     ...activity,
     works,
-    versions,
     assets,
   };
 }

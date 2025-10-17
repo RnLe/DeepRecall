@@ -1,5 +1,7 @@
 # Asset Mental Model - Implementation Guide
 
+> **⚠️ ARCHITECTURE NOTE:** This document describes the original design with the Version entity. The Version entity has since been removed - Assets now link directly to Works via `workId`. Work-linked state replaces Version-linked state. See `VERSION_REMOVAL_PROGRESS.md` for details.
+
 ## The Problem That Was Fixed
 
 Assets were not disappearing from the "Unlinked Assets" list after being linked to Activities. This was due to a **mental model violation** in the codebase.

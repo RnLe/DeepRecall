@@ -5,13 +5,11 @@
 
 import type {
   Work,
-  Version,
   Asset,
   Activity,
   Collection,
   LibraryEntity,
   WorkExtended,
-  VersionExtended,
   AssetExtended,
 } from "@/src/schema/library";
 
@@ -29,7 +27,6 @@ export type EntityKind = LibraryEntity["kind"];
  */
 export type EntityTypeMap = {
   work: Work;
-  version: Version;
   asset: Asset;
   activity: Activity;
   collection: Collection;
@@ -56,11 +53,6 @@ export function getEntityDisplayName(entity: LibraryEntity): string {
   switch (entity.kind) {
     case "work":
       return entity.title;
-    case "version":
-      return (
-        entity.versionTitle ||
-        `Version ${entity.versionNumber || entity.edition || ""}`
-      );
     case "asset":
       return entity.filename;
     case "activity":
@@ -77,8 +69,6 @@ export function getEntityTypeLabel(entity: LibraryEntity): string {
   switch (entity.kind) {
     case "work":
       return entity.workType.charAt(0).toUpperCase() + entity.workType.slice(1);
-    case "version":
-      return "Version";
     case "asset":
       return "File";
     case "activity":
@@ -134,86 +124,30 @@ export function getDisplayYear(work: WorkExtended): string | null {
 }
 
 /**
- * Get display year for a work (from its versions)
+ * Get display year for a work
  * Internal implementation
  */
 function getDisplayYearForWork(work: WorkExtended): string | null {
-  if (!work.versions || work.versions.length === 0) {
+  // Use work.year directly, or fall back to asset years
+  if (work.year) {
+    return work.year.toString();
+  }
+
+  // Check asset years as fallback
+  if (!work.assets || work.assets.length === 0) {
     return null;
   }
 
-  const versionsWithYears = work.versions.filter((v) => v.year);
-  if (versionsWithYears.length === 0) {
+  const assetsWithYears = work.assets.filter((a) => a.year);
+  if (assetsWithYears.length === 0) {
     return null;
   }
 
-  // For papers, get earliest version; for others, show range
-  const isPaper = work.workType === "paper";
-
-  if (isPaper) {
-    const sortedVersions = versionsWithYears.sort((a, b) => {
-      const aNum = a.versionNumber ?? 999;
-      const bNum = b.versionNumber ?? 999;
-      return aNum - bNum;
-    });
-    return sortedVersions[0].year!.toString();
-  } else {
-    if (versionsWithYears.length === 1) {
-      return versionsWithYears[0].year!.toString();
-    } else {
-      const years = versionsWithYears.map((v) => v.year!).sort((a, b) => a - b);
-      const minYear = years[0];
-      const maxYear = years[years.length - 1];
-      return minYear === maxYear ? minYear.toString() : `${minYear}-${maxYear}`;
-    }
-  }
-}
-
-// ============================================================================
-// Version helpers
-// ============================================================================
-
-/**
- * Get a full display name for a version (including work title if needed)
- */
-export function getVersionFullName(version: VersionExtended): string {
-  const versionLabel =
-    version.versionTitle ||
-    version.edition ||
-    `v${version.versionNumber || "?"}`;
-
-  if (version.work) {
-    return `${version.work.title} (${versionLabel})`;
-  }
-
-  return versionLabel;
-}
-
-/**
- * Get publication info string for a version
- * Format: "Publisher, Year" or "Journal Vol(Issue), Year"
- */
-export function getPublicationInfo(version: Version): string {
-  const parts: string[] = [];
-
-  if (version.journal) {
-    let journalStr = version.journal;
-    if (version.volume) {
-      journalStr += ` ${version.volume}`;
-      if (version.issue) {
-        journalStr += `(${version.issue})`;
-      }
-    }
-    parts.push(journalStr);
-  } else if (version.publisher) {
-    parts.push(version.publisher);
-  }
-
-  if (version.year) {
-    parts.push(version.year.toString());
-  }
-
-  return parts.join(", ");
+  // Get the earliest asset year
+  const years = assetsWithYears.map((a) => a.year!).sort((a, b) => a - b);
+  const minYear = years[0];
+  const maxYear = years[years.length - 1];
+  return minYear === maxYear ? minYear.toString() : `${minYear}-${maxYear}`;
 }
 
 // ============================================================================
@@ -252,7 +186,7 @@ export function isPDF(asset: Asset): boolean {
 }
 
 /**
- * Get a full display name for an asset (including version/work if available)
+ * Get a full display name for an asset (including work if available)
  */
 export function getAssetFullName(asset: AssetExtended): string {
   const parts: string[] = [];
@@ -261,10 +195,11 @@ export function getAssetFullName(asset: AssetExtended): string {
     parts.push(asset.work.title);
   }
 
-  if (asset.version) {
-    const versionLabel =
-      asset.version.edition || `v${asset.version.versionNumber || "?"}`;
-    parts.push(`(${versionLabel})`);
+  // Show edition/version info if available on the asset
+  if (asset.edition) {
+    parts.push(`(${asset.edition})`);
+  } else if (asset.versionNumber) {
+    parts.push(`(v${asset.versionNumber})`);
   }
 
   if (asset.role !== "main") {
@@ -357,12 +292,12 @@ export function formatActivityDateRange(activity: Activity): string {
  */
 export function getCollectionItemCount(collection: {
   works?: Work[];
-  versions?: Version[];
+  assets?: Asset[];
   activities?: Activity[];
 }): number {
   return (
     (collection.works?.length || 0) +
-    (collection.versions?.length || 0) +
+    (collection.assets?.length || 0) +
     (collection.activities?.length || 0)
   );
 }
@@ -383,15 +318,6 @@ export function compareWorksByTitle(a: Work, b: Work): number {
  */
 export function compareWorksByDate(a: Work, b: Work): number {
   return b.createdAt.localeCompare(a.createdAt);
-}
-
-/**
- * Compare function for sorting versions by year (newest first)
- */
-export function compareVersionsByYear(a: Version, b: Version): number {
-  const aYear = a.year || 0;
-  const bYear = b.year || 0;
-  return bYear - aYear;
 }
 
 /**

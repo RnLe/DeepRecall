@@ -314,9 +314,7 @@ export default function AdminPage() {
               Shows <strong>local Dexie data</strong> (browser IndexedDB) - not
               server blobs
             </li>
-            <li>
-              Visualizes the Asset mental model: Works → Versions → Assets
-            </li>
+            <li>Visualizes the Asset mental model: Works → Assets</li>
             <li>
               <strong>Unlinked Assets</strong> (red) have no versionId and no
               edges

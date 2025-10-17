@@ -24,7 +24,7 @@ interface WorkCardCompactProps {
 export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
   const authors = getPrimaryAuthors(work, 2);
   const year = getDisplayYear(work);
-  const versionCount = work.versions?.length || 0;
+  const assetCount = work.assets?.length || 0;
 
   const deleteWorkMutation = useDeleteWork();
   const allPresets = usePresets();
@@ -81,7 +81,7 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
     const assetId = e.dataTransfer.getData("application/x-asset-id");
 
     if (assetId) {
-      // Handle existing asset being linked - update its versionId
+      // Handle existing asset being linked - update its workId
       import("@/src/repo/assets")
         .then(async ({ getAsset }) => {
           const asset = await getAsset(assetId);
@@ -89,27 +89,10 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
             throw new Error("Asset not found");
           }
 
-          // Get the first version of this work, or create one
-          const { createVersion } = await import("@/src/repo/versions");
+          // Update the asset to link it directly to this work (use raw Dexie update)
           const { db } = await import("@/src/db/dexie");
-          let versionId: string;
-
-          if (work.versions && work.versions.length > 0) {
-            versionId = work.versions[0].id;
-          } else {
-            // Create a new version
-            const newVersion = await createVersion({
-              kind: "version",
-              workId: work.id,
-              versionNumber: 1,
-              favorite: false,
-            });
-            versionId = newVersion.id;
-          }
-
-          // Update the asset to link it to this version (use raw Dexie update)
           await db.assets.update(asset.id, {
-            versionId: versionId,
+            workId: work.id,
             updatedAt: new Date().toISOString(),
           });
 
@@ -223,7 +206,9 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
           {/* Footer */}
           <div className="flex items-center gap-2 text-xs text-neutral-600 pt-2 border-t border-neutral-800/30">
             <FileText className="w-3 h-3" />
-            <span>{versionCount}v</span>
+            <span>
+              {assetCount} {assetCount === 1 ? "file" : "files"}
+            </span>
           </div>
         </div>
       </div>

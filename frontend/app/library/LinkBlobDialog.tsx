@@ -15,7 +15,7 @@ import { PresetSelector } from "./PresetSelector";
 import { WorkSelector } from "./WorkSelector";
 import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
-import { useCreateWorkWithVersionAndAsset } from "@/src/hooks/useLibrary";
+import { useCreateWorkWithAsset } from "@/src/hooks/useLibrary";
 import { Plus, Link2 } from "lucide-react";
 
 interface LinkBlobDialogProps {
@@ -40,7 +40,7 @@ export function LinkBlobDialog({
 }: LinkBlobDialogProps) {
   const { system: systemPresets, user: userPresets } = useWorkPresets();
   const works = useWorksExtended();
-  const createWorkMutation = useCreateWorkWithVersionAndAsset();
+  const createWorkMutation = useCreateWorkWithAsset();
 
   const [mode, setMode] = useState<Mode>(
     preselectedWorkId ? "link-to-existing" : "create-new"
@@ -103,7 +103,7 @@ export function LinkBlobDialog({
         authors = coreFields.authors as { name: string }[];
       }
 
-      // Create Work + Version + Asset in a single transaction
+      // Create Work + Asset in a single transaction
       await createWorkMutation.mutateAsync({
         work: {
           kind: "work" as const,
@@ -113,16 +113,13 @@ export function LinkBlobDialog({
           workType: (coreFields.workType as any) || "other",
           topics: (coreFields.topics as string[]) || [],
           favorite: false,
-          metadata,
-        },
-        version: {
-          versionNumber: 1,
-          label: "Original",
+          presetId: selectedPreset.id,
+          allowMultipleAssets: false,
           year: coreFields.year as number | undefined,
           publisher: coreFields.publisher as string | undefined,
           doi: coreFields.doi as string | undefined,
           isbn: coreFields.isbn as string | undefined,
-          url: coreFields.url as string | undefined,
+          metadata,
         },
         asset: {
           sha256: blob.sha256,
@@ -228,7 +225,7 @@ export function LinkBlobDialog({
                 value={selectedWorkId}
                 onChange={(workId) => {
                   setSelectedWorkId(workId);
-                  // TODO: Move to version form step
+                  // TODO: Move to asset metadata form step
                   // For now, just select
                 }}
               />
@@ -588,33 +585,22 @@ export function LinkBlobDialog({
                       if (!selectedWork || !selectedWorkId) return;
 
                       try {
-                        // Create a new version for the work and link the asset
-                        const { createVersion } = await import(
-                          "@/src/repo/versions"
-                        );
+                        // Import the asset repo
                         const { createAsset } = await import(
                           "@/src/repo/assets"
                         );
 
-                        // Create version
-                        const version = await createVersion({
-                          kind: "version",
-                          workId: selectedWorkId,
-                          versionNumber:
-                            (selectedWork.versions?.length || 0) + 1,
-                          favorite: false,
-                        });
-
-                        // Create asset linked to this version
+                        // Create asset linked directly to the work
                         await createAsset({
                           kind: "asset",
-                          versionId: version.id,
+                          workId: selectedWorkId,
                           sha256: blob.sha256,
                           filename: blob.filename || "unknown.pdf",
                           bytes: blob.size,
                           mime: blob.mime,
                           role: "main",
                           pageCount: blob.pageCount,
+                          favorite: false,
                         });
 
                         console.log("✅ Asset linked to work successfully!");

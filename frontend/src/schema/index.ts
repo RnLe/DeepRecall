@@ -10,7 +10,6 @@ export * from "./library";
 export {
   // Schemas
   WorkSchema,
-  VersionSchema,
   AssetSchema,
   ActivitySchema,
   CollectionSchema,
@@ -23,7 +22,6 @@ export {
   RelationSchema,
   // Types
   type Work,
-  type Version,
   type Asset,
   type Activity,
   type Collection,
@@ -36,7 +34,6 @@ export {
   type Relation,
   // Extended types
   type WorkExtended,
-  type VersionExtended,
   type AssetExtended,
   type ActivityExtended,
   type CollectionExtended,
@@ -45,7 +42,6 @@ export {
   safeValidateLibraryEntity,
   // Type guards
   isWork,
-  isVersion,
   isAsset,
   isActivity,
   isCollection,

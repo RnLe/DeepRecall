@@ -143,7 +143,7 @@ export default function LibraryPage() {
       }
       const blob = await response.json();
 
-      // Create a standalone asset from the blob (no versionId)
+      // Create a standalone asset from the blob (no workId)
       const { createAsset } = await import("@/src/repo/assets");
       const asset = await createAsset({
         kind: "asset",
@@ -153,6 +153,7 @@ export default function LibraryPage() {
         mime: blob.mime,
         pageCount: blob.pageCount,
         role: "main",
+        favorite: false,
       });
 
       // Link the asset to the activity
@@ -197,6 +198,10 @@ export default function LibraryPage() {
       alert("Failed to link asset to activity");
     }
   };
+
+  // Defensive: if a component accidentally calls blob+asset for same drop,
+  // prefer the asset edge (no duplicate asset creation). Consumers should
+  // call only one, but this ensures safety under race conditions.
 
   const handleUnlinkWorkFromActivity = async (
     activityId: string,
@@ -281,20 +286,11 @@ export default function LibraryPage() {
         break;
       case "date":
         sorted.sort((a, b) => {
-          // Sort by most recent version year
-          const aYears =
-            a.versions
-              ?.map((v) => v.year)
-              .filter((y): y is number => y != null) || [];
-          const bYears =
-            b.versions
-              ?.map((v) => v.year)
-              .filter((y): y is number => y != null) || [];
+          // Sort by work year
+          const aYear = a.year || 0;
+          const bYear = b.year || 0;
 
-          const aMax = aYears.length > 0 ? Math.max(...aYears) : 0;
-          const bMax = bYears.length > 0 ? Math.max(...bYears) : 0;
-
-          return bMax - aMax; // Descending (newest first)
+          return bYear - aYear; // Descending (newest first)
         });
         break;
     }

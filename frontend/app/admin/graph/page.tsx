@@ -105,7 +105,6 @@ export default function GraphPage() {
 
   // Live query all Dexie data
   const works = useLiveQuery(() => db.works.toArray(), []);
-  const versions = useLiveQuery(() => db.versions.toArray(), []);
   const assets = useLiveQuery(() => db.assets.toArray(), []);
   const activities = useLiveQuery(() => db.activities.toArray(), []);
   const collections = useLiveQuery(() => db.collections.toArray(), []);
@@ -115,20 +114,19 @@ export default function GraphPage() {
   const stats = useMemo(() => {
     const unlinkedAssets = (assets || []).filter(
       (a) =>
-        !a.versionId &&
+        !a.workId &&
         !(edges || []).some((e) => e.relation === "contains" && e.toId === a.id)
     );
 
     return {
       works: works?.length || 0,
-      versions: versions?.length || 0,
       assets: assets?.length || 0,
       activities: activities?.length || 0,
       collections: collections?.length || 0,
       edges: edges?.length || 0,
       unlinkedAssets: unlinkedAssets.length,
     };
-  }, [works, versions, assets, activities, collections, edges]);
+  }, [works, assets, activities, collections, edges]);
 
   // Handle container resize
   useEffect(() => {
@@ -189,8 +187,7 @@ export default function GraphPage() {
 
   // Build graph data
   useEffect(() => {
-    if (!works || !versions || !assets || !activities || !collections || !edges)
-      return;
+    if (!works || !assets || !activities || !collections || !edges) return;
 
     const newNodes: GraphNode[] = [];
     const newLinks: GraphLink[] = [];
@@ -212,20 +209,6 @@ export default function GraphPage() {
       };
       newNodes.push(node);
       nodeMap.set(work.id, node);
-    });
-
-    // Create nodes for Versions
-    versions.forEach((version) => {
-      const node: GraphNode = {
-        id: version.id,
-        label: `v${version.versionNumber}`,
-        type: "version",
-        data: version,
-        x: centerX + (Math.random() - 0.5) * spread,
-        y: centerY + (Math.random() - 0.5) * spread,
-      };
-      newNodes.push(node);
-      nodeMap.set(version.id, node);
     });
 
     // Create nodes for Assets
@@ -270,25 +253,10 @@ export default function GraphPage() {
       nodeMap.set(collection.id, node);
     });
 
-    // Add links from Work → Version
-    versions.forEach((version) => {
-      if (version.workId) {
-        const sourceNode = nodeMap.get(version.workId);
-        const targetNode = nodeMap.get(version.id);
-        if (sourceNode && targetNode) {
-          newLinks.push({
-            source: sourceNode,
-            target: targetNode,
-            type: "hasVersion",
-          });
-        }
-      }
-    });
-
-    // Add links from Version → Asset
+    // Add links from Work → Asset
     assets.forEach((asset) => {
-      if (asset.versionId) {
-        const sourceNode = nodeMap.get(asset.versionId);
+      if (asset.workId) {
+        const sourceNode = nodeMap.get(asset.workId);
         const targetNode = nodeMap.get(asset.id);
         if (sourceNode && targetNode) {
           newLinks.push({
@@ -315,7 +283,7 @@ export default function GraphPage() {
 
     setNodes(newNodes);
     setLinks(newLinks);
-  }, [works, versions, assets, activities, collections, edges, dimensions]);
+  }, [works, assets, activities, collections, edges, dimensions]);
 
   // Compute bounding box and centroid (average position) of all nodes
   const bounds = useMemo(() => {
@@ -604,7 +572,7 @@ export default function GraphPage() {
     [nodes, clearSelection, selectNode]
   );
 
-  if (!works || !versions || !assets || !activities || !collections || !edges) {
+  if (!works || !assets || !activities || !collections || !edges) {
     return (
       <div className="w-full h-screen flex items-center justify-center text-gray-400">
         Loading graph data...
@@ -622,13 +590,6 @@ export default function GraphPage() {
           color="bg-green-500"
           type="work"
           onClick={() => handleSelectByType("work")}
-        />
-        <StatCard
-          label="Versions"
-          count={stats.versions}
-          color="bg-blue-500"
-          type="version"
-          onClick={() => handleSelectByType("version")}
         />
         <StatCard
           label="Assets"

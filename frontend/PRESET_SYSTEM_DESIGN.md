@@ -1,8 +1,10 @@
 # Preset System Design
 
+> **⚠️ ARCHITECTURE NOTE:** This document describes the original design with the Version entity. The Version entity has since been removed - Assets now link directly to Works via `workId`. Works now have an `allowMultipleAssets` boolean. See `VERSION_REMOVAL_PROGRESS.md` for details on the current architecture.
+
 ## Overview
 
-A flexible, user-configurable system for creating Works, Versions, and Assets with custom fields while maintaining type safety for core fields.
+A flexible, user-configurable system for creating Works and Assets with custom fields while maintaining type safety for core fields.
 
 ## Architecture
 

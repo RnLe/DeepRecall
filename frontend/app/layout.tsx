@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Providers } from "./providers";
 import Link from "next/link";
 import "./globals.css";
+import "katex/dist/katex.min.css";
 
 export const metadata: Metadata = {
   title: "DeepRecall",
@@ -15,10 +16,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className="antialiased overflow-hidden h-screen">
         <Providers>
-          <div className="min-h-screen bg-gray-950 text-gray-100">
-            <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur">
+          <div className="h-screen bg-gray-950 text-gray-100 flex flex-col overflow-hidden">
+            <nav className="flex-shrink-0 border-b border-gray-800 bg-gray-900/50 backdrop-blur">
               <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
                 <Link
                   href="/"
@@ -55,7 +56,7 @@ export default function RootLayout({
                 </div>
               </div>
             </nav>
-            {children}
+            <div className="flex-1 overflow-hidden">{children}</div>
           </div>
         </Providers>
       </body>

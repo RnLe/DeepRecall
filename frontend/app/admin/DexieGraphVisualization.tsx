@@ -71,7 +71,6 @@ export default function DexieGraphVisualization() {
 
   // Live query all Dexie data
   const works = useLiveQuery(() => db.works.toArray(), []);
-  const versions = useLiveQuery(() => db.versions.toArray(), []);
   const assets = useLiveQuery(() => db.assets.toArray(), []);
   const activities = useLiveQuery(() => db.activities.toArray(), []);
   const collections = useLiveQuery(() => db.collections.toArray(), []);
@@ -81,20 +80,19 @@ export default function DexieGraphVisualization() {
   const stats = useMemo(() => {
     const unlinkedAssets = (assets || []).filter(
       (a) =>
-        !a.versionId &&
+        !a.workId &&
         !(edges || []).some((e) => e.relation === "contains" && e.toId === a.id)
     );
 
     return {
       works: works?.length || 0,
-      versions: versions?.length || 0,
       assets: assets?.length || 0,
       activities: activities?.length || 0,
       collections: collections?.length || 0,
       edges: edges?.length || 0,
       unlinkedAssets: unlinkedAssets.length,
     };
-  }, [works, versions, assets, activities, collections, edges]);
+  }, [works, assets, activities, collections, edges]);
 
   // Handle container resize
   useEffect(() => {
@@ -130,14 +128,7 @@ export default function DexieGraphVisualization() {
 
   // Build graph data
   useEffect(() => {
-    if (
-      !works ||
-      !versions ||
-      !assets ||
-      !activities ||
-      !collections ||
-      !edges
-    ) {
+    if (!works || !assets || !activities || !collections || !edges) {
       return;
     }
 
@@ -162,20 +153,6 @@ export default function DexieGraphVisualization() {
       };
       newNodes.push(node);
       nodeMap.set(work.id, node);
-    });
-
-    // Add Versions
-    versions.forEach((version) => {
-      const node: GraphNode = {
-        id: version.id,
-        label: `v${version.versionNumber || "?"}`,
-        type: "version",
-        data: version,
-        x: centerX + (Math.random() - 0.5) * spread,
-        y: centerY + (Math.random() - 0.5) * spread,
-      };
-      newNodes.push(node);
-      nodeMap.set(version.id, node);
     });
 
     // Add Assets
@@ -227,22 +204,11 @@ export default function DexieGraphVisualization() {
     });
 
     // Add links from Work → Version
-    versions.forEach((version) => {
-      const sourceNode = nodeMap.get(version.workId);
-      const targetNode = nodeMap.get(version.id);
-      if (sourceNode && targetNode) {
-        newLinks.push({
-          source: sourceNode,
-          target: targetNode,
-          type: "hasVersion",
-        });
-      }
-    });
 
-    // Add links from Version → Asset
+    // Add links from Work → Asset
     assets.forEach((asset) => {
-      if (asset.versionId) {
-        const sourceNode = nodeMap.get(asset.versionId);
+      if (asset.workId) {
+        const sourceNode = nodeMap.get(asset.workId);
         const targetNode = nodeMap.get(asset.id);
         if (sourceNode && targetNode) {
           newLinks.push({
@@ -269,7 +235,7 @@ export default function DexieGraphVisualization() {
 
     setNodes(newNodes);
     setLinks(newLinks);
-  }, [works, versions, assets, activities, collections, edges, dimensions]);
+  }, [works, assets, activities, collections, edges, dimensions]);
 
   // Setup d3-force simulation
   useEffect(() => {
@@ -462,7 +428,7 @@ export default function DexieGraphVisualization() {
     node.fy = node.y;
   };
 
-  if (!works || !versions || !assets || !activities || !collections || !edges) {
+  if (!works || !assets || !activities || !collections || !edges) {
     return (
       <div className="w-full h-[800px] flex items-center justify-center text-gray-400">
         Loading Dexie data...
@@ -485,7 +451,7 @@ export default function DexieGraphVisualization() {
       {/* Stats */}
       <div className="grid grid-cols-7 gap-2 text-xs">
         <StatCard label="Works" count={stats.works} color="bg-green-500" />
-        <StatCard label="Versions" count={stats.versions} color="bg-blue-500" />
+
         <StatCard label="Assets" count={stats.assets} color="bg-orange-500" />
         <StatCard
           label="Activities"

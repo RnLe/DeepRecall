@@ -8,14 +8,14 @@
  * They reference blobs by sha256 hash, but have their own lifecycle:
  *
  * - Creating an Asset: Associates a blob with metadata (filename, role, etc.)
- * - Linking an Asset: Connects it to a Version, Activity, or Collection
+ * - Linking an Asset: Connects it to a Work, Activity, or Collection
  * - Unlinking an Asset: Removes connections but keeps the Asset entity
  * - Deleting an Asset: Removes the Asset entity (blob remains on server)
  *
  * Assets can be in three states:
- * 1. Version-linked: Has versionId (part of a Work)
- * 2. Edge-linked: No versionId, but has edges (in Activity/Collection)
- * 3. Unlinked: No versionId, no edges (standalone, needs linking)
+ * 1. Work-linked: Has workId (part of a Work)
+ * 2. Edge-linked: No workId, but has edges (in Activity/Collection)
+ * 3. Unlinked: No workId, no edges (standalone, needs linking)
  */
 
 import { db } from "@/src/db/dexie";
@@ -53,7 +53,7 @@ export async function getAsset(id: string): Promise<Asset | undefined> {
 }
 
 /**
- * Get an Asset by ID with Version and Work
+ * Get an Asset by ID with Work
  */
 export async function getAssetExtended(
   id: string
@@ -61,15 +61,11 @@ export async function getAssetExtended(
   const asset = await db.assets.get(id);
   if (!asset) return undefined;
 
-  // Handle standalone assets (no versionId)
-  const version = asset.versionId
-    ? await db.versions.get(asset.versionId)
-    : undefined;
-  const work = version ? await db.works.get(version.workId) : undefined;
+  // Get the work if asset is linked
+  const work = asset.workId ? await db.works.get(asset.workId) : undefined;
 
   return {
     ...asset,
-    version,
     work,
   };
 }
@@ -84,31 +80,10 @@ export async function getAssetByHash(
 }
 
 /**
- * List all Assets for a Version
- */
-export async function listAssetsForVersion(
-  versionId: string
-): Promise<Asset[]> {
-  return db.assets.where("versionId").equals(versionId).toArray();
-}
-
-/**
- * List all Assets for a Work (across all Versions)
+ * List all Assets for a Work
  */
 export async function listAssetsForWork(workId: string): Promise<Asset[]> {
-  const versions = await db.versions.where("workId").equals(workId).toArray();
-  const versionIds = versions.map((v) => v.id);
-
-  const assets: Asset[] = [];
-  for (const versionId of versionIds) {
-    const versionAssets = await db.assets
-      .where("versionId")
-      .equals(versionId)
-      .toArray();
-    assets.push(...versionAssets);
-  }
-
-  return assets;
+  return db.assets.where("workId").equals(workId).toArray();
 }
 
 /**
@@ -117,7 +92,7 @@ export async function listAssetsForWork(workId: string): Promise<Asset[]> {
 export async function updateAsset(
   id: string,
   updates: Partial<
-    Omit<Asset, "id" | "kind" | "versionId" | "sha256" | "createdAt">
+    Omit<Asset, "id" | "kind" | "workId" | "sha256" | "createdAt">
   >
 ): Promise<Asset | undefined> {
   const asset = await db.assets.get(id);
@@ -177,16 +152,6 @@ export async function searchAssetsByFilename(query: string): Promise<Asset[]> {
  */
 export async function listAssetsByHash(sha256: string): Promise<Asset[]> {
   return db.assets.where("sha256").equals(sha256).toArray();
-}
-
-/**
- * Get total size of all Assets for a Version
- */
-export async function getTotalSizeForVersion(
-  versionId: string
-): Promise<number> {
-  const assets = await db.assets.where("versionId").equals(versionId).toArray();
-  return assets.reduce((sum, asset) => sum + asset.bytes, 0);
 }
 
 /**
