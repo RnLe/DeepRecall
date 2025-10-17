@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import type { Annotation, NormalizedRect } from "@/src/schema/annotation";
 
 interface PDFScrollbarProps {
@@ -104,11 +104,29 @@ export function PDFScrollbar({
 }: PDFScrollbarProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragScrollTop, setDragScrollTop] = useState<number | null>(null);
+  const dragScrollTopRef = useRef<number | null>(null); // Use ref during drag to prevent re-renders
   const [justFinishedDragging, setJustFinishedDragging] = useState(false);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(
     null
   );
   const [isHoveringCursor, setIsHoveringCursor] = useState(false);
+
+  // Store callbacks in refs to prevent effect re-runs
+  const onScrollToRef = useRef(onScrollTo);
+  onScrollToRef.current = onScrollTo;
+
+  const onAnnotationSelectRef = useRef(onAnnotationSelect);
+  onAnnotationSelectRef.current = onAnnotationSelect;
+
+  // Stable hover handlers
+  const handleCursorMouseEnter = useCallback(
+    () => setIsHoveringCursor(true),
+    []
+  );
+  const handleCursorMouseLeave = useCallback(
+    () => setIsHoveringCursor(false),
+    []
+  );
 
   // Calculate annotation stripes
   const annotationStripes = useMemo<AnnotationStripe[]>(() => {
@@ -175,9 +193,9 @@ export function PDFScrollbar({
           ? stripe.annotation.data.rects[0]?.y || 0
           : stripe.annotation.data.ranges[0]?.rects[0]?.y || 0;
 
-      onAnnotationSelect(stripe.annotation, normalizedY);
+      onAnnotationSelectRef.current(stripe.annotation, normalizedY);
     },
-    [onAnnotationSelect, justFinishedDragging]
+    [justFinishedDragging]
   );
 
   // Handle click on scrollbar background (jump to position)
@@ -195,9 +213,9 @@ export function PDFScrollbar({
         Math.min(totalHeight - containerHeight, centeredScroll)
       );
 
-      onScrollTo(clampedScroll);
+      onScrollToRef.current(clampedScroll);
     },
-    [totalHeight, containerHeight, onScrollTo]
+    [totalHeight, containerHeight]
   );
 
   // Handle cursor drag start
@@ -213,6 +231,8 @@ export function PDFScrollbar({
       setDragScrollTop(null);
       return;
     }
+
+    let rafId: number | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
       // Find the scrollbar element
@@ -231,14 +251,21 @@ export function PDFScrollbar({
         Math.min(totalHeight - containerHeight, adjustedScroll)
       );
 
-      // Update local drag position immediately for visual feedback
-      setDragScrollTop(clampedScroll);
-      // Also update actual scroll position
-      onScrollTo(clampedScroll);
+      // Throttle updates to the next animation frame to avoid deep update loops
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        // Update ref for visual feedback (no re-render during drag)
+        dragScrollTopRef.current = clampedScroll;
+        setDragScrollTop(clampedScroll); // Update state once for render
+        // Also update actual scroll position
+        onScrollToRef.current(clampedScroll);
+        rafId = null;
+      });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      dragScrollTopRef.current = null;
       setDragScrollTop(null);
 
       // Set flag to prevent annotation click on release
@@ -256,8 +283,9 @@ export function PDFScrollbar({
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
-  }, [isDragging, totalHeight, containerHeight, onScrollTo]);
+  }, [isDragging, totalHeight, containerHeight]);
 
   if (totalHeight === 0) return null;
 
@@ -319,8 +347,8 @@ export function PDFScrollbar({
           cursor: "default",
         }}
         onMouseDown={handleCursorMouseDown}
-        onMouseEnter={() => setIsHoveringCursor(true)}
-        onMouseLeave={() => setIsHoveringCursor(false)}
+        onMouseEnter={handleCursorMouseEnter}
+        onMouseLeave={handleCursorMouseLeave}
         onClick={(e) => e.stopPropagation()}
       />
     </div>

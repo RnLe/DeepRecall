@@ -187,22 +187,32 @@ export function AnnotationHandlers({
     browserSelection.removeAllRanges();
   }, [tool, page, selection.textRanges, normalizePoint, setSelection]);
 
-  // Only attach handlers when not in pan mode
-  if (tool === "pan") {
-    return <>{children}</>;
+  // Only attach handlers when in rectangle mode
+  // For pan and highlight, let events pass through to text layer
+  if (tool === "pan" || tool === "highlight") {
+    return (
+      <div
+        ref={pageRef}
+        onMouseUpCapture={
+          tool === "highlight" ? handleTextSelection : undefined
+        }
+        className="relative"
+        style={{ userSelect: "text" }}
+      >
+        {children}
+      </div>
+    );
   }
 
+  // Rectangle mode: capture all mouse events
   return (
     <div
       ref={pageRef}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseUpCapture={tool === "highlight" ? handleTextSelection : undefined}
-      className={`relative ${
-        tool === "rectangle" ? "cursor-crosshair" : "cursor-text"
-      }`}
-      style={{ userSelect: tool === "highlight" ? "text" : "none" }}
+      className="relative cursor-crosshair"
+      style={{ userSelect: "none" }}
     >
       {children}
     </div>

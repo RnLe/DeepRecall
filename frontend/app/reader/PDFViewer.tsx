@@ -52,6 +52,9 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
   } = usePDF(source);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Track programmatic scroll to prevent feedback loop
+  const isProgrammaticScroll = useRef(false);
+
   // Annotation state
   const annotationUI = useAnnotationUI();
   const { rightSidebarOpen, toggleRightSidebar } = useReaderUI();
@@ -123,6 +126,12 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
     let rafId: number | null = null;
 
     const handleScroll = () => {
+      // Skip if this is a programmatic scroll update
+      if (isProgrammaticScroll.current) {
+        isProgrammaticScroll.current = false;
+        return;
+      }
+
       // Cancel any pending RAF to avoid duplicate updates
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
@@ -150,6 +159,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
     if (!container) return;
     const diff = Math.abs(container.scrollTop - viewport.scrollTop);
     if (diff > 1) {
+      isProgrammaticScroll.current = true;
       container.scrollTop = viewport.scrollTop;
     }
   }, [viewport.scrollTop]);
@@ -294,6 +304,20 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
     (annotation: Annotation) => {
       // Always select the annotation (don't toggle off)
       annotationUI.setSelectedAnnotationId(annotation.id);
+    },
+    [annotationUI]
+  );
+
+  // Scrollbar callbacks (must be defined at top level, not in JSX)
+  const handleScrollbarScrollTo = useCallback(
+    (scrollTop: number) => viewport.setScrollTop(scrollTop),
+    [viewport]
+  );
+
+  const handleScrollbarAnnotationSelect = useCallback(
+    (annotation: Annotation, yOffset: number) => {
+      // Navigate to annotation position without selecting
+      annotationUI.navigateToPage(annotation.page, yOffset);
     },
     [annotationUI]
   );
@@ -656,11 +680,8 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
             containerHeight={viewport.containerHeight}
             annotations={allAnnotations}
             scale={viewport.scale}
-            onScrollTo={(scrollTop) => viewport.setScrollTop(scrollTop)}
-            onAnnotationSelect={(annotation, yOffset) => {
-              // Navigate to annotation position without selecting
-              annotationUI.navigateToPage(annotation.page, yOffset);
-            }}
+            onScrollTo={handleScrollbarScrollTo}
+            onAnnotationSelect={handleScrollbarAnnotationSelect}
           />
         )}
       </div>

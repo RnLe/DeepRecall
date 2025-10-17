@@ -14,6 +14,8 @@ if (typeof window !== "undefined") {
     pdfjsLib = lib;
     // Configure worker - critical for performance
     lib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
+    // Expose library globally so pdfjs-dist/web helpers can access it
+    (globalThis as any).pdfjsLib = lib;
   });
 }
 

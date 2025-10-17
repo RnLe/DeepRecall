@@ -14,4 +14,68 @@
   .pdf-container::-webkit-scrollbar {
     display: none;
   }
+
+  /* PDF.js Text Layer Styles */
+  .pdf-text-layer {
+    position: absolute;
+    text-align: initial;
+    inset: 0;
+    overflow: hidden;
+    opacity: 1;
+    line-height: 1;
+    -webkit-text-size-adjust: none;
+    -moz-text-size-adjust: none;
+    text-size-adjust: none;
+    forced-color-adjust: none;
+    transform-origin: 0 0;
+    caret-color: CanvasText;
+    pointer-events: auto;
+
+    /* CSS variables for font scaling - computed by PDFTextLayer */
+    --scale-factor: 1;
+    --user-unit: 1;
+    --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  }
+
+  .pdf-text-layer :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text !important;
+    transform-origin: 0% 0%;
+    pointer-events: auto !important; /* Enable selection on text */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+
+  /* Selection styling */
+  .pdf-text-layer ::selection {
+    background: rgba(0, 128, 255, 0.3);
+    color: transparent;
+  }
+
+  .pdf-text-layer ::-moz-selection {
+    background: rgba(0, 128, 255, 0.3);
+    color: transparent;
+  }
+
+  /* PDF Annotation Layer (Links) */
+  .pdf-annotation-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none; /* allow underlying text selection except on links */
+  }
+
+  .pdf-link {
+    position: absolute;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    background-color: transparent;
+    border: none;
+    transition: background-color 0.2s;
+  }
+
+  .pdf-link:hover {
+    background-color: rgba(100, 150, 255, 0.15) !important;
+  }
 }

@@ -146,7 +146,7 @@ export function AnnotationOverlay({
       style={{
         width: pageWidth,
         height: pageHeight,
-        zIndex: 10,
+        zIndex: 40,
       }}
     >
       {/* Anchored context menu */}
