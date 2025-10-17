@@ -7,9 +7,37 @@
 
 import { Fragment, useEffect, useState } from "react";
 import type { Annotation, NormalizedRect } from "@/src/schema/annotation";
+import type { AnnotationTool } from "@/src/stores/annotation-ui";
 import { useAnnotationUI } from "@/src/stores/annotation-ui";
 import { useReaderUI } from "@/src/stores/reader-ui";
 import { AnnotationContextMenu } from "./AnnotationContextMenu";
+import {
+  Save,
+  X,
+  FunctionSquare,
+  Table2,
+  Image,
+  BookOpen,
+  Lightbulb,
+  CheckSquare,
+  Shield,
+  Beaker,
+  StickyNote,
+  HelpCircle,
+} from "lucide-react";
+
+const ANNOTATION_KINDS: Record<string, any> = {
+  Equation: FunctionSquare,
+  Table: Table2,
+  Figure: Image,
+  Abstract: BookOpen,
+  Definition: Lightbulb,
+  Theorem: CheckSquare,
+  Proof: Shield,
+  Example: Beaker,
+  Note: StickyNote,
+  Question: HelpCircle,
+};
 
 interface AnnotationOverlayProps {
   /** PDF document SHA-256 hash */
@@ -22,8 +50,14 @@ interface AnnotationOverlayProps {
   pageHeight: number;
   /** Saved annotations for this page */
   annotations: Annotation[];
+  /** Current annotation tool */
+  tool: AnnotationTool;
   /** Callback when annotation is clicked */
   onAnnotationClick?: (annotation: Annotation) => void;
+  /** Callback to save in-progress annotation */
+  onSave?: () => void;
+  /** Callback to cancel in-progress annotation */
+  onCancel?: () => void;
 }
 
 export function AnnotationOverlay({
@@ -32,10 +66,17 @@ export function AnnotationOverlay({
   pageWidth,
   pageHeight,
   annotations,
+  tool,
   onAnnotationClick,
+  onSave,
+  onCancel,
 }: AnnotationOverlayProps) {
-  const { selection, selectedAnnotationId, setSelectedAnnotationId } =
-    useAnnotationUI();
+  const {
+    selection,
+    selectedAnnotationId,
+    setSelectedAnnotationId,
+    isDrawing,
+  } = useAnnotationUI();
   const { rightSidebarOpen, toggleRightSidebar } = useReaderUI();
   const [mounted, setMounted] = useState(false);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(
@@ -223,6 +264,52 @@ export function AnnotationOverlay({
                     />
                   );
                 })}
+                {/* Kind icon badge at top-right corner */}
+                {annotation.metadata?.kind &&
+                  annotation.data.rects[0] &&
+                  (() => {
+                    const firstRect = denormalize(annotation.data.rects[0]);
+                    const KindIcon = ANNOTATION_KINDS[annotation.metadata.kind];
+                    if (!KindIcon) return null;
+
+                    const iconSize = 28;
+                    const iconX = firstRect.x + firstRect.width - iconSize / 2;
+                    const iconY = firstRect.y - iconSize / 2;
+
+                    return (
+                      <g
+                        key="kind-icon"
+                        transform={`translate(${iconX}, ${iconY})`}
+                      >
+                        <circle
+                          cx={iconSize / 2}
+                          cy={iconSize / 2}
+                          r={iconSize / 2}
+                          fill="#ffffff"
+                          stroke={color}
+                          strokeWidth={2.5}
+                        />
+                        <foreignObject
+                          x={4}
+                          y={4}
+                          width={iconSize - 8}
+                          height={iconSize - 8}
+                          style={{ pointerEvents: "none" }}
+                        >
+                          <div className="flex items-center justify-center w-full h-full">
+                            <KindIcon
+                              style={{
+                                width: 16,
+                                height: 16,
+                                color: "#000000",
+                                strokeWidth: 2,
+                              }}
+                            />
+                          </div>
+                        </foreignObject>
+                      </g>
+                    );
+                  })()}
               </g>
             </Fragment>
           );
@@ -244,9 +331,9 @@ export function AnnotationOverlay({
                         width={width}
                         height={height}
                         fill={color}
-                        fillOpacity={isSelected ? 0.4 : 0.3}
+                        fillOpacity={isSelected ? 0.25 : 0.2}
                         stroke="none"
-                        className="transition-all hover:fill-opacity-50"
+                        className="transition-all hover:fill-opacity-30"
                         onMouseEnter={() =>
                           setHoveredAnnotationId(annotation.id)
                         }
@@ -316,7 +403,7 @@ export function AnnotationOverlay({
                   width={width}
                   height={height}
                   fill={selection.color}
-                  fillOpacity={0.4}
+                  fillOpacity={0.2}
                   stroke="none"
                   className="pointer-events-none"
                 />
@@ -325,6 +412,127 @@ export function AnnotationOverlay({
           )}
         </>
       )}
+
+      {/* Anchored Save/Cancel buttons for completed selections */}
+      {selection.page === page &&
+        !isDrawing &&
+        (tool === "rectangle" ||
+          tool === "highlight" ||
+          tool === "kind-rectangle") &&
+        (selection.rectangles.length > 0 || selection.textRanges.length > 0) &&
+        onSave &&
+        onCancel && (
+          <>
+            {(() => {
+              // Calculate position for buttons (top-left of first selection)
+              let buttonX = 0;
+              let buttonY = 0;
+
+              if (selection.rectangles.length > 0) {
+                const rect = denormalize(selection.rectangles[0]);
+                buttonX = rect.x;
+                buttonY = rect.y;
+              } else if (
+                selection.textRanges.length > 0 &&
+                selection.textRanges[0].rects.length > 0
+              ) {
+                const rect = denormalize(selection.textRanges[0].rects[0]);
+                buttonX = rect.x;
+                buttonY = rect.y;
+              }
+
+              return (
+                <g transform={`translate(${buttonX}, ${buttonY - 36})`}>
+                  {/* Save button */}
+                  <g
+                    className="cursor-pointer transition-all hover:brightness-110"
+                    style={{ pointerEvents: "all" }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onSave?.();
+                    }}
+                  >
+                    <rect
+                      x={0}
+                      y={0}
+                      width={70}
+                      height={28}
+                      rx={4}
+                      fill="#9333ea"
+                      style={{ pointerEvents: "all" }}
+                    />
+                    {/* Save icon (check mark) */}
+                    <path
+                      d="M16 7l-6 6-3-3"
+                      stroke="white"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                    <text
+                      x={28}
+                      y={18}
+                      fill="white"
+                      fontSize={12}
+                      fontWeight="500"
+                    >
+                      Save
+                    </text>
+                  </g>
+
+                  {/* Cancel button */}
+                  <g
+                    className="cursor-pointer transition-all hover:brightness-110"
+                    style={{ pointerEvents: "all" }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onCancel?.();
+                    }}
+                    transform="translate(78, 0)"
+                  >
+                    <rect
+                      x={0}
+                      y={0}
+                      width={70}
+                      height={28}
+                      rx={4}
+                      fill="#374151"
+                      style={{ pointerEvents: "all" }}
+                    />
+                    {/* Cancel icon (X) */}
+                    <path
+                      d="M15 9L21 15M21 9L15 15"
+                      stroke="#d1d5db"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <text
+                      x={28}
+                      y={18}
+                      fill="#d1d5db"
+                      fontSize={12}
+                      fontWeight="500"
+                    >
+                      Cancel
+                    </text>
+                  </g>
+                </g>
+              );
+            })()}
+          </>
+        )}
     </svg>
   );
 }

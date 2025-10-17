@@ -29,7 +29,7 @@ export function AnnotationHandlers({
   containerRef,
   children,
 }: AnnotationHandlersProps) {
-  const { tool, selection, setSelection } = useAnnotationUI();
+  const { tool, selection, setSelection, setIsDrawing } = useAnnotationUI();
   const pageRef = useRef<HTMLDivElement>(null);
   const drawingRef = useRef<{
     startX: number;
@@ -58,14 +58,15 @@ export function AnnotationHandlers({
     (e: React.MouseEvent) => {
       if (tool === "pan") return;
 
-      // Only handle rectangle tool with mouse (highlight uses text selection)
-      if (tool !== "rectangle") return;
+      // Only handle rectangle tools with mouse (highlight uses text selection)
+      if (tool !== "rectangle" && tool !== "kind-rectangle") return;
 
       e.preventDefault();
       e.stopPropagation();
 
       const { x, y } = normalizePoint(e.clientX, e.clientY);
       drawingRef.current = { startX: x, startY: y, isDrawing: true };
+      setIsDrawing(true);
 
       // Initialize selection if needed
       if (selection.page !== page) {
@@ -81,7 +82,11 @@ export function AnnotationHandlers({
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!drawingRef.current?.isDrawing || tool !== "rectangle") return;
+      if (
+        !drawingRef.current?.isDrawing ||
+        (tool !== "rectangle" && tool !== "kind-rectangle")
+      )
+        return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -111,7 +116,11 @@ export function AnnotationHandlers({
 
   const handleMouseUp = useCallback(
     (e: React.MouseEvent) => {
-      if (!drawingRef.current?.isDrawing || tool !== "rectangle") return;
+      if (
+        !drawingRef.current?.isDrawing ||
+        (tool !== "rectangle" && tool !== "kind-rectangle")
+      )
+        return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -143,8 +152,16 @@ export function AnnotationHandlers({
       }
 
       drawingRef.current = null;
+      setIsDrawing(false);
     },
-    [tool, page, selection.rectangles, normalizePoint, setSelection]
+    [
+      tool,
+      page,
+      selection.rectangles,
+      normalizePoint,
+      setSelection,
+      setIsDrawing,
+    ]
   );
 
   const handleTextSelection = useCallback(() => {
@@ -204,15 +221,19 @@ export function AnnotationHandlers({
     );
   }
 
-  // Rectangle mode: capture all mouse events
+  // Rectangle or kind-rectangle mode: capture all mouse events
+  // Text layer handles its own cursor and pointer events based on tool
   return (
     <div
       ref={pageRef}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      className="relative cursor-crosshair"
-      style={{ userSelect: "none" }}
+      className="relative"
+      style={{
+        cursor: "crosshair",
+        userSelect: "none",
+      }}
     >
       {children}
     </div>

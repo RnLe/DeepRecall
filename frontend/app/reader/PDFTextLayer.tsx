@@ -12,13 +12,20 @@ interface PDFTextLayerProps {
   page: PDFPageProxy;
   scale: number;
   viewport: any;
+  /** Current annotation tool - used to disable text selection during rectangle drawing */
+  tool?: "pan" | "rectangle" | "highlight" | "note" | "kind-rectangle";
 }
 
 /**
  * Renders text layer and annotation layer (links) over the PDF canvas
  * Uses PDF.js renderTextLayer for production-ready text selection
  */
-export function PDFTextLayer({ page, scale, viewport }: PDFTextLayerProps) {
+export function PDFTextLayer({
+  page,
+  scale,
+  viewport,
+  tool,
+}: PDFTextLayerProps) {
   const textContainerRef = useRef<HTMLDivElement>(null);
   const annotationContainerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
@@ -58,8 +65,6 @@ export function PDFTextLayer({ page, scale, viewport }: PDFTextLayerProps) {
 
         const textLayerDiv: HTMLDivElement = textLayerBuilder.div;
         textLayerDiv.classList.add("pdf-text-layer");
-        textLayerDiv.style.pointerEvents = "auto";
-        textLayerDiv.style.userSelect = "text";
         textLayerDiv.style.zIndex = "5";
 
         // Set CSS variables for accurate font scaling (PDF.js expects these)
@@ -150,7 +155,6 @@ export function PDFTextLayer({ page, scale, viewport }: PDFTextLayerProps) {
         style={{
           opacity: isReady ? 1 : 0,
           lineHeight: 1,
-          pointerEvents: "auto",
           zIndex: 5,
         }}
       />

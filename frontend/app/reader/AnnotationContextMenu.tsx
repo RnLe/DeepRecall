@@ -13,6 +13,16 @@ import {
   Type,
   Palette,
   Tag as TagIcon,
+  FunctionSquare,
+  Table2,
+  Image,
+  BookOpen,
+  Lightbulb,
+  CheckSquare,
+  Shield,
+  Beaker,
+  StickyNote,
+  HelpCircle,
 } from "lucide-react";
 import type { Annotation } from "@/src/schema/annotation";
 import * as annotationRepo from "@/src/repo/annotations";
@@ -27,16 +37,16 @@ const ANNOTATION_COLORS = [
 ];
 
 const ANNOTATION_KINDS = [
-  "Equation",
-  "Table",
-  "Figure",
-  "Abstract",
-  "Definition",
-  "Theorem",
-  "Proof",
-  "Example",
-  "Note",
-  "Question",
+  { name: "Equation", icon: FunctionSquare },
+  { name: "Table", icon: Table2 },
+  { name: "Figure", icon: Image },
+  { name: "Abstract", icon: BookOpen },
+  { name: "Definition", icon: Lightbulb },
+  { name: "Theorem", icon: CheckSquare },
+  { name: "Proof", icon: Shield },
+  { name: "Example", icon: Beaker },
+  { name: "Note", icon: StickyNote },
+  { name: "Question", icon: HelpCircle },
 ];
 
 interface AnnotationContextMenuProps {
@@ -67,8 +77,6 @@ export function AnnotationContextMenu({
   const isOpen = isAnchored ? !!open : internalOpen;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const [showKindPicker, setShowKindPicker] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(
     annotation.metadata?.title || ""
@@ -95,8 +103,6 @@ export function AnnotationContextMenu({
           setInternalOpen(false);
         }
         setShowDeleteConfirm(false);
-        setShowColorPicker(false);
-        setShowKindPicker(false);
         setEditingTitle(false);
       }
     };
@@ -108,8 +114,6 @@ export function AnnotationContextMenu({
           setInternalOpen(false);
         }
         setShowDeleteConfirm(false);
-        setShowColorPicker(false);
-        setShowKindPicker(false);
         setEditingTitle(false);
       }
     };
@@ -146,7 +150,6 @@ export function AnnotationContextMenu({
           kind: kind || undefined,
         },
       });
-      setShowKindPicker(false);
       onUpdate?.();
     } catch (error) {
       console.error("Failed to update kind:", error);
@@ -162,7 +165,6 @@ export function AnnotationContextMenu({
           color,
         },
       });
-      setShowColorPicker(false);
       onUpdate?.();
     } catch (error) {
       console.error("Failed to update color:", error);
@@ -200,18 +202,6 @@ export function AnnotationContextMenu({
     <div
       className="w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-lg shadow-black/50 py-1 z-50"
       ref={menuRef}
-      onMouseLeave={
-        isAnchored
-          ? () => {
-              // Close when user moves cursor away (anchored only)
-              onRequestClose?.();
-              setShowDeleteConfirm(false);
-              setShowColorPicker(false);
-              setShowKindPicker(false);
-              setEditingTitle(false);
-            }
-          : undefined
-      }
       onClick={(e) => e.stopPropagation()}
     >
       {/* Title */}
@@ -254,79 +244,64 @@ export function AnnotationContextMenu({
 
       {/* Kind */}
       <div className="px-3 py-2">
+        <div className="flex items-center gap-2 mb-2">
+          <TagIcon className="w-3.5 h-3.5 text-gray-400" />
+          <span className="text-xs font-medium text-gray-400">Kind</span>
+        </div>
+        {/* None button */}
         <button
-          onClick={() => setShowKindPicker(!showKindPicker)}
-          className="w-full flex items-center justify-between text-xs text-gray-300 hover:text-gray-100 transition-colors"
+          onClick={() => handleUpdateKind("")}
+          className="w-full px-2 py-1 mb-2 text-xs text-left text-gray-500 hover:bg-gray-700 rounded transition-colors"
+          title="Remove kind"
         >
-          <div className="flex items-center gap-2">
-            <TagIcon className="w-3.5 h-3.5 text-gray-400" />
-            <span className="font-medium text-gray-400">Kind</span>
-          </div>
-          <span className="text-gray-400">
-            {annotation.metadata?.kind || "None"}
-          </span>
+          None
         </button>
-        {showKindPicker && (
-          <div className="mt-2 max-h-48 overflow-y-auto bg-gray-900 border border-gray-600 rounded p-1">
-            <button
-              onClick={() => handleUpdateKind("")}
-              className="w-full px-2 py-1 text-xs text-left text-gray-500 hover:bg-gray-700 rounded transition-colors"
-            >
-              None
-            </button>
-            {ANNOTATION_KINDS.map((kind) => (
+        {/* 2x5 grid of icon buttons - always visible */}
+        <div className="grid grid-cols-5 gap-1">
+          {ANNOTATION_KINDS.map((kind) => {
+            const IconComponent = kind.icon;
+            return (
               <button
-                key={kind}
-                onClick={() => handleUpdateKind(kind)}
-                className={`w-full px-2 py-1 text-xs text-left hover:bg-gray-700 rounded transition-colors ${
-                  annotation.metadata?.kind === kind
-                    ? "bg-gray-700 text-purple-300"
-                    : "text-gray-300"
+                key={kind.name}
+                onClick={() => handleUpdateKind(kind.name)}
+                className={`flex items-center justify-center w-8 h-8 rounded transition-colors hover:bg-gray-700 ${
+                  annotation.metadata?.kind === kind.name
+                    ? "bg-purple-500/20 text-purple-300"
+                    : "text-gray-400"
                 }`}
+                title={kind.name}
               >
-                {kind}
+                <IconComponent className="w-4 h-4" />
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
 
       <div className="h-px bg-gray-700/50 my-1" />
 
       {/* Color */}
       <div className="px-3 py-2">
-        <button
-          onClick={() => setShowColorPicker(!showColorPicker)}
-          className="w-full flex items-center justify-between text-xs text-gray-300 hover:text-gray-100 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Palette className="w-3.5 h-3.5 text-gray-400" />
-            <span className="font-medium text-gray-400">Color</span>
-          </div>
-          <div
-            className="w-4 h-4 rounded border border-gray-600"
-            style={{
-              backgroundColor: annotation.metadata?.color || "#fbbf24",
-            }}
-          />
-        </button>
-        {showColorPicker && (
-          <div className="mt-2 grid grid-cols-3 gap-2 p-2 bg-gray-900 border border-gray-600 rounded">
-            {ANNOTATION_COLORS.map((color) => (
-              <button
-                key={color.value}
-                onClick={() => handleUpdateColor(color.value)}
-                className={`w-8 h-8 rounded transition-transform hover:scale-110 ${
-                  annotation.metadata?.color === color.value
-                    ? "ring-2 ring-white scale-110"
-                    : ""
-                }`}
-                style={{ backgroundColor: color.value }}
-                title={color.name}
-              />
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-2 mb-2">
+          <Palette className="w-3.5 h-3.5 text-gray-400" />
+          <span className="text-xs font-medium text-gray-400">Color</span>
+        </div>
+        {/* Single row of color buttons - always visible */}
+        <div className="flex items-center justify-between">
+          {ANNOTATION_COLORS.map((color) => (
+            <button
+              key={color.value}
+              onClick={() => handleUpdateColor(color.value)}
+              className={`w-4 h-4 rounded transition-all hover:scale-110 ${
+                annotation.metadata?.color === color.value
+                  ? "ring-2 ring-white scale-110"
+                  : ""
+              }`}
+              style={{ backgroundColor: color.value }}
+              title={color.name}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="h-px bg-gray-700/50 my-1" />
@@ -358,13 +333,37 @@ export function AnnotationContextMenu({
 
   if (isAnchored) {
     if (!isOpen || !anchor) return null;
+
+    // Calculate position to keep menu within viewport
+    const menuWidth = 224; // w-56 = 14rem = 224px
+    const menuHeight = 400; // Approximate height
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let left = anchor.x;
+    let top = anchor.y;
+
+    // Adjust horizontal position if too close to right edge
+    if (left + menuWidth > viewportWidth) {
+      left = viewportWidth - menuWidth - 8;
+    }
+
+    // Adjust vertical position if too close to bottom edge
+    if (top + menuHeight > viewportHeight) {
+      top = viewportHeight - menuHeight - 8;
+    }
+
+    // Ensure minimum margins
+    left = Math.max(8, left);
+    top = Math.max(8, top);
+
     // Render anchored dropdown in a portal at fixed coordinates
     return createPortal(
       <div
         style={{
           position: "fixed",
-          left: anchor.x,
-          top: anchor.y,
+          left,
+          top,
           zIndex: 1000,
         }}
       >
@@ -383,8 +382,6 @@ export function AnnotationContextMenu({
           e.stopPropagation();
           setInternalOpen(!internalOpen);
           setShowDeleteConfirm(false);
-          setShowColorPicker(false);
-          setShowKindPicker(false);
           setEditingTitle(false);
         }}
         className={`p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 rounded transition-colors ${triggerClassName}`}

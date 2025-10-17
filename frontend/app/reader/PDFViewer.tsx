@@ -237,7 +237,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
 
   // Save annotation
   const handleSaveAnnotation = useCallback(async () => {
-    const { selection } = annotationUI;
+    const { selection, selectedKind, tool } = annotationUI;
     if (!hasActiveSelection(annotationUI)) return;
     if (selection.page === null) return;
 
@@ -253,6 +253,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
           },
           metadata: {
             color: selection.color,
+            kind: tool === "kind-rectangle" ? selectedKind : undefined,
             title: selection.title || undefined,
             notes: selection.notes || undefined,
             tags: selection.tags.length > 0 ? selection.tags : undefined,
@@ -289,6 +290,9 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
 
       // Clear selection
       annotationUI.clearSelection();
+
+      // Switch to pan tool after saving
+      annotationUI.setTool("pan");
     } catch (error) {
       console.error("Failed to save annotation:", error);
     }
@@ -297,15 +301,31 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
   // Cancel annotation
   const handleCancelAnnotation = useCallback(() => {
     annotationUI.clearSelection();
+    // Also deselect tool when canceling
+    if (annotationUI.tool !== "pan") {
+      annotationUI.setTool("pan");
+    }
   }, [annotationUI]);
 
   // Handle annotation click
   const handleAnnotationClick = useCallback(
     (annotation: Annotation) => {
-      // Always select the annotation (don't toggle off)
-      annotationUI.setSelectedAnnotationId(annotation.id);
+      const currentlySelected = annotationUI.selectedAnnotationId;
+
+      // If sidebar is open and this annotation is already selected, keep it selected
+      if (rightSidebarOpen && currentlySelected === annotation.id) {
+        return; // Don't deselect when sidebar is open
+      }
+
+      // If sidebar is closed, toggle: deselect if already selected
+      if (!rightSidebarOpen && currentlySelected === annotation.id) {
+        annotationUI.setSelectedAnnotationId(null);
+      } else {
+        // Select the annotation
+        annotationUI.setSelectedAnnotationId(annotation.id);
+      }
     },
-    [annotationUI]
+    [annotationUI, rightSidebarOpen]
   );
 
   // Scrollbar callbacks (must be defined at top level, not in JSX)
@@ -615,7 +635,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
                   }}
                   onClick={(e) => {
                     // Priority 1: Close context menu if open
-                    // Priority 2: Close right sidebar if clicking on page (not annotation)
+                    // Priority 2: Deselect annotation if clicking outside annotations and links
                     const hasOpenMenu = (AnnotationOverlay as any)._hasOpenMenu;
 
                     if (hasOpenMenu) {
@@ -623,12 +643,27 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
                       return;
                     }
 
-                    // Check if click target is the page wrapper or PDF canvas
+                    const target = e.target as HTMLElement;
+
+                    // Don't deselect if clicking on a link
                     if (
-                      e.target === e.currentTarget ||
-                      (e.target as HTMLElement).tagName === "CANVAS"
+                      target.classList.contains("pdf-link") ||
+                      target.closest(".pdf-link")
                     ) {
-                      // Always unselect annotation
+                      return;
+                    }
+
+                    // Check if click is on page background (not on annotation, link, or interactive element)
+                    const isBackground =
+                      target === e.currentTarget ||
+                      target.tagName === "CANVAS" ||
+                      target.classList.contains("pdf-text-layer") ||
+                      target.classList.contains("pdf-annotation-layer") ||
+                      target.closest(".pdf-text-layer") !== null ||
+                      target.closest(".pdf-annotation-layer") !== null;
+
+                    if (isBackground) {
+                      // Deselect annotation when clicking page background
                       annotationUI.setSelectedAnnotationId(null);
                       // Close sidebar if it's open
                       if (rightSidebarOpen) {
@@ -650,6 +685,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
                         scale={viewport.scale}
                         docId={sha256}
                         onLoad={(w, h) => handlePageLoad(pageNumber, w, h)}
+                        tool={annotationUI.tool}
                       />
 
                       {/* Annotation overlay */}
@@ -660,7 +696,10 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
                           annotations={annotations}
                           pageWidth={pageWidth}
                           pageHeight={pageHeight}
+                          tool={annotationUI.tool}
                           onAnnotationClick={handleAnnotationClick}
+                          onSave={handleSaveAnnotation}
+                          onCancel={handleCancelAnnotation}
                         />
                       )}
                     </div>

@@ -15,7 +15,27 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { X, Tag, Type, FileText, Trash2, Eye, Pen } from "lucide-react";
+import {
+  X,
+  Tag,
+  Type,
+  FileText,
+  Trash2,
+  Eye,
+  Pen,
+  Copy,
+  Check,
+  FunctionSquare,
+  Table2,
+  Image,
+  BookOpen,
+  Lightbulb,
+  CheckSquare,
+  Shield,
+  Beaker,
+  StickyNote,
+  HelpCircle,
+} from "lucide-react";
 
 const ANNOTATION_COLORS = [
   { name: "Amber", value: "#fbbf24" },
@@ -27,16 +47,16 @@ const ANNOTATION_COLORS = [
 ];
 
 const ANNOTATION_KINDS = [
-  "Equation",
-  "Table",
-  "Figure",
-  "Abstract",
-  "Definition",
-  "Theorem",
-  "Proof",
-  "Example",
-  "Note",
-  "Question",
+  { name: "Equation", icon: FunctionSquare },
+  { name: "Table", icon: Table2 },
+  { name: "Figure", icon: Image },
+  { name: "Abstract", icon: BookOpen },
+  { name: "Definition", icon: Lightbulb },
+  { name: "Theorem", icon: CheckSquare },
+  { name: "Proof", icon: Shield },
+  { name: "Example", icon: Beaker },
+  { name: "Note", icon: StickyNote },
+  { name: "Question", icon: HelpCircle },
 ];
 
 interface AnnotationEditorProps {
@@ -67,6 +87,8 @@ export function AnnotationEditor({
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [isMarkdownPreview, setIsMarkdownPreview] = useState(true);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
 
   // Load annotation when selected
   useEffect(() => {
@@ -124,11 +146,18 @@ export function AnnotationEditor({
 
   const handleDelete = async () => {
     if (!annotation) return;
-    if (!confirm("Delete this annotation?")) return;
+
+    if (!deleteConfirmation) {
+      setDeleteConfirmation(true);
+      // Reset confirmation after 3 seconds
+      setTimeout(() => setDeleteConfirmation(false), 3000);
+      return;
+    }
 
     try {
       await annotationRepo.deleteAnnotation(annotation.id);
       setSelectedAnnotationId(null);
+      setDeleteConfirmation(false);
       onAnnotationDeleted?.();
     } catch (error) {
       console.error("Failed to delete annotation:", error);
@@ -152,6 +181,18 @@ export function AnnotationEditor({
     const newTags = tags.filter((t) => t !== tag);
     setTags(newTags);
     handleUpdate({ tags: newTags });
+  };
+
+  const handleCopyText = async () => {
+    if (!annotation || annotation.data.type !== "highlight") return;
+    const text = annotation.data.ranges.map((r) => r.text).join(" ");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy text:", error);
+    }
   };
 
   if (!selectedAnnotationId) {
@@ -180,27 +221,61 @@ export function AnnotationEditor({
         <h3 className="text-sm font-semibold text-gray-200">
           Annotation Details
         </h3>
-        <button
-          onClick={() => {
-            setSelectedAnnotationId(null);
-            toggleRightSidebar();
-          }}
-          className="p-1 hover:bg-gray-800 rounded text-gray-400 hover:text-gray-200 transition-colors"
-          title="Close"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleDelete}
+            className="p-1 hover:bg-gray-800 rounded transition-colors group relative"
+            title={
+              deleteConfirmation
+                ? "Click again to confirm"
+                : "Delete annotation"
+            }
+          >
+            <Trash2
+              className={`w-4 h-4 ${
+                deleteConfirmation
+                  ? "text-red-400"
+                  : "text-gray-400 group-hover:text-red-400"
+              } transition-colors`}
+            />
+            {deleteConfirmation && (
+              <span className="absolute right-full mr-2 top-1/2 -translate-y-1/2 whitespace-nowrap px-2 py-1 bg-red-600 text-white text-xs rounded shadow-lg">
+                Click again to confirm
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setSelectedAnnotationId(null);
+              toggleRightSidebar();
+            }}
+            className="p-1 hover:bg-gray-800 rounded text-gray-400 hover:text-gray-200 transition-colors"
+            title="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Type Badge */}
+        {/* Type Badge and Timestamps */}
         <div className="flex items-center gap-2">
-          <Type className="w-4 h-4 text-gray-400" />
-          <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs font-medium text-gray-300 capitalize">
-            {annotation.data.type}
-          </span>
           <span className="text-xs text-gray-500">Page {annotation.page}</span>
+          <span className="text-xs text-gray-500">•</span>
+          <span
+            className="text-xs text-gray-500"
+            title={formatDate(annotation.createdAt)}
+          >
+            Created: {getRelativeTime(annotation.createdAt)}
+          </span>
+          <span className="text-xs text-gray-500">•</span>
+          <span
+            className="text-xs text-gray-500"
+            title={formatDate(annotation.updatedAt)}
+          >
+            Updated: {getRelativeTime(annotation.updatedAt)}
+          </span>
         </div>
 
         {/* Title */}
@@ -220,37 +295,39 @@ export function AnnotationEditor({
 
         {/* Kind */}
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1">
+          <label className="block text-xs font-medium text-gray-400 mb-2">
             Kind
           </label>
-          <div className="relative">
-            <input
-              type="text"
-              list="annotation-kinds"
-              value={kind}
-              onChange={(e) => setKind(e.target.value)}
-              onBlur={() => handleUpdate({ kind: kind || undefined })}
-              placeholder="e.g., Equation, Table, Figure..."
-              className="w-full px-3 py-2 pr-8 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-            />
-            {kind && (
-              <button
-                onClick={() => {
-                  setKind("");
-                  handleUpdate({ kind: undefined });
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-gray-200 transition-colors"
-                title="Clear"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
+          <div className="grid grid-cols-5 gap-1">
+            {ANNOTATION_KINDS.map((k) => {
+              const Icon = k.icon;
+              const isSelected = kind === k.name;
+              return (
+                <button
+                  key={k.name}
+                  onClick={() => {
+                    const newKind = isSelected ? "" : k.name;
+                    setKind(newKind);
+                    handleUpdate({ kind: newKind || undefined });
+                  }}
+                  className={`flex flex-col items-center justify-center gap-1 aspect-square p-2 rounded transition-all ${
+                    isSelected
+                      ? "text-white"
+                      : "text-gray-400 hover:bg-gray-700"
+                  }`}
+                  style={
+                    isSelected ? { backgroundColor: `${color}40` } : undefined
+                  }
+                  title={k.name}
+                >
+                  <Icon className="w-6 h-6" />
+                  <span className="text-[11px] leading-tight text-center">
+                    {k.name}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <datalist id="annotation-kinds">
-            {ANNOTATION_KINDS.map((k) => (
-              <option key={k} value={k} />
-            ))}
-          </datalist>
         </div>
 
         {/* Color */}
@@ -258,7 +335,7 @@ export function AnnotationEditor({
           <label className="block text-xs font-medium text-gray-400 mb-2">
             Color
           </label>
-          <div className="grid grid-cols-6 gap-2">
+          <div className="flex items-center justify-between">
             {ANNOTATION_COLORS.map((c) => (
               <button
                 key={c.value}
@@ -266,10 +343,8 @@ export function AnnotationEditor({
                   setColor(c.value);
                   handleUpdate({ color: c.value });
                 }}
-                className={`w-8 h-8 rounded border-2 transition-transform hover:scale-110 ${
-                  color === c.value
-                    ? "border-white scale-110"
-                    : "border-gray-700"
+                className={`w-7 h-7 rounded transition-all hover:brightness-110 ${
+                  color === c.value ? "ring-2 ring-white shadow-lg" : ""
                 }`}
                 style={{ backgroundColor: c.value }}
                 title={c.name}
@@ -305,7 +380,9 @@ export function AnnotationEditor({
                   textareaRef.current?.focus();
                 }, 0);
               }}
-              className="w-full min-h-[12rem] px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 cursor-text prose prose-invert prose-sm prose-headings:text-gray-100 prose-p:text-gray-200 prose-a:text-purple-400 prose-strong:text-gray-100 prose-code:text-purple-300 max-w-none overflow-auto"
+              className={`w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 cursor-text prose prose-invert prose-sm prose-headings:text-gray-100 prose-p:text-gray-200 prose-a:text-purple-400 prose-strong:text-gray-100 prose-code:text-purple-300 max-w-none overflow-auto ${
+                notes ? "min-h-[8rem] max-h-[20rem]" : "min-h-[4rem]"
+              }`}
             >
               {notes ? (
                 <ReactMarkdown
@@ -329,8 +406,8 @@ export function AnnotationEditor({
               }}
               onFocus={() => setIsMarkdownPreview(false)}
               placeholder="Add notes in markdown..."
-              rows={8}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent resize-none font-mono"
+              rows={5}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent resize-y font-mono min-h-[6rem]"
             />
           )}
         </div>
@@ -383,39 +460,27 @@ export function AnnotationEditor({
         {/* Highlight Text (if applicable) */}
         {annotation.data.type === "highlight" && (
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">
-              Selected Text
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-400">
+                Selected Text
+              </label>
+              <button
+                onClick={handleCopyText}
+                className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-gray-200 transition-colors"
+                title="Copy to clipboard"
+              >
+                {copiedText ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+            </div>
             <div className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-300 italic">
               {annotation.data.ranges.map((r) => r.text).join(" ")}
             </div>
           </div>
         )}
-
-        {/* Metadata */}
-        <div className="pt-4 border-t border-gray-800">
-          <div className="text-[10px] text-gray-500 space-y-0.5">
-            <div>
-              Created {formatDate(annotation.createdAt)} •{" "}
-              {getRelativeTime(annotation.createdAt)}
-            </div>
-            <div>
-              Updated {formatDate(annotation.updatedAt)} •{" "}
-              {getRelativeTime(annotation.updatedAt)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer - Delete */}
-      <div className="p-4 border-t border-gray-700">
-        <button
-          onClick={handleDelete}
-          className="w-full px-3 py-2 bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 rounded text-sm text-red-400 transition-colors flex items-center justify-center gap-2"
-        >
-          <Trash2 className="w-4 h-4" />
-          Delete Annotation
-        </button>
       </div>
     </div>
   );

@@ -14,7 +14,12 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import type { NormalizedRect } from "../schema/annotation";
 
-export type AnnotationTool = "pan" | "rectangle" | "highlight" | "note";
+export type AnnotationTool =
+  | "pan"
+  | "rectangle"
+  | "highlight"
+  | "note"
+  | "kind-rectangle";
 
 interface SelectionState {
   // Rectangle tool: in-progress rectangles
@@ -40,6 +45,14 @@ interface AnnotationUIState {
   // Active tool
   tool: AnnotationTool;
   setTool: (tool: AnnotationTool) => void;
+
+  // Drawing state (true while mouse is down during rectangle drawing)
+  isDrawing: boolean;
+  setIsDrawing: (isDrawing: boolean) => void;
+
+  // Selected kind for rectangle annotations
+  selectedKind: string;
+  setSelectedKind: (kind: string) => void;
 
   // Selection in progress
   selection: SelectionState;
@@ -75,6 +88,14 @@ export const useAnnotationUI = create<AnnotationUIState>()(
     // Tool state
     tool: "pan",
     setTool: (tool) => set({ tool }),
+
+    // Drawing state
+    isDrawing: false,
+    setIsDrawing: (isDrawing) => set({ isDrawing }),
+
+    // Selected kind
+    selectedKind: "Figure",
+    setSelectedKind: (kind) => set({ selectedKind: kind }),
 
     // Selection state
     selection: {

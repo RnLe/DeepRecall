@@ -19,6 +19,8 @@ export interface PDFPageProps {
   onLoad?: (width: number, height: number) => void;
   /** Enable text layer for selection (default: true) */
   enableTextLayer?: boolean;
+  /** Current annotation tool - passed to text layer to control interaction */
+  tool?: "pan" | "rectangle" | "highlight" | "note" | "kind-rectangle";
 }
 
 /**
@@ -28,11 +30,12 @@ export interface PDFPageProps {
 export function PDFPage({
   pdf,
   pageNumber,
-  scale = 1.5,
+  scale = 1,
   className = "",
   docId,
   onLoad,
   enableTextLayer = true,
+  tool,
 }: PDFPageProps) {
   const { canvas, isLoading, error, pageInfo } = usePDFPage(
     pdf,
@@ -98,7 +101,12 @@ export function PDFPage({
 
       {/* Text layer for selection */}
       {enableTextLayer && page && viewport && !isLoading && !error && (
-        <PDFTextLayer page={page} scale={scale} viewport={viewport} />
+        <PDFTextLayer
+          page={page}
+          scale={scale}
+          viewport={viewport}
+          tool={tool}
+        />
       )}
 
       {isLoading && (

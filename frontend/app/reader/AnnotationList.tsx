@@ -11,8 +11,35 @@ import { db } from "@/src/db/dexie";
 import { useAnnotationUI } from "@/src/stores/annotation-ui";
 import { useReaderUI } from "@/src/stores/reader-ui";
 import type { Annotation } from "@/src/schema/annotation";
-import { Square, Highlighter, FileQuestion } from "lucide-react";
+import {
+  Square,
+  Highlighter,
+  FileQuestion,
+  FunctionSquare,
+  Table2,
+  Image,
+  BookOpen,
+  Lightbulb,
+  CheckSquare,
+  Shield,
+  Beaker,
+  StickyNote,
+  HelpCircle,
+} from "lucide-react";
 import { AnnotationContextMenu } from "./AnnotationContextMenu";
+
+const ANNOTATION_KINDS: Record<string, any> = {
+  Equation: FunctionSquare,
+  Table: Table2,
+  Figure: Image,
+  Abstract: BookOpen,
+  Definition: Lightbulb,
+  Theorem: CheckSquare,
+  Proof: Shield,
+  Example: Beaker,
+  Note: StickyNote,
+  Question: HelpCircle,
+};
 
 interface AnnotationListProps {
   /** Current PDF SHA-256 */
@@ -158,23 +185,29 @@ export function AnnotationList({
                       <div
                         className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center"
                         style={{ backgroundColor: `${color}20`, color }}
+                        title={kind || undefined}
                       >
-                        {annotation.data.type === "rectangle" ? (
-                          <Square className="w-3.5 h-3.5" />
-                        ) : (
-                          <Highlighter className="w-3.5 h-3.5" />
-                        )}
+                        {(() => {
+                          // Show kind icon for rectangles with kind
+                          if (annotation.data.type === "rectangle" && kind) {
+                            const KindIcon = ANNOTATION_KINDS[kind];
+                            if (KindIcon) {
+                              return <KindIcon className="w-3.5 h-3.5" />;
+                            }
+                          }
+                          // Default icons
+                          return annotation.data.type === "rectangle" ? (
+                            <Square className="w-3.5 h-3.5" />
+                          ) : (
+                            <Highlighter className="w-3.5 h-3.5" />
+                          );
+                        })()}
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        {/* Title line with kind badge */}
+                        {/* Title line */}
                         <div className="flex items-center gap-1.5">
-                          {kind && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 bg-gray-700/50 border border-gray-600/50 rounded text-[9px] text-gray-400 font-medium flex-shrink-0">
-                              {kind}
-                            </span>
-                          )}
                           <span className="text-xs font-medium text-gray-200 truncate">
                             {annotation.metadata?.title || (
                               <span className="text-gray-500 italic">

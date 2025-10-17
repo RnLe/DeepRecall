@@ -150,11 +150,18 @@ function FileListItem({
   isOpen: boolean;
   onClick: () => void;
 }) {
+  const { setLeftSidebarView } = useReaderUI();
+
   // Load annotation count
   const annotationCount = useLiveQuery(
     () => countPDFAnnotations(asset.sha256),
     [asset.sha256]
   );
+
+  const handleDoubleClick = () => {
+    onClick(); // Open the file
+    setLeftSidebarView("annotations"); // Switch to annotations tab
+  };
 
   const title = work?.title || asset.filename || "Untitled";
   const isLinked = !!work;
@@ -167,6 +174,7 @@ function FileListItem({
   return (
     <button
       onClick={onClick}
+      onDoubleClick={handleDoubleClick}
       className={`
         w-full px-3 py-2 flex items-center gap-2.5 hover:bg-gray-800/70
         transition-colors text-left group

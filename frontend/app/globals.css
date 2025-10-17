@@ -48,14 +48,24 @@
     -webkit-user-select: text !important;
   }
 
-  /* Selection styling */
+  /* Selection styling - must be more specific */
+  .pdf-text-layer span::selection {
+    background: rgba(0, 128, 255, 0.25) !important;
+    color: transparent;
+  }
+
+  .pdf-text-layer span::-moz-selection {
+    background: rgba(0, 128, 255, 0.25) !important;
+    color: transparent;
+  }
+
   .pdf-text-layer ::selection {
-    background: rgba(0, 128, 255, 0.3);
+    background: rgba(0, 128, 255, 0.25) !important;
     color: transparent;
   }
 
   .pdf-text-layer ::-moz-selection {
-    background: rgba(0, 128, 255, 0.3);
+    background: rgba(0, 128, 255, 0.25) !important;
     color: transparent;
   }
 

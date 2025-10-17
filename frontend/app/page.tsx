@@ -13,7 +13,7 @@ export default function HomePage() {
               alt="DeepRecall Logo"
               width={80}
               height={80}
-              className="w-20 h-20"
+              className="w-30 h-30"
             />
             <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent pb-2">
               DeepRecall
@@ -57,7 +57,7 @@ export default function HomePage() {
           >
             <div className="flex flex-col items-center space-y-4">
               <Brain className="w-12 h-12 text-green-400 group-hover:scale-110 transition-transform" />
-              <h2 className="text-2xl font-semibold">Review</h2>
+              <h2 className="text-2xl font-semibold">Study</h2>
               <p className="text-gray-400 text-center">
                 Daily SRS review session
               </p>

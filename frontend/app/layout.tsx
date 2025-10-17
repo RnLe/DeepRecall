@@ -42,10 +42,10 @@ export default function RootLayout({
                     Reader
                   </Link>
                   <Link
-                    href="/review"
+                    href="/study"
                     className="text-gray-400 hover:text-gray-100 transition-colors"
                   >
-                    Review
+                    Study
                   </Link>
                   <Link
                     href="/admin"
