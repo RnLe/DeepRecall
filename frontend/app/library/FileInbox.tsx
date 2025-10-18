@@ -30,6 +30,20 @@ export function FileInbox() {
   const [isNewFilesCollapsed, setIsNewFilesCollapsed] = useState(false);
   const [isUnlinkedCollapsed, setIsUnlinkedCollapsed] = useState(false);
 
+  // Debug logging
+  console.log(
+    `[FileInbox] Render - newFiles:`,
+    newFiles?.length || 0,
+    "unlinkedAssets:",
+    unlinkedAssets?.length || 0
+  );
+
+  // Log when data changes
+  if (newFiles && newFiles.length > 0) {
+    console.log(`[FileInbox] ✅ Has ${newFiles.length} new files:`);
+    newFiles.forEach((f) => console.log(`  - ${f.filename}`));
+  }
+
   const hasNewFiles = newFiles && newFiles.length > 0;
   const hasUnlinkedAssets = unlinkedAssets && unlinkedAssets.length > 0;
 

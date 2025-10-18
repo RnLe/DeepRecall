@@ -50,7 +50,9 @@ export const BlobWithMetadataSchema = z.object({
   pageCount: z.number().optional(),
   pdfMetadata: PDFMetadataSchema.optional(),
   // Health status for file integrity tracking
-  health: z.enum(["healthy", "missing", "modified", "relocated"]).optional(),
+  health: z
+    .enum(["healthy", "missing", "modified", "relocated", "duplicate"])
+    .optional(),
 });
 
 export type BlobWithMetadata = z.infer<typeof BlobWithMetadataSchema>;

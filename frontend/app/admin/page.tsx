@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Database,
@@ -11,9 +12,21 @@ import {
 } from "lucide-react";
 import type { BlobWithMetadata } from "../api/library/blobs/route";
 import Link from "next/link";
+import { DuplicateResolutionModal } from "./DuplicateResolutionModal";
+
+interface DuplicateGroup {
+  hash: string;
+  files: Array<{
+    path: string;
+    filename: string;
+    size: number;
+    isExisting: boolean;
+  }>;
+}
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
 
   // Fetch raw blobs from database (with paths and health status)
   const {
@@ -40,10 +53,15 @@ export default function AdminPage() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      // Refetch blobs
-      queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
-      queryClient.invalidateQueries({ queryKey: ["files"] });
+    onSuccess: (data) => {
+      // Check if duplicates were found
+      if (data.duplicates && data.duplicates.length > 0) {
+        setDuplicates(data.duplicates);
+      } else {
+        // No duplicates - just refetch blobs
+        queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+        queryClient.invalidateQueries({ queryKey: ["files"] });
+      }
     },
   });
 
@@ -79,6 +97,37 @@ export default function AdminPage() {
     },
   });
 
+  // Handle duplicate resolution
+  const handleResolveDuplicates = async (
+    mode: "user-selection" | "auto-resolve",
+    resolutions: Array<{
+      hash: string;
+      keepPath: string;
+      deletePaths?: string[];
+    }>
+  ) => {
+    const response = await fetch("/api/admin/resolve-duplicates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, resolutions }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Duplicate resolution failed");
+    }
+
+    const result = await response.json();
+    console.log("Resolution result:", result);
+
+    // Close modal
+    setDuplicates([]);
+
+    // No need to rescan - the new systematic scan handles everything in one pass
+    // Just refresh the blob list to show updated data
+    queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+    queryClient.invalidateQueries({ queryKey: ["files"] });
+  };
+
   const handleClear = () => {
     if (
       confirm(
@@ -90,8 +139,8 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-950">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="h-screen overflow-y-auto p-8 bg-gray-950">
+      <div className="max-w-7xl mx-auto space-y-6 pb-8">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Database className="w-10 h-10 text-blue-400" />
@@ -330,6 +379,15 @@ export default function AdminPage() {
           </ul>
         </div>
       </div>
+
+      {/* Duplicate Resolution Modal */}
+      {duplicates.length > 0 && (
+        <DuplicateResolutionModal
+          duplicates={duplicates}
+          onResolve={handleResolveDuplicates}
+          onClose={() => setDuplicates([])}
+        />
+      )}
     </div>
   );
 }

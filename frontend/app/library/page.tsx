@@ -368,7 +368,7 @@ export default function LibraryPage() {
     setDragCounter(0);
   };
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Left Sidebar */}
       <LibraryLeftSidebar onCreateWorkWithPreset={handleCreateWorkWithPreset} />
 

@@ -86,7 +86,21 @@ export async function getOrphanedBlobs(): Promise<BlobWithMetadata[]> {
   const assets = await db.assets.toArray();
   const assetHashes = new Set(assets.map((a) => a.sha256));
 
-  return blobs.filter((blob) => !assetHashes.has(blob.sha256));
+  console.log(`[getOrphanedBlobs] Total blobs from server: ${blobs.length}`);
+  console.log(`[getOrphanedBlobs] Total assets in Dexie: ${assets.length}`);
+  console.log(
+    `[getOrphanedBlobs] Asset hashes:`,
+    Array.from(assetHashes).map((h) => h.slice(0, 8))
+  );
+
+  const orphaned = blobs.filter((blob) => !assetHashes.has(blob.sha256));
+
+  console.log(`[getOrphanedBlobs] Orphaned blobs: ${orphaned.length}`);
+  orphaned.forEach((b) =>
+    console.log(`  - ${b.filename} (${b.sha256.slice(0, 8)}...)`)
+  );
+
+  return orphaned;
 }
 
 /**
@@ -94,11 +108,40 @@ export async function getOrphanedBlobs(): Promise<BlobWithMetadata[]> {
  * Uses React Query because blobs are remote data (server CAS)
  */
 export function useOrphanedBlobs() {
-  return useQuery({
+  console.log("[useOrphanedBlobs] Hook called");
+
+  const result = useQuery({
     queryKey: ["orphanedBlobs"],
-    queryFn: getOrphanedBlobs,
+    queryFn: async () => {
+      console.log("[useOrphanedBlobs] Query function triggered");
+      try {
+        const orphaned = await getOrphanedBlobs();
+        console.log(
+          "[useOrphanedBlobs] Query function completed:",
+          orphaned.length,
+          "orphaned blobs"
+        );
+        return orphaned;
+      } catch (error) {
+        console.error("[useOrphanedBlobs] Query function error:", error);
+        throw error;
+      }
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus
   });
+
+  console.log("[useOrphanedBlobs] Query state:", {
+    isLoading: result.isLoading,
+    isFetching: result.isFetching,
+    isSuccess: result.isSuccess,
+    isError: result.isError,
+    error: result.error,
+    dataLength: result.data?.length || 0,
+  });
+
+  return result;
 }
 
 /**

@@ -3,7 +3,7 @@
  * Handles file scanning, hashing, and storage coordination
  */
 
-import { readdir, stat, writeFile, mkdir } from "fs/promises";
+import { readdir, stat, writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { getDB } from "./db";
 import { blobs, paths } from "./schema";
@@ -93,7 +93,7 @@ async function scanDirectory(dirPath: string): Promise<string[]> {
  * @param filePath - file path
  * @returns MIME type string
  */
-function getMimeType(filePath: string): string {
+export function getMimeType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   switch (ext) {
     case ".pdf":
@@ -189,8 +189,15 @@ async function processFile(filePath: string): Promise<boolean> {
 
 /**
  * Scan the library directory and update the database
- * Detects: new files, edited files (same path, different hash), removed files
- * @returns object with detailed scan statistics
+ *
+ * SYSTEMATIC QUEUE-BASED APPROACH:
+ * 1. Build file map from hard disk (path -> hash)
+ * 2. Build database map (hash -> blob, path -> hash)
+ * 3. Process database queue: check if files still exist, mark missing/duplicates
+ * 4. Process remaining disk files: add new singles, collect duplicates
+ * 5. Return duplication queue for user resolution
+ *
+ * This ensures we process each file exactly once and handle duplicates systematically.
  */
 export async function scanLibrary(): Promise<{
   scanned: number;
@@ -200,169 +207,305 @@ export async function scanLibrary(): Promise<{
   editedFiles: number;
   missingFiles: number;
   relocatedFiles: number;
+  duplicates: Array<{
+    hash: string;
+    files: Array<{
+      path: string;
+      filename: string;
+      size: number;
+      isExisting: boolean;
+    }>;
+  }>;
 }> {
-  console.log("Starting library scan...");
+  console.log("Starting systematic library scan...");
 
   const db = getDB();
   const libraryPath = getLibraryPath();
 
-  // Get all existing blobs and paths from database
-  const existingBlobs = await db.select().from(blobs).all();
-  const existingPaths = await db.select().from(paths).all();
-
-  // Create maps for efficient lookups
-  const pathToHash = new Map(existingPaths.map((p) => [p.path, p.hash]));
-  const hashToBlob = new Map(existingBlobs.map((b) => [b.hash, b]));
-
-  // Track what we find during scan (this is the "mark" - not persisted to DB)
-  const scannedPaths = new Set<string>();
-  const scannedHashes = new Set<string>();
-  const processedHashes = new Set<string>(); // Hashes we've updated/confirmed as healthy
-
-  // Scan filesystem
-  const files = await scanDirectory(libraryPath);
-  console.log(`Found ${files.length} files`);
-
+  // Statistics
+  let scanned = 0;
   let processed = 0;
   let failed = 0;
   let newFiles = 0;
   let editedFiles = 0;
+  let missingFiles = 0;
   let relocatedFiles = 0;
 
-  // Process all files found on disk
-  for (const file of files) {
-    scannedPaths.add(file);
+  // ========================================
+  // STEP 1: Build hard disk file map
+  // ========================================
+  console.log("\\n=== Step 1: Scanning hard disk ===");
+  const diskFiles = await scanDirectory(libraryPath);
+  console.log(`Found ${diskFiles.length} files on disk`);
 
+  // Map: path -> { hash, filename, size, stats }
+  const diskFileMap = new Map<
+    string,
+    { hash: string; filename: string; size: number; stats: any }
+  >();
+
+  for (const filePath of diskFiles) {
     try {
-      const stats = await stat(file);
-      const hash = await hashFile(file);
-      scannedHashes.add(hash);
-      const mime = getMimeType(file);
-      const filename = path.basename(file);
+      const stats = await stat(filePath);
+      const hash = await hashFile(filePath);
+      const filename = path.basename(filePath);
 
-      const oldHash = pathToHash.get(file);
-      const isNewPath = !pathToHash.has(file);
-      const isNewHash = !hashToBlob.has(hash);
+      diskFileMap.set(filePath, { hash, filename, size: stats.size, stats });
+      scanned++;
+    } catch (error) {
+      console.error(`Failed to hash ${filePath}:`, error);
+      failed++;
+    }
+  }
 
-      // Determine file status
-      if (isNewPath && isNewHash) {
-        // Completely new file
-        newFiles++;
-        console.log(`NEW: ${filename}`);
-      } else if (!isNewPath && oldHash !== hash) {
-        // Same path, different hash = file was edited
-        editedFiles++;
-        console.log(`EDITED: ${filename} (hash changed)`);
-      } else if (isNewPath && !isNewHash) {
-        // New path, existing hash = file was relocated/copied
+  // Build reverse map: hash -> paths[] (for duplicate detection)
+  const hashToDiskPaths = new Map<string, string[]>();
+  for (const [filePath, fileInfo] of diskFileMap.entries()) {
+    if (!hashToDiskPaths.has(fileInfo.hash)) {
+      hashToDiskPaths.set(fileInfo.hash, []);
+    }
+    hashToDiskPaths.get(fileInfo.hash)!.push(filePath);
+  }
+
+  // ========================================
+  // STEP 2: Build database maps
+  // ========================================
+  console.log("\\n=== Step 2: Loading database ===");
+  const existingBlobs = await db.select().from(blobs).all();
+  const existingPaths = await db.select().from(paths).all();
+
+  console.log(
+    `Database has ${existingBlobs.length} blobs, ${existingPaths.length} paths`
+  );
+
+  // Map: hash -> blob
+  const hashToBlob = new Map(existingBlobs.map((b) => [b.hash, b]));
+
+  // Map: path -> hash
+  const pathToHash = new Map(existingPaths.map((p) => [p.path, p.hash]));
+
+  // ========================================
+  // STEP 3: Process database queue
+  // ========================================
+  console.log("\\n=== Step 3: Processing database queue ===");
+  const duplicationQueue: Map<string, Set<string>> = new Map(); // hash -> Set of paths
+  const processedDiskPaths = new Set<string>(); // Paths we've already handled
+
+  for (const dbPath of existingPaths) {
+    const dbHash = dbPath.hash;
+    const diskFile = diskFileMap.get(dbPath.path);
+
+    if (!diskFile) {
+      // File missing from disk
+      console.log(`MISSING: ${dbPath.path} (hash: ${dbHash.slice(0, 16)}...)`);
+      await db
+        .update(blobs)
+        .set({ health: "missing" })
+        .where(eq(blobs.hash, dbHash));
+      missingFiles++;
+      // Keep path entry for tracking
+    } else if (diskFile.hash === dbHash) {
+      // File still exists at same path with same hash - check for duplicates
+      const pathsWithThisHash = hashToDiskPaths.get(dbHash) || [];
+
+      if (pathsWithThisHash.length > 1) {
+        // DUPLICATE: Multiple files on disk with this hash
+        console.log(
+          `DUPLICATE: ${dbPath.path} has ${pathsWithThisHash.length} copies on disk`
+        );
+
+        // Add all paths to duplication queue
+        if (!duplicationQueue.has(dbHash)) {
+          duplicationQueue.set(dbHash, new Set());
+        }
+        pathsWithThisHash.forEach((p) => {
+          duplicationQueue.get(dbHash)!.add(p);
+          processedDiskPaths.add(p);
+        });
+      } else {
+        // Single file - update as healthy
+        await db
+          .update(blobs)
+          .set({
+            health: "healthy",
+            size: diskFile.size,
+            mtime_ms: diskFile.stats.mtimeMs,
+            filename: diskFile.filename,
+          })
+          .where(eq(blobs.hash, dbHash));
+
+        processedDiskPaths.add(dbPath.path);
+        processed++;
+      }
+    } else {
+      // File exists but hash changed (edited)
+      console.log(
+        `EDITED: ${dbPath.path} (hash changed from ${dbHash.slice(0, 16)}... to ${diskFile.hash.slice(0, 16)}...)`
+      );
+
+      // Remove old path mapping
+      await db.delete(paths).where(eq(paths.path, dbPath.path));
+
+      // This file will be re-added as new in next step
+      editedFiles++;
+    }
+  }
+
+  // ========================================
+  // STEP 4: Process remaining disk files
+  // ========================================
+  console.log("\\n=== Step 4: Processing new disk files ===");
+
+  for (const [filePath, fileInfo] of diskFileMap.entries()) {
+    // Skip if already processed
+    if (processedDiskPaths.has(filePath)) {
+      continue;
+    }
+
+    const pathsWithThisHash = hashToDiskPaths.get(fileInfo.hash) || [];
+    const unprocessedPathsWithThisHash = pathsWithThisHash.filter(
+      (p) => !processedDiskPaths.has(p)
+    );
+
+    if (unprocessedPathsWithThisHash.length > 1) {
+      // NEW DUPLICATE GROUP
+      console.log(
+        `NEW DUPLICATE: Found ${unprocessedPathsWithThisHash.length} new files with hash ${fileInfo.hash.slice(0, 16)}...`
+      );
+
+      if (!duplicationQueue.has(fileInfo.hash)) {
+        duplicationQueue.set(fileInfo.hash, new Set());
+      }
+      unprocessedPathsWithThisHash.forEach((p) => {
+        duplicationQueue.get(fileInfo.hash)!.add(p);
+        processedDiskPaths.add(p);
+      });
+    } else {
+      // NEW SINGLE FILE
+      const isRelocated = hashToBlob.has(fileInfo.hash);
+
+      if (isRelocated) {
+        console.log(
+          `RELOCATED: ${fileInfo.filename} (found at new path: ${filePath})`
+        );
         relocatedFiles++;
-        console.log(`RELOCATED: ${filename}`);
+      } else {
+        console.log(`NEW: ${fileInfo.filename}`);
+        newFiles++;
       }
 
-      // Insert or update blob metadata
+      const mime = getMimeType(filePath);
+
+      // Add blob
       await db
         .insert(blobs)
         .values({
-          hash,
-          size: stats.size,
+          hash: fileInfo.hash,
+          size: fileInfo.size,
           mime,
-          mtime_ms: stats.mtimeMs,
+          mtime_ms: fileInfo.stats.mtimeMs,
           created_ms: Date.now(),
-          filename,
+          filename: fileInfo.filename,
           health: "healthy",
         })
         .onConflictDoUpdate({
           target: blobs.hash,
           set: {
-            size: stats.size,
-            mime,
-            mtime_ms: stats.mtimeMs,
-            filename,
-            health: "healthy", // Reset to healthy if file is found
+            health: "healthy",
+            size: fileInfo.size,
+            mtime_ms: fileInfo.stats.mtimeMs,
+            filename: fileInfo.filename,
           },
         });
 
-      // Mark this hash as processed (found and healthy)
-      processedHashes.add(hash);
-
-      // Insert or update path mapping
+      // Add path mapping
       await db
         .insert(paths)
         .values({
-          hash,
-          path: file,
+          hash: fileInfo.hash,
+          path: filePath,
         })
         .onConflictDoUpdate({
           target: paths.path,
-          set: {
-            hash,
-          },
+          set: { hash: fileInfo.hash },
         });
 
+      processedDiskPaths.add(filePath);
       processed++;
-    } catch (error) {
-      console.error(`Failed to process ${file}:`, error);
-      failed++;
     }
   }
 
-  // PHASE 2: Check remaining database entries that weren't found during filesystem scan
-  // This handles: a) files deleted from disk, b) files moved to new locations
-  console.log("\n=== Phase 2: Checking database entries ===");
-  let missingFiles = 0;
+  // ========================================
+  // STEP 5: Build duplication queue result
+  // ========================================
+  console.log("\\n=== Step 5: Building duplication queue ===");
+  const duplicateGroups: Array<{
+    hash: string;
+    files: Array<{
+      path: string;
+      filename: string;
+      size: number;
+      isExisting: boolean;
+    }>;
+  }> = [];
 
-  // Check all paths in the database
-  for (const existingPath of existingPaths) {
-    if (!scannedPaths.has(existingPath.path)) {
-      // This path was not found during the filesystem scan
-      const blob = hashToBlob.get(existingPath.hash);
+  for (const [hash, pathSet] of duplicationQueue.entries()) {
+    const paths = Array.from(pathSet);
+    const isExisting = hashToBlob.has(hash);
 
-      if (scannedHashes.has(existingPath.hash)) {
-        // Hash exists at a different path = file was relocated/copied
-        console.log(
-          `RELOCATED: ${blob?.filename || existingPath.hash.slice(0, 16)} (old path: ${existingPath.path})`
-        );
-        // Only update health to "relocated" if it wasn't already marked healthy
-        if (!processedHashes.has(existingPath.hash)) {
-          await db
-            .update(blobs)
-            .set({ health: "relocated" })
-            .where(eq(blobs.hash, existingPath.hash));
-        }
-      } else {
-        // Hash not found anywhere = file is completely missing
-        missingFiles++;
-        console.log(
-          `MISSING: ${blob?.filename || existingPath.hash.slice(0, 16)} (was at: ${existingPath.path})`
-        );
-        await db
-          .update(blobs)
-          .set({ health: "missing" })
-          .where(eq(blobs.hash, existingPath.hash));
-      }
+    const files = paths.map((filePath) => {
+      const fileInfo = diskFileMap.get(filePath)!;
+      return {
+        path: filePath,
+        filename: fileInfo.filename,
+        size: fileInfo.size,
+        isExisting,
+      };
+    });
 
-      // Remove the old path mapping (path no longer exists)
-      await db.delete(paths).where(eq(paths.path, existingPath.path));
-    }
+    duplicateGroups.push({ hash, files });
+    console.log(
+      `⚠️  DUPLICATE GROUP: ${files.length} files with hash ${hash.slice(0, 16)}...`
+    );
+    files.forEach((f) => console.log(`   - ${f.filename} (${f.path})`));
   }
 
+  // ========================================
+  // Summary
+  // ========================================
+  console.log("\\n=== Scan Complete ===");
+  console.log(`Scanned: ${scanned} files`);
+  console.log(`Processed: ${processed} files`);
   console.log(
-    `\nPhase 2 complete: Found ${existingPaths.length - scannedPaths.size} stale paths`
+    `New: ${newFiles}, Edited: ${editedFiles}, Relocated: ${relocatedFiles}, Missing: ${missingFiles}`
+  );
+  console.log(
+    `Duplicates: ${duplicateGroups.length} groups requiring resolution`
   );
 
-  console.log(`Scan complete: ${processed} processed, ${failed} failed`);
-  console.log(
-    `  New: ${newFiles}, Edited: ${editedFiles}, Relocated: ${relocatedFiles}, Missing: ${missingFiles}`
-  );
+  if (duplicateGroups.length > 0) {
+    console.log("\\n⚠️  Duplicates found - user resolution required");
+    return {
+      scanned,
+      processed,
+      failed,
+      newFiles,
+      editedFiles,
+      missingFiles,
+      relocatedFiles,
+      duplicates: duplicateGroups,
+    };
+  }
 
   return {
-    scanned: files.length,
+    scanned,
     processed,
     failed,
     newFiles,
     editedFiles,
     missingFiles,
     relocatedFiles,
+    duplicates: [],
   };
 }
 
@@ -460,6 +603,35 @@ export async function storeBlob(
 ): Promise<{ hash: string; path: string; size: number }> {
   const hash = hashBuffer(buffer);
   const mime = getMimeType(filename);
+  const db = getDB();
+
+  // DEDUPLICATION PROTOCOL:
+  // Check if this hash already exists in the database
+  const existingBlob = await getBlobByHash(hash);
+
+  if (existingBlob) {
+    // Hash already exists - this is a duplicate file
+    console.log(
+      `DUPLICATE DETECTED: ${filename} → ${hash.slice(0, 16)}... (already exists as ${existingBlob.filename})`
+    );
+
+    // Get existing path for this hash
+    const existingPath = await getPathForHash(hash);
+
+    if (existingPath) {
+      console.log(`  Reusing existing file at: ${existingPath}`);
+      console.log(`  Skipping duplicate upload (no new file written to disk)`);
+
+      // Return existing blob info (no new file created)
+      return {
+        hash,
+        path: existingPath,
+        size: existingBlob.size,
+      };
+    }
+  }
+
+  // No duplicate found - proceed with normal storage
   const storagePath = getStoragePathForRole(role, mime);
 
   // Ensure directory exists
@@ -471,8 +643,10 @@ export async function storeBlob(
 
   // Write file (idempotent - content-addressed)
   await writeFile(targetPath, buffer);
+  console.log(
+    `NEW FILE: ${filename} → ${hash.slice(0, 16)}... stored at ${targetPath}`
+  );
 
-  const db = getDB();
   const size = buffer.length;
   const now = Date.now();
 

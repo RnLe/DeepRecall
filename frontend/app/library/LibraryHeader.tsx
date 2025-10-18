@@ -5,8 +5,7 @@
 
 "use client";
 
-import { BookOpen, FileText, Plus, RefreshCw } from "lucide-react";
-import { useScanMutation } from "@/src/hooks/useFilesQuery";
+import { BookOpen, FileText, Plus } from "lucide-react";
 import { useBlobStats } from "@/src/hooks/useBlobs";
 
 interface LibraryHeaderProps {
@@ -22,12 +21,7 @@ export function LibraryHeader({
   onCreateActivity,
   onOpenTemplates,
 }: LibraryHeaderProps) {
-  const scanMutation = useScanMutation();
   const { data: blobStats } = useBlobStats();
-
-  const handleScan = () => {
-    scanMutation.mutate();
-  };
 
   return (
     <div>
@@ -128,17 +122,6 @@ export function LibraryHeader({
               />
             </svg>
             Clear DB
-          </button>
-
-          <button
-            onClick={handleScan}
-            disabled={scanMutation.isPending}
-            className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-900 disabled:cursor-not-allowed text-neutral-300 text-sm rounded-lg transition-colors border border-neutral-700 hover:border-neutral-600"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${scanMutation.isPending ? "animate-spin" : ""}`}
-            />
-            {scanMutation.isPending ? "Scanning..." : "Scan"}
           </button>
 
           {onCreateActivity && (
