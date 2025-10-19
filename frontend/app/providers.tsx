@@ -31,11 +31,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
  * Users must manually click "Initialize Defaults" in PresetManager
  */
 function PresetInitializer() {
-  useEffect(() => {
-    console.log(
-      "ℹ️ Preset system ready - use PresetManager to initialize defaults"
-    );
-  }, []);
-
   return null;
 }

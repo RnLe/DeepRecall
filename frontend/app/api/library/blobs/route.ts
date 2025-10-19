@@ -78,13 +78,6 @@ export async function GET() {
       })
     );
 
-    console.log(`[Blobs API] Returning ${enrichedBlobs.length} blobs:`);
-    enrichedBlobs.forEach((b) => {
-      console.log(
-        `  - ${b.filename} (hash: ${b.sha256.slice(0, 8)}..., health: ${b.health}, path: ${b.path ? "yes" : "NO PATH"})`
-      );
-    });
-
     return NextResponse.json(enrichedBlobs);
   } catch (error) {
     console.error("Error fetching blobs:", error);

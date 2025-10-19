@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useOrphanedBlobs, useUnlinkedAssets } from "@/src/hooks/useBlobs";
 import { LinkBlobDialog } from "./LinkBlobDialog";
+import { SimplePDFViewer } from "../reader/SimplePDFViewer";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 import type { Asset } from "@/src/schema/library";
 
@@ -27,6 +28,8 @@ export function FileInbox() {
   const { data: newFiles } = useOrphanedBlobs(); // Never touched blobs (React Query)
   const unlinkedAssets = useUnlinkedAssets(); // Created but unlinked assets (useLiveQuery)
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
+  const [viewingBlob, setViewingBlob] = useState<BlobWithMetadata | null>(null);
+  const [viewingAsset, setViewingAsset] = useState<Asset | null>(null);
   const [isNewFilesCollapsed, setIsNewFilesCollapsed] = useState(false);
   const [isUnlinkedCollapsed, setIsUnlinkedCollapsed] = useState(false);
 
@@ -118,14 +121,28 @@ export function FileInbox() {
                   className="bg-neutral-900/30 border border-amber-900/30 rounded-lg p-2.5 hover:border-amber-800/50 transition-colors cursor-move"
                 >
                   <div className="flex items-center gap-2.5">
-                    {/* Mini thumbnail */}
-                    <div className="flex-shrink-0 w-10 h-10 bg-neutral-800/50 rounded flex items-center justify-center border border-neutral-700/50">
+                    {/* Mini thumbnail - clickable for PDF preview */}
+                    <button
+                      onClick={() => {
+                        if (blob.mime === "application/pdf") {
+                          setViewingBlob(blob);
+                        }
+                      }}
+                      className="flex-shrink-0 w-10 h-10 bg-neutral-800/50 rounded flex items-center justify-center border border-neutral-700/50 hover:bg-neutral-800 transition-colors"
+                    >
                       <FileText className="w-4 h-4 text-neutral-600" />
-                    </div>
+                    </button>
 
-                    {/* Filename & size */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm text-neutral-300 font-medium truncate">
+                    {/* Filename & size - clickable for PDF preview */}
+                    <button
+                      onClick={() => {
+                        if (blob.mime === "application/pdf") {
+                          setViewingBlob(blob);
+                        }
+                      }}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <h3 className="text-sm text-neutral-300 font-medium truncate hover:text-neutral-100 transition-colors">
                         {blob.filename}
                       </h3>
                       <div className="flex items-center gap-1.5 text-xs text-neutral-600 mt-0.5">
@@ -137,7 +154,7 @@ export function FileInbox() {
                           </>
                         )}
                       </div>
-                    </div>
+                    </button>
 
                     {/* Link button */}
                     <button
@@ -233,14 +250,28 @@ export function FileInbox() {
                   className="bg-neutral-900/30 border border-blue-900/30 rounded-lg p-2.5 hover:border-blue-800/50 transition-colors cursor-move"
                 >
                   <div className="flex items-center gap-2.5">
-                    {/* Mini thumbnail */}
-                    <div className="flex-shrink-0 w-10 h-10 bg-neutral-800/50 rounded flex items-center justify-center border border-neutral-700/50">
+                    {/* Mini thumbnail - clickable for PDF preview */}
+                    <button
+                      onClick={() => {
+                        if (asset.mime === "application/pdf") {
+                          setViewingAsset(asset);
+                        }
+                      }}
+                      className="flex-shrink-0 w-10 h-10 bg-neutral-800/50 rounded flex items-center justify-center border border-neutral-700/50 hover:bg-neutral-800 transition-colors"
+                    >
                       <FileText className="w-4 h-4 text-neutral-600" />
-                    </div>
+                    </button>
 
-                    {/* Filename & size */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm text-neutral-300 font-medium truncate">
+                    {/* Filename & size - clickable for PDF preview */}
+                    <button
+                      onClick={() => {
+                        if (asset.mime === "application/pdf") {
+                          setViewingAsset(asset);
+                        }
+                      }}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <h3 className="text-sm text-neutral-300 font-medium truncate hover:text-neutral-100 transition-colors">
                         {asset.filename}
                       </h3>
                       <div className="flex items-center gap-1.5 text-xs text-neutral-600 mt-0.5">
@@ -254,7 +285,7 @@ export function FileInbox() {
                         <span>·</span>
                         <span className="text-blue-500">Asset</span>
                       </div>
-                    </div>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -275,6 +306,24 @@ export function FileInbox() {
             queryClient.invalidateQueries({ queryKey: ["files"] });
           }}
           onCancel={() => setLinkingBlob(null)}
+        />
+      )}
+
+      {/* PDF Viewer for blobs */}
+      {viewingBlob && (
+        <SimplePDFViewer
+          sha256={viewingBlob.sha256}
+          title={viewingBlob.filename || "Untitled"}
+          onClose={() => setViewingBlob(null)}
+        />
+      )}
+
+      {/* PDF Viewer for assets */}
+      {viewingAsset && (
+        <SimplePDFViewer
+          sha256={viewingAsset.sha256}
+          title={viewingAsset.filename || "Untitled"}
+          onClose={() => setViewingAsset(null)}
         />
       )}
     </div>

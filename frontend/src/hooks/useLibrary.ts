@@ -38,9 +38,7 @@ export function useWorks() {
 export function useWorksExtended() {
   return useLiveQuery(async () => {
     try {
-      console.log("useWorksExtended: Fetching works...");
       const result = await workRepo.listWorksExtended();
-      console.log("useWorksExtended: Fetched", result.length, "works");
       return result;
     } catch (error) {
       console.error("useWorksExtended: Error fetching works:", error);

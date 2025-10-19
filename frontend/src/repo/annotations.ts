@@ -376,6 +376,8 @@ export async function createNoteGroup(
     name,
     color,
     order: maxOrder + 1,
+    viewMode: "detailed" as const,
+    columns: 1 as const,
   };
 
   const updated = {

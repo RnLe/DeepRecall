@@ -19,8 +19,11 @@ import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
 import { useDeleteWork } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useReaderUI } from "@/src/stores/reader-ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
+import { EditWorkDialog } from "./EditWorkDialog";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 
 interface WorkCardListProps {
@@ -33,10 +36,13 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
   const year = getDisplayYear(work);
   const assetCount = work.assets?.length || 0;
 
+  const router = useRouter();
+  const { openTab, setLeftSidebarView } = useReaderUI();
   const deleteWorkMutation = useDeleteWork();
   const allPresets = usePresets();
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const journal = work.journal;
 
@@ -46,9 +52,22 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
     : null;
 
   const handleDelete = async () => {
+    if (!confirm(`Delete "${work.title}"?`)) return;
     await deleteWorkMutation.mutateAsync(work.id);
   };
 
+  const handleDoubleClick = () => {
+    // Find first PDF asset
+    const pdfAsset = work.assets?.find(
+      (asset) => asset.mime === "application/pdf"
+    );
+    if (!pdfAsset) return;
+
+    // Open in reader
+    openTab(pdfAsset.sha256, work.title || pdfAsset.filename);
+    setLeftSidebarView("annotations");
+    router.push("/reader");
+  };
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation();
     e.dataTransfer.effectAllowed = "link";
@@ -117,6 +136,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
     <>
       <div
         onClick={onClick}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -130,18 +150,13 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`group relative bg-neutral-900/50 border rounded-lg p-3 transition-all duration-200 cursor-pointer ${
+        className={`group relative bg-neutral-900/50 border rounded-lg px-4 py-0.5 transition-all duration-200 cursor-pointer ${
           isDragOver
             ? "border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-500/20"
             : "border-neutral-800/50 hover:border-neutral-700 hover:bg-neutral-900/80"
         }`}
       >
         <div className="flex items-center gap-4">
-          {/* Icon - Left */}
-          <div className="flex-shrink-0">
-            <BookOpen className="w-5 h-5 text-neutral-500" />
-          </div>
-
           {/* Preset Label + Title - Main */}
           <div className="flex-1 min-w-0">
             <div>
@@ -168,7 +183,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
               </h3>
             </div>
             {work.subtitle && (
-              <p className="text-xs text-neutral-500 line-clamp-1 mt-0.5">
+              <p className="text-xs text-neutral-500 line-clamp-1 mt-0">
                 {work.subtitle}
               </p>
             )}
@@ -216,7 +231,11 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
             )}
 
             <div data-context-menu-trigger>
-              <WorkContextMenu workId={work.id} onDelete={handleDelete} />
+              <WorkContextMenu
+                workId={work.id}
+                onDelete={handleDelete}
+                onEdit={() => setIsEditDialogOpen(true)}
+              />
             </div>
           </div>
         </div>
@@ -229,6 +248,19 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
           preselectedWorkId={work.id}
           onSuccess={() => setDroppedBlob(null)}
           onCancel={() => setDroppedBlob(null)}
+        />
+      )}
+
+      {/* Edit dialog */}
+      {isEditDialogOpen && (
+        <EditWorkDialog
+          work={work}
+          isOpen={isEditDialogOpen}
+          onClose={() => setIsEditDialogOpen(false)}
+          onSuccess={() => {
+            setIsEditDialogOpen(false);
+            // Works will auto-refresh via useLiveQuery
+          }}
         />
       )}
     </>

@@ -82,25 +82,22 @@ export function useBlobMetadata(hash: string | undefined) {
  * MENTAL MODEL: Blobs exist on server, but no Asset entity created yet in Dexie
  */
 export async function getOrphanedBlobs(): Promise<BlobWithMetadata[]> {
-  const blobs = await fetchBlobs();
+  // Step 1: Get all blobs from server
+  const response = await fetch("/api/library/blobs/");
+  if (!response.ok) throw new Error("Failed to fetch blobs");
+  const serverBlobs: BlobWithMetadata[] = await response.json();
+
+  // Step 2: Get all asset references from local Dexie
   const assets = await db.assets.toArray();
-  const assetHashes = new Set(assets.map((a) => a.sha256));
+  const assetHashes = new Set(assets.map((a) => a.sha256.slice(0, 8)));
 
-  console.log(`[getOrphanedBlobs] Total blobs from server: ${blobs.length}`);
-  console.log(`[getOrphanedBlobs] Total assets in Dexie: ${assets.length}`);
-  console.log(
-    `[getOrphanedBlobs] Asset hashes:`,
-    Array.from(assetHashes).map((h) => h.slice(0, 8))
-  );
+  // Step 3: Filter out blobs that are already linked to assets
+  const orphanedBlobs = serverBlobs.filter((blob) => {
+    const blobHash8 = blob.sha256.slice(0, 8);
+    return !assetHashes.has(blobHash8);
+  });
 
-  const orphaned = blobs.filter((blob) => !assetHashes.has(blob.sha256));
-
-  console.log(`[getOrphanedBlobs] Orphaned blobs: ${orphaned.length}`);
-  orphaned.forEach((b) =>
-    console.log(`  - ${b.filename} (${b.sha256.slice(0, 8)}...)`)
-  );
-
-  return orphaned;
+  return orphanedBlobs;
 }
 
 /**
@@ -108,44 +105,22 @@ export async function getOrphanedBlobs(): Promise<BlobWithMetadata[]> {
  * Uses React Query because blobs are remote data (server CAS)
  */
 export function useOrphanedBlobs() {
-  console.log("[useOrphanedBlobs] Hook called");
-
-  const result = useQuery({
+  const query = useQuery<BlobWithMetadata[], Error>({
     queryKey: ["orphanedBlobs"],
     queryFn: async () => {
-      console.log("[useOrphanedBlobs] Query function triggered");
-      try {
-        const orphaned = await getOrphanedBlobs();
-        console.log(
-          "[useOrphanedBlobs] Query function completed:",
-          orphaned.length,
-          "orphaned blobs"
-        );
-        return orphaned;
-      } catch (error) {
-        console.error("[useOrphanedBlobs] Query function error:", error);
-        throw error;
-      }
+      const result = await getOrphanedBlobs();
+      return result;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnMount: true, // Always refetch when component mounts
-    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchInterval: false,
   });
 
-  console.log("[useOrphanedBlobs] Query state:", {
-    isLoading: result.isLoading,
-    isFetching: result.isFetching,
-    isSuccess: result.isSuccess,
-    isError: result.isError,
-    error: result.error,
-    dataLength: result.data?.length || 0,
-  });
-
-  return result;
+  return query;
 }
 
-/**
- * Hook to get unlinked standalone assets - "Unlinked Assets"
+/**\n * Hook to get unlinked standalone assets - \"Unlinked Assets\"
  *
  * MENTAL MODEL: Assets that exist in Dexie but are not connected to anything:
  * - No workId (not part of any Work)

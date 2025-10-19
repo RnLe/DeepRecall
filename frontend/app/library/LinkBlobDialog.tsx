@@ -16,6 +16,7 @@ import { WorkSelector } from "./WorkSelector";
 import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
 import { useCreateWorkWithAsset } from "@/src/hooks/useLibrary";
+import { PDFPreview } from "../reader/PDFPreview";
 import { Plus, Link2 } from "lucide-react";
 
 interface LinkBlobDialogProps {
@@ -146,17 +147,17 @@ export function LinkBlobDialog({
   const userPresetsFiltered = allPresets.filter((p) => !p.isSystem);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      {/* Dialog - 80% of viewport */}
-      <div className="bg-neutral-900 rounded-xl shadow-2xl w-[80vw] h-[80vh] flex flex-col border border-neutral-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+      {/* Dialog - 90% of viewport */}
+      <div className="bg-neutral-900/80 rounded-xl shadow-2xl w-[90vw] h-[90vh] flex flex-col border border-neutral-700/50">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 px-8 py-6 border-b border-neutral-800 bg-neutral-900/50">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-neutral-100">
+              <h2 className="text-xl font-bold text-neutral-100">
                 Link File to Library
               </h2>
-              <p className="text-sm text-neutral-400 mt-1.5">
+              <p className="text-xs text-neutral-400 mt-1">
                 Linking:{" "}
                 <span className="text-neutral-300 font-medium">
                   {blob.filename || blob.sha256.slice(0, 16)}
@@ -165,11 +166,11 @@ export function LinkBlobDialog({
             </div>
             <button
               onClick={onCancel}
-              className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-lg transition-colors"
+              className="p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-lg transition-colors flex-shrink-0 ml-3"
               title="Close"
             >
               <svg
-                className="w-6 h-6"
+                className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -186,10 +187,10 @@ export function LinkBlobDialog({
 
           {/* Mode Tabs - Only show on select step */}
           {step === "select" && (
-            <div className="flex gap-2 mt-6 border-b border-neutral-800">
+            <div className="flex gap-2 mt-4 border-b border-neutral-800">
               <button
                 onClick={() => setMode("link-to-existing")}
-                className={`flex items-center gap-2 px-5 py-3 rounded-t-lg transition-all font-medium ${
+                className={`flex items-center gap-2 px-4 py-2 text-sm rounded-t-lg transition-all font-medium ${
                   mode === "link-to-existing"
                     ? "bg-neutral-800 text-neutral-100 border-b-2 border-blue-500"
                     : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
@@ -203,7 +204,7 @@ export function LinkBlobDialog({
                   setMode("create-new");
                   setSelectedWorkId(null);
                 }}
-                className={`flex items-center gap-2 px-5 py-3 rounded-t-lg transition-all font-medium ${
+                className={`flex items-center gap-2 px-4 py-2 text-sm rounded-t-lg transition-all font-medium ${
                   mode === "create-new"
                     ? "bg-neutral-800 text-neutral-100 border-b-2 border-emerald-500"
                     : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
@@ -216,198 +217,27 @@ export function LinkBlobDialog({
           )}
         </div>
 
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 min-h-0">
-          {/* Mode: Link to Existing Work */}
-          {mode === "link-to-existing" && step === "select" && (
-            <div className="space-y-6">
-              <WorkSelector
-                value={selectedWorkId}
-                onChange={(workId) => {
-                  setSelectedWorkId(workId);
-                  // TODO: Move to asset metadata form step
-                  // For now, just select
-                }}
-              />
+        {/* Scrollable Content Area - Horizontal Split */}
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          {/* Left: Form Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 border-r border-neutral-800">
+            {/* Mode: Link to Existing Work */}
+            {mode === "link-to-existing" && step === "select" && (
+              <div className="space-y-4">
+                <WorkSelector
+                  value={selectedWorkId}
+                  onChange={(workId) => {
+                    setSelectedWorkId(workId);
+                    // TODO: Move to asset metadata form step
+                    // For now, just select
+                  }}
+                />
 
-              {works && works.length === 0 && (
-                <div className="border-2 border-dashed border-neutral-700 rounded-xl p-12 text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-800 text-neutral-400 mb-4">
-                    <svg
-                      className="w-8 h-8"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-neutral-300 mb-2 text-lg font-semibold">
-                    No works yet
-                  </p>
-                  <p className="text-sm text-neutral-500 mb-6">
-                    Create your first work to link files to it
-                  </p>
-                  <button
-                    onClick={() => setMode("create-new")}
-                    className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-                  >
-                    Create New Work
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Mode: Create New Work - Step 1: Select Preset */}
-          {mode === "create-new" && step === "select" && (
-            <div className="space-y-6">
-              {allPresets.length > 0 ? (
-                <>
-                  {/* System Templates */}
-                  {systemPresetsFiltered.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-                        <svg
-                          className="w-5 h-5 text-blue-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                        System Templates
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {systemPresetsFiltered.map((preset) => (
-                          <button
-                            key={preset.id}
-                            onClick={() => handlePresetSelect(preset.id)}
-                            className={`group relative bg-neutral-800/50 border rounded-xl p-5 text-left transition-all hover:bg-neutral-800 hover:border-neutral-600 hover:shadow-lg ${
-                              selectedPresetId === preset.id
-                                ? "border-blue-500 bg-blue-950/20"
-                                : "border-neutral-700"
-                            }`}
-                          >
-                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-xl opacity-50 group-hover:opacity-100 transition-opacity" />
-
-                            <div className="pl-3">
-                              <h4 className="font-semibold text-neutral-100 mb-1.5 text-base">
-                                {preset.name}
-                              </h4>
-                              {preset.description && (
-                                <p className="text-sm text-neutral-400 line-clamp-2 mb-3">
-                                  {preset.description}
-                                </p>
-                              )}
-
-                              <div className="flex items-center gap-2 text-xs text-neutral-500">
-                                <span className="flex items-center gap-1">
-                                  <svg
-                                    className="w-3.5 h-3.5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                    />
-                                  </svg>
-                                  {preset.customFields.length} custom fields
-                                </span>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* User Templates */}
-                  {userPresetsFiltered.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-                        <svg
-                          className="w-5 h-5 text-emerald-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                          />
-                        </svg>
-                        My Templates
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {userPresetsFiltered.map((preset) => (
-                          <button
-                            key={preset.id}
-                            onClick={() => handlePresetSelect(preset.id)}
-                            className={`group relative bg-neutral-800/50 border rounded-xl p-5 text-left transition-all hover:bg-neutral-800 hover:border-neutral-600 hover:shadow-lg ${
-                              selectedPresetId === preset.id
-                                ? "border-emerald-500 bg-emerald-950/20"
-                                : "border-neutral-700"
-                            }`}
-                          >
-                            <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-xl opacity-50 group-hover:opacity-100 transition-opacity" />
-
-                            <div className="pl-3">
-                              <h4 className="font-semibold text-neutral-100 mb-1.5 text-base">
-                                {preset.name}
-                              </h4>
-                              {preset.description && (
-                                <p className="text-sm text-neutral-400 line-clamp-2 mb-3">
-                                  {preset.description}
-                                </p>
-                              )}
-
-                              <div className="flex items-center gap-2 text-xs text-neutral-500">
-                                <span className="flex items-center gap-1">
-                                  <svg
-                                    className="w-3.5 h-3.5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                    />
-                                  </svg>
-                                  {preset.customFields.length} custom fields
-                                </span>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Create New Template Card */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-200 mb-4 flex items-center gap-2">
+                {works && works.length === 0 && (
+                  <div className="border-2 border-dashed border-neutral-700 rounded-xl p-8 text-center">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-neutral-800 text-neutral-400 mb-3">
                       <svg
-                        className="w-5 h-5 text-neutral-400"
+                        className="w-6 h-6"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -416,18 +246,171 @@ export function LinkBlobDialog({
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M12 4v16m8-8H4"
+                          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
                         />
                       </svg>
-                      Or Create New Template
-                    </h3>
+                    </div>
+                    <p className="text-neutral-300 mb-2 text-lg font-semibold">
+                      No works yet
+                    </p>
+                    <p className="text-sm text-neutral-500 mb-4">
+                      Create your first work to link files to it
+                    </p>
                     <button
-                      onClick={() => setStep("create-preset")}
-                      className="w-full border-2 border-dashed border-neutral-700 rounded-xl p-8 text-center hover:border-neutral-600 hover:bg-neutral-800/30 transition-all group"
+                      onClick={() => setMode("create-new")}
+                      className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
                     >
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-neutral-800 text-neutral-400 group-hover:bg-neutral-700 group-hover:text-neutral-300 transition-colors mb-3">
+                      Create New Work
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mode: Create New Work - Step 1: Select Preset */}
+            {mode === "create-new" && step === "select" && (
+              <div className="space-y-5">
+                {allPresets.length > 0 ? (
+                  <>
+                    {/* System Templates */}
+                    {systemPresetsFiltered.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-neutral-200 mb-4 flex items-center gap-2">
+                          <svg
+                            className="w-5 h-5 text-blue-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                          </svg>
+                          System Templates
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {systemPresetsFiltered.map((preset) => (
+                            <button
+                              key={preset.id}
+                              onClick={() => handlePresetSelect(preset.id)}
+                              className={`group relative bg-neutral-800/50 border rounded-xl p-4 text-left transition-all hover:bg-neutral-800 hover:border-neutral-600 hover:shadow-lg ${
+                                selectedPresetId === preset.id
+                                  ? "border-blue-500 bg-blue-950/20"
+                                  : "border-neutral-700"
+                              }`}
+                            >
+                              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-xl opacity-50 group-hover:opacity-100 transition-opacity" />
+
+                              <div className="pl-3">
+                                <h4 className="font-semibold text-neutral-100 mb-1 text-sm">
+                                  {preset.name}
+                                </h4>
+                                {preset.description && (
+                                  <p className="text-xs text-neutral-400 line-clamp-2 mb-2">
+                                    {preset.description}
+                                  </p>
+                                )}
+
+                                <div className="flex items-center gap-2 text-xs text-neutral-500">
+                                  <span className="flex items-center gap-1">
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                      />
+                                    </svg>
+                                    {preset.customFields.length} custom fields
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* User Templates */}
+                    {userPresetsFiltered.length > 0 && (
+                      <div>
+                        <h3 className="text-base font-semibold text-neutral-200 mb-3 flex items-center gap-2">
+                          <svg
+                            className="w-5 h-5 text-emerald-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                          My Templates
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {userPresetsFiltered.map((preset) => (
+                            <button
+                              key={preset.id}
+                              onClick={() => handlePresetSelect(preset.id)}
+                              className={`group relative bg-neutral-800/50 border rounded-xl p-4 text-left transition-all hover:bg-neutral-800 hover:border-neutral-600 hover:shadow-lg ${
+                                selectedPresetId === preset.id
+                                  ? "border-emerald-500 bg-emerald-950/20"
+                                  : "border-neutral-700"
+                              }`}
+                            >
+                              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-xl opacity-50 group-hover:opacity-100 transition-opacity" />
+
+                              <div className="pl-3">
+                                <h4 className="font-semibold text-neutral-100 mb-1 text-sm">
+                                  {preset.name}
+                                </h4>
+                                {preset.description && (
+                                  <p className="text-xs text-neutral-400 line-clamp-2 mb-2">
+                                    {preset.description}
+                                  </p>
+                                )}
+
+                                <div className="flex items-center gap-2 text-xs text-neutral-500">
+                                  <span className="flex items-center gap-1">
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                      />
+                                    </svg>
+                                    {preset.customFields.length} custom fields
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Create New Template Card */}
+                    <div>
+                      <h3 className="text-base font-semibold text-neutral-200 mb-3 flex items-center gap-2">
                         <svg
-                          className="w-6 h-6"
+                          className="w-5 h-5 text-neutral-400"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -439,128 +422,183 @@ export function LinkBlobDialog({
                             d="M12 4v16m8-8H4"
                           />
                         </svg>
-                      </div>
-                      <p className="text-neutral-300 font-medium mb-1">
-                        Create Custom Template
-                      </p>
-                      <p className="text-sm text-neutral-500">
-                        Design your own template with custom fields
-                      </p>
+                        Or Create New Template
+                      </h3>
+                      <button
+                        onClick={() => setStep("create-preset")}
+                        className="w-full border-2 border-dashed border-neutral-700 rounded-xl p-6 text-center hover:border-neutral-600 hover:bg-neutral-800/30 transition-all group"
+                      >
+                        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-neutral-800 text-neutral-400 group-hover:bg-neutral-700 group-hover:text-neutral-300 transition-colors mb-2">
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 4v16m8-8H4"
+                            />
+                          </svg>
+                        </div>
+                        <p className="text-neutral-300 font-medium text-sm mb-1">
+                          Create Custom Template
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          Design your own template with custom fields
+                        </p>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="border-2 border-dashed border-neutral-700 rounded-xl p-8 text-center">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-neutral-800 text-neutral-400 mb-3">
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-neutral-300 mb-2 text-lg font-semibold">
+                      No templates available yet
+                    </p>
+                    <p className="text-sm text-neutral-500 mb-4">
+                      Create your first template to get started
+                    </p>
+                    <button
+                      onClick={() => setStep("create-preset")}
+                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      Create Template
                     </button>
                   </div>
-                </>
-              ) : (
-                <div className="border-2 border-dashed border-neutral-700 rounded-xl p-12 text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-800 text-neutral-400 mb-4">
-                    <svg
-                      className="w-8 h-8"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-neutral-300 mb-2 text-lg font-semibold">
-                    No templates available yet
-                  </p>
-                  <p className="text-sm text-neutral-500 mb-6">
-                    Create your first template to get started
-                  </p>
-                  <button
-                    onClick={() => setStep("create-preset")}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                )}
+              </div>
+            )}
+
+            {/* Create Preset Step */}
+            {step === "create-preset" && (
+              <div className="space-y-4">
+                {/* Back button */}
+                <button
+                  onClick={() => setStep("select")}
+                  className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    Create Template
-                  </button>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                  Back to Templates
+                </button>
+
+                <PresetFormBuilder
+                  targetEntity="work"
+                  onSuccess={(presetId) => {
+                    // Auto-select the newly created preset and go to form
+                    setSelectedPresetId(presetId);
+                    setStep("form");
+                  }}
+                  onCancel={() => setStep("select")}
+                />
+              </div>
+            )}
+
+            {/* Step 2: Fill Form */}
+            {step === "form" && selectedPreset && (
+              <div className="space-y-4">
+                {/* Back button */}
+                <button
+                  onClick={() => setStep("select")}
+                  className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                  Change Template
+                </button>
+
+                {/* Form */}
+                <DynamicForm
+                  preset={selectedPreset}
+                  initialValues={initialValues}
+                  onSubmit={handleSubmit}
+                  onCancel={onCancel}
+                  submitLabel="Create Work"
+                  isSubmitting={createWorkMutation.isPending}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Right: PDF Preview */}
+          <div className="w-[45%] flex flex-col bg-neutral-950">
+            {blob.mime === "application/pdf" ? (
+              <PDFPreview
+                source={`/api/blob/${blob.sha256}`}
+                sha256={blob.sha256}
+                showToolbar={true}
+                autoFitToHeight={true}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-neutral-500">
+                <div className="text-center">
+                  <svg
+                    className="w-16 h-16 mx-auto mb-3 opacity-30"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <p className="text-sm">No PDF preview available</p>
+                  <p className="text-xs text-neutral-600 mt-1">
+                    File type: {blob.mime}
+                  </p>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Create Preset Step */}
-          {step === "create-preset" && (
-            <div className="space-y-4">
-              {/* Back button */}
-              <button
-                onClick={() => setStep("select")}
-                className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                Back to Templates
-              </button>
-
-              <PresetFormBuilder
-                targetEntity="work"
-                onSuccess={(presetId) => {
-                  // Auto-select the newly created preset and go to form
-                  setSelectedPresetId(presetId);
-                  setStep("form");
-                }}
-                onCancel={() => setStep("select")}
-              />
-            </div>
-          )}
-
-          {/* Step 2: Fill Form */}
-          {step === "form" && selectedPreset && (
-            <div className="space-y-4">
-              {/* Back button */}
-              <button
-                onClick={() => setStep("select")}
-                className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                Change Template
-              </button>
-
-              {/* Form */}
-              <DynamicForm
-                preset={selectedPreset}
-                initialValues={initialValues}
-                onSubmit={handleSubmit}
-                onCancel={onCancel}
-                submitLabel="Create Work"
-                isSubmitting={createWorkMutation.isPending}
-              />
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Fixed Footer - Show on select step */}
         {step === "select" && (
-          <div className="flex-shrink-0 px-8 py-4 border-t border-neutral-800 bg-neutral-900/50">
+          <div className="flex-shrink-0 px-6 py-3 border-t border-neutral-800 bg-neutral-900/50">
             <div className="flex justify-between items-center">
-              <div className="text-sm text-neutral-500">
+              <div className="text-xs text-neutral-500">
                 {mode === "link-to-existing" && selectedWorkId && (
                   <span className="text-neutral-400">
                     Work selected • Ready to continue
@@ -572,10 +610,10 @@ export function LinkBlobDialog({
                   </span>
                 )}
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <button
                   onClick={onCancel}
-                  className="px-6 py-2.5 bg-neutral-800 text-neutral-200 rounded-lg hover:bg-neutral-750 transition-colors font-medium"
+                  className="px-4 py-2 text-sm bg-neutral-800 text-neutral-200 rounded-lg hover:bg-neutral-750 transition-colors font-medium"
                 >
                   Cancel
                 </button>
@@ -614,7 +652,7 @@ export function LinkBlobDialog({
                       }
                     }}
                     disabled={createWorkMutation.isPending}
-                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-blue-800 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-blue-800 disabled:cursor-not-allowed"
                   >
                     {createWorkMutation.isPending ? "Linking..." : "Continue"}
                   </button>

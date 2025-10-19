@@ -46,13 +46,6 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
   const activeTab = getActiveTab();
   const activeSha256 = activeTab?.assetId || null;
 
-  // Ensure Files is the default tab and right sidebar is closed on mount and page reload
-  useEffect(() => {
-    setLeftSidebarView("files");
-    // run only once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Left sidebar resize logic
   useEffect(() => {
     if (!isResizingLeft) return;

@@ -13,7 +13,6 @@ import { WorkCardList } from "./WorkCardList";
 import { LibraryHeader } from "./LibraryHeader";
 import { LibraryFilters, type ViewMode } from "./LibraryFilters";
 import { LibraryLeftSidebar } from "./LibraryLeftSidebar";
-import { LibraryRightSidebar } from "./LibraryRightSidebar";
 import { CreateWorkDialog } from "./CreateWorkDialog";
 import { CreateActivityDialog } from "./CreateActivityDialog";
 import { ActivityBanner } from "./ActivityBanner";
@@ -25,8 +24,6 @@ import type {
   ActivityExtended,
 } from "@/src/schema/library";
 import { compareWorksByTitle, compareWorksByDate } from "@/src/utils/library";
-import { FileInbox } from "./FileInbox";
-import { DatabaseTest } from "./DatabaseTest";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import * as activityRepo from "@/src/repo/activities";
 import * as edgeRepo from "@/src/repo/edges";
@@ -42,16 +39,6 @@ export default function LibraryPage() {
   // useLiveQuery returns undefined during initial load, then returns the actual data
   const isLoading = works === undefined;
   const error = null; // useLiveQuery doesn't expose errors directly
-
-  // Debug logging - but less verbose
-  if (isLoading) {
-    console.log("Library page: Loading...");
-  } else {
-    console.log("Library page: Loaded", works?.length, "works");
-  }
-
-  // Debug logging
-  console.log("Library page - works:", works, "isLoading:", isLoading);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -490,7 +477,7 @@ export default function LibraryPage() {
                     </div>
                   )}
                   {viewMode === "list" ? (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {filteredWorks.map((work) => (
                         <WorkCardList
                           key={work.id}
@@ -502,7 +489,7 @@ export default function LibraryPage() {
                       ))}
                     </div>
                   ) : viewMode === "detailed" ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {filteredWorks.map((work) => (
                         <WorkCardDetailed
                           key={work.id}
@@ -514,7 +501,7 @@ export default function LibraryPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="space-y-2">
                       {filteredWorks.map((work) => (
                         <WorkCardCompact
                           key={work.id}
@@ -529,18 +516,9 @@ export default function LibraryPage() {
                 </div>
               )}
             </div>
-
-            {/* File Inbox - New files and unlinked assets */}
-            <FileInbox />
-
-            {/* Database test (temporary) */}
-            <DatabaseTest />
           </div>
         </div>
       </div>
-
-      {/* Right Sidebar */}
-      <LibraryRightSidebar />
 
       {/* Create Work Dialog */}
       <CreateWorkDialog
