@@ -56,6 +56,7 @@ export default function LibraryPage() {
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
   const [isDraggingOverLibrary, setIsDraggingOverLibrary] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
+  const [isUploadingToLibrary, setIsUploadingToLibrary] = useState(false);
 
   // Template Library UI state from Zustand
   const openTemplateLibrary = useTemplateLibraryUI((state) => state.openModal);
@@ -186,6 +187,68 @@ export default function LibraryPage() {
     }
   };
 
+  const handleDropFilesToActivity = async (
+    activityId: string,
+    files: FileList
+  ) => {
+    try {
+      // Upload files and create assets
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("metadata", JSON.stringify({ role: "main" }));
+
+        const response = await fetch("/api/library/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        }
+
+        const { blob } = await response.json();
+
+        // Create asset from uploaded blob
+        const { createAsset } = await import("@/src/repo/assets");
+        const asset = await createAsset({
+          kind: "asset",
+          sha256: blob.sha256,
+          filename: blob.filename || `file-${blob.sha256.substring(0, 8)}`,
+          bytes: blob.size,
+          mime: blob.mime,
+          pageCount: blob.pageCount,
+          role: "main",
+          favorite: false,
+        });
+
+        // Link the asset to the activity
+        await edgeRepo.addToActivity(activityId, asset.id);
+
+        return asset;
+      });
+
+      await Promise.all(uploadPromises);
+
+      // Refresh activities
+      const extended = await activityRepo.getActivityExtended(activityId);
+      if (extended) {
+        setEnrichedActivities((prev) =>
+          prev.map((a) => (a.id === activityId ? extended : a))
+        );
+      }
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
+    } catch (error) {
+      console.error("Failed to upload files to activity:", error);
+      alert(
+        `Failed to upload files: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  };
+
   // Defensive: if a component accidentally calls blob+asset for same drop,
   // prefer the asset edge (no duplicate asset creation). Consumers should
   // call only one, but this ensures safety under race conditions.
@@ -297,11 +360,12 @@ export default function LibraryPage() {
 
   // Handle drag & drop of assets onto library area
   const handleLibraryDragEnter = (e: React.DragEvent) => {
-    // Check if we have blob or asset data
+    // Check if we have blob/asset data OR external files
     if (
       e.dataTransfer.types.includes("application/x-deeprecall-blob") ||
       e.dataTransfer.types.includes("application/x-blob-id") ||
-      e.dataTransfer.types.includes("application/x-asset-id")
+      e.dataTransfer.types.includes("application/x-asset-id") ||
+      e.dataTransfer.types.includes("Files")
     ) {
       e.preventDefault();
       setDragCounter((prev) => prev + 1);
@@ -310,11 +374,12 @@ export default function LibraryPage() {
   };
 
   const handleLibraryDragOver = (e: React.DragEvent) => {
-    // Check if we have blob or asset data
+    // Check if we have blob/asset data OR external files
     if (
       e.dataTransfer.types.includes("application/x-deeprecall-blob") ||
       e.dataTransfer.types.includes("application/x-blob-id") ||
-      e.dataTransfer.types.includes("application/x-asset-id")
+      e.dataTransfer.types.includes("application/x-asset-id") ||
+      e.dataTransfer.types.includes("Files")
     ) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "link";
@@ -323,28 +388,120 @@ export default function LibraryPage() {
 
   const handleLibraryDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
+    const relatedTarget = e.relatedTarget as Node | null;
+    const currentTarget = e.currentTarget as Node;
+
+    // If relatedTarget exists and is within container, we're moving to a child
+    if (relatedTarget && currentTarget.contains(relatedTarget)) {
+      return;
+    }
+
+    // If relatedTarget is null, we're leaving the window entirely - clear immediately
+    if (!relatedTarget) {
+      setDragCounter(0);
+      setIsDraggingOverLibrary(false);
+      return;
+    }
+
+    // Otherwise, decrement counter
     setDragCounter((prev) => {
       const newCount = prev - 1;
-      if (newCount === 0) {
+      if (newCount <= 0) {
         setIsDraggingOverLibrary(false);
+        return 0;
       }
       return newCount;
     });
   };
 
-  const handleLibraryDrop = (e: React.DragEvent) => {
+  const handleLibraryDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOverLibrary(false);
     setDragCounter(0);
 
-    // Try to get blob data
+    // Priority 1: Try to get blob data from sidebar
     const blobJson = e.dataTransfer.getData("application/x-deeprecall-blob");
     if (blobJson) {
       try {
         const blob = JSON.parse(blobJson) as BlobWithMetadata;
         setLinkingBlob(blob);
+        return;
       } catch (error) {
         console.error("Failed to parse dropped blob:", error);
+      }
+    }
+
+    // Priority 2: Handle external file drops
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      // Only handle single file drops for now (opens dialog immediately)
+      if (files.length === 1) {
+        setIsUploadingToLibrary(true);
+        try {
+          const file = files[0];
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("metadata", JSON.stringify({ role: "main" }));
+
+          const response = await fetch("/api/library/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || "Upload failed");
+          }
+
+          const result = await response.json();
+
+          // Refresh orphaned blobs and open link dialog
+          queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
+
+          // Open dialog with uploaded blob
+          setLinkingBlob(result.blob);
+        } catch (error) {
+          console.error("File upload failed:", error);
+          alert(
+            `Upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
+          );
+        } finally {
+          setIsUploadingToLibrary(false);
+        }
+      } else {
+        // Multiple files: upload all and refresh, don't open dialog
+        setIsUploadingToLibrary(true);
+        try {
+          const uploadPromises = Array.from(files).map(async (file) => {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("metadata", JSON.stringify({ role: "main" }));
+
+            const response = await fetch("/api/library/upload", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || "Upload failed");
+            }
+
+            return response.json();
+          });
+
+          await Promise.all(uploadPromises);
+
+          // Refresh the orphaned blobs list
+          queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
+        } catch (error) {
+          console.error("File upload failed:", error);
+          alert(
+            `Upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
+          );
+        } finally {
+          setIsUploadingToLibrary(false);
+        }
       }
     }
   };
@@ -373,9 +530,32 @@ export default function LibraryPage() {
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto p-8 space-y-6">
+        {/* Scrollable Content with Drop Zone */}
+        <div
+          className="flex-1 overflow-y-auto relative"
+          onDragEnter={handleLibraryDragEnter}
+          onDragOver={handleLibraryDragOver}
+          onDragLeave={handleLibraryDragLeave}
+          onDrop={handleLibraryDrop}
+        >
+          {/* Drop zone background overlay - lowest z-index */}
+          {isDraggingOverLibrary && (
+            <div className="absolute inset-0 bg-blue-500/5 pointer-events-none z-0" />
+          )}
+
+          {/* Upload loading overlay - highest z-index */}
+          {isUploadingToLibrary && (
+            <div className="absolute inset-0 bg-neutral-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="bg-neutral-800 border border-neutral-700 rounded-lg px-6 py-4">
+                <p className="text-sm font-medium text-neutral-200">
+                  Uploading file...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Content - middle z-index */}
+          <div className="max-w-7xl mx-auto p-8 space-y-6 relative z-10">
             <LibraryFilters
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -391,9 +571,13 @@ export default function LibraryPage() {
               onToggleActivities={() => setShowActivities(!showActivities)}
             />
 
-            {/* Activity Banners */}
+            {/* Activity Banners - elevated on drag */}
             {showActivities && enrichedActivities.length > 0 && (
-              <div className="space-y-4 mb-8">
+              <div
+                className={`space-y-4 mb-8 transition-transform ${
+                  isDraggingOverLibrary ? "scale-[0.98] opacity-90" : ""
+                }`}
+              >
                 {enrichedActivities.map((activity) => (
                   <ActivityBanner
                     key={activity.id}
@@ -401,6 +585,7 @@ export default function LibraryPage() {
                     onDropWork={handleDropWorkToActivity}
                     onDropBlob={handleDropBlobToActivity}
                     onDropAsset={handleDropAssetToActivity}
+                    onDropFiles={handleDropFilesToActivity}
                     onUnlinkWork={handleUnlinkWorkFromActivity}
                     onUnlinkAsset={handleUnlinkAssetFromActivity}
                   />
@@ -408,17 +593,11 @@ export default function LibraryPage() {
               </div>
             )}
 
-            {/* Works Drop Zone - Wraps works area or empty state */}
+            {/* Works Area - elevated on drag */}
             <div
-              className={`transition-all ${
-                isDraggingOverLibrary
-                  ? "bg-blue-500/5 border-2 border-dashed border-blue-500/30 rounded-lg mx-8 min-h-[200px]"
-                  : ""
+              className={`transition-all duration-200 ${
+                isDraggingOverLibrary ? "scale-[0.98] opacity-90" : ""
               }`}
-              onDragEnter={handleLibraryDragEnter}
-              onDragOver={handleLibraryDragOver}
-              onDragLeave={handleLibraryDragLeave}
-              onDrop={handleLibraryDrop}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
@@ -462,10 +641,10 @@ export default function LibraryPage() {
                   </div>
                 </div>
               ) : (
-                <div className={isDraggingOverLibrary ? "pb-20" : ""}>
-                  {/* Drop zone indicator overlay for when works exist */}
+                <>
+                  {/* Drop zone indicator when works exist */}
                   {isDraggingOverLibrary && (
-                    <div className="absolute inset-x-0 bottom-0 pointer-events-none z-10 flex items-center justify-center pb-8">
+                    <div className="flex items-center justify-center py-4 mb-4">
                       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg px-6 py-3 backdrop-blur-sm">
                         <div className="flex items-center gap-2">
                           <Link2 className="w-5 h-5 text-blue-400" />
@@ -513,7 +692,7 @@ export default function LibraryPage() {
                       ))}
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>

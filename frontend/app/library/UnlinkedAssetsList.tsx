@@ -1,40 +1,45 @@
 /**
- * FileInbox Component
- * Displays new files (inbox) - orphaned blobs that have never been touched
+ * UnlinkedAssetsList Component
+ * Displays assets that were created but are not currently linked to any work or activity
  */
 
 "use client";
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileQuestion, Link, ChevronDown, ChevronUp } from "lucide-react";
-import { useOrphanedBlobs } from "@/src/hooks/useBlobs";
+import { Package, Link, ChevronDown, ChevronUp } from "lucide-react";
+import { useUnlinkedAssets } from "@/src/hooks/useBlobs";
 import { MarkdownPreview } from "../reader/MarkdownPreview";
-import type { BlobWithMetadata } from "@/src/schema/blobs";
+import type { Asset } from "@/src/schema/library";
 
-interface FileInboxProps {
-  onLinkBlob: (blob: BlobWithMetadata) => void;
-  onViewBlob: (blob: BlobWithMetadata) => void;
+interface UnlinkedAssetsListProps {
+  onLinkAsset: (asset: Asset) => void;
+  onViewAsset: (asset: Asset) => void;
+  onMoveToInbox: (assetId: string) => void;
 }
 
-export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
+export function UnlinkedAssetsList({
+  onLinkAsset,
+  onViewAsset,
+  onMoveToInbox,
+}: UnlinkedAssetsListProps) {
   const queryClient = useQueryClient();
-  const { data: newFiles } = useOrphanedBlobs();
+  const unlinkedAssets = useUnlinkedAssets();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
+  const [assetContextMenu, setAssetContextMenu] = useState<{
     x: number;
     y: number;
-    blob: BlobWithMetadata;
+    asset: Asset;
   } | null>(null);
-  const [renamingBlob, setRenamingBlob] = useState<string | null>(null);
+  const [renamingAsset, setRenamingAsset] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [viewingMarkdown, setViewingMarkdown] = useState<{
-    blob: BlobWithMetadata;
+    asset: Asset;
     content: string;
   } | null>(null);
 
-  const hasNewFiles = newFiles && newFiles.length > 0;
+  const hasUnlinkedAssets = unlinkedAssets && unlinkedAssets.length > 0;
 
   // Helper to get filename without extension for display
   const getDisplayName = (filename: string | null) => {
@@ -57,31 +62,10 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
   };
 
   // Helper to format file metadata based on file type
-  const getFileMetadata = (
-    mime: string,
-    pageCount?: number,
-    imageWidth?: number,
-    imageHeight?: number,
-    lineCount?: number
-  ) => {
+  const getFileMetadata = (mime: string, pageCount?: number) => {
     // PDF files: show page count
     if (mime === "application/pdf" && pageCount) {
       return `${pageCount} ${pageCount === 1 ? "page" : "pages"}`;
-    }
-
-    // Images: show resolution
-    if (mime.startsWith("image/") && imageWidth && imageHeight) {
-      return `${imageWidth}×${imageHeight}`;
-    }
-
-    // Text files: show line count
-    if (
-      (mime === "text/plain" ||
-        mime === "text/markdown" ||
-        mime.startsWith("text/")) &&
-      lineCount
-    ) {
-      return `${lineCount} ${lineCount === 1 ? "line" : "lines"}`;
     }
 
     return null;
@@ -162,8 +146,9 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
     );
   };
 
-  // Handle rename
-  const handleRename = async (
+  // Handle asset rename
+  const handleAssetRename = async (
+    assetId: string,
     hash: string,
     newFilename: string,
     originalFilename: string | null
@@ -184,6 +169,7 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
       // Add the original extension back
       finalFilename = finalFilename + originalExt;
 
+      // Rename on server (updates SQLite DB and file on disk)
       const response = await fetch(`/api/library/blobs/${hash}/rename`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -195,10 +181,17 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
         throw new Error(error.error || "Rename failed");
       }
 
+      // Update asset in Dexie
+      const { db } = await import("@/src/db/dexie");
+      await db.assets.update(assetId, {
+        filename: finalFilename,
+        updatedAt: new Date().toISOString(),
+      });
+
       // Refresh data
       queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
       queryClient.invalidateQueries({ queryKey: ["files"] });
-      setRenamingBlob(null);
+      setRenamingAsset(null);
     } catch (error) {
       console.error("Rename failed:", error);
       alert(
@@ -207,9 +200,14 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
     }
   };
 
-  // Handle delete
-  const handleDelete = async (hash: string) => {
+  // Handle asset delete
+  const handleAssetDelete = async (assetId: string, hash: string) => {
     try {
+      // Delete asset from Dexie
+      const { db } = await import("@/src/db/dexie");
+      await db.assets.delete(assetId);
+
+      // Also delete blob from server
       const response = await fetch(`/api/library/blobs/${hash}/delete`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -217,8 +215,9 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Delete failed");
+        console.warn(
+          "Failed to delete blob from server, but asset was removed from Dexie"
+        );
       }
 
       // Refresh data
@@ -235,17 +234,17 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
 
   // Close context menu when clicking outside
   const handleClickOutside = () => {
-    setContextMenu(null);
+    setAssetContextMenu(null);
     setPendingDelete(null);
   };
 
   // Handle viewing markdown files
-  const handleViewMarkdown = async (blob: BlobWithMetadata) => {
+  const handleViewMarkdown = async (asset: Asset) => {
     try {
-      const response = await fetch(`/api/blob/${blob.sha256}`);
+      const response = await fetch(`/api/blob/${asset.sha256}`);
       if (!response.ok) throw new Error("Failed to fetch file");
       const text = await response.text();
-      setViewingMarkdown({ blob, content: text });
+      setViewingMarkdown({ asset, content: text });
     } catch (error) {
       console.error("Failed to load markdown:", error);
       alert("Failed to load markdown file");
@@ -257,18 +256,18 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <FileQuestion className="w-4 h-4 text-amber-500" />
+          <Package className="w-4 h-4 text-blue-500" />
           <h3 className="text-sm font-semibold text-neutral-200">
-            New Files (Inbox)
-            {hasNewFiles && (
+            Unlinked Assets
+            {hasUnlinkedAssets && (
               <span className="text-xs font-normal text-neutral-500 ml-2">
-                ({newFiles.length})
+                ({unlinkedAssets.length})
               </span>
             )}
           </h3>
         </div>
 
-        {hasNewFiles && (
+        {hasUnlinkedAssets && (
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-1 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 rounded transition-colors"
@@ -284,58 +283,63 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
       </div>
 
       {/* Empty state */}
-      {!hasNewFiles && (
+      {!hasUnlinkedAssets && (
         <div className="bg-neutral-800/30 border border-neutral-700/50 rounded-lg p-3 flex flex-col items-center justify-center text-center">
-          <FileQuestion className="w-8 h-8 text-neutral-600 mb-1.5" />
-          <p className="text-xs text-neutral-500">No new files</p>
+          <Package className="w-8 h-8 text-neutral-600 mb-1.5" />
+          <p className="text-xs text-neutral-500">No unlinked assets</p>
         </div>
       )}
 
       {/* Compact list */}
-      {hasNewFiles && !isCollapsed && (
+      {hasUnlinkedAssets && !isCollapsed && (
         <div
           className="space-y-1.5"
           onDragOver={(e) => {
-            // Allow dropping from unlinked assets back to inbox
-            if (e.dataTransfer.types.includes("application/x-asset-id")) {
+            // Allow dropping from inbox to convert to asset
+            if (e.dataTransfer.types.includes("application/x-blob-id")) {
               e.preventDefault();
               e.stopPropagation();
-              e.dataTransfer.dropEffect = "move";
+              e.dataTransfer.dropEffect = "copy";
             }
           }}
           onDrop={(e) => {
-            // Handle asset being moved back to inbox
-            const assetId = e.dataTransfer.getData("application/x-asset-id");
-            if (assetId) {
+            // Handle blob being converted to asset
+            const blobId = e.dataTransfer.getData("application/x-blob-id");
+            if (blobId) {
               e.preventDefault();
               e.stopPropagation();
               // This will be handled by parent component
             }
           }}
         >
-          {newFiles.map((blob) => {
-            const isRenaming = renamingBlob === blob.sha256;
-            const displayName = getDisplayName(blob.filename);
-            const fileExt = getFileExtension(blob.filename, blob.mime);
+          {unlinkedAssets.map((asset) => {
+            const isRenaming = renamingAsset === asset.id;
+            const displayName = getDisplayName(asset.filename);
+            const fileExt = getFileExtension(asset.filename, asset.mime);
             const colors = getFileTypeColor(fileExt);
-            const metadata = getFileMetadata(
-              blob.mime,
-              blob.pageCount,
-              blob.imageWidth,
-              blob.imageHeight,
-              blob.lineCount
-            );
+            const metadata = getFileMetadata(asset.mime, asset.pageCount);
 
             return (
               <div
-                key={blob.sha256}
+                key={asset.id}
                 draggable={!isRenaming}
                 onDragStart={(e) => {
+                  // Set asset ID for activity/work drops
+                  e.dataTransfer.setData("application/x-asset-id", asset.id);
+                  // Also set blob data for library area drops
+                  const blobData = {
+                    sha256: asset.sha256,
+                    size: asset.bytes,
+                    mime: asset.mime,
+                    filename: asset.filename,
+                    pageCount: asset.pageCount,
+                    path: null,
+                  };
                   e.dataTransfer.setData(
                     "application/x-deeprecall-blob",
-                    JSON.stringify(blob)
+                    JSON.stringify(blobData)
                   );
-                  e.dataTransfer.setData("application/x-blob-id", blob.sha256);
+                  e.dataTransfer.setData("application/x-blob-id", asset.sha256);
                   e.dataTransfer.effectAllowed = "link";
                   if (e.currentTarget instanceof HTMLElement) {
                     e.currentTarget.style.opacity = "0.5";
@@ -348,23 +352,23 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  setContextMenu({ x: e.clientX, y: e.clientY, blob });
+                  setAssetContextMenu({ x: e.clientX, y: e.clientY, asset });
                 }}
                 onClick={() => {
                   if (!isRenaming) {
-                    if (blob.mime === "application/pdf") {
-                      onViewBlob(blob);
+                    if (asset.mime === "application/pdf") {
+                      onViewAsset(asset);
                     } else if (
-                      blob.mime === "text/markdown" ||
-                      blob.mime === "text/plain" ||
-                      blob.filename?.endsWith(".md") ||
-                      blob.filename?.endsWith(".markdown")
+                      asset.mime === "text/markdown" ||
+                      asset.mime === "text/plain" ||
+                      asset.filename?.endsWith(".md") ||
+                      asset.filename?.endsWith(".markdown")
                     ) {
-                      handleViewMarkdown(blob);
+                      handleViewMarkdown(asset);
                     }
                   }
                 }}
-                className="bg-neutral-900/30 border border-amber-900/30 rounded-lg p-1.5 hover:border-amber-800/50 transition-colors cursor-move hover:cursor-pointer"
+                className="bg-neutral-900/30 border border-blue-900/30 rounded-lg p-1.5 hover:border-blue-800/50 transition-colors cursor-move hover:cursor-pointer"
               >
                 <div className="flex items-center gap-2">
                   {/* Filename - editable or clickable */}
@@ -375,13 +379,14 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
                       onChange={(e) => setRenameValue(e.target.value)}
                       onBlur={() => {
                         if (renameValue.trim() && renameValue !== displayName) {
-                          handleRename(
-                            blob.sha256,
+                          handleAssetRename(
+                            asset.id,
+                            asset.sha256,
                             renameValue.trim(),
-                            blob.filename
+                            asset.filename
                           );
                         } else {
-                          setRenamingBlob(null);
+                          setRenamingAsset(null);
                         }
                       }}
                       onKeyDown={(e) => {
@@ -390,20 +395,21 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
                             renameValue.trim() &&
                             renameValue !== displayName
                           ) {
-                            handleRename(
-                              blob.sha256,
+                            handleAssetRename(
+                              asset.id,
+                              asset.sha256,
                               renameValue.trim(),
-                              blob.filename
+                              asset.filename
                             );
                           } else {
-                            setRenamingBlob(null);
+                            setRenamingAsset(null);
                           }
                         } else if (e.key === "Escape") {
-                          setRenamingBlob(null);
+                          setRenamingAsset(null);
                         }
                       }}
                       autoFocus
-                      className="flex-1 min-w-0 text-sm text-neutral-300 font-medium bg-neutral-800 border border-neutral-700 rounded px-2 py-1 focus:outline-none focus:border-amber-500"
+                      className="flex-1 min-w-0 text-sm text-neutral-300 font-medium bg-neutral-800 border border-neutral-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
                     />
                   ) : (
                     <div className="flex-1 min-w-0">
@@ -416,7 +422,7 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
                         >
                           {fileExt}
                         </span>
-                        <span>{(blob.size / 1024 / 1024).toFixed(2)} MB</span>
+                        <span>{(asset.bytes / 1024 / 1024).toFixed(2)} MB</span>
                         {metadata && (
                           <>
                             <span>·</span>
@@ -432,9 +438,9 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onLinkBlob(blob);
+                        onLinkAsset(asset);
                       }}
-                      className="flex-shrink-0 p-1.5 text-amber-500 hover:bg-amber-500/10 rounded transition-colors"
+                      className="flex-shrink-0 p-1.5 text-blue-500 hover:bg-blue-500/10 rounded transition-colors"
                       title="Link to work"
                     >
                       <Link className="w-4 h-4" />
@@ -448,7 +454,7 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
       )}
 
       {/* Context Menu */}
-      {contextMenu && (
+      {assetContextMenu && (
         <>
           {/* Backdrop to close menu */}
           <div className="fixed inset-0 z-40" onClick={handleClickOutside} />
@@ -456,13 +462,13 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
           {/* Menu */}
           <div
             className="fixed z-50 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[160px]"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+            style={{ left: assetContextMenu.x, top: assetContextMenu.y }}
           >
             <button
               onClick={() => {
-                setRenamingBlob(contextMenu.blob.sha256);
-                setRenameValue(getDisplayName(contextMenu.blob.filename));
-                setContextMenu(null);
+                setRenamingAsset(assetContextMenu.asset.id);
+                setRenameValue(getDisplayName(assetContextMenu.asset.filename));
+                setAssetContextMenu(null);
               }}
               className="w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-neutral-700 transition-colors"
             >
@@ -470,29 +476,32 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
             </button>
             <button
               onClick={() => {
-                onLinkBlob(contextMenu.blob);
-                setContextMenu(null);
+                onMoveToInbox(assetContextMenu.asset.id);
+                setAssetContextMenu(null);
               }}
               className="w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-neutral-700 transition-colors"
             >
-              Link to work
+              Move to inbox
             </button>
             <button
               onClick={() => {
-                if (pendingDelete === contextMenu.blob.sha256) {
-                  handleDelete(contextMenu.blob.sha256);
-                  setContextMenu(null);
+                if (pendingDelete === assetContextMenu.asset.id) {
+                  handleAssetDelete(
+                    assetContextMenu.asset.id,
+                    assetContextMenu.asset.sha256
+                  );
+                  setAssetContextMenu(null);
                 } else {
-                  setPendingDelete(contextMenu.blob.sha256);
+                  setPendingDelete(assetContextMenu.asset.id);
                 }
               }}
               className={`w-full px-4 py-2 text-left text-sm transition-colors ${
-                pendingDelete === contextMenu.blob.sha256
+                pendingDelete === assetContextMenu.asset.id
                   ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
                   : "text-red-500 hover:bg-neutral-700"
               }`}
             >
-              {pendingDelete === contextMenu.blob.sha256
+              {pendingDelete === assetContextMenu.asset.id
                 ? "Click again to remove"
                 : "Remove"}
             </button>
@@ -504,16 +513,18 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
       {viewingMarkdown && (
         <MarkdownPreview
           initialContent={viewingMarkdown.content}
-          title={viewingMarkdown.blob.filename || "Markdown Preview"}
-          sha256={viewingMarkdown.blob.sha256}
+          title={viewingMarkdown.asset.filename || "Markdown Preview"}
+          sha256={viewingMarkdown.asset.sha256}
           onClose={() => setViewingMarkdown(null)}
           onSaved={(newHash) => {
             // Update the viewing markdown with new hash
             setViewingMarkdown((prev) =>
-              prev ? { ...prev, blob: { ...prev.blob, sha256: newHash } } : null
+              prev
+                ? { ...prev, asset: { ...prev.asset, sha256: newHash } }
+                : null
             );
-            // Trigger a refresh of the blobs list
-            queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
+            // Trigger a refresh of the assets list
+            queryClient.invalidateQueries({ queryKey: ["unlinkedAssets"] });
           }}
         />
       )}

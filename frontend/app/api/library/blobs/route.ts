@@ -29,6 +29,11 @@ export interface BlobWithMetadata {
     creationDate?: string;
     modificationDate?: string;
   };
+  // Image metadata (if applicable)
+  imageWidth?: number;
+  imageHeight?: number;
+  // Text file metadata (if applicable)
+  lineCount?: number;
 }
 
 export async function GET() {
@@ -47,6 +52,11 @@ export async function GET() {
           filename: blob.filename,
           path: blob.path,
           health: (blob as any).health || "healthy",
+          // Image metadata (from database)
+          imageWidth: (blob as any).imageWidth,
+          imageHeight: (blob as any).imageHeight,
+          // Text file metadata (from database)
+          lineCount: (blob as any).lineCount,
         };
 
         // If it's a PDF, extract metadata

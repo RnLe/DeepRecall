@@ -9,6 +9,9 @@ import {
   RefreshCw,
   Trash2,
   Network,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import type { BlobWithMetadata } from "../api/library/blobs/route";
 import Link from "next/link";
@@ -27,6 +30,28 @@ interface DuplicateGroup {
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
+  const [editingHash, setEditingHash] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  // Helper to get filename without extension for display
+  const getDisplayName = (filename: string | null) => {
+    if (!filename) return "Untitled";
+    const lastDotIndex = filename.lastIndexOf(".");
+    if (lastDotIndex > 0) {
+      return filename.substring(0, lastDotIndex);
+    }
+    return filename;
+  };
+
+  // Helper to get file extension
+  const getFileExt = (filename: string | null) => {
+    if (!filename) return "";
+    const lastDotIndex = filename.lastIndexOf(".");
+    if (lastDotIndex > 0 && lastDotIndex < filename.length - 1) {
+      return filename.substring(lastDotIndex);
+    }
+    return "";
+  };
 
   // Fetch raw blobs from database (with paths and health status)
   const {
@@ -79,6 +104,54 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
       queryClient.invalidateQueries({ queryKey: ["files"] });
+    },
+  });
+
+  // Rename blob mutation
+  const renameBlobMutation = useMutation({
+    mutationFn: async ({
+      hash,
+      filename,
+      originalFilename,
+    }: {
+      hash: string;
+      filename: string;
+      originalFilename: string | null;
+    }) => {
+      // Get the original extension
+      const originalExt = getFileExt(originalFilename);
+
+      // If user provided extension, strip it
+      let finalFilename = filename;
+      if (originalExt && finalFilename.endsWith(originalExt)) {
+        finalFilename = finalFilename.substring(
+          0,
+          finalFilename.length - originalExt.length
+        );
+      }
+
+      // Add the original extension back
+      finalFilename = finalFilename + originalExt;
+
+      const response = await fetch(`/api/library/blobs/${hash}/rename`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: finalFilename }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Rename failed");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      setEditingHash(null);
+    },
+    onError: (error: Error) => {
+      alert(`Rename failed: ${error.message}`);
+      setEditingHash(null);
     },
   });
 
@@ -250,6 +323,7 @@ export default function AdminPage() {
                       modified: "text-yellow-500",
                       relocated: "text-blue-500",
                     };
+                    const isEditing = editingHash === blob.sha256;
                     return (
                       <tr
                         key={`${blob.sha256}-${blob.path || "no-path"}`}
@@ -264,13 +338,86 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td
-                          className="p-3 text-sm font-medium cursor-help"
+                          className="p-3 text-sm font-medium"
                           title={blob.path || "No path available"}
                         >
-                          {blob.filename || (
-                            <span className="text-gray-600 italic">
-                              Untitled
-                            </span>
+                          {isEditing ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const displayName = getDisplayName(
+                                      blob.filename
+                                    );
+                                    if (
+                                      editValue.trim() &&
+                                      editValue !== displayName
+                                    ) {
+                                      renameBlobMutation.mutate({
+                                        hash: blob.sha256,
+                                        filename: editValue.trim(),
+                                        originalFilename: blob.filename,
+                                      });
+                                    } else {
+                                      setEditingHash(null);
+                                    }
+                                  } else if (e.key === "Escape") {
+                                    setEditingHash(null);
+                                  }
+                                }}
+                                autoFocus
+                                className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              />
+                              <button
+                                onClick={() => {
+                                  const displayName = getDisplayName(
+                                    blob.filename
+                                  );
+                                  if (
+                                    editValue.trim() &&
+                                    editValue !== displayName
+                                  ) {
+                                    renameBlobMutation.mutate({
+                                      hash: blob.sha256,
+                                      filename: editValue.trim(),
+                                      originalFilename: blob.filename,
+                                    });
+                                  } else {
+                                    setEditingHash(null);
+                                  }
+                                }}
+                                className="p-1 text-green-500 hover:bg-green-500/10 rounded"
+                                title="Save"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setEditingHash(null)}
+                                className="p-1 text-red-500 hover:bg-red-500/10 rounded"
+                                title="Cancel"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="flex-1">
+                                {getDisplayName(blob.filename)}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setEditingHash(blob.sha256);
+                                  setEditValue(getDisplayName(blob.filename));
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-500/10 rounded text-blue-400"
+                                title="Rename"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           )}
                         </td>
                         <td className="p-3 font-mono text-sm text-blue-400">

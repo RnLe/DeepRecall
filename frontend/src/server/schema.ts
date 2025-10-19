@@ -17,6 +17,11 @@ export const blobs = sqliteTable("blobs", {
   created_ms: integer("created_ms").notNull(), // timestamp when added to database
   filename: text("filename"), // optional, original filename
   health: text("health").default("healthy"), // healthy | missing | modified | relocated | duplicate
+  // Image metadata
+  imageWidth: integer("image_width"), // width in pixels for images
+  imageHeight: integer("image_height"), // height in pixels for images
+  // Text file metadata
+  lineCount: integer("line_count"), // number of lines for text files
 });
 
 /**

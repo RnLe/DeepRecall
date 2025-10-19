@@ -4,7 +4,11 @@ CREATE TABLE `blobs` (
 	`mime` text NOT NULL,
 	`mtime_ms` integer NOT NULL,
 	`created_ms` integer NOT NULL,
-	`filename` text
+	`filename` text,
+	`health` text DEFAULT 'healthy',
+	`image_width` integer,
+	`image_height` integer,
+	`line_count` integer
 );
 --> statement-breakpoint
 CREATE TABLE `paths` (

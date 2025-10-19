@@ -9,6 +9,7 @@ import { getDB } from "./db";
 import { blobs, paths } from "./schema";
 import { hashFile, hashBuffer } from "./hash";
 import { eq } from "drizzle-orm";
+import { extractFileMetadata, extractBufferMetadata } from "./metadata";
 
 /**
  * Get the library directory path from environment or default
@@ -137,6 +138,9 @@ async function processFile(filePath: string): Promise<boolean> {
     const mime = getMimeType(filePath);
     const filename = path.basename(filePath);
 
+    // Extract file-specific metadata
+    const metadata = await extractFileMetadata(filePath, mime);
+
     const db = getDB();
 
     // Insert or update blob metadata
@@ -150,6 +154,9 @@ async function processFile(filePath: string): Promise<boolean> {
         created_ms: Date.now(),
         filename,
         health: "healthy",
+        imageWidth: metadata.imageWidth,
+        imageHeight: metadata.imageHeight,
+        lineCount: metadata.lineCount,
       })
       .onConflictDoUpdate({
         target: blobs.hash,
@@ -160,6 +167,9 @@ async function processFile(filePath: string): Promise<boolean> {
           // Don't update created_ms on conflict - keep original
           filename,
           health: "healthy",
+          imageWidth: metadata.imageWidth,
+          imageHeight: metadata.imageHeight,
+          lineCount: metadata.lineCount,
         },
       });
 
@@ -396,6 +406,9 @@ export async function scanLibrary(): Promise<{
 
       const mime = getMimeType(filePath);
 
+      // Extract file-specific metadata
+      const metadata = await extractFileMetadata(filePath, mime);
+
       // Add blob
       await db
         .insert(blobs)
@@ -407,6 +420,9 @@ export async function scanLibrary(): Promise<{
           created_ms: Date.now(),
           filename: fileInfo.filename,
           health: "healthy",
+          imageWidth: metadata.imageWidth,
+          imageHeight: metadata.imageHeight,
+          lineCount: metadata.lineCount,
         })
         .onConflictDoUpdate({
           target: blobs.hash,
@@ -415,6 +431,9 @@ export async function scanLibrary(): Promise<{
             size: fileInfo.size,
             mtime_ms: fileInfo.stats.mtimeMs,
             filename: fileInfo.filename,
+            imageWidth: metadata.imageWidth,
+            imageHeight: metadata.imageHeight,
+            lineCount: metadata.lineCount,
           },
         });
 
@@ -533,6 +552,9 @@ export async function listFilesWithPaths() {
       created_ms: blobs.created_ms,
       filename: blobs.filename,
       health: blobs.health,
+      imageWidth: blobs.imageWidth,
+      imageHeight: blobs.imageHeight,
+      lineCount: blobs.lineCount,
       path: paths.path,
     })
     .from(blobs)
@@ -650,6 +672,9 @@ export async function storeBlob(
   const size = buffer.length;
   const now = Date.now();
 
+  // Extract file-specific metadata from buffer
+  const metadata = await extractBufferMetadata(buffer, mime);
+
   // Insert blob metadata
   await db
     .insert(blobs)
@@ -661,6 +686,9 @@ export async function storeBlob(
       created_ms: now,
       filename,
       health: "healthy",
+      imageWidth: metadata.imageWidth,
+      imageHeight: metadata.imageHeight,
+      lineCount: metadata.lineCount,
     })
     .onConflictDoNothing();
 

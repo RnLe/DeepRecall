@@ -26,6 +26,7 @@ interface ActivityBannerProps {
   onDropWork: (activityId: string, workId: string) => void;
   onDropBlob: (activityId: string, blobId: string) => void;
   onDropAsset: (activityId: string, assetId: string) => void;
+  onDropFiles: (activityId: string, files: FileList) => void;
   onUnlinkWork: (activityId: string, workId: string) => void;
   onUnlinkAsset: (activityId: string, assetId: string) => void;
 }
@@ -55,6 +56,7 @@ export function ActivityBanner({
   onDropWork,
   onDropBlob,
   onDropAsset,
+  onDropFiles,
   onUnlinkWork,
   onUnlinkAsset,
 }: ActivityBannerProps) {
@@ -103,14 +105,31 @@ export function ActivityBanner({
 
   // Handle drag events
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
+    // Accept both internal drag data and external files
+    if (
+      e.dataTransfer.types.includes("application/x-work-id") ||
+      e.dataTransfer.types.includes("application/x-blob-id") ||
+      e.dataTransfer.types.includes("application/x-asset-id") ||
+      e.dataTransfer.types.includes("Files")
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(true);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Only clear isDragOver if we're truly leaving the banner, not just entering a child
+    const relatedTarget = e.relatedTarget as Node | null;
+    const currentTarget = e.currentTarget as Node;
+
+    if (relatedTarget && currentTarget.contains(relatedTarget)) {
+      return;
+    }
+
     setIsDragOver(false);
   };
 
@@ -119,6 +138,14 @@ export function ActivityBanner({
     e.stopPropagation();
     setIsDragOver(false);
 
+    // Priority 1: Check for external files
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      onDropFiles(activity.id, files);
+      return;
+    }
+
+    // Priority 2: Check for drag data
     const workId = e.dataTransfer.getData("application/x-work-id");
     const blobId = e.dataTransfer.getData("application/x-blob-id");
     const assetId = e.dataTransfer.getData("application/x-asset-id");

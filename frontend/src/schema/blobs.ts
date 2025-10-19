@@ -53,6 +53,11 @@ export const BlobWithMetadataSchema = z.object({
   health: z
     .enum(["healthy", "missing", "modified", "relocated", "duplicate"])
     .optional(),
+  // Image metadata (optional)
+  imageWidth: z.number().optional(),
+  imageHeight: z.number().optional(),
+  // Text file metadata (optional)
+  lineCount: z.number().optional(),
 });
 
 export type BlobWithMetadata = z.infer<typeof BlobWithMetadataSchema>;
