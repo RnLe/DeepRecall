@@ -12,10 +12,14 @@ import {
   Pencil,
   Check,
   X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { BlobWithMetadata } from "../api/library/blobs/route";
 import Link from "next/link";
 import { DuplicateResolutionModal } from "./DuplicateResolutionModal";
+import { MarkdownPreview } from "../reader/MarkdownPreview";
+import { SimplePDFViewer } from "../reader/SimplePDFViewer";
 
 interface DuplicateGroup {
   hash: string;
@@ -32,6 +36,14 @@ export default function AdminPage() {
   const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
   const [editingHash, setEditingHash] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [viewingMarkdown, setViewingMarkdown] = useState<{
+    blob: BlobWithMetadata;
+    content: string;
+  } | null>(null);
+  const [viewingPDF, setViewingPDF] = useState<BlobWithMetadata | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortColumn, setSortColumn] = useState<keyof BlobWithMetadata>("mtime_ms");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Helper to get filename without extension for display
   const getDisplayName = (filename: string | null) => {
@@ -53,6 +65,75 @@ export default function AdminPage() {
     return "";
   };
 
+  // Helper to get relative time string
+  const getRelativeTime = (timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (days > 0) {
+      return `${days} day${days === 1 ? "" : "s"} ago`;
+    } else if (hours > 0) {
+      return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+    } else if (minutes > 0) {
+      return `${minutes} min${minutes === 1 ? "" : "s"} ago`;
+    } else {
+      return "Just now";
+    }
+  };
+
+  // Helper to handle column sorting
+  const handleSort = (column: keyof BlobWithMetadata) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // Helper to highlight matching text
+  const highlightText = (text: string, query: string) => {
+    if (!query) return text;
+    const parts = text.split(new RegExp(`(${query})`, "gi"));
+    return (
+      <>
+        {parts.map((part, i) =>
+          part.toLowerCase() === query.toLowerCase() ? (
+            <mark key={i} className="bg-yellow-500/30 text-yellow-200">
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  };
+
+  // Helper to find matching substring in hash
+  const getHashDisplay = (hash: string, query: string) => {
+    if (!query) return `${hash.slice(0, 16)}...`;
+    const lowerHash = hash.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const index = lowerHash.indexOf(lowerQuery);
+    if (index !== -1) {
+      const start = Math.max(0, index - 3);
+      const end = Math.min(hash.length, index + query.length + 3);
+      const snippet = hash.slice(start, end);
+      return (
+        <>
+          {start > 0 && "..."}
+          {highlightText(snippet, query)}
+          {end < hash.length && "..."}
+        </>
+      );
+    }
+    return `${hash.slice(0, 16)}...`;
+  };
+
   // Fetch raw blobs from database (with paths and health status)
   const {
     data: blobs,
@@ -68,6 +149,41 @@ export default function AdminPage() {
       return response.json();
     },
   });
+
+  // Filter and sort blobs
+  const filteredAndSortedBlobs = blobs
+    ? blobs
+        .filter((blob) => {
+          if (!searchQuery) return true;
+          const query = searchQuery.toLowerCase();
+          return (
+            blob.filename?.toLowerCase().includes(query) ||
+            blob.sha256.toLowerCase().includes(query) ||
+            blob.mime.toLowerCase().includes(query) ||
+            blob.health?.toLowerCase().includes(query) ||
+            new Date(blob.created_ms).toLocaleString().toLowerCase().includes(query) ||
+            new Date(blob.mtime_ms).toLocaleString().toLowerCase().includes(query)
+          );
+        })
+        .sort((a, b) => {
+          let aVal: any = a[sortColumn];
+          let bVal: any = b[sortColumn];
+
+          // Handle null/undefined
+          if (aVal == null) return 1;
+          if (bVal == null) return -1;
+
+          // Compare values
+          if (typeof aVal === "string") {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+          }
+
+          if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+          if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+          return 0;
+        })
+    : [];
 
   // Rescan mutation
   const rescanMutation = useMutation({
@@ -211,15 +327,37 @@ export default function AdminPage() {
     }
   };
 
+  // Handle viewing blobs in preview modals
+  const handleViewBlob = async (blob: BlobWithMetadata) => {
+    if (blob.mime === "application/pdf") {
+      setViewingPDF(blob);
+    } else if (
+      blob.mime === "text/markdown" ||
+      blob.mime === "text/plain" ||
+      blob.filename?.endsWith(".md") ||
+      blob.filename?.endsWith(".markdown")
+    ) {
+      try {
+        const response = await fetch(`/api/blob/${blob.sha256}`);
+        if (!response.ok) throw new Error("Failed to fetch file");
+        const text = await response.text();
+        setViewingMarkdown({ blob, content: text });
+      } catch (error) {
+        console.error("Failed to load markdown:", error);
+        alert("Failed to load markdown file");
+      }
+    }
+  };
+
   return (
     <div className="h-screen overflow-y-auto p-8 bg-gray-950">
-      <div className="max-w-7xl mx-auto space-y-6 pb-8">
+      <div className="w-[90%] mx-auto space-y-4 pb-8">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Database className="w-10 h-10 text-blue-400" />
-            <div>
-              <h1 className="text-4xl font-bold">Database Admin</h1>
-              <p className="text-gray-400 mt-2">
+            <Database className="w-8 h-8 text-blue-400" />
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-3xl font-bold">Database Admin</h1>
+              <p className="text-sm text-gray-500">
                 Raw blob storage (content-addressable layer)
               </p>
             </div>
@@ -228,7 +366,7 @@ export default function AdminPage() {
             <button
               onClick={() => rescanMutation.mutate()}
               disabled={rescanMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 hover:bg-blue-600/10 disabled:border-gray-700 disabled:text-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors"
             >
               <RefreshCw
                 className={`w-4 h-4 ${rescanMutation.isPending ? "animate-spin" : ""}`}
@@ -238,7 +376,7 @@ export default function AdminPage() {
             <button
               onClick={handleClear}
               disabled={clearMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border border-red-600 text-red-600 hover:bg-red-600/10 disabled:border-gray-700 disabled:text-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors"
             >
               <Trash2 className="w-4 h-4" />
               {clearMutation.isPending ? "Clearing..." : "Clear Database"}
@@ -246,32 +384,32 @@ export default function AdminPage() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-6 bg-gray-900 border border-gray-800 rounded-lg">
-            <HardDrive className="w-8 h-8 text-green-400 mb-3" />
-            <p className="text-2xl font-bold">{blobs?.length || 0}</p>
-            <p className="text-sm text-gray-400">Total Blobs</p>
+        <div className="flex items-center gap-6 p-4 bg-gray-900 border border-gray-800 rounded-lg">
+          <div className="flex items-center gap-2">
+            <HardDrive className="w-5 h-5 text-green-400" />
+            <span className="text-lg font-bold">{filteredAndSortedBlobs.length}</span>
+            <span className="text-sm text-gray-400">Total Blobs</span>
           </div>
-
-          <div className="p-6 bg-gray-900 border border-gray-800 rounded-lg">
-            <FileText className="w-8 h-8 text-blue-400 mb-3" />
-            <p className="text-2xl font-bold">
-              {blobs
+          <div className="w-px h-6 bg-gray-700" />
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-400" />
+            <span className="text-lg font-bold">
+              {filteredAndSortedBlobs.length
                 ? (
-                    blobs.reduce((acc, b) => acc + b.size, 0) /
+                    filteredAndSortedBlobs.reduce((acc, b) => acc + b.size, 0) /
                     1024 /
                     1024
                   ).toFixed(2)
                 : 0}{" "}
               MB
-            </p>
-            <p className="text-sm text-gray-400">Total Size</p>
+            </span>
+            <span className="text-sm text-gray-400">Total Size</span>
           </div>
-
-          <div className="p-6 bg-gray-900 border border-gray-800 rounded-lg">
-            <Database className="w-8 h-8 text-purple-400 mb-3" />
-            <p className="text-2xl font-bold">SQLite</p>
-            <p className="text-sm text-gray-400">Storage Backend</p>
+          <div className="w-px h-6 bg-gray-700" />
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-purple-400" />
+            <span className="text-lg font-bold">SQLite</span>
+            <span className="text-sm text-gray-400">Storage Backend</span>
           </div>
         </div>
 
@@ -293,29 +431,125 @@ export default function AdminPage() {
           </div>
         )}
 
-        {blobs && blobs.length > 0 && (
+        {filteredAndSortedBlobs.length > 0 && (
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold mb-4">Blobs Table</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">Blobs Table</h2>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500 w-64"
+              />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="p-3 text-gray-400 font-medium">Health</th>
-                    <th className="p-3 text-gray-400 font-medium">Filename</th>
-                    <th className="p-3 text-gray-400 font-medium">
-                      Hash (SHA-256)
+                    <th
+                      className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                      onClick={() => handleSort("health")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Health
+                        {sortColumn === "health" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          ))}
+                      </div>
                     </th>
-                    <th className="p-3 text-gray-400 font-medium">Size</th>
-                    <th className="p-3 text-gray-400 font-medium">MIME</th>
-                    <th className="p-3 text-gray-400 font-medium">
-                      Date Added
+                    <th
+                      className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                      onClick={() => handleSort("filename")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Filename
+                        {sortColumn === "filename" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          ))}
+                      </div>
                     </th>
-                    <th className="p-3 text-gray-400 font-medium">Modified</th>
-                    <th className="p-3 text-gray-400 font-medium">Actions</th>
+                    <th
+                      className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                      onClick={() => handleSort("sha256")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Hash (SHA-256)
+                        {sortColumn === "sha256" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          ))}
+                      </div>
+                    </th>
+                    <th
+                      className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                      onClick={() => handleSort("size")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Size
+                        {sortColumn === "size" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          ))}
+                      </div>
+                    </th>
+                    <th
+                      className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                      onClick={() => handleSort("mime")}
+                    >
+                      <div className="flex items-center gap-1">
+                        MIME
+                        {sortColumn === "mime" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          ))}
+                      </div>
+                    </th>
+                    <th
+                      className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                      onClick={() => handleSort("created_ms")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Date Added
+                        {sortColumn === "created_ms" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          ))}
+                      </div>
+                    </th>
+                    <th
+                      className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+                      onClick={() => handleSort("mtime_ms")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Modified
+                        {sortColumn === "mtime_ms" &&
+                          (sortDirection === "asc" ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          ))}
+                      </div>
+                    </th>
+                    <th className="px-2 py-1.5 text-xs text-gray-400 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {blobs.map((blob) => {
+                  {filteredAndSortedBlobs.map((blob) => {
                     const health = blob.health || "healthy";
                     const healthColors = {
                       healthy: "text-green-500",
@@ -327,9 +561,10 @@ export default function AdminPage() {
                     return (
                       <tr
                         key={`${blob.sha256}-${blob.path || "no-path"}`}
-                        className="group border-b border-gray-800 hover:bg-gray-900/50"
+                        onClick={() => !isEditing && handleViewBlob(blob)}
+                        className="group border-b border-gray-800 hover:bg-gray-900/50 cursor-pointer"
                       >
-                        <td className="p-3">
+                        <td className="px-2 py-1.5">
                           <span
                             className={`text-xs font-medium uppercase ${healthColors[health as keyof typeof healthColors]}`}
                             title={`File status: ${health}`}
@@ -338,7 +573,7 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td
-                          className="p-3 text-sm font-medium"
+                          className="px-2 py-1.5 text-sm font-medium"
                           title={blob.path || "No path available"}
                         >
                           {isEditing ? (
@@ -392,23 +627,45 @@ export default function AdminPage() {
                                 className="p-1 text-green-500 hover:bg-green-500/10 rounded"
                                 title="Save"
                               >
-                                <Check className="w-4 h-4" />
+                                <Check className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => setEditingHash(null)}
                                 className="p-1 text-red-500 hover:bg-red-500/10 rounded"
                                 title="Cancel"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="flex-1">
-                                {getDisplayName(blob.filename)}
-                              </span>
+                            <span>{highlightText(getDisplayName(blob.filename), searchQuery)}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 font-mono text-xs text-blue-400">
+                          {getHashDisplay(blob.sha256, searchQuery)}
+                        </td>
+                        <td className="px-2 py-1.5 text-xs">
+                          {highlightText(`${(blob.size / 1024 / 1024).toFixed(2)} MB`, searchQuery)}
+                        </td>
+                        <td className="px-2 py-1.5 text-xs text-gray-400">
+                          {highlightText(blob.mime.split("/")[1]?.toUpperCase() || "?", searchQuery)}
+                        </td>
+                        <td className="px-2 py-1.5 text-xs text-green-600">
+                          <span title={new Date(blob.created_ms).toLocaleString()}>
+                            {highlightText(getRelativeTime(blob.created_ms), searchQuery)}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 text-xs text-gray-500">
+                          <span title={new Date(blob.mtime_ms).toLocaleString()}>
+                            {highlightText(getRelativeTime(blob.mtime_ms), searchQuery)}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <div className="flex items-center gap-1">
+                            {!isEditing && (
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setEditingHash(blob.sha256);
                                   setEditValue(getDisplayName(blob.filename));
                                 }}
@@ -417,41 +674,25 @@ export default function AdminPage() {
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3 font-mono text-sm text-blue-400">
-                          {blob.sha256.slice(0, 16)}...
-                        </td>
-                        <td className="p-3 text-sm">
-                          {(blob.size / 1024 / 1024).toFixed(2)} MB
-                        </td>
-                        <td className="p-3 text-sm text-gray-400">
-                          {blob.mime.split("/")[1]?.toUpperCase() || "?"}
-                        </td>
-                        <td className="p-3 text-sm text-green-600">
-                          {new Date(blob.created_ms).toLocaleString()}
-                        </td>
-                        <td className="p-3 text-sm text-gray-500">
-                          {new Date(blob.mtime_ms).toLocaleString()}
-                        </td>
-                        <td className="p-3">
-                          <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  `Delete blob ${blob.filename || blob.sha256.slice(0, 16)}?\n\nThis will remove the database entry but keep the file on disk.`
-                                )
-                              ) {
-                                deleteBlobMutation.mutate(blob.sha256);
-                              }
-                            }}
-                            disabled={deleteBlobMutation.isPending}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-500/10 rounded text-red-500 hover:text-red-400 disabled:opacity-50"
-                            title="Delete blob entry"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (
+                                  confirm(
+                                    `Delete blob ${blob.filename || blob.sha256.slice(0, 16)}?\n\nThis will remove the database entry but keep the file on disk.`
+                                  )
+                                ) {
+                                  deleteBlobMutation.mutate(blob.sha256);
+                                }
+                              }}
+                              disabled={deleteBlobMutation.isPending}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/10 rounded text-red-500 hover:text-red-400 disabled:opacity-50"
+                              title="Delete blob entry"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -461,70 +702,6 @@ export default function AdminPage() {
             </div>
           </div>
         )}
-
-        <div className="mt-8 p-4 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-400">
-          <p className="font-semibold mb-2">💡 What is this?</p>
-          <ul className="space-y-1 ml-4 list-disc">
-            <li>
-              This shows <strong>raw blobs</strong> stored in the database
-              (content-addressable storage layer)
-            </li>
-            <li>
-              Each blob is identified by its SHA-256 hash (immutable,
-              deduplicated)
-            </li>
-            <li>
-              The <strong>library</strong> is a separate concept that will link
-              to these blobs with metadata
-            </li>
-            <li>
-              This is for debugging - users will interact with the library, not
-              this
-            </li>
-          </ul>
-        </div>
-
-        {/* Link to Graph Visualization */}
-        <div className="mt-12 pt-8 border-t border-gray-800">
-          <Link href="/admin/graph">
-            <div className="p-6 bg-gray-900 border border-gray-800 rounded-lg hover:border-gray-700 transition-colors cursor-pointer">
-              <div className="flex items-center gap-4">
-                <Network className="w-8 h-8 text-blue-400" />
-                <div>
-                  <h3 className="text-xl font-bold">
-                    Data Graph Visualization
-                  </h3>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Interactive force-directed graph of all local Dexie data
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        <div className="mt-8 p-4 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-400">
-          <p className="font-semibold mb-2">📊 Graph Visualization</p>
-          <ul className="space-y-1 ml-4 list-disc">
-            <li>
-              Shows <strong>local Dexie data</strong> (browser IndexedDB) - not
-              server blobs
-            </li>
-            <li>Visualizes the Asset mental model: Works → Assets</li>
-            <li>
-              <strong>Unlinked Assets</strong> (red) have no versionId and no
-              edges
-            </li>
-            <li>
-              Activities and Collections link to Works/Assets via "contains"
-              edges (dashed lines)
-            </li>
-            <li>
-              Drag nodes to reposition • Scroll to zoom • Live updates on data
-              changes
-            </li>
-          </ul>
-        </div>
       </div>
 
       {/* Duplicate Resolution Modal */}
@@ -533,6 +710,31 @@ export default function AdminPage() {
           duplicates={duplicates}
           onResolve={handleResolveDuplicates}
           onClose={() => setDuplicates([])}
+        />
+      )}
+
+      {/* Markdown Preview */}
+      {viewingMarkdown && (
+        <MarkdownPreview
+          initialContent={viewingMarkdown.content}
+          title={viewingMarkdown.blob.filename || "Markdown Preview"}
+          sha256={viewingMarkdown.blob.sha256}
+          onClose={() => setViewingMarkdown(null)}
+          onSaved={(newHash) => {
+            setViewingMarkdown((prev) =>
+              prev ? { ...prev, blob: { ...prev.blob, sha256: newHash } } : null
+            );
+            queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
+          }}
+        />
+      )}
+
+      {/* PDF Viewer */}
+      {viewingPDF && (
+        <SimplePDFViewer
+          sha256={viewingPDF.sha256}
+          title={viewingPDF.filename || "PDF Preview"}
+          onClose={() => setViewingPDF(null)}
         />
       )}
     </div>

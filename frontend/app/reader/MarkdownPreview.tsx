@@ -475,12 +475,12 @@ export function MarkdownPreview({
             <div className="flex-1 flex overflow-hidden">
               {/* Left: Editor */}
               <div className="flex-1 flex flex-col border-r border-blue-500/20">
-                <div className="px-4 py-2 bg-neutral-900/50 border-b border-blue-500/20 flex items-center justify-between">
+                <div className="px-4 py-2 bg-neutral-900/50 border-b border-blue-500/20 flex items-center justify-between min-h-[39px]">
                   <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wide">
                     {isEditable ? "Source (Editable)" : "Source (Read-only)"}
                   </h3>
                   {/* Save button - outlined style, only show when there are unsaved changes */}
-                  {isEditable && hasUnsavedChanges && (
+                  {isEditable && hasUnsavedChanges ? (
                     <button
                       onClick={handleSave}
                       disabled={isSaving}
@@ -490,6 +490,8 @@ export function MarkdownPreview({
                       <Save className="w-3.5 h-3.5" />
                       <span>{isSaving ? "Saving..." : "Save"}</span>
                     </button>
+                  ) : (
+                    <div className="w-[72px]" />
                   )}
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -527,6 +529,39 @@ export function MarkdownPreview({
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
+                        // Prevent images from loading to avoid 404 errors
+                        img: ({ node, ...props }) => {
+                          return (
+                            <img
+                              {...props}
+                              loading="lazy"
+                              onError={(e) => {
+                                // Prevent 404s from showing in console
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          );
+                        },
+                        // Handle links - prevent navigation for invalid URLs
+                        a: ({ node, ...props }) => {
+                          const href = props.href;
+                          // Only allow valid HTTP(S) URLs or anchors
+                          const isValid =
+                            href?.startsWith("http://") ||
+                            href?.startsWith("https://") ||
+                            href?.startsWith("#");
+                          
+                          if (!isValid && href) {
+                            // Invalid/relative URL - render as span
+                            return (
+                              <span className="text-blue-400 cursor-not-allowed opacity-50">
+                                {props.children}
+                              </span>
+                            );
+                          }
+                          
+                          return <a {...props} target="_blank" rel="noopener noreferrer" />;
+                        },
                         h1: ({ node, ...props }) => {
                           const text = props.children?.toString() || "";
                           const id = `heading-${text.toLowerCase().replace(/[^\w]+/g, "-")}`;
