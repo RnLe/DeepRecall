@@ -1,13 +1,16 @@
 /**
  * PUT /api/library/blobs/[hash]/update
- * Update a markdown file - creates a new blob and updates references
+ * Update a markdown file - creates a new blob and DELETES the old one completely
+ * This ensures only one version exists (no history)
  */
 
 import { NextResponse } from "next/server";
-import { storeBlob } from "@/src/server/cas";
+import { storeBlob, deleteBlob } from "@/src/server/cas";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { eq } from "drizzle-orm";
+import { rename } from "fs/promises";
+import path from "path";
 
 export async function PUT(
   request: Request,
@@ -35,14 +38,7 @@ export async function PUT(
 
     const db = getDB();
 
-    // Get old paths for this blob
-    const oldPaths = await db
-      .select()
-      .from(paths)
-      .where(eq(paths.hash, oldHash))
-      .all();
-
-    // Store new blob with updated content
+    // Store new blob with the provided filename
     const buffer = Buffer.from(content, "utf-8");
     const { hash: newHash, path: newPath } = await storeBlob(
       buffer,
@@ -50,47 +46,43 @@ export async function PUT(
       "notes"
     );
 
-    // Handle path and blob updates
-    if (newHash !== oldHash) {
-      // Content changed - new hash
-      for (const oldPath of oldPaths) {
-        // Delete old path reference
-        await db.delete(paths).where(eq(paths.path, oldPath.path)).run();
+    // Always delete the old blob completely (database + disk) FIRST
+    // This frees up the desired filename path in the database
+    if (oldHash && oldHash !== newHash) {
+      await deleteBlob(oldHash);
+    }
 
-        // Add new path reference with new hash
+    // Rename the physical file to match the desired filename
+    // CAS stores as ${hash}.md, but we want user-facing filename on disk
+    const directory = path.dirname(newPath);
+    const desiredPath = path.join(directory, filename);
+
+    if (newPath !== desiredPath) {
+      try {
+        await rename(newPath, desiredPath);
+        console.log(`Renamed file: ${newPath} → ${desiredPath}`);
+
+        // Delete the old path entry and insert new one
+        // (path is primary key, so we can't update to an existing path)
+        await db.delete(paths).where(eq(paths.hash, newHash)).run();
         await db
           .insert(paths)
           .values({
-            path: oldPath.path,
             hash: newHash,
+            path: desiredPath,
           })
           .run();
+      } catch (error) {
+        console.error("Failed to rename file:", error);
+        // Continue anyway - file exists with hash name
       }
-
-      // Delete the old blob entry since we have a new one
-      await db.delete(blobs).where(eq(blobs.hash, oldHash)).run();
-
-      // Update the new blob's filename
-      await db
-        .update(blobs)
-        .set({ filename })
-        .where(eq(blobs.hash, newHash))
-        .run();
-    } else {
-      // Content unchanged - same hash
-      // Just update the filename on the existing blob
-      await db
-        .update(blobs)
-        .set({ filename })
-        .where(eq(blobs.hash, newHash))
-        .run();
     }
 
     return NextResponse.json({
       success: true,
       hash: newHash,
       filename,
-      path: newPath,
+      path: desiredPath,
     });
   } catch (error) {
     console.error("Error updating blob:", error);

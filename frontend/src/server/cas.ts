@@ -720,3 +720,34 @@ export async function createMarkdownBlob(
   const buffer = Buffer.from(content, "utf-8");
   return storeBlob(buffer, filename, "notes");
 }
+
+/**
+ * Delete a blob completely from the database and disk
+ * Removes all traces: blob entry, path entries, and physical file
+ * @param hash - SHA-256 hash of the blob to delete
+ */
+export async function deleteBlob(hash: string): Promise<void> {
+  const db = getDB();
+
+  // Get the blob's file path before deleting from database
+  const pathRecord = await db
+    .select()
+    .from(paths)
+    .where(eq(paths.hash, hash))
+    .get();
+
+  // Delete from database first
+  await db.delete(paths).where(eq(paths.hash, hash)).run();
+  await db.delete(blobs).where(eq(blobs.hash, hash)).run();
+
+  // Then delete the physical file if path exists
+  if (pathRecord?.path) {
+    try {
+      await unlink(pathRecord.path);
+      console.log(`Deleted file: ${pathRecord.path}`);
+    } catch (error) {
+      // File might already be deleted or not exist - log but don't fail
+      console.warn(`Failed to delete file ${pathRecord.path}:`, error);
+    }
+  }
+}

@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { X, List, Check, AlertCircle, Loader2 } from "lucide-react";
+import { X, List, Check, AlertCircle, Save } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -51,15 +51,15 @@ export function MarkdownPreview({
   const [isEditingFilename, setIsEditingFilename] = useState(false);
   const [activeHeading, setActiveHeading] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "error"
-  >("idle");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">(
+    "idle"
+  );
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const isEditorScrolling = useRef(false);
   const isPreviewScrolling = useRef(false);
   const isUserScrolling = useRef(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const filenameInputRef = useRef<HTMLInputElement>(null);
 
   // Enable editing if sha256 is provided
@@ -143,41 +143,28 @@ export function MarkdownPreview({
     }
   }, []);
 
-  // Handle content changes with debounced auto-save
+  // Handle content changes
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
+    setHasUnsavedChanges(true);
+    setSaveStatus("idle");
     onChange?.(newContent);
-
-    // Auto-save with debounce if sha256 is provided
-    if (sha256 && isEditable) {
-      setSaveStatus("saving");
-
-      // Clear existing timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      // Set new timeout for auto-save (2 seconds after last edit)
-      saveTimeoutRef.current = setTimeout(async () => {
-        await saveContent(newContent, filename);
-      }, 2000);
-    }
   };
 
   // Save content to server
-  const saveContent = async (contentToSave: string, filenameToSave: string) => {
-    if (!sha256) return;
+  const handleSave = useCallback(async () => {
+    if (!sha256 || !hasUnsavedChanges) return;
 
     try {
       setIsSaving(true);
-      setSaveStatus("saving");
+      setSaveStatus("idle");
 
       const response = await fetch(`/api/library/blobs/${sha256}/update`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content: contentToSave,
-          filename: filenameToSave,
+          content: content,
+          filename: filename,
         }),
       });
 
@@ -186,14 +173,15 @@ export function MarkdownPreview({
       }
 
       const data = await response.json();
+      setHasUnsavedChanges(false);
       setSaveStatus("saved");
 
-      // Call onSaved callback with new hash if it changed
-      if (data.hash !== sha256 && onSaved) {
+      // Call onSaved callback with new hash
+      if (onSaved) {
         onSaved(data.hash);
       }
 
-      // Fade out after 1 second
+      // Fade out "Saved" indicator after 1 second
       setTimeout(() => {
         setSaveStatus("idle");
       }, 1000);
@@ -206,7 +194,7 @@ export function MarkdownPreview({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [sha256, hasUnsavedChanges, content, filename, onSaved]);
 
   // Handle filename edit
   const handleFilenameClick = () => {
@@ -224,26 +212,31 @@ export function MarkdownPreview({
     // Extract name without extension
     const nameWithoutExt = newFilename.replace(/\.md$/i, "");
 
-    // Validate: must have at least 1 character
-    if (nameWithoutExt.trim().length === 0) {
-      return;
-    }
-
-    // Always append .md
-    const finalFilename = nameWithoutExt.trim() + ".md";
+    // Allow empty input - we'll handle it on blur/save
+    const finalFilename = nameWithoutExt.trim()
+      ? nameWithoutExt.trim() + ".md"
+      : "";
     setFilename(finalFilename);
   };
 
   const handleFilenameBlur = async () => {
     setIsEditingFilename(false);
 
+    // If filename is empty, generate ISO date string
+    let finalFilename = filename;
+    if (!finalFilename || finalFilename.trim() === "") {
+      const isoDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      finalFilename = `${isoDate}.md`;
+      setFilename(finalFilename);
+    }
+
     // Save filename change if sha256 is provided
-    if (sha256 && filename !== title) {
+    if (sha256 && finalFilename !== title) {
       try {
         const response = await fetch(`/api/library/blobs/${sha256}/rename`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename }),
+          body: JSON.stringify({ filename: finalFilename }),
         });
 
         if (!response.ok) {
@@ -345,26 +338,30 @@ export function MarkdownPreview({
     }
   }, [tableOfContents]);
 
-  // Cleanup save timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Handle escape key to close
+  // Handle keyboard shortcuts (Escape to close, Ctrl+S to save)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isEditingFilename) {
         onClose();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (isEditable && hasUnsavedChanges && !isSaving) {
+          handleSave();
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, isEditingFilename]);
+  }, [
+    onClose,
+    isEditingFilename,
+    isEditable,
+    hasUnsavedChanges,
+    isSaving,
+    handleSave,
+  ]);
 
   return (
     <>
@@ -478,10 +475,22 @@ export function MarkdownPreview({
             <div className="flex-1 flex overflow-hidden">
               {/* Left: Editor */}
               <div className="flex-1 flex flex-col border-r border-blue-500/20">
-                <div className="px-4 py-2 bg-neutral-900/50 border-b border-blue-500/20">
+                <div className="px-4 py-2 bg-neutral-900/50 border-b border-blue-500/20 flex items-center justify-between">
                   <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wide">
                     {isEditable ? "Source (Editable)" : "Source (Read-only)"}
                   </h3>
+                  {/* Save button - outlined style, only show when there are unsaved changes */}
+                  {isEditable && hasUnsavedChanges && (
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-400 border border-blue-400 hover:bg-blue-500/10 disabled:text-blue-400/50 disabled:border-blue-400/50 disabled:cursor-not-allowed rounded transition-colors"
+                      title="Save changes (Ctrl+S)"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{isSaving ? "Saving..." : "Save"}</span>
+                    </button>
+                  )}
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <textarea
