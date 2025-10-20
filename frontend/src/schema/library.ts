@@ -59,6 +59,86 @@ export const PersonSchema = z.object({
 export type Person = z.infer<typeof PersonSchema>;
 
 // ============================================================================
+// Author = full entity for researchers/writers
+// Stored in Dexie for proper relationship management
+// ============================================================================
+
+/**
+ * Academic/professional titles
+ */
+export const AuthorTitleSchema = z.enum([
+  "Dr.",
+  "Prof.",
+  "PhD",
+  "M.Sc.",
+  "B.Sc.",
+  "M.A.",
+  "B.A.",
+  "Ph.D.",
+  "M.D.",
+  "Jr.",
+  "Sr.",
+  "III",
+  "IV",
+]);
+
+export type AuthorTitle = z.infer<typeof AuthorTitleSchema>;
+
+/**
+ * Author entity - full representation of a researcher/writer
+ */
+export const AuthorSchema = z.object({
+  id: Id,
+  kind: z.literal("author"),
+
+  // Name components
+  firstName: z.string(),
+  lastName: z.string(),
+  middleName: z.string().optional(),
+
+  // Optional title/suffix
+  title: z.string().optional(), // Allow free-form for flexibility beyond enum
+
+  // Professional info
+  affiliation: z.string().optional(), // Institution/organization
+  contact: z.string().optional(), // Email or other contact
+
+  // Standard identifiers
+  orcid: z.string().optional(), // ORCID iD (e.g., 0000-0002-1825-0097)
+
+  // Additional metadata
+  website: z.string().url().optional(),
+  bio: z.string().optional(), // Brief biography
+
+  // Timestamps
+  createdAt: ISODate,
+  updatedAt: ISODate,
+});
+
+export type Author = z.infer<typeof AuthorSchema>;
+
+/**
+ * Helper to get full name from Author
+ */
+export function getAuthorFullName(author: Author): string {
+  const parts = [
+    author.title,
+    author.firstName,
+    author.middleName,
+    author.lastName,
+  ].filter(Boolean);
+  return parts.join(" ");
+}
+
+/**
+ * Helper to get citation name (Last, First)
+ */
+export function getAuthorCitationName(author: Author): string {
+  const first = [author.firstName, author.middleName].filter(Boolean).join(" ");
+  return `${author.lastName}, ${first}`;
+}
+
+// ============================================================================
 // Work = abstract identity of a book/paper/notes
 // ============================================================================
 
@@ -84,7 +164,15 @@ export const WorkSchema = z.object({
   // Core identity
   title: z.string(),
   subtitle: z.string().optional(),
-  authors: z.array(PersonSchema).default([]),
+
+  // Authors: References to Author entities (many-to-many relationship)
+  // Stores Author IDs, actual Author data is in separate authors table
+  authorIds: z.array(Id).default([]),
+
+  // LEGACY: Keep for backward compatibility during migration
+  // Will be deprecated once all data is migrated to use authorIds
+  authors: z.array(PersonSchema).optional(),
+
   workType: WorkTypeSchema.default("paper"),
 
   // Topics/tags at the Work level

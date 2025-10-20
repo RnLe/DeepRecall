@@ -17,7 +17,12 @@ import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
 import { useCreateWorkWithAsset } from "@/src/hooks/useLibrary";
 import { PDFPreview } from "../reader/PDFPreview";
-import { Plus, Link2 } from "lucide-react";
+import { Plus, Link2, FileCode } from "lucide-react";
+import { BibtexImportModal } from "./BibtexImportModal";
+import { bibtexToWorkFormValues, type BibtexEntry } from "@/src/utils/bibtex";
+import { AuthorInput } from "./AuthorInput";
+import { useAuthorsByIds, useFindOrCreateAuthor } from "@/src/hooks/useAuthors";
+import { parseAuthorList } from "@/src/utils/nameParser";
 
 interface LinkBlobDialogProps {
   /** Blob to link */
@@ -51,6 +56,14 @@ export function LinkBlobDialog({
     preselectedWorkId || null
   );
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [bibtexModalOpen, setBibtexModalOpen] = useState(false);
+  const [prefillValues, setPrefillValues] = useState<Record<string, unknown>>(
+    {}
+  );
+  const [authorIds, setAuthorIds] = useState<string[]>([]);
+
+  const { data: selectedAuthors = [] } = useAuthorsByIds(authorIds);
+  const findOrCreateAuthor = useFindOrCreateAuthor();
 
   // Get all presets and selected entities
   const allPresets = useMemo(
@@ -60,16 +73,19 @@ export function LinkBlobDialog({
   const selectedPreset = allPresets.find((p) => p.id === selectedPresetId);
   const selectedWork = works?.find((w) => w.id === selectedWorkId);
 
-  // Extract initial values from blob pdfMetadata
-  const initialValues = blob.pdfMetadata
-    ? {
-        title: blob.pdfMetadata.title || blob.filename || "Untitled",
-        // PDF author field is a string, would need parsing for multiple authors
-        // Add more metadata mappings as needed
-      }
-    : {
-        title: blob.filename || "Untitled",
-      };
+  // Extract initial values from blob pdfMetadata or prefillValues
+  const initialValues =
+    Object.keys(prefillValues).length > 0
+      ? prefillValues
+      : blob.pdfMetadata
+        ? {
+            title: blob.pdfMetadata.title || blob.filename || "Untitled",
+            // PDF author field is a string, would need parsing for multiple authors
+            // Add more metadata mappings as needed
+          }
+        : {
+            title: blob.filename || "Untitled",
+          };
 
   // Handle preset selection
   const handlePresetSelect = (presetId: string | null) => {
@@ -77,6 +93,49 @@ export function LinkBlobDialog({
     if (presetId) {
       setStep("form");
     }
+  };
+
+  // Handle BibTeX import
+  const handleBibtexImport = async (entry: BibtexEntry, presetName: string) => {
+    // Find preset by name
+    const preset = allPresets.find((p) => p.name === presetName);
+    if (!preset) {
+      console.error(`Preset not found: ${presetName}`);
+      return;
+    }
+
+    // Convert BibTeX to form values
+    const formValues = bibtexToWorkFormValues(entry);
+
+    // Parse and create authors if present
+    const newAuthorIds: string[] = [];
+    if (formValues.authors && typeof formValues.authors === "string") {
+      const parsedAuthors = parseAuthorList(formValues.authors);
+
+      for (const parsed of parsedAuthors) {
+        try {
+          const author = await findOrCreateAuthor.mutateAsync({
+            firstName: parsed.firstName,
+            lastName: parsed.lastName,
+            middleName: parsed.middleName,
+            orcid: parsed.orcid,
+          });
+          newAuthorIds.push(author.id);
+        } catch (error) {
+          console.error("Failed to create author:", error);
+        }
+      }
+
+      // Remove authors from form values (we'll use authorIds)
+      delete formValues.authors;
+    }
+
+    // Set preset, authors, and prefill values
+    setSelectedPresetId(preset.id);
+    setAuthorIds(newAuthorIds);
+    setPrefillValues(formValues);
+    setStep("form");
+    setBibtexModalOpen(false);
   };
 
   // Handle form submission
@@ -92,25 +151,13 @@ export function LinkBlobDialog({
     try {
       console.log("Creating work with:", { coreFields, metadata, blob });
 
-      // Parse authors field - handle both string and array
-      let authors: { name: string }[] = [];
-      if (typeof coreFields.authors === "string") {
-        // Split by comma and create author objects
-        authors = coreFields.authors
-          .split(",")
-          .map((name) => ({ name: name.trim() }))
-          .filter((a) => a.name.length > 0);
-      } else if (Array.isArray(coreFields.authors)) {
-        authors = coreFields.authors as { name: string }[];
-      }
-
       // Create Work + Asset in a single transaction
       await createWorkMutation.mutateAsync({
         work: {
           kind: "work" as const,
           title: (coreFields.title as string) || "Untitled",
           subtitle: coreFields.subtitle as string | undefined,
-          authors,
+          authorIds,
           workType: (coreFields.workType as any) || "other",
           topics: (coreFields.topics as string[]) || [],
           favorite: false,
@@ -148,6 +195,13 @@ export function LinkBlobDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+      {/* BibTeX Import Modal */}
+      <BibtexImportModal
+        isOpen={bibtexModalOpen}
+        onClose={() => setBibtexModalOpen(false)}
+        onImport={handleBibtexImport}
+      />
+
       {/* Dialog - 90% of viewport */}
       <div className="bg-neutral-900/80 rounded-xl shadow-2xl w-[90vw] h-[90vh] flex flex-col border border-neutral-700/50">
         {/* Fixed Header */}
@@ -275,22 +329,31 @@ export function LinkBlobDialog({
                     {/* System Templates */}
                     {systemPresetsFiltered.length > 0 && (
                       <div>
-                        <h3 className="text-lg font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-                          <svg
-                            className="w-5 h-5 text-blue-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-neutral-200 flex items-center gap-2">
+                            <svg
+                              className="w-5 h-5 text-blue-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                            System Templates
+                          </h3>
+                          <button
+                            onClick={() => setBibtexModalOpen(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                          System Templates
-                        </h3>
+                            <FileCode className="w-4 h-4" />
+                            Add from bib
+                          </button>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                           {systemPresetsFiltered.map((preset) => (
                             <button
@@ -545,6 +608,19 @@ export function LinkBlobDialog({
                   </svg>
                   Change Template
                 </button>
+
+                {/* Authors Field */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-neutral-300 mb-2">
+                    Authors
+                  </label>
+                  <AuthorInput
+                    value={authorIds}
+                    authors={selectedAuthors}
+                    onChange={setAuthorIds}
+                    placeholder="Search or add authors (e.g., 'Smith, John and Doe, Jane')..."
+                  />
+                </div>
 
                 {/* Form */}
                 <DynamicForm

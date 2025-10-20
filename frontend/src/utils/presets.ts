@@ -198,16 +198,33 @@ export function validateField(
 
 /**
  * Group fields by their group property
+ * Core Fields always appear first
  */
 export function groupFieldsByGroup(
   fields: PresetExpanded["allFields"]
 ): Map<string, PresetExpanded["allFields"]> {
   const groups = new Map<string, PresetExpanded["allFields"]>();
 
+  // Separate core fields first
+  const coreFields: PresetExpanded["allFields"] = [];
+  const otherFields: PresetExpanded["allFields"] = [];
+
   fields.forEach((field) => {
-    const group = field.isCustom
-      ? (field.config as CustomFieldDefinition).group || "General"
-      : "Core Fields";
+    if (!field.isCustom) {
+      coreFields.push(field);
+    } else {
+      otherFields.push(field);
+    }
+  });
+
+  // Add core fields first if they exist
+  if (coreFields.length > 0) {
+    groups.set("Core Fields", coreFields);
+  }
+
+  // Then add custom fields by their groups
+  otherFields.forEach((field) => {
+    const group = (field.config as CustomFieldDefinition).group || "General";
 
     if (!groups.has(group)) {
       groups.set(group, []);

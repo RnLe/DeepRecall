@@ -5,7 +5,7 @@
 
 "use client";
 
-import { BookOpen, FileText, Plus } from "lucide-react";
+import { BookOpen, FileText, Plus, User } from "lucide-react";
 import { useBlobStats } from "@/src/hooks/useBlobs";
 
 interface LibraryHeaderProps {
@@ -13,6 +13,7 @@ interface LibraryHeaderProps {
   onCreateWork?: () => void;
   onCreateActivity?: () => void;
   onOpenTemplates?: () => void;
+  onOpenAuthors?: () => void;
 }
 
 export function LibraryHeader({
@@ -20,6 +21,7 @@ export function LibraryHeader({
   onCreateWork,
   onCreateActivity,
   onOpenTemplates,
+  onOpenAuthors,
 }: LibraryHeaderProps) {
   const { data: blobStats } = useBlobStats();
 
@@ -64,6 +66,17 @@ export function LibraryHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {onOpenAuthors && (
+            <button
+              onClick={onOpenAuthors}
+              className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm rounded-lg transition-colors border border-neutral-700 hover:border-neutral-600"
+              title="Manage authors"
+            >
+              <User className="w-4 h-4" />
+              Authors
+            </button>
+          )}
+
           {onOpenTemplates && (
             <button
               onClick={onOpenTemplates}

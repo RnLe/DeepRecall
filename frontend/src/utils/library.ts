@@ -86,33 +86,48 @@ export function getEntityTypeLabel(entity: LibraryEntity): string {
 // ============================================================================
 
 /**
- * Get primary author(s) for a work (first N authors)
+ * Get primary author(s) display string from author entities
+ * @param authors - Array of Author entities
+ * @param maxAuthors - Maximum number of authors to display before "et al."
  */
-export function getPrimaryAuthors(work: Work, maxAuthors: number = 3): string {
-  if (work.authors.length === 0) {
+export function getPrimaryAuthors(
+  authors: any[],
+  maxAuthors: number = 3
+): string {
+  if (!authors || authors.length === 0) {
     return "Unknown Author";
   }
 
-  if (work.authors.length <= maxAuthors) {
-    return work.authors.map((a) => a.name).join(", ");
+  // Get full names from author entities
+  const names = authors.map((author) => {
+    if (typeof author === "string") return author;
+    if (author.firstName && author.lastName) {
+      return `${author.firstName} ${author.lastName}`;
+    }
+    return author.name || "Unknown";
+  });
+
+  if (names.length <= maxAuthors) {
+    return names.join(", ");
   }
 
-  const firstAuthors = work.authors
-    .slice(0, maxAuthors)
-    .map((a) => a.name)
-    .join(", ");
+  const firstAuthors = names.slice(0, maxAuthors).join(", ");
   return `${firstAuthors}, et al.`;
 }
 
 /**
  * Get a citation-style string for a work
  * Format: "Author(s) (Year). Title."
+ * Note: This function now requires author entities to be resolved separately
  */
-export function getCitationString(work: WorkExtended): string {
-  const authors = getPrimaryAuthors(work, 2);
+export function getCitationString(
+  work: WorkExtended,
+  authors: any[] = []
+): string {
+  const authorsStr = getPrimaryAuthors(authors, 2);
   const year = getDisplayYearForWork(work);
   const yearStr = year ? ` (${year})` : "";
-  return `${authors}${yearStr}. ${work.title}.`;
+  return `${authorsStr}${yearStr}. ${work.title}.`;
 }
 
 /**

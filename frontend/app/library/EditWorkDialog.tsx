@@ -12,6 +12,8 @@ import { useUpdateWork } from "@/src/hooks/useLibrary";
 import type { WorkExtended } from "@/src/schema/library";
 import { CompactDynamicForm } from "./CompactDynamicForm";
 import { PDFPreview } from "../reader/PDFPreview";
+import { AuthorInput } from "./AuthorInput";
+import { useAuthorsByIds } from "@/src/hooks/useAuthors";
 
 interface EditWorkDialogProps {
   work: WorkExtended;
@@ -34,6 +36,9 @@ export function EditWorkDialog({
   const [selectedPresetIdState, setSelectedPresetIdState] = useState<
     string | null
   >(null);
+  const [authorIds, setAuthorIds] = useState<string[]>(work.authorIds || []);
+
+  const { data: selectedAuthors = [] } = useAuthorsByIds(authorIds);
 
   // Flatten system and user presets into single array
   const allPresets = useMemo(
@@ -48,20 +53,17 @@ export function EditWorkDialog({
     return allPresets.find((p) => p.id === presetId) || null;
   }, [selectedPresetIdState, work.presetId, allPresets]);
 
-  // Reset selected preset when work changes
+  // Reset selected preset and authorIds when work changes
   useMemo(() => {
     setSelectedPresetIdState(null);
-  }, [work.id]);
+    setAuthorIds(work.authorIds || []);
+  }, [work.id, work.authorIds]);
 
   // Convert work data to form initial values
   const initialValues = useMemo(() => {
-    // Convert authors array to comma-separated string for form display
-    const authorsString = work.authors.map((a) => a.name).join(", ");
-
     const values: Record<string, unknown> = {
       title: work.title,
       subtitle: work.subtitle,
-      authors: authorsString,
       workType: work.workType,
       topics: work.topics,
       year: work.year,
@@ -100,22 +102,11 @@ export function EditWorkDialog({
 
       const { coreFields, metadata } = data;
 
-      // Handle authors (string or array)
-      let authors: { name: string }[] = [];
-      if (typeof coreFields.authors === "string") {
-        authors = coreFields.authors
-          .split(",")
-          .map((name) => ({ name: name.trim() }))
-          .filter((a) => a.name.length > 0);
-      } else if (Array.isArray(coreFields.authors)) {
-        authors = coreFields.authors as { name: string }[];
-      }
-
       // Prepare update data
       const updates = {
         title: (coreFields.title as string) || work.title,
         subtitle: coreFields.subtitle as string | undefined,
-        authors,
+        authorIds, // Use authorIds from state
         workType: (coreFields.workType as any) || work.workType,
         topics: (coreFields.topics as string[]) || [],
         year: coreFields.year as number | undefined,
@@ -373,6 +364,19 @@ export function EditWorkDialog({
         <div className="flex-1 flex overflow-hidden min-h-0">
           {/* Left: Form */}
           <div className="flex-1 overflow-y-auto px-6 py-5 border-r border-neutral-800">
+            {/* Authors Field */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-neutral-300 mb-2">
+                Authors
+              </label>
+              <AuthorInput
+                value={authorIds}
+                authors={selectedAuthors}
+                onChange={setAuthorIds}
+                placeholder="Search or add authors (e.g., 'Smith, John and Doe, Jane')..."
+              />
+            </div>
+
             <CompactDynamicForm
               preset={selectedPreset}
               initialValues={initialValues}

@@ -9,6 +9,7 @@
 import { BookOpen, Star, Users } from "lucide-react";
 import type { WorkExtended } from "@/src/schema/library";
 import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
+import { useAuthorsByIds } from "@/src/hooks/useAuthors";
 import { useDeleteWork } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
 import { useState } from "react";
@@ -17,6 +18,7 @@ import { useReaderUI } from "@/src/stores/reader-ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
+import { BibtexExportModal } from "./BibtexExportModal";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 import { PDFThumbnail } from "./PDFThumbnail";
 
@@ -26,7 +28,8 @@ interface WorkCardCompactProps {
 }
 
 export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
-  const authors = getPrimaryAuthors(work, 2);
+  const { data: authorEntities = [] } = useAuthorsByIds(work.authorIds || []);
+  const authors = getPrimaryAuthors(authorEntities, 2);
   const year = getDisplayYear(work);
   const assetCount = work.assets?.length || 0;
 
@@ -35,6 +38,7 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
   const deleteWorkMutation = useDeleteWork();
   const allPresets = usePresets();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
 
@@ -184,6 +188,7 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
                   workId={work.id}
                   onDelete={handleDelete}
                   onEdit={() => setIsEditDialogOpen(true)}
+                  onExportBibtex={() => setIsExportModalOpen(true)}
                 />
               </div>
             </div>
@@ -260,6 +265,13 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
           }}
         />
       )}
+
+      {/* BibTeX Export Modal */}
+      <BibtexExportModal
+        work={work}
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
     </>
   );
 }

@@ -11,6 +11,12 @@ import { useCreateWorkWithAsset } from "@/src/hooks/useLibrary";
 import { PresetSelector } from "./PresetSelector";
 import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
+import { BibtexImportModal } from "./BibtexImportModal";
+import { bibtexToWorkFormValues, type BibtexEntry } from "@/src/utils/bibtex";
+import { AuthorInput } from "./AuthorInput";
+import { useAuthorsByIds, useFindOrCreateAuthor } from "@/src/hooks/useAuthors";
+import { parseAuthorList } from "@/src/utils/nameParser";
+import { FileCode } from "lucide-react";
 
 interface CreateWorkDialogProps {
   isOpen: boolean;
@@ -36,6 +42,14 @@ export function CreateWorkDialog({
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(
     preselectedPresetId || null
   );
+  const [bibtexModalOpen, setBibtexModalOpen] = useState(false);
+  const [prefillValues, setPrefillValues] = useState<Record<string, unknown>>(
+    {}
+  );
+  const [authorIds, setAuthorIds] = useState<string[]>([]);
+
+  const { data: selectedAuthors = [] } = useAuthorsByIds(authorIds);
+  const findOrCreateAuthor = useFindOrCreateAuthor();
 
   // Flatten system and user presets into single array
   const allPresets = useMemo(
@@ -58,7 +72,51 @@ export function CreateWorkDialog({
   const handleCancel = () => {
     setStep("select");
     setSelectedPresetId(null);
+    setPrefillValues({});
+    setAuthorIds([]);
     onClose();
+  };
+
+  const handleBibtexImport = async (entry: BibtexEntry, presetName: string) => {
+    // Find preset by name
+    const preset = allPresets.find((p) => p.name === presetName);
+    if (!preset) {
+      console.error(`Preset not found: ${presetName}`);
+      return;
+    }
+
+    // Convert BibTeX to form values
+    const formValues = bibtexToWorkFormValues(entry);
+
+    // Parse and create authors if present
+    const newAuthorIds: string[] = [];
+    if (formValues.authors && typeof formValues.authors === "string") {
+      const parsedAuthors = parseAuthorList(formValues.authors);
+
+      for (const parsed of parsedAuthors) {
+        try {
+          const author = await findOrCreateAuthor.mutateAsync({
+            firstName: parsed.firstName,
+            lastName: parsed.lastName,
+            middleName: parsed.middleName,
+            orcid: parsed.orcid,
+          });
+          newAuthorIds.push(author.id);
+        } catch (error) {
+          console.error("Failed to create author:", error);
+        }
+      }
+
+      // Remove authors from form values (we'll use authorIds)
+      delete formValues.authors;
+    }
+
+    // Set preset, authors, and prefill values
+    setSelectedPresetId(preset.id);
+    setAuthorIds(newAuthorIds);
+    setPrefillValues(formValues);
+    setStep("form");
+    setBibtexModalOpen(false);
   };
 
   const handleSubmit = async (formValues: Record<string, unknown>) => {
@@ -92,23 +150,12 @@ export function CreateWorkDialog({
         }
       });
 
-      // Handle authors (string or array)
-      let authors: { name: string }[] = [];
-      if (typeof coreFields.authors === "string") {
-        authors = coreFields.authors
-          .split(",")
-          .map((name) => ({ name: name.trim() }))
-          .filter((a) => a.name.length > 0);
-      } else if (Array.isArray(coreFields.authors)) {
-        authors = coreFields.authors as { name: string }[];
-      }
-
       // Create Work (no Asset - user can add files later)
       const workData = {
         kind: "work" as const,
         title: (coreFields.title as string) || "Untitled",
         subtitle: coreFields.subtitle as string | undefined,
-        authors,
+        authorIds,
         workType: (coreFields.workType as any) || "other",
         topics: (coreFields.topics as string[]) || [],
         favorite: false,
@@ -153,6 +200,13 @@ export function CreateWorkDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      {/* BibTeX Import Modal */}
+      <BibtexImportModal
+        isOpen={bibtexModalOpen}
+        onClose={() => setBibtexModalOpen(false)}
+        onImport={handleBibtexImport}
+      />
+
       {/* Dialog - 80% of viewport */}
       <div className="bg-neutral-900 rounded-xl shadow-2xl w-[80vw] h-[80vh] flex flex-col border border-neutral-800">
         {/* Fixed Header */}
@@ -200,22 +254,31 @@ export function CreateWorkDialog({
                   {/* System Templates */}
                   {systemPresets.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-                        <svg
-                          className="w-5 h-5 text-blue-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-neutral-200 flex items-center gap-2">
+                          <svg
+                            className="w-5 h-5 text-blue-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                          </svg>
+                          System Templates
+                        </h3>
+                        <button
+                          onClick={() => setBibtexModalOpen(true)}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                        System Templates
-                      </h3>
+                          <FileCode className="w-4 h-4" />
+                          Add from bib
+                        </button>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {systemPresets.map((preset) => (
                           <button
@@ -475,10 +538,23 @@ export function CreateWorkDialog({
                 Change Template
               </button>
 
+              {/* Authors Field */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  Authors
+                </label>
+                <AuthorInput
+                  value={authorIds}
+                  authors={selectedAuthors}
+                  onChange={setAuthorIds}
+                  placeholder="Search or add authors (e.g., 'Smith, John and Doe, Jane')..."
+                />
+              </div>
+
               {/* Form */}
               <DynamicForm
                 preset={selectedPreset}
-                initialValues={{}}
+                initialValues={prefillValues}
                 onSubmit={handleSubmit}
                 onCancel={handleCancel}
                 submitLabel="Create Work"

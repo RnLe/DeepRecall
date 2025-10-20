@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { WorkExtended } from "@/src/schema/library";
 import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
+import { useAuthorsByIds } from "@/src/hooks/useAuthors";
 import { useDeleteWork } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
 import { useState } from "react";
@@ -24,6 +25,7 @@ import { useReaderUI } from "@/src/stores/reader-ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
+import { BibtexExportModal } from "./BibtexExportModal";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 import { PDFThumbnail } from "./PDFThumbnail";
 
@@ -33,7 +35,8 @@ interface WorkCardDetailedProps {
 }
 
 export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
-  const authors = getPrimaryAuthors(work, 3);
+  const { data: authorEntities = [] } = useAuthorsByIds(work.authorIds || []);
+  const authors = getPrimaryAuthors(authorEntities, 3);
   const year = getDisplayYear(work);
   const assetCount = work.assets?.length || 0;
 
@@ -44,6 +47,7 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Get journal and publisher from work
   const journal = work.journal;
@@ -188,6 +192,7 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
                   workId={work.id}
                   onDelete={handleDelete}
                   onEdit={() => setIsEditDialogOpen(true)}
+                  onExportBibtex={() => setIsExportModalOpen(true)}
                 />
               </div>
             </div>
@@ -301,6 +306,13 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
           }}
         />
       )}
+
+      {/* BibTeX Export Modal */}
+      <BibtexExportModal
+        work={work}
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
     </>
   );
 }

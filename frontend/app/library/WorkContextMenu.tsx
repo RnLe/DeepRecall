@@ -6,13 +6,20 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Trash2, Edit, Link as LinkIcon } from "lucide-react";
+import {
+  MoreVertical,
+  Trash2,
+  Edit,
+  Link as LinkIcon,
+  FileCode,
+} from "lucide-react";
 
 interface WorkContextMenuProps {
   workId: string;
   onDelete: () => Promise<void>;
   onEdit?: () => void;
   onLink?: () => void;
+  onExportBibtex?: () => void;
 }
 
 export function WorkContextMenu({
@@ -20,6 +27,7 @@ export function WorkContextMenu({
   onDelete,
   onEdit,
   onLink,
+  onExportBibtex,
 }: WorkContextMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -114,6 +122,22 @@ export function WorkContextMenu({
             {!onLink && (
               <span className="ml-auto text-xs text-neutral-600">Soon</span>
             )}
+          </button>
+
+          {/* Divider */}
+          <div className="h-px bg-neutral-700/50 my-1" />
+
+          {/* Export BibTeX */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onExportBibtex?.();
+              setIsOpen(false);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-700/50 transition-colors"
+          >
+            <FileCode className="w-4 h-4" />
+            <span>Get BibTeX</span>
           </button>
 
           {/* Divider */}

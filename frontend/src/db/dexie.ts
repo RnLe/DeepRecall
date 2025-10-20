@@ -12,6 +12,7 @@ import type {
   Activity,
   Collection,
   Edge,
+  Author,
 } from "@/src/schema/library";
 import type { Preset } from "@/src/schema/presets";
 
@@ -23,6 +24,7 @@ class DeepRecallDB extends Dexie {
   collections!: EntityTable<Collection, "id">;
   edges!: EntityTable<Edge, "id">;
   presets!: EntityTable<Preset, "id">;
+  authors!: EntityTable<Author, "id">;
 
   // Annotations & cards
   annotations!: EntityTable<Annotation, "id">;
@@ -195,6 +197,114 @@ class DeepRecallDB extends Dexie {
 
         console.log(
           "✅ Database upgraded to v4 - annotation attachment support enabled"
+        );
+      });
+
+    // Version 5: Add Authors table and migrate Work.authors to authorIds
+    this.version(5)
+      .stores({
+        // Add authors table
+        authors:
+          "id, lastName, firstName, orcid, affiliation, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 5 (adding Authors table and migrating author data)"
+        );
+
+        const works = await tx.table("works").toArray();
+        let authorsCreated = 0;
+        let worksUpdated = 0;
+
+        // Create a map to deduplicate authors by full name
+        const authorMap = new Map<string, string>(); // key: full name, value: author ID
+
+        for (const work of works) {
+          if (!work.authors || work.authors.length === 0) {
+            // No authors to migrate, but set authorIds to empty array
+            await tx.table("works").update(work.id, { authorIds: [] });
+            worksUpdated++;
+            continue;
+          }
+
+          const authorIds: string[] = [];
+
+          for (const oldAuthor of work.authors) {
+            const fullName = oldAuthor.name.trim();
+            if (!fullName) continue;
+
+            // Check if we've already created this author
+            let authorId = authorMap.get(fullName);
+
+            if (!authorId) {
+              // Parse name (simple: assume "First Last" or "Last, First" format)
+              let firstName = "";
+              let lastName = "";
+
+              if (fullName.includes(",")) {
+                // "Last, First" format
+                const parts = fullName.split(",").map((s) => s.trim());
+                lastName = parts[0] || "";
+                firstName = parts[1] || "";
+              } else {
+                // "First Last" format (or single name)
+                const parts = fullName.split(" ").filter((s) => s);
+                if (parts.length === 1) {
+                  lastName = parts[0];
+                } else {
+                  firstName = parts.slice(0, -1).join(" ");
+                  lastName = parts[parts.length - 1];
+                }
+              }
+
+              // Generate new author ID
+              const { v4: uuidv4 } = await import("uuid");
+              authorId = uuidv4();
+
+              // Create author entity
+              const now = new Date().toISOString();
+              await tx.table("authors").add({
+                id: authorId,
+                kind: "author",
+                firstName,
+                lastName,
+                affiliation: oldAuthor.affiliation,
+                orcid: oldAuthor.orcid,
+                createdAt: now,
+                updatedAt: now,
+              });
+
+              authorMap.set(fullName, authorId);
+              authorsCreated++;
+            }
+
+            authorIds.push(authorId);
+          }
+
+          // Update work with authorIds
+          await tx.table("works").update(work.id, { authorIds });
+          worksUpdated++;
+        }
+
+        console.log(
+          `✅ Database upgraded to v5: Created ${authorsCreated} authors, updated ${worksUpdated} works`
         );
       });
   }

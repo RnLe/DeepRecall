@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { WorkExtended } from "@/src/schema/library";
 import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
+import { useAuthorsByIds } from "@/src/hooks/useAuthors";
 import { useDeleteWork } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
 import { useState } from "react";
@@ -24,6 +25,7 @@ import { useReaderUI } from "@/src/stores/reader-ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
+import { BibtexExportModal } from "./BibtexExportModal";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 
 interface WorkCardListProps {
@@ -32,7 +34,8 @@ interface WorkCardListProps {
 }
 
 export function WorkCardList({ work, onClick }: WorkCardListProps) {
-  const authors = getPrimaryAuthors(work, 3);
+  const { data: authorEntities = [] } = useAuthorsByIds(work.authorIds || []);
+  const authors = getPrimaryAuthors(authorEntities, 3);
   const year = getDisplayYear(work);
   const assetCount = work.assets?.length || 0;
 
@@ -43,6 +46,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const journal = work.journal;
 
@@ -235,6 +239,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
                 workId={work.id}
                 onDelete={handleDelete}
                 onEdit={() => setIsEditDialogOpen(true)}
+                onExportBibtex={() => setIsExportModalOpen(true)}
               />
             </div>
           </div>
@@ -263,6 +268,13 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
           }}
         />
       )}
+
+      {/* BibTeX Export Modal */}
+      <BibtexExportModal
+        work={work}
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
     </>
   );
 }

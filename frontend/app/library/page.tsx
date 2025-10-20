@@ -17,6 +17,7 @@ import { CreateWorkDialog } from "./CreateWorkDialog";
 import { CreateActivityDialog } from "./CreateActivityDialog";
 import { ActivityBanner } from "./ActivityBanner";
 import { TemplateLibrary } from "./TemplateLibrary";
+import { AuthorLibrary } from "./AuthorLibrary";
 import { BookOpen, Link2 } from "lucide-react";
 import type {
   WorkType,
@@ -57,6 +58,7 @@ export default function LibraryPage() {
   const [isDraggingOverLibrary, setIsDraggingOverLibrary] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
   const [isUploadingToLibrary, setIsUploadingToLibrary] = useState(false);
+  const [isAuthorLibraryOpen, setIsAuthorLibraryOpen] = useState(false);
 
   // Template Library UI state from Zustand
   const openTemplateLibrary = useTemplateLibraryUI((state) => state.openModal);
@@ -306,7 +308,11 @@ export default function LibraryPage() {
         (work) =>
           work.title.toLowerCase().includes(query) ||
           work.subtitle?.toLowerCase().includes(query) ||
-          work.authors.some((a) => a.name.toLowerCase().includes(query)) ||
+          // Legacy author field (for backward compatibility)
+          work.authors?.some((a) => a.name.toLowerCase().includes(query)) ||
+          // TODO: Also search through resolved author names from authorIds
+          // This would require resolving all authorIds which could be expensive
+          // Consider implementing this with a debounced author resolver
           work.topics.some((t) => t.toLowerCase().includes(query))
       );
     }
@@ -329,8 +335,8 @@ export default function LibraryPage() {
         break;
       case "author":
         sorted.sort((a, b) => {
-          const aAuthor = a.authors.length > 0 ? a.authors[0].name : "Unknown";
-          const bAuthor = b.authors.length > 0 ? b.authors[0].name : "Unknown";
+          const aAuthor = a.authors?.length ? a.authors[0].name : "Unknown";
+          const bAuthor = b.authors?.length ? b.authors[0].name : "Unknown";
           return aAuthor.localeCompare(bAuthor);
         });
         break;
@@ -526,6 +532,7 @@ export default function LibraryPage() {
               onCreateActivity={() => setIsCreateActivityDialogOpen(true)}
               onCreateWork={() => setIsCreateDialogOpen(true)}
               onOpenTemplates={openTemplateLibrary}
+              onOpenAuthors={() => setIsAuthorLibraryOpen(true)}
             />
           </div>
         </div>
@@ -738,6 +745,12 @@ export default function LibraryPage() {
 
       {/* Template Library Modal */}
       <TemplateLibrary />
+
+      {/* Author Library Modal */}
+      <AuthorLibrary
+        isOpen={isAuthorLibraryOpen}
+        onClose={() => setIsAuthorLibraryOpen(false)}
+      />
     </div>
   );
 }
