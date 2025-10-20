@@ -20,6 +20,9 @@ import { db } from "@/src/db/dexie";
 import { ZoomIn, ZoomOut, Maximize2, Info, RotateCcw } from "lucide-react";
 import { WorkCardCompact } from "@/app/library/WorkCardCompact";
 import type { WorkExtended } from "@/src/schema/library";
+import { useWorksExtended } from "@/src/hooks/useLibrary";
+import { useRouter } from "next/navigation";
+import { useReaderUI } from "@/src/stores/reader-ui";
 
 interface GraphNode {
   id: string;
@@ -68,9 +71,15 @@ export default function DexieGraphVisualization() {
     null
   );
   const isPointerOverGraph = useRef(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isHoveringCard, setIsHoveringCard] = useState(false);
+
+  // Router and reader UI for double-click navigation
+  const router = useRouter();
+  const { openTab, setLeftSidebarView } = useReaderUI();
 
   // Live query all Dexie data
-  const works = useLiveQuery(() => db.works.toArray(), []);
+  const works = useWorksExtended(); // Use extended works to get assets
   const assets = useLiveQuery(() => db.assets.toArray(), []);
   const activities = useLiveQuery(() => db.activities.toArray(), []);
   const collections = useLiveQuery(() => db.collections.toArray(), []);
@@ -123,6 +132,15 @@ export default function DexieGraphVisualization() {
     });
     return () => {
       window.removeEventListener("wheel", preventScroll, true);
+    };
+  }, []);
+
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -345,7 +363,7 @@ export default function DexieGraphVisualization() {
 
   // Mouse wheel zoom - zoom towards cursor
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
+    // Note: preventDefault is handled globally
     e.stopPropagation();
 
     const rect = containerRef.current?.getBoundingClientRect();
@@ -416,6 +434,24 @@ export default function DexieGraphVisualization() {
   };
 
   // Node drag handlers
+  const handleNodeDoubleClick = (e: React.MouseEvent, node: GraphNode) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    // Only handle work nodes with PDF assets
+    if (node.type === "work") {
+      const work = node.data as WorkExtended;
+      const pdfAsset = work.assets?.find(
+        (asset) => asset.mime === "application/pdf"
+      );
+      if (pdfAsset) {
+        openTab(pdfAsset.sha256, work.title || pdfAsset.filename);
+        setLeftSidebarView("annotations");
+        router.push("/reader");
+      }
+    }
+  };
+
   const handleNodeMouseDown = (e: React.MouseEvent, node: GraphNode) => {
     e.stopPropagation();
     setDraggedNode(node);
@@ -596,11 +632,25 @@ export default function DexieGraphVisualization() {
                     cy={node.y}
                     r={radius}
                     fill={NODE_COLORS[node.type]}
-                    stroke={isHovered ? "#fff" : "none"}
+                    stroke={isHovered ? "#ffffff" : "transparent"}
                     strokeWidth={isHovered ? 2 : 0}
                     style={{ cursor: "grab", pointerEvents: "all" }}
-                    onMouseEnter={() => setHoveredNode(node)}
-                    onMouseLeave={() => setHoveredNode(null)}
+                    onDoubleClick={(e) => handleNodeDoubleClick(e as any, node)}
+                    onMouseEnter={() => {
+                      if (hoverTimeoutRef.current) {
+                        clearTimeout(hoverTimeoutRef.current);
+                        hoverTimeoutRef.current = null;
+                      }
+                      setHoveredNode(node);
+                    }}
+                    onMouseLeave={() => {
+                      // Delay hiding to allow mouse to move to the card
+                      hoverTimeoutRef.current = setTimeout(() => {
+                        if (!isHoveringCard) {
+                          setHoveredNode(null);
+                        }
+                      }, 150);
+                    }}
                     onMouseDown={(e) => handleNodeMouseDown(e as any, node)}
                   />
                   <text
@@ -622,10 +672,21 @@ export default function DexieGraphVisualization() {
         {/* Tooltip for hovered node */}
         {hoveredNode && (
           <div
-            className="absolute z-20 pointer-events-none"
+            className="absolute z-20 pointer-events-auto"
             style={{
               left: hoveredNode.x * zoomTransform.k + zoomTransform.x + 20,
               top: hoveredNode.y * zoomTransform.k + zoomTransform.y - 10,
+            }}
+            onMouseEnter={() => {
+              if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+                hoverTimeoutRef.current = null;
+              }
+              setIsHoveringCard(true);
+            }}
+            onMouseLeave={() => {
+              setIsHoveringCard(false);
+              setHoveredNode(null);
             }}
           >
             {hoveredNode.type === "work" ? (

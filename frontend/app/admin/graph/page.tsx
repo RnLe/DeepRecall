@@ -8,6 +8,9 @@ import { ZoomIn, ZoomOut, Maximize2, RotateCcw } from "lucide-react";
 import { WorkCardCompact } from "@/app/library/WorkCardCompact";
 import type { WorkExtended } from "@/src/schema/library";
 import { useGraphUI, type GraphNode } from "@/src/stores/graph-ui";
+import { useWorksExtended } from "@/src/hooks/useLibrary";
+import { useRouter } from "next/navigation";
+import { useReaderUI } from "@/src/stores/reader-ui";
 
 interface GraphLink {
   source: GraphNode;
@@ -71,6 +74,12 @@ export default function GraphPage() {
   );
   const isPointerOverGraph = useRef(false);
   const hasAutoFittedRef = useRef(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isHoveringCard, setIsHoveringCard] = useState(false);
+
+  // Router and reader UI for double-click navigation
+  const router = useRouter();
+  const { openTab, setLeftSidebarView } = useReaderUI();
 
   // Track initial positions for relative dragging
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(
@@ -104,7 +113,7 @@ export default function GraphPage() {
   } = useGraphUI();
 
   // Live query all Dexie data
-  const works = useLiveQuery(() => db.works.toArray(), []);
+  const works = useWorksExtended(); // Use extended works to get assets
   const assets = useLiveQuery(() => db.assets.toArray(), []);
   const activities = useLiveQuery(() => db.activities.toArray(), []);
   const collections = useLiveQuery(() => db.collections.toArray(), []);
@@ -184,6 +193,15 @@ export default function GraphPage() {
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [setMultiSelectMode, clearSelection]);
+
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Build graph data
   useEffect(() => {
@@ -431,7 +449,7 @@ export default function GraphPage() {
   // Mouse wheel zoom - zoom towards cursor
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
-      e.preventDefault();
+      // Note: preventDefault is handled globally in useEffect with passive:false
       e.stopPropagation();
 
       const rect = containerRef.current?.getBoundingClientRect();
@@ -510,6 +528,24 @@ export default function GraphPage() {
   };
 
   // Node interaction handlers
+  const handleNodeDoubleClick = (e: React.MouseEvent, node: GraphNode) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    // Only handle work nodes with PDF assets
+    if (node.type === "work") {
+      const work = node.data as WorkExtended;
+      const pdfAsset = work.assets?.find(
+        (asset) => asset.mime === "application/pdf"
+      );
+      if (pdfAsset) {
+        openTab(pdfAsset.sha256, work.title || pdfAsset.filename);
+        setLeftSidebarView("annotations");
+        router.push("/reader");
+      }
+    }
+  };
+
   const handleNodeMouseDown = (e: React.MouseEvent, node: GraphNode) => {
     e.stopPropagation();
     e.preventDefault(); // Prevent native drag/select behavior
@@ -792,9 +828,23 @@ export default function GraphPage() {
                   key={node.id}
                   style={{ cursor: "pointer", pointerEvents: "all" }}
                   onMouseDown={(e) => handleNodeMouseDown(e as any, node)}
+                  onDoubleClick={(e) => handleNodeDoubleClick(e as any, node)}
                   onDragStart={(e) => e.preventDefault()}
-                  onMouseEnter={() => setHoveredNode(node)}
-                  onMouseLeave={() => setHoveredNode(null)}
+                  onMouseEnter={() => {
+                    if (hoverTimeoutRef.current) {
+                      clearTimeout(hoverTimeoutRef.current);
+                      hoverTimeoutRef.current = null;
+                    }
+                    setHoveredNode(node);
+                  }}
+                  onMouseLeave={() => {
+                    // Delay hiding to allow mouse to move to the card
+                    hoverTimeoutRef.current = setTimeout(() => {
+                      if (!isHoveringCard) {
+                        setHoveredNode(null);
+                      }
+                    }, 150);
+                  }}
                 >
                   <circle
                     cx={node.x}
@@ -814,10 +864,21 @@ export default function GraphPage() {
         {/* Hover card for Works */}
         {hoveredNode && hoveredNode.type === "work" && (
           <div
-            className="absolute z-20 pointer-events-none"
+            className="absolute z-20 pointer-events-auto"
             style={{
               left: hoveredNode.x * zoomTransform.k + zoomTransform.x + 40,
               top: hoveredNode.y * zoomTransform.k + zoomTransform.y,
+            }}
+            onMouseEnter={() => {
+              if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+                hoverTimeoutRef.current = null;
+              }
+              setIsHoveringCard(true);
+            }}
+            onMouseLeave={() => {
+              setIsHoveringCard(false);
+              setHoveredNode(null);
             }}
           >
             <WorkCardCompact work={hoveredNode.data as WorkExtended} />
