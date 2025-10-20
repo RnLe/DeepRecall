@@ -550,7 +550,7 @@ export function MarkdownPreview({
                             href?.startsWith("http://") ||
                             href?.startsWith("https://") ||
                             href?.startsWith("#");
-                          
+
                           if (!isValid && href) {
                             // Invalid/relative URL - render as span
                             return (
@@ -559,8 +559,14 @@ export function MarkdownPreview({
                               </span>
                             );
                           }
-                          
-                          return <a {...props} target="_blank" rel="noopener noreferrer" />;
+
+                          return (
+                            <a
+                              {...props}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            />
+                          );
                         },
                         h1: ({ node, ...props }) => {
                           const text = props.children?.toString() || "";

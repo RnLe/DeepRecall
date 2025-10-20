@@ -42,7 +42,8 @@ export default function AdminPage() {
   } | null>(null);
   const [viewingPDF, setViewingPDF] = useState<BlobWithMetadata | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortColumn, setSortColumn] = useState<keyof BlobWithMetadata>("mtime_ms");
+  const [sortColumn, setSortColumn] =
+    useState<keyof BlobWithMetadata>("mtime_ms");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Helper to get filename without extension for display
@@ -161,8 +162,14 @@ export default function AdminPage() {
             blob.sha256.toLowerCase().includes(query) ||
             blob.mime.toLowerCase().includes(query) ||
             blob.health?.toLowerCase().includes(query) ||
-            new Date(blob.created_ms).toLocaleString().toLowerCase().includes(query) ||
-            new Date(blob.mtime_ms).toLocaleString().toLowerCase().includes(query)
+            new Date(blob.created_ms)
+              .toLocaleString()
+              .toLowerCase()
+              .includes(query) ||
+            new Date(blob.mtime_ms)
+              .toLocaleString()
+              .toLowerCase()
+              .includes(query)
           );
         })
         .sort((a, b) => {
@@ -387,7 +394,9 @@ export default function AdminPage() {
         <div className="flex items-center gap-6 p-4 bg-gray-900 border border-gray-800 rounded-lg">
           <div className="flex items-center gap-2">
             <HardDrive className="w-5 h-5 text-green-400" />
-            <span className="text-lg font-bold">{filteredAndSortedBlobs.length}</span>
+            <span className="text-lg font-bold">
+              {filteredAndSortedBlobs.length}
+            </span>
             <span className="text-sm text-gray-400">Total Blobs</span>
           </div>
           <div className="w-px h-6 bg-gray-700" />
@@ -545,7 +554,9 @@ export default function AdminPage() {
                           ))}
                       </div>
                     </th>
-                    <th className="px-2 py-1.5 text-xs text-gray-400 font-medium">Actions</th>
+                    <th className="px-2 py-1.5 text-xs text-gray-400 font-medium">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -638,26 +649,47 @@ export default function AdminPage() {
                               </button>
                             </div>
                           ) : (
-                            <span>{highlightText(getDisplayName(blob.filename), searchQuery)}</span>
+                            <span>
+                              {highlightText(
+                                getDisplayName(blob.filename),
+                                searchQuery
+                              )}
+                            </span>
                           )}
                         </td>
                         <td className="px-2 py-1.5 font-mono text-xs text-blue-400">
                           {getHashDisplay(blob.sha256, searchQuery)}
                         </td>
                         <td className="px-2 py-1.5 text-xs">
-                          {highlightText(`${(blob.size / 1024 / 1024).toFixed(2)} MB`, searchQuery)}
+                          {highlightText(
+                            `${(blob.size / 1024 / 1024).toFixed(2)} MB`,
+                            searchQuery
+                          )}
                         </td>
                         <td className="px-2 py-1.5 text-xs text-gray-400">
-                          {highlightText(blob.mime.split("/")[1]?.toUpperCase() || "?", searchQuery)}
+                          {highlightText(
+                            blob.mime.split("/")[1]?.toUpperCase() || "?",
+                            searchQuery
+                          )}
                         </td>
                         <td className="px-2 py-1.5 text-xs text-green-600">
-                          <span title={new Date(blob.created_ms).toLocaleString()}>
-                            {highlightText(getRelativeTime(blob.created_ms), searchQuery)}
+                          <span
+                            title={new Date(blob.created_ms).toLocaleString()}
+                          >
+                            {highlightText(
+                              getRelativeTime(blob.created_ms),
+                              searchQuery
+                            )}
                           </span>
                         </td>
                         <td className="px-2 py-1.5 text-xs text-gray-500">
-                          <span title={new Date(blob.mtime_ms).toLocaleString()}>
-                            {highlightText(getRelativeTime(blob.mtime_ms), searchQuery)}
+                          <span
+                            title={new Date(blob.mtime_ms).toLocaleString()}
+                          >
+                            {highlightText(
+                              getRelativeTime(blob.mtime_ms),
+                              searchQuery
+                            )}
                           </span>
                         </td>
                         <td className="px-2 py-1.5">
