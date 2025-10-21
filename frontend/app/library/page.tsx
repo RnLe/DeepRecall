@@ -31,6 +31,8 @@ import * as edgeRepo from "@/src/repo/edges";
 import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 import { useTemplateLibraryUI } from "@/src/stores/template-library-ui";
+import { ExportDataDialog } from "./ExportDataDialog";
+import { ImportDataDialog } from "./ImportDataDialog";
 
 export default function LibraryPage() {
   const works = useWorksExtended();
@@ -59,6 +61,8 @@ export default function LibraryPage() {
   const [dragCounter, setDragCounter] = useState(0);
   const [isUploadingToLibrary, setIsUploadingToLibrary] = useState(false);
   const [isAuthorLibraryOpen, setIsAuthorLibraryOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   // Template Library UI state from Zustand
   const openTemplateLibrary = useTemplateLibraryUI((state) => state.openModal);
@@ -66,6 +70,12 @@ export default function LibraryPage() {
   const handleCreateWorkWithPreset = (presetId: string) => {
     setPreselectedPresetId(presetId);
     setIsCreateDialogOpen(true);
+  };
+  
+  const handleImportSuccess = () => {
+    // Refresh the library after import
+    queryClient.invalidateQueries();
+    window.location.reload(); // Full reload to ensure all data is fresh
   };
 
   // Enrich activities with their contained works/assets
@@ -533,6 +543,8 @@ export default function LibraryPage() {
               onCreateWork={() => setIsCreateDialogOpen(true)}
               onOpenTemplates={openTemplateLibrary}
               onOpenAuthors={() => setIsAuthorLibraryOpen(true)}
+              onExportData={() => setIsExportDialogOpen(true)}
+              onImportData={() => setIsImportDialogOpen(true)}
             />
           </div>
         </div>
@@ -750,6 +762,19 @@ export default function LibraryPage() {
       <AuthorLibrary
         isOpen={isAuthorLibraryOpen}
         onClose={() => setIsAuthorLibraryOpen(false)}
+      />
+
+      {/* Export Data Dialog */}
+      <ExportDataDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+      />
+
+      {/* Import Data Dialog */}
+      <ImportDataDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onSuccess={handleImportSuccess}
       />
     </div>
   );

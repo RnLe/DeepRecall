@@ -7,5 +7,4 @@
 **/.pnpm-store/
 
 # Database files
-data/library/
-data/avatars/
+data/

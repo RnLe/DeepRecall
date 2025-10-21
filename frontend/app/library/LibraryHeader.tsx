@@ -5,7 +5,7 @@
 
 "use client";
 
-import { BookOpen, FileText, Plus, User } from "lucide-react";
+import { BookOpen, FileText, Plus, User, Download, Upload } from "lucide-react";
 import { useBlobStats } from "@/src/hooks/useBlobs";
 
 interface LibraryHeaderProps {
@@ -14,6 +14,8 @@ interface LibraryHeaderProps {
   onCreateActivity?: () => void;
   onOpenTemplates?: () => void;
   onOpenAuthors?: () => void;
+  onExportData?: () => void;
+  onImportData?: () => void;
 }
 
 export function LibraryHeader({
@@ -22,6 +24,8 @@ export function LibraryHeader({
   onCreateActivity,
   onOpenTemplates,
   onOpenAuthors,
+  onExportData,
+  onImportData,
 }: LibraryHeaderProps) {
   const { data: blobStats } = useBlobStats();
 
@@ -66,6 +70,28 @@ export function LibraryHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {onImportData && (
+            <button
+              onClick={onImportData}
+              className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm rounded-lg transition-colors border border-neutral-700 hover:border-neutral-600"
+              title="Import data from archive"
+            >
+              <Upload className="w-4 h-4" />
+              Import
+            </button>
+          )}
+
+          {onExportData && (
+            <button
+              onClick={onExportData}
+              className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm rounded-lg transition-colors border border-neutral-700 hover:border-neutral-600"
+              title="Export all data to archive"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+          )}
+
           {onOpenAuthors && (
             <button
               onClick={onOpenAuthors}
