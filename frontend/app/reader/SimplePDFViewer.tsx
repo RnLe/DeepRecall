@@ -20,7 +20,7 @@ export function SimplePDFViewer({
 }: SimplePDFViewerProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-      <div className="bg-neutral-900/80 rounded-xl shadow-2xl w-[90vw] h-[90vh] flex flex-col border border-neutral-700/50">
+      <div className="bg-neutral-900/80 rounded-xl shadow-2xl w-[60%] h-[90vh] flex flex-col border border-neutral-700/50">
         {/* Header */}
         <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
           <div className="flex items-center justify-between">

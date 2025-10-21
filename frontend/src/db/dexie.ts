@@ -307,6 +307,86 @@ class DeepRecallDB extends Dexie {
           `✅ Database upgraded to v5: Created ${authorsCreated} authors, updated ${worksUpdated} works`
         );
       });
+
+    // Version 6: Add avatar fields to Authors table
+    this.version(6)
+      .stores({
+        // Add avatar indexes to authors table
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 6 (adding avatar fields to Authors)"
+        );
+        // No data migration needed - new fields are optional
+        // Existing authors will have undefined avatar fields
+      });
+
+    // Version 7: Migrate title (string) to titles (array)
+    this.version(7)
+      .stores({
+        // Authors table (unchanged indexes)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 7 (migrating title to titles array)"
+        );
+
+        const authors = await tx.table("authors").toArray();
+        let migrated = 0;
+
+        for (const author of authors) {
+          if (author.title && typeof author.title === "string") {
+            // Convert single title string to array
+            await tx.table("authors").update(author.id, {
+              titles: [author.title],
+              title: undefined, // Remove old field
+            });
+            migrated++;
+          }
+        }
+
+        console.log(
+          `✅ Database upgraded to v7: Migrated ${migrated} authors with titles`
+        );
+      });
   }
 }
 

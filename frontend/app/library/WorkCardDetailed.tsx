@@ -26,6 +26,7 @@ import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
 import { BibtexExportModal } from "./BibtexExportModal";
+import { SimplePDFViewer } from "../reader/SimplePDFViewer";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 import { PDFThumbnail } from "./PDFThumbnail";
 
@@ -48,6 +49,7 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
 
   // Get journal and publisher from work
   const journal = work.journal;
@@ -158,15 +160,23 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`group relative bg-neutral-900/50 border rounded-xl overflow-hidden transition-all duration-200 cursor-pointer ${
+        className={`group relative bg-neutral-900/50 border rounded-xl transition-all duration-200 cursor-pointer ${
           isDragOver
             ? "border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-500/20"
             : "border-neutral-800/50 hover:border-neutral-700 hover:bg-neutral-900/80"
         }`}
       >
-        <div className="flex">
+        <div className="flex overflow-hidden rounded-xl">
           {/* Thumbnail Area - Left Side (A4 ratio: ~1:1.41) - Borderless, touches edges */}
-          <div className="flex-shrink-0 w-32 bg-neutral-800/50 flex items-center justify-center relative overflow-hidden">
+          <div
+            className="flex-shrink-0 w-32 bg-neutral-800/50 flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-neutral-700/50 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (work.assets?.[0]?.mime === "application/pdf") {
+                setIsPdfPreviewOpen(true);
+              }
+            }}
+          >
             {work.assets &&
             work.assets.length > 0 &&
             work.assets[0].mime === "application/pdf" ? (
@@ -313,6 +323,15 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
       />
+
+      {/* PDF Preview */}
+      {isPdfPreviewOpen && work.assets?.[0]?.sha256 && (
+        <SimplePDFViewer
+          sha256={work.assets[0].sha256}
+          title={work.title || "PDF Preview"}
+          onClose={() => setIsPdfPreviewOpen(false)}
+        />
+      )}
     </>
   );
 }

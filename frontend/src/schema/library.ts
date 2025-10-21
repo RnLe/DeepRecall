@@ -85,6 +85,17 @@ export const AuthorTitleSchema = z.enum([
 export type AuthorTitle = z.infer<typeof AuthorTitleSchema>;
 
 /**
+ * Crop region for avatar images (normalized 0-1 coordinates)
+ */
+export const CropRegionSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  size: z.number().min(0).max(1),
+});
+
+export type CropRegion = z.infer<typeof CropRegionSchema>;
+
+/**
  * Author entity - full representation of a researcher/writer
  */
 export const AuthorSchema = z.object({
@@ -96,8 +107,8 @@ export const AuthorSchema = z.object({
   lastName: z.string(),
   middleName: z.string().optional(),
 
-  // Optional title/suffix
-  title: z.string().optional(), // Allow free-form for flexibility beyond enum
+  // Optional titles (array for multiple titles like ["Dr.", "Prof."])
+  titles: z.array(z.string()).optional(), // Allow free-form for flexibility
 
   // Professional info
   affiliation: z.string().optional(), // Institution/organization
@@ -110,6 +121,11 @@ export const AuthorSchema = z.object({
   website: z.string().url().optional(),
   bio: z.string().optional(), // Brief biography
 
+  // Avatar
+  avatarOriginalPath: z.string().optional(), // Path to original (compressed) image
+  avatarDisplayPath: z.string().optional(), // Path to display (100x100px) image
+  avatarCropRegion: CropRegionSchema.optional(), // Crop region for re-editing
+
   // Timestamps
   createdAt: ISODate,
   updatedAt: ISODate,
@@ -118,15 +134,12 @@ export const AuthorSchema = z.object({
 export type Author = z.infer<typeof AuthorSchema>;
 
 /**
- * Helper to get full name from Author
+ * Helper to get full name from Author (without titles)
  */
 export function getAuthorFullName(author: Author): string {
-  const parts = [
-    author.title,
-    author.firstName,
-    author.middleName,
-    author.lastName,
-  ].filter(Boolean);
+  const parts = [author.firstName, author.middleName, author.lastName].filter(
+    Boolean
+  );
   return parts.join(" ");
 }
 

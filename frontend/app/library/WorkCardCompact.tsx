@@ -19,6 +19,7 @@ import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
 import { BibtexExportModal } from "./BibtexExportModal";
+import { SimplePDFViewer } from "../reader/SimplePDFViewer";
 import type { BlobWithMetadata } from "@/src/schema/blobs";
 import { PDFThumbnail } from "./PDFThumbnail";
 
@@ -39,6 +40,7 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
   const allPresets = usePresets();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
 
@@ -154,15 +156,23 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`group relative bg-neutral-900/50 border rounded-lg overflow-hidden transition-all duration-200 cursor-pointer h-24 ${
+        className={`group relative bg-neutral-900/50 border rounded-lg transition-all duration-200 cursor-pointer h-24 ${
           isDragOver
             ? "border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-500/20"
             : "border-neutral-800/50 hover:border-neutral-700 hover:bg-neutral-900/80"
         }`}
       >
-        <div className="flex h-full">
-          {/* Thumbnail - Left */}
-          <div className="flex-shrink-0 w-16 bg-neutral-800/50 flex items-center justify-center border-r border-neutral-800/50">
+        <div className="flex h-full overflow-hidden rounded-lg">
+          {/* Thumbnail - Left (borderless on top, left, bottom) */}
+          <div
+            className="flex-shrink-0 w-16 bg-neutral-800/50 flex items-center justify-center border-r border-neutral-800/50 -ml-px -mt-px -mb-px rounded-l-lg overflow-hidden cursor-pointer hover:bg-neutral-700/50 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (work.assets?.[0]?.mime === "application/pdf") {
+                setIsPdfPreviewOpen(true);
+              }
+            }}
+          >
             {work.assets &&
             work.assets.length > 0 &&
             work.assets[0].mime === "application/pdf" ? (
@@ -266,12 +276,21 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
         />
       )}
 
-      {/* BibTeX Export Modal */}
+      {/* BibTeX export modal */}
       <BibtexExportModal
         work={work}
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
       />
+
+      {/* PDF preview */}
+      {isPdfPreviewOpen && work.assets?.[0]?.sha256 && (
+        <SimplePDFViewer
+          sha256={work.assets[0].sha256}
+          title={work.title || "PDF Preview"}
+          onClose={() => setIsPdfPreviewOpen(false)}
+        />
+      )}
     </>
   );
 }
