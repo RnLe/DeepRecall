@@ -16,12 +16,14 @@
 6. Save the `.tar.gz` file somewhere safe
 
 **Recommended for device sync:**
+
 - ✅ Knowledge Data
 - ✅ File Metadata
 - ☐ PDF Files (sync these via cloud storage instead)
 - ✅ Other Files
 
 **Recommended for full backup:**
+
 - ✅ All options
 
 ### Importing Data
@@ -45,7 +47,11 @@
 ### Quick Integration
 
 ```typescript
-import { exportData, previewImport, executeImport } from "@/src/utils/data-sync";
+import {
+  exportData,
+  previewImport,
+  executeImport,
+} from "@/src/utils/data-sync";
 
 // Export
 await exportData({
@@ -77,11 +83,11 @@ const result = await executeImport(tempId, {
 
 ```typescript
 type ExportOptions = {
-  includeDexie: boolean;      // Always true
-  includeSQLite: boolean;     // Include blob metadata
-  includeBlobs: boolean;      // Include PDF files
-  includeFiles: boolean;      // Include avatars, DB files
-  deviceName?: string;        // Optional identifier
+  includeDexie: boolean; // Always true
+  includeSQLite: boolean; // Include blob metadata
+  includeBlobs: boolean; // Include PDF files
+  includeFiles: boolean; // Include avatars, DB files
+  deviceName?: string; // Optional identifier
 };
 
 type ImportStrategy = "merge" | "replace";
@@ -91,7 +97,7 @@ type ImportOptions = {
   importDexie: boolean;
   importSQLite: boolean;
   importFiles: boolean;
-  skipExisting?: boolean;     // Future: for merge conflicts
+  skipExisting?: boolean; // Future: for merge conflicts
 };
 ```
 
@@ -123,6 +129,7 @@ files/library/        # Library folder contents
 ### Common Patterns
 
 **Export all data:**
+
 ```typescript
 await exportData({
   includeDexie: true,
@@ -134,6 +141,7 @@ await exportData({
 ```
 
 **Lightweight export (no PDFs):**
+
 ```typescript
 await exportData({
   includeDexie: true,
@@ -144,10 +152,11 @@ await exportData({
 ```
 
 **Safe merge import:**
+
 ```typescript
 const { preview, tempId } = await previewImport(file);
 const result = await executeImport(tempId, {
-  strategy: "merge",      // Safe: won't delete existing data
+  strategy: "merge", // Safe: won't delete existing data
   importDexie: true,
   importSQLite: true,
   importFiles: true,
@@ -155,9 +164,10 @@ const result = await executeImport(tempId, {
 ```
 
 **Fresh start (replace all):**
+
 ```typescript
 const result = await executeImport(tempId, {
-  strategy: "replace",    // ⚠️ Deletes all existing data!
+  strategy: "replace", // ⚠️ Deletes all existing data!
   importDexie: true,
   importSQLite: true,
   importFiles: true,
@@ -167,6 +177,7 @@ const result = await executeImport(tempId, {
 ## Mental Model
 
 **Export Flow:**
+
 ```
 Client (Dexie) → Export Utilities → API → Server
                                             ↓
@@ -178,6 +189,7 @@ Client (Dexie) → Export Utilities → API → Server
 ```
 
 **Import Flow:**
+
 ```
 Browser upload → API → Extract to temp
                          ↓
@@ -194,12 +206,14 @@ Browser upload → API → Extract to temp
 ## Debugging
 
 **Enable detailed logging:**
+
 ```typescript
 // In browser console:
 localStorage.setItem("DEBUG", "data-sync:*");
 ```
 
 **Check export size:**
+
 ```typescript
 import { estimateExportSize } from "@/src/utils/data-sync";
 const size = await estimateExportSize(options);
@@ -207,6 +221,7 @@ console.log(`Estimated: ${formatBytes(size.total)}`);
 ```
 
 **Inspect archive:**
+
 ```bash
 tar -tzf deeprecall-export-*.tar.gz  # List contents
 tar -xzf deeprecall-export-*.tar.gz -C /tmp/inspect  # Extract
@@ -214,6 +229,7 @@ cat /tmp/inspect/manifest.json | jq  # View manifest
 ```
 
 **Check Dexie data:**
+
 ```typescript
 // In browser console:
 import { db } from "@/src/db/dexie";
@@ -234,13 +250,13 @@ console.log(`${works.length} works in Dexie`);
 
 **Common Issues:**
 
-| Issue | Solution |
-|-------|----------|
-| Export button missing | Update LibraryHeader component |
-| Import fails silently | Check browser console for errors |
-| PDFs not imported | Verify `includeBlobs` was true during export |
-| Annotations missing | Check `importDexie` option is true |
-| Database locked | Close other tabs/processes using the app |
+| Issue                 | Solution                                     |
+| --------------------- | -------------------------------------------- |
+| Export button missing | Update LibraryHeader component               |
+| Import fails silently | Check browser console for errors             |
+| PDFs not imported     | Verify `includeBlobs` was true during export |
+| Annotations missing   | Check `importDexie` option is true           |
+| Database locked       | Close other tabs/processes using the app     |
 
 **Need Help?**
 Check `DATA_SYNC_IMPLEMENTATION.md` for detailed documentation.

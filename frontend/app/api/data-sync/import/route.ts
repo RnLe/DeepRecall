@@ -5,7 +5,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { ExportPackageSchema, EXPORT_VERSION, ARCHIVE_STRUCTURE } from "@/src/schema/data-sync";
+import {
+  ExportPackageSchema,
+  EXPORT_VERSION,
+  ARCHIVE_STRUCTURE,
+} from "@/src/schema/data-sync";
 import type { ImportPreview, ExportPackage } from "@/src/schema/data-sync";
 import { writeFile, readFile, mkdir, rm } from "fs/promises";
 import path from "path";
@@ -15,11 +19,14 @@ import { randomBytes } from "crypto";
 /**
  * Extract tar.gz archive
  */
-async function extractArchive(archivePath: string, destDir: string): Promise<void> {
+async function extractArchive(
+  archivePath: string,
+  destDir: string
+): Promise<void> {
   const { exec } = await import("child_process");
   const { promisify } = await import("util");
   const execPromise = promisify(exec);
-  
+
   await mkdir(destDir, { recursive: true });
   await execPromise(`tar -xzf "${archivePath}" -C "${destDir}"`);
 }
@@ -31,7 +38,7 @@ function isCompatibleVersion(exportVersion: string): boolean {
   // For now, only exact match. Later, can be more flexible.
   const [exportMajor] = exportVersion.split(".");
   const [currentMajor] = EXPORT_VERSION.split(".");
-  
+
   return exportMajor === currentMajor;
 }
 
@@ -39,49 +46,54 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    
+
     if (!file) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
-    
+
     // Save uploaded file to temp location
     const tempId = randomBytes(8).toString("hex");
-    const tempUploadPath = path.join(tmpdir(), `deeprecall-import-${tempId}.tar.gz`);
+    const tempUploadPath = path.join(
+      tmpdir(),
+      `deeprecall-import-${tempId}.tar.gz`
+    );
     const tempExtractDir = path.join(tmpdir(), `deeprecall-import-${tempId}`);
-    
+
     try {
       // Write uploaded file
       const arrayBuffer = await file.arrayBuffer();
       await writeFile(tempUploadPath, new Uint8Array(arrayBuffer));
-      
+
       // Extract archive
       await extractArchive(tempUploadPath, tempExtractDir);
-      
+
       // Read manifest
-      const manifestPath = path.join(tempExtractDir, ARCHIVE_STRUCTURE.MANIFEST);
+      const manifestPath = path.join(
+        tempExtractDir,
+        ARCHIVE_STRUCTURE.MANIFEST
+      );
       const manifestContent = await readFile(manifestPath, "utf-8");
-      const importPackage = ExportPackageSchema.parse(JSON.parse(manifestContent));
-      
+      const importPackage = ExportPackageSchema.parse(
+        JSON.parse(manifestContent)
+      );
+
       // Check version compatibility
       const compatible = isCompatibleVersion(importPackage.metadata.version);
       const warnings: string[] = [];
-      
+
       if (!compatible) {
         warnings.push(
           `Export version ${importPackage.metadata.version} may not be fully compatible with current version ${EXPORT_VERSION}`
         );
       }
-      
+
       // Check Dexie version
       if (importPackage.metadata.dexieVersion !== 7) {
         warnings.push(
           `Export was created with Dexie version ${importPackage.metadata.dexieVersion}, but current version is 7. Data migration may be needed.`
         );
       }
-      
+
       // Conflicts will be calculated on the client side since Dexie only works in browser
       // Provide empty conflicts object for now
       const conflicts = {
@@ -96,9 +108,10 @@ export async function POST(request: NextRequest) {
         cards: 0,
         reviewLogs: 0,
       };
-      
+
       // Calculate potential changes (client will recalculate with actual conflicts)
-      const totalNew = importPackage.metadata.counts.works +
+      const totalNew =
+        importPackage.metadata.counts.works +
         importPackage.metadata.counts.assets +
         importPackage.metadata.counts.activities +
         importPackage.metadata.counts.collections +
@@ -108,7 +121,7 @@ export async function POST(request: NextRequest) {
         importPackage.metadata.counts.annotations +
         importPackage.metadata.counts.cards +
         importPackage.metadata.counts.reviewLogs;
-      
+
       const preview: ImportPreview = {
         metadata: importPackage.metadata,
         compatible,
@@ -120,22 +133,22 @@ export async function POST(request: NextRequest) {
           removed: 0, // Only for replace strategy, calculated on client
         },
       };
-      
+
       // Store temp ID in response for later use
       const response = {
         preview,
         tempId, // Client will send this back when executing import
       };
-      
+
       return NextResponse.json(response);
-      
     } catch (error) {
       // Clean up on error
       await rm(tempUploadPath, { force: true }).catch(() => {});
-      await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {});
+      await rm(tempExtractDir, { recursive: true, force: true }).catch(
+        () => {}
+      );
       throw error;
     }
-    
   } catch (error) {
     console.error("Import preview error:", error);
     return NextResponse.json(

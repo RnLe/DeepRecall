@@ -231,7 +231,7 @@ export async function scanLibrary(): Promise<{
 
   const db = getDB();
   const libraryPath = getLibraryPath();
-  
+
   // Ensure required directories exist
   const avatarsPath = path.join(process.cwd(), "data", "avatars");
   await mkdir(libraryPath, { recursive: true });

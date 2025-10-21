@@ -115,7 +115,7 @@ export const ExportMetadataSchema = z.object({
   deviceName: z.string().optional(), // Optional device identifier
   dexieVersion: z.number(), // Dexie DB version at export time
   includeFiles: z.boolean(), // Whether file system files are included
-  
+
   // Counts for preview
   counts: z.object({
     works: z.number(),
@@ -132,7 +132,7 @@ export const ExportMetadataSchema = z.object({
     paths: z.number(),
     files: z.number(),
   }),
-  
+
   // Size information
   sizes: z.object({
     dexieData: z.number(), // Size in bytes
@@ -195,7 +195,7 @@ export const ImportPreviewSchema = z.object({
   metadata: ExportMetadataSchema,
   compatible: z.boolean(), // Is version compatible?
   warnings: z.array(z.string()), // Any warnings about the import
-  
+
   // What exists locally vs in import
   conflicts: z.object({
     works: z.number(),
@@ -209,7 +209,7 @@ export const ImportPreviewSchema = z.object({
     cards: z.number(),
     reviewLogs: z.number(),
   }),
-  
+
   // What would be added (merge) or replaced (replace)
   changes: z.object({
     added: z.number(),

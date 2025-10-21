@@ -125,6 +125,7 @@ Click "Import" button → Opens `ImportDataDialog`
 ### 3. Preview import
 
 Server:
+
 1. Extracts archive to temporary directory
 2. Reads and validates `manifest.json`
 3. Checks version compatibility
@@ -132,6 +133,7 @@ Server:
 5. Returns preview information to client
 
 Client displays:
+
 - Export metadata (date, device, version, size)
 - Warnings (version incompatibility, etc.)
 - Conflict counts
@@ -141,12 +143,14 @@ Client displays:
 ### 4. Choose import strategy
 
 **Merge Strategy:**
+
 - Adds new items
 - Updates existing items (by ID)
 - Keeps items not in import
 - Uses Dexie's `bulkPut()` which updates or inserts
 
 **Replace Strategy:**
+
 - Clears all existing data first
 - Adds all items from import
 - Destructive - cannot be undone
@@ -157,6 +161,7 @@ Client displays:
 Client calls `/api/data-sync/import/execute` with tempId and options
 
 Server:
+
 1. Reads extracted data from temporary directory
 2. Imports SQLite data (merge or replace)
 3. Copies blob files to correct locations
@@ -164,6 +169,7 @@ Server:
 5. Returns Dexie data to client
 
 Client:
+
 1. Receives Dexie data from server
 2. Imports into IndexedDB using chosen strategy
 3. Shows completion message
@@ -174,6 +180,7 @@ Client:
 ### POST `/api/data-sync/export`
 
 **Request:**
+
 ```json
 {
   "options": {
@@ -200,15 +207,18 @@ Binary tar.gz file with `Content-Disposition` header
 FormData with `file` field (tar.gz archive)
 
 **Response:**
+
 ```json
 {
   "preview": {
-    "metadata": { /* export info */ },
+    "metadata": {
+      /* export info */
+    },
     "compatible": true,
     "warnings": [],
     "conflicts": {
       "works": 5,
-      "assets": 12,
+      "assets": 12
       // ... conflict counts
     },
     "changes": {
@@ -224,6 +234,7 @@ FormData with `file` field (tar.gz archive)
 ### POST `/api/data-sync/import/execute`
 
 **Request:**
+
 ```json
 {
   "tempId": "abc123def456",
@@ -237,6 +248,7 @@ FormData with `file` field (tar.gz archive)
 ```
 
 **Response:**
+
 ```json
 {
   "result": {

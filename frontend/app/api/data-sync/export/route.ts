@@ -5,8 +5,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { ExportOptionsSchema, ARCHIVE_STRUCTURE, EXPORT_VERSION } from "@/src/schema/data-sync";
-import type { ExportPackage, ExportMetadata, SQLiteExport, FileManifest } from "@/src/schema/data-sync";
+import {
+  ExportOptionsSchema,
+  ARCHIVE_STRUCTURE,
+  EXPORT_VERSION,
+} from "@/src/schema/data-sync";
+import type {
+  ExportPackage,
+  ExportMetadata,
+  SQLiteExport,
+  FileManifest,
+} from "@/src/schema/data-sync";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { readdir, readFile, stat } from "fs/promises";
@@ -25,12 +34,12 @@ const pipelineAsync = promisify(pipeline);
  */
 async function exportSQLiteData(): Promise<SQLiteExport> {
   const db = getDB();
-  
+
   const blobRecords = db.select().from(blobs).all();
   const pathRecords = db.select().from(paths).all();
-  
+
   return {
-    blobs: blobRecords.map(b => ({
+    blobs: blobRecords.map((b) => ({
       hash: b.hash,
       size: b.size,
       mime: b.mime,
@@ -42,7 +51,7 @@ async function exportSQLiteData(): Promise<SQLiteExport> {
       imageHeight: b.imageHeight,
       lineCount: b.lineCount,
     })),
-    paths: pathRecords.map(p => ({
+    paths: pathRecords.map((p) => ({
       hash: p.hash,
       path: p.path,
     })),
@@ -54,20 +63,20 @@ async function exportSQLiteData(): Promise<SQLiteExport> {
  */
 async function getFileManifest(): Promise<FileManifest> {
   const dataDir = path.join(process.cwd(), "data");
-  
+
   const manifest: FileManifest = {
     avatars: [],
     libraryFiles: [],
     dbFiles: [],
     totalSize: 0,
   };
-  
+
   // List avatars
   try {
     const avatarsDir = path.join(dataDir, "avatars");
     const avatarFiles = await readdir(avatarsDir);
-    manifest.avatars = avatarFiles.filter(f => !f.startsWith("."));
-    
+    manifest.avatars = avatarFiles.filter((f) => !f.startsWith("."));
+
     for (const file of manifest.avatars) {
       const filePath = path.join(avatarsDir, file);
       const stats = await stat(filePath);
@@ -76,18 +85,21 @@ async function getFileManifest(): Promise<FileManifest> {
   } catch (err) {
     console.warn("Could not read avatars directory:", err);
   }
-  
+
   // List library files (recursively)
   try {
     const libraryDir = path.join(dataDir, "library");
-    const listFiles = async (dir: string, baseDir: string): Promise<string[]> => {
+    const listFiles = async (
+      dir: string,
+      baseDir: string
+    ): Promise<string[]> => {
       const files: string[] = [];
       const entries = await readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(baseDir, fullPath);
-        
+
         if (entry.isDirectory()) {
           const subFiles = await listFiles(fullPath, baseDir);
           files.push(...subFiles);
@@ -97,15 +109,15 @@ async function getFileManifest(): Promise<FileManifest> {
           manifest.totalSize += stats.size;
         }
       }
-      
+
       return files;
     };
-    
+
     manifest.libraryFiles = await listFiles(libraryDir, libraryDir);
   } catch (err) {
     console.warn("Could not read library directory:", err);
   }
-  
+
   // List .db files
   try {
     manifest.dbFiles = ["cas.db", "cas.db-shm", "cas.db-wal"];
@@ -121,7 +133,7 @@ async function getFileManifest(): Promise<FileManifest> {
   } catch (err) {
     console.warn("Could not read .db files:", err);
   }
-  
+
   return manifest;
 }
 
@@ -136,7 +148,7 @@ function calculateSizes(
   const dexieDataSize = JSON.stringify(dexieData).length;
   const sqliteDataSize = sqliteData ? JSON.stringify(sqliteData).length : 0;
   const fileDataSize = fileManifest?.totalSize || 0;
-  
+
   return {
     dexieData: dexieDataSize,
     sqliteData: sqliteDataSize,
@@ -154,36 +166,39 @@ async function createArchive(
 ): Promise<string> {
   // For now, we'll use a simple approach with tar command
   // In production, you might want to use a proper tar library
-  
-  const tempDir = path.join(tmpdir(), `deeprecall-export-${randomBytes(8).toString("hex")}`);
+
+  const tempDir = path.join(
+    tmpdir(),
+    `deeprecall-export-${randomBytes(8).toString("hex")}`
+  );
   const archivePath = `${tempDir}.tar.gz`;
-  
+
   const { mkdir, writeFile, rm } = await import("fs/promises");
   await mkdir(tempDir, { recursive: true });
-  
+
   try {
     // Write manifest.json
     await writeFile(
       path.join(tempDir, ARCHIVE_STRUCTURE.MANIFEST),
       JSON.stringify(exportPackage, null, 2)
     );
-    
+
     // Write Dexie data
     const dexieDir = path.join(tempDir, ARCHIVE_STRUCTURE.DEXIE_DIR);
     await mkdir(dexieDir, { recursive: true });
-    
+
     for (const [table, data] of Object.entries(exportPackage.dexie)) {
       await writeFile(
         path.join(dexieDir, `${table}.json`),
         JSON.stringify(data, null, 2)
       );
     }
-    
+
     // Write SQLite data if included
     if (exportPackage.sqlite) {
       const sqliteDir = path.join(tempDir, ARCHIVE_STRUCTURE.SQLITE_DIR);
       await mkdir(sqliteDir, { recursive: true });
-      
+
       await writeFile(
         path.join(sqliteDir, "blobs.json"),
         JSON.stringify(exportPackage.sqlite.blobs, null, 2)
@@ -193,14 +208,14 @@ async function createArchive(
         JSON.stringify(exportPackage.sqlite.paths, null, 2)
       );
     }
-    
+
     // Copy files if included (library/, avatars/, db files)
     if (options.includeFiles && exportPackage.files) {
       const filesDir = path.join(tempDir, ARCHIVE_STRUCTURE.FILES_DIR);
       await mkdir(filesDir, { recursive: true });
-      
+
       const dataDir = path.join(process.cwd(), "data");
-      
+
       // Copy avatars
       const avatarsDir = path.join(filesDir, "avatars");
       await mkdir(avatarsDir, { recursive: true });
@@ -214,7 +229,7 @@ async function createArchive(
           console.warn(`Could not copy avatar ${file}:`, err);
         }
       }
-      
+
       // Copy library files
       const libraryDir = path.join(filesDir, "library");
       await mkdir(libraryDir, { recursive: true });
@@ -222,17 +237,17 @@ async function createArchive(
         try {
           const sourcePath = path.join(dataDir, "library", file);
           const destPath = path.join(libraryDir, file);
-          
+
           // Create parent directories
           await mkdir(path.dirname(destPath), { recursive: true });
-          
+
           const content = await readFile(sourcePath);
           await writeFile(destPath, content);
         } catch (err) {
           console.warn(`Could not copy library file ${file}:`, err);
         }
       }
-      
+
       // Copy .db files
       const dbDir = path.join(filesDir, "db");
       await mkdir(dbDir, { recursive: true });
@@ -248,16 +263,16 @@ async function createArchive(
         }
       }
     }
-    
+
     // Create tar.gz archive using Node.js tar
     const { exec } = await import("child_process");
     const execPromise = promisify(exec);
-    
+
     await execPromise(`tar -czf "${archivePath}" -C "${tempDir}" .`);
-    
+
     // Clean up temp directory
     await rm(tempDir, { recursive: true, force: true });
-    
+
     return archivePath;
   } catch (error) {
     // Clean up on error
@@ -271,20 +286,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const options = ExportOptionsSchema.parse(body.options);
     const dexieData = body.dexieData; // Already exported from client
-    
+
     if (!dexieData) {
       return NextResponse.json(
         { error: "Missing dexieData in request body" },
         { status: 400 }
       );
     }
-    
+
     // Get SQLite data if requested
-    const sqliteData = options.includeSQLite ? await exportSQLiteData() : undefined;
-    
+    const sqliteData = options.includeSQLite
+      ? await exportSQLiteData()
+      : undefined;
+
     // Get file manifest if requested
-    const fileManifest = options.includeFiles ? await getFileManifest() : undefined;
-    
+    const fileManifest = options.includeFiles
+      ? await getFileManifest()
+      : undefined;
+
     // Build export package
     const exportPackage: ExportPackage = {
       metadata: {
@@ -306,10 +325,11 @@ export async function POST(request: NextRequest) {
           reviewLogs: dexieData.reviewLogs?.length || 0,
           blobs: sqliteData?.blobs?.length || 0,
           paths: sqliteData?.paths?.length || 0,
-          files: fileManifest ? 
-            fileManifest.avatars.length + 
-            fileManifest.libraryFiles.length + 
-            fileManifest.dbFiles.length : 0,
+          files: fileManifest
+            ? fileManifest.avatars.length +
+              fileManifest.libraryFiles.length +
+              fileManifest.dbFiles.length
+            : 0,
         },
         sizes: calculateSizes(dexieData, sqliteData, fileManifest),
       },
@@ -317,22 +337,25 @@ export async function POST(request: NextRequest) {
       sqlite: sqliteData,
       files: fileManifest,
     };
-    
+
     // Create archive
     const archivePath = await createArchive(exportPackage, {
       includeFiles: options.includeFiles,
     });
-    
+
     // Read the archive and return as download
     const archiveBuffer = await readFile(archivePath);
-    
+
     // Clean up
     const { rm } = await import("fs/promises");
     await rm(archivePath, { force: true });
-    
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .slice(0, -5);
     const filename = `deeprecall-export-${timestamp}.tar.gz`;
-    
+
     return new NextResponse(new Uint8Array(archiveBuffer), {
       headers: {
         "Content-Type": "application/gzip",
@@ -340,13 +363,12 @@ export async function POST(request: NextRequest) {
         "Content-Length": archiveBuffer.length.toString(),
       },
     });
-    
   } catch (error) {
     console.error("Export error:", error);
     return NextResponse.json(
-      { 
+      {
         error: "Failed to create export",
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

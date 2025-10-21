@@ -71,7 +71,7 @@ export default function LibraryPage() {
     setPreselectedPresetId(presetId);
     setIsCreateDialogOpen(true);
   };
-  
+
   const handleImportSuccess = () => {
     // Refresh the library after import
     queryClient.invalidateQueries();

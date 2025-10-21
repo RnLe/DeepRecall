@@ -40,7 +40,7 @@ export async function exportDexieData(): Promise<DexieExportTyped> {
     db.cards.toArray(),
     db.reviewLogs.toArray(),
   ]);
-  
+
   return {
     works,
     assets,
@@ -62,7 +62,7 @@ export async function exportData(options: ExportOptions): Promise<void> {
   try {
     // Export Dexie data
     const dexieData = await exportDexieData();
-    
+
     // Call server API to create archive
     const response = await fetch("/api/data-sync/export", {
       method: "POST",
@@ -74,18 +74,18 @@ export async function exportData(options: ExportOptions): Promise<void> {
         dexieData,
       }),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.details || error.error || "Export failed");
     }
-    
+
     // Download the file
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    
+
     // Get filename from Content-Disposition header or generate one
     const contentDisposition = response.headers.get("Content-Disposition");
     let filename = "deeprecall-export.tar.gz";
@@ -95,13 +95,12 @@ export async function exportData(options: ExportOptions): Promise<void> {
         filename = match[1];
       }
     }
-    
+
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
   } catch (error) {
     console.error("Export failed:", error);
     throw error;
@@ -118,23 +117,29 @@ export async function previewImport(file: File): Promise<{
   try {
     const formData = new FormData();
     formData.append("file", file);
-    
+
     const response = await fetch("/api/data-sync/import", {
       method: "POST",
       body: formData,
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.details || error.error || "Failed to preview import");
+      throw new Error(
+        error.details || error.error || "Failed to preview import"
+      );
     }
-    
+
     const result = await response.json();
-    
+
     // Calculate actual conflicts on client side (Dexie only works in browser)
     const conflicts = await calculateConflicts(result.preview.metadata.counts);
-    const totalConflicts = Object.values(conflicts).reduce((sum, n) => sum + n, 0);
-    const totalNew = result.preview.metadata.counts.works +
+    const totalConflicts = Object.values(conflicts).reduce(
+      (sum, n) => sum + n,
+      0
+    );
+    const totalNew =
+      result.preview.metadata.counts.works +
       result.preview.metadata.counts.assets +
       result.preview.metadata.counts.activities +
       result.preview.metadata.counts.collections +
@@ -144,7 +149,7 @@ export async function previewImport(file: File): Promise<{
       result.preview.metadata.counts.annotations +
       result.preview.metadata.counts.cards +
       result.preview.metadata.counts.reviewLogs;
-    
+
     // Update preview with actual conflict data
     result.preview.conflicts = conflicts;
     result.preview.changes = {
@@ -152,7 +157,7 @@ export async function previewImport(file: File): Promise<{
       updated: totalConflicts,
       removed: 0, // Only for replace strategy
     };
-    
+
     return result;
   } catch (error) {
     console.error("Import preview failed:", error);
@@ -163,7 +168,9 @@ export async function previewImport(file: File): Promise<{
 /**
  * Calculate conflicts between import data and local Dexie data
  */
-async function calculateConflicts(importCounts: any): Promise<ImportPreview["conflicts"]> {
+async function calculateConflicts(
+  importCounts: any
+): Promise<ImportPreview["conflicts"]> {
   // This will be replaced with actual conflict detection
   // For now, assume no conflicts (optimistic)
   return {
@@ -199,18 +206,18 @@ export async function executeImport(
         options,
       }),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.details || error.error || "Import failed");
     }
-    
+
     const { result, dexieData } = await response.json();
-    
+
     // Import Dexie data on client side
     if (options.importDexie && dexieData) {
       const dexieResult = await importDexieData(dexieData, options.strategy);
-      
+
       // Merge counts
       result.imported.works = dexieResult.works;
       result.imported.assets = dexieResult.assets;
@@ -223,7 +230,7 @@ export async function executeImport(
       result.imported.cards = dexieResult.cards;
       result.imported.reviewLogs = dexieResult.reviewLogs;
     }
-    
+
     return result;
   } catch (error) {
     console.error("Import execution failed:", error);
@@ -253,145 +260,157 @@ async function importDexieData(
     paths: 0,
     files: 0,
   };
-  
+
   if (strategy === "replace") {
     // Clear all tables
-    await db.transaction("rw", [
-      db.works,
-      db.assets,
-      db.activities,
-      db.collections,
-      db.edges,
-      db.presets,
-      db.authors,
-      db.annotations,
-      db.cards,
-      db.reviewLogs,
-    ], async () => {
-      await db.works.clear();
-      await db.assets.clear();
-      await db.activities.clear();
-      await db.collections.clear();
-      await db.edges.clear();
-      await db.presets.clear();
-      await db.authors.clear();
-      await db.annotations.clear();
-      await db.cards.clear();
-      await db.reviewLogs.clear();
-    });
-    
+    await db.transaction(
+      "rw",
+      [
+        db.works,
+        db.assets,
+        db.activities,
+        db.collections,
+        db.edges,
+        db.presets,
+        db.authors,
+        db.annotations,
+        db.cards,
+        db.reviewLogs,
+      ],
+      async () => {
+        await db.works.clear();
+        await db.assets.clear();
+        await db.activities.clear();
+        await db.collections.clear();
+        await db.edges.clear();
+        await db.presets.clear();
+        await db.authors.clear();
+        await db.annotations.clear();
+        await db.cards.clear();
+        await db.reviewLogs.clear();
+      }
+    );
+
     // Bulk add all data
-    await db.transaction("rw", [
-      db.works,
-      db.assets,
-      db.activities,
-      db.collections,
-      db.edges,
-      db.presets,
-      db.authors,
-      db.annotations,
-      db.cards,
-      db.reviewLogs,
-    ], async () => {
-      if (data.works?.length) {
-        await db.works.bulkAdd(data.works);
-        imported.works = data.works.length;
+    await db.transaction(
+      "rw",
+      [
+        db.works,
+        db.assets,
+        db.activities,
+        db.collections,
+        db.edges,
+        db.presets,
+        db.authors,
+        db.annotations,
+        db.cards,
+        db.reviewLogs,
+      ],
+      async () => {
+        if (data.works?.length) {
+          await db.works.bulkAdd(data.works);
+          imported.works = data.works.length;
+        }
+        if (data.assets?.length) {
+          await db.assets.bulkAdd(data.assets);
+          imported.assets = data.assets.length;
+        }
+        if (data.activities?.length) {
+          await db.activities.bulkAdd(data.activities);
+          imported.activities = data.activities.length;
+        }
+        if (data.collections?.length) {
+          await db.collections.bulkAdd(data.collections);
+          imported.collections = data.collections.length;
+        }
+        if (data.edges?.length) {
+          await db.edges.bulkAdd(data.edges);
+          imported.edges = data.edges.length;
+        }
+        if (data.presets?.length) {
+          await db.presets.bulkAdd(data.presets);
+          imported.presets = data.presets.length;
+        }
+        if (data.authors?.length) {
+          await db.authors.bulkAdd(data.authors);
+          imported.authors = data.authors.length;
+        }
+        if (data.annotations?.length) {
+          await db.annotations.bulkAdd(data.annotations);
+          imported.annotations = data.annotations.length;
+        }
+        if (data.cards?.length) {
+          await db.cards.bulkAdd(data.cards);
+          imported.cards = data.cards.length;
+        }
+        if (data.reviewLogs?.length) {
+          await db.reviewLogs.bulkAdd(data.reviewLogs);
+          imported.reviewLogs = data.reviewLogs.length;
+        }
       }
-      if (data.assets?.length) {
-        await db.assets.bulkAdd(data.assets);
-        imported.assets = data.assets.length;
-      }
-      if (data.activities?.length) {
-        await db.activities.bulkAdd(data.activities);
-        imported.activities = data.activities.length;
-      }
-      if (data.collections?.length) {
-        await db.collections.bulkAdd(data.collections);
-        imported.collections = data.collections.length;
-      }
-      if (data.edges?.length) {
-        await db.edges.bulkAdd(data.edges);
-        imported.edges = data.edges.length;
-      }
-      if (data.presets?.length) {
-        await db.presets.bulkAdd(data.presets);
-        imported.presets = data.presets.length;
-      }
-      if (data.authors?.length) {
-        await db.authors.bulkAdd(data.authors);
-        imported.authors = data.authors.length;
-      }
-      if (data.annotations?.length) {
-        await db.annotations.bulkAdd(data.annotations);
-        imported.annotations = data.annotations.length;
-      }
-      if (data.cards?.length) {
-        await db.cards.bulkAdd(data.cards);
-        imported.cards = data.cards.length;
-      }
-      if (data.reviewLogs?.length) {
-        await db.reviewLogs.bulkAdd(data.reviewLogs);
-        imported.reviewLogs = data.reviewLogs.length;
-      }
-    });
+    );
   } else {
     // Merge strategy: use put() which updates if exists, adds if not
-    await db.transaction("rw", [
-      db.works,
-      db.assets,
-      db.activities,
-      db.collections,
-      db.edges,
-      db.presets,
-      db.authors,
-      db.annotations,
-      db.cards,
-      db.reviewLogs,
-    ], async () => {
-      // For merge, we use bulkPut which updates existing or adds new
-      if (data.works?.length) {
-        await db.works.bulkPut(data.works);
-        imported.works = data.works.length;
+    await db.transaction(
+      "rw",
+      [
+        db.works,
+        db.assets,
+        db.activities,
+        db.collections,
+        db.edges,
+        db.presets,
+        db.authors,
+        db.annotations,
+        db.cards,
+        db.reviewLogs,
+      ],
+      async () => {
+        // For merge, we use bulkPut which updates existing or adds new
+        if (data.works?.length) {
+          await db.works.bulkPut(data.works);
+          imported.works = data.works.length;
+        }
+        if (data.assets?.length) {
+          await db.assets.bulkPut(data.assets);
+          imported.assets = data.assets.length;
+        }
+        if (data.activities?.length) {
+          await db.activities.bulkPut(data.activities);
+          imported.activities = data.activities.length;
+        }
+        if (data.collections?.length) {
+          await db.collections.bulkPut(data.collections);
+          imported.collections = data.collections.length;
+        }
+        if (data.edges?.length) {
+          await db.edges.bulkPut(data.edges);
+          imported.edges = data.edges.length;
+        }
+        if (data.presets?.length) {
+          await db.presets.bulkPut(data.presets);
+          imported.presets = data.presets.length;
+        }
+        if (data.authors?.length) {
+          await db.authors.bulkPut(data.authors);
+          imported.authors = data.authors.length;
+        }
+        if (data.annotations?.length) {
+          await db.annotations.bulkPut(data.annotations);
+          imported.annotations = data.annotations.length;
+        }
+        if (data.cards?.length) {
+          await db.cards.bulkPut(data.cards);
+          imported.cards = data.cards.length;
+        }
+        if (data.reviewLogs?.length) {
+          await db.reviewLogs.bulkPut(data.reviewLogs);
+          imported.reviewLogs = data.reviewLogs.length;
+        }
       }
-      if (data.assets?.length) {
-        await db.assets.bulkPut(data.assets);
-        imported.assets = data.assets.length;
-      }
-      if (data.activities?.length) {
-        await db.activities.bulkPut(data.activities);
-        imported.activities = data.activities.length;
-      }
-      if (data.collections?.length) {
-        await db.collections.bulkPut(data.collections);
-        imported.collections = data.collections.length;
-      }
-      if (data.edges?.length) {
-        await db.edges.bulkPut(data.edges);
-        imported.edges = data.edges.length;
-      }
-      if (data.presets?.length) {
-        await db.presets.bulkPut(data.presets);
-        imported.presets = data.presets.length;
-      }
-      if (data.authors?.length) {
-        await db.authors.bulkPut(data.authors);
-        imported.authors = data.authors.length;
-      }
-      if (data.annotations?.length) {
-        await db.annotations.bulkPut(data.annotations);
-        imported.annotations = data.annotations.length;
-      }
-      if (data.cards?.length) {
-        await db.cards.bulkPut(data.cards);
-        imported.cards = data.cards.length;
-      }
-      if (data.reviewLogs?.length) {
-        await db.reviewLogs.bulkPut(data.reviewLogs);
-        imported.reviewLogs = data.reviewLogs.length;
-      }
-    });
+    );
   }
-  
+
   return imported;
 }
 
@@ -407,14 +426,15 @@ export async function estimateExportSize(options: ExportOptions): Promise<{
   // Export Dexie data to estimate size
   const dexieData = await exportDexieData();
   const dexieSize = JSON.stringify(dexieData).length;
-  
+
   // Rough estimates for other data (will be calculated server-side)
   // This is just for UI preview
   return {
     dexie: dexieSize,
     sqlite: options.includeSQLite ? 1000000 : 0, // ~1MB estimate
     files: options.includeFiles ? 105000000 : 0, // ~105MB estimate (includes all library PDFs)
-    total: dexieSize + 
+    total:
+      dexieSize +
       (options.includeSQLite ? 1000000 : 0) +
       (options.includeFiles ? 105000000 : 0),
   };
@@ -425,10 +445,10 @@ export async function estimateExportSize(options: ExportOptions): Promise<{
  */
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
-  
+
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
 }
