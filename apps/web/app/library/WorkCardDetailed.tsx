@@ -119,7 +119,7 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
           }
 
           // Update the asset to link it directly to this work (use raw Dexie update)
-          const { db } = await import("@/src/db/dexie");
+          const { db } = await import("@deeprecall/data/db");
           await db.assets.update(asset.id, {
             workId: work.id,
             updatedAt: new Date().toISOString(),
@@ -169,7 +169,7 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
         <div className="flex overflow-hidden rounded-xl">
           {/* Thumbnail Area - Left Side (A4 ratio: ~1:1.41) - Borderless, touches edges */}
           <div
-            className="flex-shrink-0 w-32 bg-neutral-800/50 flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-neutral-700/50 transition-colors"
+            className="shrink-0 w-32 bg-neutral-800/50 flex items-center justify-center relative overflow-hidden cursor-pointer hover:bg-neutral-700/50 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               if (work.assets?.[0]?.mime === "application/pdf") {
@@ -242,18 +242,18 @@ export function WorkCardDetailed({ work, onClick }: WorkCardDetailedProps) {
             {/* Authors, Year, Journal/Publisher - Compact */}
             <div className="text-xs text-neutral-400 space-y-0.5 mb-1.5">
               <div className="flex items-center gap-1.5">
-                <Users className="w-3 h-3 flex-shrink-0 text-neutral-500" />
+                <Users className="w-3 h-3 shrink-0 text-neutral-500" />
                 <span className="line-clamp-1">{authors}</span>
                 {year && (
                   <>
                     <span className="text-neutral-600">·</span>
-                    <span className="flex-shrink-0">{year}</span>
+                    <span className="shrink-0">{year}</span>
                   </>
                 )}
               </div>
               {(journal || publisher) && (
                 <div className="flex items-center gap-1.5">
-                  <Building className="w-3 h-3 flex-shrink-0 text-neutral-500" />
+                  <Building className="w-3 h-3 shrink-0 text-neutral-500" />
                   <span className="line-clamp-1">{journal || publisher}</span>
                 </div>
               )}

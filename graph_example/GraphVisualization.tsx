@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Group } from '@visx/group';
-import { Circle, Line } from '@visx/shape';
-import { Text } from '@visx/text';
-import { scaleOrdinal } from '@visx/scale';
-import { schemeCategory10 } from 'd3-scale-chromatic';
-import * as d3Force from 'd3-force';
-import * as d3Zoom from 'd3-zoom';
-import * as d3Selection from 'd3-selection';
-import { ZoomIn, ZoomOut, Maximize2, Link2 } from 'lucide-react';
-import type { KnowledgeGraph, GraphNode, GraphLink } from './types';
-import GraphSettings from './GraphSettings';
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { Group } from "@visx/group";
+import { Circle, Line } from "@visx/shape";
+import { Text } from "@visx/text";
+import { scaleOrdinal } from "@visx/scale";
+import { schemeCategory10 } from "d3-scale-chromatic";
+import * as d3Force from "d3-force";
+import * as d3Zoom from "d3-zoom";
+import * as d3Selection from "d3-selection";
+import { ZoomIn, ZoomOut, Maximize2, Link2 } from "lucide-react";
+import type { KnowledgeGraph, GraphNode, GraphLink } from "./types";
+import GraphSettings from "./GraphSettings";
 
 interface GraphVisualizationProps {
   data: KnowledgeGraph | null;
@@ -26,7 +26,7 @@ interface GraphVisualizationProps {
 
 // Color scale for different node kinds
 const colorScale = scaleOrdinal({
-  domain: ['entity', 'concept', 'action', 'resource', 'place', 'role', 'norm'],
+  domain: ["entity", "concept", "action", "resource", "place", "role", "norm"],
   range: [...schemeCategory10],
 });
 
@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS = {
   centerStrength: 0.1,
 };
 
-export default function GraphVisualization({ 
+export default function GraphVisualization({
   data,
   selectedNode,
   selectedNodes = new Set(),
@@ -57,17 +57,28 @@ export default function GraphVisualization({
   const [links, setLinks] = useState<GraphLink[]>([]);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const simulationRef = useRef<d3Force.Simulation<GraphNode, GraphLink> | null>(null);
+  const simulationRef = useRef<d3Force.Simulation<GraphNode, GraphLink> | null>(
+    null
+  );
   const isDraggingRef = useRef(false);
   const draggedNodeRef = useRef<GraphNode | null>(null);
-  const zoomBehaviorRef = useRef<d3Zoom.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const zoomBehaviorRef = useRef<d3Zoom.ZoomBehavior<
+    SVGSVGElement,
+    unknown
+  > | null>(null);
 
   // Calculate connection counts for each node
   const nodeConnectionCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    links.forEach(link => {
-      const srcId = typeof link.source === 'string' ? link.source : (link.source as any).canon_id;
-      const tgtId = typeof link.target === 'string' ? link.target : (link.target as any).canon_id;
+    links.forEach((link) => {
+      const srcId =
+        typeof link.source === "string"
+          ? link.source
+          : (link.source as any).canon_id;
+      const tgtId =
+        typeof link.target === "string"
+          ? link.target
+          : (link.target as any).canon_id;
       counts[srcId] = (counts[srcId] || 0) + 1;
       counts[tgtId] = (counts[tgtId] || 0) + 1;
     });
@@ -85,8 +96,14 @@ export default function GraphVisualization({
   // Check if an edge is connected to the selected node
   const isEdgeConnectedToSelected = (link: GraphLink) => {
     if (!selectedNode) return false;
-    const srcId = typeof link.source === 'string' ? link.source : (link.source as any).canon_id;
-    const tgtId = typeof link.target === 'string' ? link.target : (link.target as any).canon_id;
+    const srcId =
+      typeof link.source === "string"
+        ? link.source
+        : (link.source as any).canon_id;
+    const tgtId =
+      typeof link.target === "string"
+        ? link.target
+        : (link.target as any).canon_id;
     return srcId === selectedNode.canon_id || tgtId === selectedNode.canon_id;
   };
 
@@ -96,7 +113,7 @@ export default function GraphVisualization({
   // Calculate node type counts for legend
   const nodeTypeCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       counts[node.kind] = (counts[node.kind] || 0) + 1;
     });
     return counts;
@@ -124,10 +141,11 @@ export default function GraphVisualization({
     const svg = d3Selection.select(svgRef.current);
     const g = d3Selection.select(gRef.current);
 
-    const zoom = d3Zoom.zoom<SVGSVGElement, unknown>()
+    const zoom = d3Zoom
+      .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
         setZoomLevel(event.transform.k);
       });
 
@@ -135,7 +153,7 @@ export default function GraphVisualization({
     zoomBehaviorRef.current = zoom;
 
     return () => {
-      svg.on('.zoom', null);
+      svg.on(".zoom", null);
     };
   }, [data]); // Re-initialize when data changes
 
@@ -148,7 +166,7 @@ export default function GraphVisualization({
     }
 
     // Initialize nodes with random positions
-    const initialNodes: GraphNode[] = data.nodes.map(node => ({
+    const initialNodes: GraphNode[] = data.nodes.map((node) => ({
       ...node,
       x: Math.random() * dimensions.width,
       y: Math.random() * dimensions.height,
@@ -157,7 +175,7 @@ export default function GraphVisualization({
     }));
 
     // Create links
-    const initialLinks: GraphLink[] = data.edges.map(edge => ({
+    const initialLinks: GraphLink[] = data.edges.map((edge) => ({
       source: edge.src,
       target: edge.tgt,
       kind: edge.kind,
@@ -179,21 +197,36 @@ export default function GraphVisualization({
     }
 
     // Create new simulation
-    const simulation = d3Force.forceSimulation<GraphNode>(nodes)
-      .force('charge', d3Force.forceManyBody<GraphNode>().strength(settings.chargeStrength))
-      .force('link', d3Force.forceLink<GraphNode, GraphLink>(links)
-        .id((d: any) => d.canon_id)
-        .distance(settings.linkDistance)
-        .strength(settings.linkStrength))
-      .force('center', d3Force.forceCenter<GraphNode>(dimensions.width / 2, dimensions.height / 2)
-        .strength(settings.centerStrength))
-      .force('collision', d3Force.forceCollide<GraphNode>().radius((node: any) => {
-        return getNodeRadius(node.canon_id) + 5; // Add padding
-      }))
+    const simulation = d3Force
+      .forceSimulation<GraphNode>(nodes)
+      .force(
+        "charge",
+        d3Force.forceManyBody<GraphNode>().strength(settings.chargeStrength)
+      )
+      .force(
+        "link",
+        d3Force
+          .forceLink<GraphNode, GraphLink>(links)
+          .id((d: any) => d.canon_id)
+          .distance(settings.linkDistance)
+          .strength(settings.linkStrength)
+      )
+      .force(
+        "center",
+        d3Force
+          .forceCenter<GraphNode>(dimensions.width / 2, dimensions.height / 2)
+          .strength(settings.centerStrength)
+      )
+      .force(
+        "collision",
+        d3Force.forceCollide<GraphNode>().radius((node: any) => {
+          return getNodeRadius(node.canon_id) + 5; // Add padding
+        })
+      )
       .alphaDecay(0.02)
       .velocityDecay(0.4);
 
-    simulation.on('tick', () => {
+    simulation.on("tick", () => {
       // Only update if not dragging
       if (!isDraggingRef.current) {
         setNodes([...simulation.nodes()]);
@@ -212,7 +245,7 @@ export default function GraphVisualization({
     e.stopPropagation();
     isDraggingRef.current = true;
     draggedNodeRef.current = node;
-    
+
     if (simulationRef.current) {
       simulationRef.current.alphaTarget(0.3).restart();
       node.fx = node.x;
@@ -221,13 +254,14 @@ export default function GraphVisualization({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDraggingRef.current || !draggedNodeRef.current || !svgRef.current) return;
+    if (!isDraggingRef.current || !draggedNodeRef.current || !svgRef.current)
+      return;
 
     const svg = svgRef.current;
     const rect = svg.getBoundingClientRect();
-    
+
     // Get current zoom transform
-    const transform = zoomBehaviorRef.current 
+    const transform = zoomBehaviorRef.current
       ? d3Zoom.zoomTransform(svg as any)
       : { k: 1, x: 0, y: 0 };
 
@@ -244,7 +278,11 @@ export default function GraphVisualization({
   };
 
   const handleMouseUp = () => {
-    if (isDraggingRef.current && draggedNodeRef.current && simulationRef.current) {
+    if (
+      isDraggingRef.current &&
+      draggedNodeRef.current &&
+      simulationRef.current
+    ) {
       isDraggingRef.current = false;
       draggedNodeRef.current.fx = null;
       draggedNodeRef.current.fy = null;
@@ -257,7 +295,7 @@ export default function GraphVisualization({
   const handleNodeClick = (e: React.MouseEvent, node: GraphNode) => {
     e.stopPropagation();
     if (!isDraggingRef.current) {
-      console.log('Node clicked:', node.canon_id, 'Shift:', e.shiftKey);
+      console.log("Node clicked:", node.canon_id, "Shift:", e.shiftKey);
       onNodeSelect?.(node.canon_id, e.shiftKey);
     }
   };
@@ -278,10 +316,10 @@ export default function GraphVisualization({
   const handleZoomReset = useCallback(() => {
     if (!svgRef.current || !zoomBehaviorRef.current) return;
     const svg = d3Selection.select(svgRef.current);
-    svg.transition().duration(300).call(
-      zoomBehaviorRef.current.transform,
-      d3Zoom.zoomIdentity
-    );
+    svg
+      .transition()
+      .duration(300)
+      .call(zoomBehaviorRef.current.transform, d3Zoom.zoomIdentity);
   }, []);
 
   // Settings handlers
@@ -298,9 +336,13 @@ export default function GraphVisualization({
   }
 
   return (
-    <div 
-      ref={containerRef} 
-      className={`relative w-full h-full ${edgeConnector.active ? 'bg-purple-50 dark:bg-purple-950' : 'bg-gray-50 dark:bg-gray-900'}`}
+    <div
+      ref={containerRef}
+      className={`relative w-full h-full ${
+        edgeConnector.active
+          ? "bg-purple-50 dark:bg-purple-950"
+          : "bg-gray-50 dark:bg-gray-900"
+      }`}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -308,15 +350,25 @@ export default function GraphVisualization({
     >
       <GraphSettings
         chargeStrength={settings.chargeStrength}
-        onChargeStrengthChange={(v) => setSettings(s => ({ ...s, chargeStrength: v }))}
+        onChargeStrengthChange={(v) =>
+          setSettings((s) => ({ ...s, chargeStrength: v }))
+        }
         linkDistance={settings.linkDistance}
-        onLinkDistanceChange={(v) => setSettings(s => ({ ...s, linkDistance: v }))}
+        onLinkDistanceChange={(v) =>
+          setSettings((s) => ({ ...s, linkDistance: v }))
+        }
         linkStrength={settings.linkStrength}
-        onLinkStrengthChange={(v) => setSettings(s => ({ ...s, linkStrength: v }))}
+        onLinkStrengthChange={(v) =>
+          setSettings((s) => ({ ...s, linkStrength: v }))
+        }
         collisionRadius={settings.collisionRadius}
-        onCollisionRadiusChange={(v) => setSettings(s => ({ ...s, collisionRadius: v }))}
+        onCollisionRadiusChange={(v) =>
+          setSettings((s) => ({ ...s, collisionRadius: v }))
+        }
         centerStrength={settings.centerStrength}
-        onCenterStrengthChange={(v) => setSettings(s => ({ ...s, centerStrength: v }))}
+        onCenterStrengthChange={(v) =>
+          setSettings((s) => ({ ...s, centerStrength: v }))
+        }
         onReset={handleResetSettings}
       />
 
@@ -328,10 +380,14 @@ export default function GraphVisualization({
               onClick={onEdgeConnectorToggle}
               className={`p-2 rounded shadow-lg transition-colors ${
                 edgeConnector.active
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  ? "bg-purple-600 hover:bg-purple-700 text-white"
+                  : "bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
-              title={edgeConnector.active ? 'Exit Edge Connector Mode' : 'Edge Connector Mode'}
+              title={
+                edgeConnector.active
+                  ? "Exit Edge Connector Mode"
+                  : "Edge Connector Mode"
+              }
             >
               <Link2 className="w-5 h-5" />
             </button>
@@ -377,7 +433,7 @@ export default function GraphVisualization({
                 title={`Click to select all ${kind} nodes`}
               >
                 <div
-                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  className="w-3 h-3 rounded-full shrink-0"
                   style={{ backgroundColor: colorScale(kind) }}
                 />
                 <span className="flex-1 text-left text-gray-700 dark:text-gray-300">
@@ -414,14 +470,26 @@ export default function GraphVisualization({
         ref={svgRef}
         width={dimensions.width}
         height={dimensions.height}
-        style={{ cursor: isDraggingRef.current ? 'grabbing' : 'grab' }}
+        style={{ cursor: isDraggingRef.current ? "grabbing" : "grab" }}
       >
         <Group innerRef={gRef}>
           {/* Render edges */}
           {links.map((link, i) => {
-            const sourceNode = nodes.find(n => n.canon_id === (typeof link.source === 'string' ? link.source : (link.source as any).canon_id));
-            const targetNode = nodes.find(n => n.canon_id === (typeof link.target === 'string' ? link.target : (link.target as any).canon_id));
-            
+            const sourceNode = nodes.find(
+              (n) =>
+                n.canon_id ===
+                (typeof link.source === "string"
+                  ? link.source
+                  : (link.source as any).canon_id)
+            );
+            const targetNode = nodes.find(
+              (n) =>
+                n.canon_id ===
+                (typeof link.target === "string"
+                  ? link.target
+                  : (link.target as any).canon_id)
+            );
+
             if (!sourceNode || !targetNode) return null;
 
             const isHighlighted = isEdgeConnectedToSelected(link);
@@ -441,7 +509,7 @@ export default function GraphVisualization({
                 <Line
                   from={{ x: sourceNode.x!, y: sourceNode.y! }}
                   to={{ x: targetNode.x!, y: targetNode.y! }}
-                  stroke={isHighlighted ? '#ffffff' : '#999'}
+                  stroke={isHighlighted ? "#ffffff" : "#999"}
                   strokeWidth={strokeWidth}
                   strokeOpacity={isHighlighted ? 0.9 : 0.6}
                 />
@@ -451,11 +519,11 @@ export default function GraphVisualization({
                   y={midY}
                   fontSize={9}
                   textAnchor="middle"
-                  fill={isHighlighted ? '#ffffff' : '#666'}
-                  style={{ 
-                    pointerEvents: 'none', 
-                    userSelect: 'none',
-                    opacity: isHighlighted ? 1 : 0.5
+                  fill={isHighlighted ? "#ffffff" : "#666"}
+                  style={{
+                    pointerEvents: "none",
+                    userSelect: "none",
+                    opacity: isHighlighted ? 1 : 0.5,
                   }}
                 >
                   {link.kind}
@@ -469,28 +537,29 @@ export default function GraphVisualization({
             const isSelected = selectedNode?.canon_id === node.canon_id;
             const isInMultiSelection = selectedNodes.has(node.canon_id);
             const isHovered = hoveredNode?.canon_id === node.canon_id;
-            const isFirstInConnector = edgeConnector.firstNode === node.canon_id;
+            const isFirstInConnector =
+              edgeConnector.firstNode === node.canon_id;
             const radius = getNodeRadius(node.canon_id);
 
             // Edge connector mode: orange for first node, purple for others
             // Multi-selection: purple, Single selection: blue
-            let strokeColor = '#fff';
+            let strokeColor = "#fff";
             let strokeWidth = 1;
-            
+
             if (isFirstInConnector) {
-              strokeColor = '#f97316'; // orange
+              strokeColor = "#f97316"; // orange
               strokeWidth = 4;
             } else if (edgeConnector.active) {
-              strokeColor = '#a855f7'; // purple
+              strokeColor = "#a855f7"; // purple
               strokeWidth = 2;
             } else if (isInMultiSelection) {
-              strokeColor = selectedNodes.size > 1 ? '#a855f7' : '#3b82f6';
+              strokeColor = selectedNodes.size > 1 ? "#a855f7" : "#3b82f6";
               strokeWidth = 3;
             } else if (isSelected) {
-              strokeColor = '#3b82f6';
+              strokeColor = "#3b82f6";
               strokeWidth = 3;
             } else if (isHovered) {
-              strokeColor = '#64748b';
+              strokeColor = "#64748b";
               strokeWidth = 2;
             }
 
@@ -501,8 +570,12 @@ export default function GraphVisualization({
                   fill={colorScale(node.kind)}
                   stroke={strokeColor}
                   strokeWidth={strokeWidth}
-                  style={{ cursor: edgeConnector.active ? 'crosshair' : 'pointer' }}
-                  onMouseDown={(e) => !edgeConnector.active && handleMouseDown(e, node)}
+                  style={{
+                    cursor: edgeConnector.active ? "crosshair" : "pointer",
+                  }}
+                  onMouseDown={(e) =>
+                    !edgeConnector.active && handleMouseDown(e, node)
+                  }
                   onClick={(e) => handleNodeClick(e, node)}
                   onContextMenu={(e) => {
                     e.stopPropagation();
@@ -517,9 +590,11 @@ export default function GraphVisualization({
                   fontSize={10}
                   textAnchor="middle"
                   fill="currentColor"
-                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  style={{ pointerEvents: "none", userSelect: "none" }}
                 >
-                  {node.display_name || node.canon_id.split('.').pop() || node.canon_id}
+                  {node.display_name ||
+                    node.canon_id.split(".").pop() ||
+                    node.canon_id}
                 </Text>
               </Group>
             );
@@ -529,21 +604,25 @@ export default function GraphVisualization({
 
       {/* Tooltip for hovered node */}
       {hoveredNode && (
-        <div 
+        <div
           className="absolute z-30 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg pointer-events-none max-w-xs"
           style={{
             left: (hoveredNode.x || 0) + 20,
             top: (hoveredNode.y || 0) - 10,
           }}
         >
-          <div className="font-semibold">{hoveredNode.display_name || hoveredNode.canon_id}</div>
+          <div className="font-semibold">
+            {hoveredNode.display_name || hoveredNode.canon_id}
+          </div>
           {hoveredNode.display_name && (
-            <div className="text-gray-400 text-[10px] mt-0.5">{hoveredNode.canon_id}</div>
+            <div className="text-gray-400 text-[10px] mt-0.5">
+              {hoveredNode.canon_id}
+            </div>
           )}
           <div className="text-gray-300 mt-1">Kind: {hoveredNode.kind}</div>
           {hoveredNode.tags && hoveredNode.tags.length > 0 && (
             <div className="text-gray-300 mt-1">
-              Tags: {hoveredNode.tags.join(', ')}
+              Tags: {hoveredNode.tags.join(", ")}
             </div>
           )}
         </div>

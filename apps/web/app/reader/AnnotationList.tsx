@@ -183,7 +183,7 @@ export function AnnotationList({
                     <div className="flex items-start gap-2.5">
                       {/* Icon */}
                       <div
-                        className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center"
+                        className="shrink-0 w-6 h-6 rounded flex items-center justify-center"
                         style={{ backgroundColor: `${color}20`, color }}
                         title={kind || undefined}
                       >

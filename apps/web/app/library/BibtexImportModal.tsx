@@ -122,7 +122,7 @@ export function BibtexImportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="bg-neutral-900 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col border border-neutral-800">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-neutral-800">
@@ -220,7 +220,7 @@ Example:
               {parseResult.errors.length > 0 && (
                 <div className="p-4 bg-rose-900/20 border border-rose-700/40 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="font-semibold text-rose-200 mb-2">
                         Parsing Errors
@@ -240,7 +240,7 @@ Example:
                 <div className="space-y-3">
                   <div className="p-4 bg-emerald-900/20 border border-emerald-700/40 rounded-lg">
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <p className="font-semibold text-emerald-200">
                           {parseResult.entries.length} entr
@@ -285,7 +285,7 @@ Example:
                                 )}
                               </div>
                               {selectedEntryIndex === idx && (
-                                <CheckCircle className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                                <CheckCircle className="w-5 h-5 text-blue-400 shrink-0" />
                               )}
                             </div>
                           </button>

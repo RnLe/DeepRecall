@@ -217,7 +217,7 @@ export function NoteTreeView({
 
           {/* Empty State */}
           {sortedGroups.length === 0 && (
-            <div className="flex-shrink-0 w-80 flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-700 rounded-lg">
+            <div className="shrink-0 w-80 flex items-center justify-center text-gray-500 border-2 border-dashed border-gray-700 rounded-lg">
               <div className="text-center p-6">
                 <p className="text-sm mb-2">No note groups yet</p>
                 <button

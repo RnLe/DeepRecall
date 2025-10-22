@@ -607,7 +607,7 @@ export function usePresetUsageCount(presetId: string | undefined) {
   return useLiveQuery(async () => {
     if (!presetId) return { works: 0, assets: 0, total: 0 };
 
-    const db = (await import("@/src/db/dexie")).db;
+    const db = (await import("@deeprecall/data/db")).db;
 
     const [works, assets] = await Promise.all([
       db.works.where("presetId").equals(presetId).count(),

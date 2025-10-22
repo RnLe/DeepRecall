@@ -39,7 +39,7 @@ export function MessageModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-neutral-850 border border-neutral-700 rounded-lg shadow-2xl max-w-md w-full">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-neutral-700">

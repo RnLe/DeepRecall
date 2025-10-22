@@ -44,7 +44,10 @@ import {
 } from "@/src/hooks/useAuthors";
 import { useWorksExtended } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
-import { getAuthorFullName, type Author } from "@deeprecall/core/schemas/library";
+import {
+  getAuthorFullName,
+  type Author,
+} from "@deeprecall/core/schemas/library";
 import { useRouter } from "next/navigation";
 import { SimplePDFViewer } from "../reader/SimplePDFViewer";
 import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
@@ -139,7 +142,7 @@ export function AuthorLibrary({ isOpen, onClose }: AuthorLibraryProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-neutral-900 rounded-xl shadow-2xl w-[80vw] h-[80vh] flex flex-col border border-neutral-800">
         {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800">
+        <div className="shrink-0 px-6 py-4 border-b border-neutral-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600/20 rounded-lg">
@@ -253,11 +256,11 @@ export function AuthorLibrary({ isOpen, onClose }: AuthorLibraryProps) {
       {contextMenu && (
         <>
           <div
-            className="fixed inset-0 z-[9998]"
+            className="fixed inset-0 z-9998"
             onClick={() => setContextMenu(null)}
           />
           <div
-            className="fixed z-[9999] bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[180px]"
+            className="fixed z-9999 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[180px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             <button
@@ -328,7 +331,7 @@ function Avatar({ author, size = "medium", className = "" }: AvatarProps) {
   if (author.avatarDisplayPath) {
     return (
       <div
-        className={`${sizeClasses[size]} rounded-full bg-neutral-800 border border-neutral-700 overflow-hidden flex-shrink-0 ${className}`}
+        className={`${sizeClasses[size]} rounded-full bg-neutral-800 border border-neutral-700 overflow-hidden shrink-0 ${className}`}
       >
         <img
           src={author.avatarDisplayPath}
@@ -342,7 +345,7 @@ function Avatar({ author, size = "medium", className = "" }: AvatarProps) {
   // Fallback: gradient with initials
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-medium text-white flex-shrink-0 ${className}`}
+      className={`${sizeClasses[size]} rounded-full bg-linear-to-br from-blue-600 to-purple-600 flex items-center justify-center font-medium text-white shrink-0 ${className}`}
     >
       {initials}
     </div>
@@ -439,7 +442,7 @@ function AvatarEditView({
   return (
     <div className="h-full flex flex-col">
       {author.avatarDisplayPath && (
-        <div className="flex-shrink-0 px-6 py-3 border-b border-neutral-800 flex items-center justify-between">
+        <div className="shrink-0 px-6 py-3 border-b border-neutral-800 flex items-center justify-between">
           <button
             onClick={onBack}
             className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
@@ -530,7 +533,7 @@ function AuthorListView({
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800 space-y-3">
+      <div className="shrink-0 px-6 py-4 border-b border-neutral-800 space-y-3">
         {/* Search and Actions */}
         <div className="flex items-center gap-3">
           <div className="flex-1 relative">
@@ -642,7 +645,7 @@ function AuthorListView({
                   {/* 2-Column Layout */}
                   <div className="flex h-full">
                     {/* Left Column - Avatar */}
-                    <div className="w-1/3 flex-shrink-0 bg-neutral-800/50 relative overflow-hidden">
+                    <div className="w-1/3 shrink-0 bg-neutral-800/50 relative overflow-hidden">
                       <div className="absolute inset-0 flex items-center justify-center p-1">
                         <Avatar author={author} size="large" className="" />
                       </div>
@@ -704,7 +707,7 @@ function AuthorListView({
                           {getAuthorFullName(author)}
                         </h3>
                         {author.titles && author.titles.length > 0 && (
-                          <div className="flex items-center gap-1 flex-shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             {author.titles.slice(0, 2).map((title, idx) => (
                               <span
                                 key={idx}
@@ -730,11 +733,11 @@ function AuthorListView({
                         {statsText && (
                           <>
                             {author.affiliation && (
-                              <span className="text-neutral-600 flex-shrink-0">
+                              <span className="text-neutral-600 shrink-0">
                                 •
                               </span>
                             )}
-                            <span className="text-neutral-500 flex-shrink-0">
+                            <span className="text-neutral-500 shrink-0">
                               {statsText}
                             </span>
                           </>
@@ -937,7 +940,7 @@ function AuthorEditView({
   return (
     <div className="flex flex-col h-full">
       {/* Action Bar - Back, Save, Delete */}
-      <div className="flex-shrink-0 px-6 py-3 border-b border-neutral-800">
+      <div className="shrink-0 px-6 py-3 border-b border-neutral-800">
         <div className="flex items-center justify-between">
           <button
             onClick={onBack}
@@ -1440,7 +1443,7 @@ function AuthorCreateView({ onBack, onCreate }: AuthorCreateViewProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Back button */}
-      <div className="flex-shrink-0 px-6 py-3 border-b border-neutral-800">
+      <div className="shrink-0 px-6 py-3 border-b border-neutral-800">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
@@ -1767,7 +1770,7 @@ function AuthorImportView({
   return (
     <div className="flex flex-col h-full">
       {/* Back button */}
-      <div className="flex-shrink-0 px-6 py-3 border-b border-neutral-800">
+      <div className="shrink-0 px-6 py-3 border-b border-neutral-800">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"

@@ -15,7 +15,7 @@ export default function HomePage() {
               height={80}
               className="w-30 h-30"
             />
-            <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent pb-2">
+            <h1 className="text-6xl font-bold bg-linear-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent pb-2">
               DeepRecall
             </h1>
           </div>

@@ -50,7 +50,7 @@ export function InputModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-neutral-850 border border-neutral-700 rounded-lg shadow-2xl max-w-md w-full">
         <form onSubmit={handleSubmit}>
           {/* Header */}

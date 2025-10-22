@@ -40,7 +40,7 @@ export function PDFPreviewModal({
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-neutral-800 rounded transition-colors flex-shrink-0"
+            className="p-1.5 hover:bg-neutral-800 rounded transition-colors shrink-0"
             title="Close"
           >
             <X className="w-5 h-5 text-neutral-400" />

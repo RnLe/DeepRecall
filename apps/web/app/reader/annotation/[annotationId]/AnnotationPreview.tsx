@@ -426,7 +426,7 @@ export function AnnotationPreview({
                 size={20}
                 color={color}
                 strokeWidth={2}
-                className="flex-shrink-0"
+                className="shrink-0"
               />
             </div>
 
@@ -561,7 +561,7 @@ export function AnnotationPreview({
                   }, 0);
                 }}
                 className={`w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 cursor-text prose prose-invert prose-sm prose-headings:text-gray-100 prose-p:text-gray-200 prose-a:text-purple-400 prose-strong:text-gray-100 prose-code:text-purple-300 max-w-none overflow-auto ${
-                  notes ? "min-h-[8rem] max-h-[20rem]" : "min-h-[4rem]"
+                  notes ? "min-h-32 max-h-80" : "min-h-16"
                 }`}
               >
                 {notes ? (
@@ -587,7 +587,7 @@ export function AnnotationPreview({
                 onFocus={() => setIsMarkdownPreview(false)}
                 placeholder="Add notes in markdown..."
                 rows={5}
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent resize-y font-mono min-h-[6rem]"
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent resize-y font-mono min-h-24"
               />
             )}
           </div>

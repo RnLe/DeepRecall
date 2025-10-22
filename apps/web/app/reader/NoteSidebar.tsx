@@ -202,7 +202,7 @@ export function NoteSidebar({
                 </div>
                 {annotation.metadata?.color && (
                   <div
-                    className="w-3 h-3 rounded-full border border-gray-600 flex-shrink-0"
+                    className="w-3 h-3 rounded-full border border-gray-600 shrink-0"
                     style={{ backgroundColor: annotation.metadata.color }}
                   />
                 )}

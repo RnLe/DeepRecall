@@ -828,7 +828,7 @@ function TemplateCard({
       {/* Header */}
       <div className="flex items-start gap-3">
         <div
-          className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
+          className="w-3 h-3 rounded-full mt-1 shrink-0"
           style={{ backgroundColor: getPresetColor(preset.color) }}
         />
         <div className="flex-1 min-w-0">

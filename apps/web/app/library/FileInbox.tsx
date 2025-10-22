@@ -434,7 +434,7 @@ export function FileInbox({ onLinkBlob, onViewBlob }: FileInboxProps) {
                         e.stopPropagation();
                         onLinkBlob(blob);
                       }}
-                      className="flex-shrink-0 p-1.5 text-amber-500 hover:bg-amber-500/10 rounded transition-colors"
+                      className="shrink-0 p-1.5 text-amber-500 hover:bg-amber-500/10 rounded transition-colors"
                       title="Link to work"
                     >
                       <Link className="w-4 h-4" />

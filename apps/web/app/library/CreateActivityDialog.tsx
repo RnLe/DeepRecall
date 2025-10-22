@@ -91,7 +91,7 @@ export function CreateActivityDialog({
       {/* Dialog - 70% of viewport */}
       <div className="bg-neutral-900 rounded-xl shadow-2xl w-[70vw] max-h-[80vh] flex flex-col border border-neutral-800">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 px-8 py-6 border-b border-neutral-800 bg-neutral-900/50">
+        <div className="shrink-0 px-8 py-6 border-b border-neutral-800 bg-neutral-900/50">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-neutral-100">
@@ -246,7 +246,7 @@ export function CreateActivityDialog({
         </form>
 
         {/* Fixed Footer */}
-        <div className="flex-shrink-0 px-8 py-4 border-t border-neutral-800 bg-neutral-900/50">
+        <div className="shrink-0 px-8 py-4 border-t border-neutral-800 bg-neutral-900/50">
           <div className="flex justify-end gap-3">
             <button
               type="button"

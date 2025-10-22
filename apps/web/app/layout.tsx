@@ -19,7 +19,7 @@ export default function RootLayout({
       <body className="antialiased overflow-hidden h-screen">
         <Providers>
           <div className="h-screen bg-gray-950 text-gray-100 flex flex-col overflow-hidden">
-            <nav className="flex-shrink-0 border-b border-gray-800 bg-gray-900/50 backdrop-blur">
+            <nav className="shrink-0 border-b border-gray-800 bg-gray-900/50 backdrop-blur">
               <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
                 <Link
                   href="/"

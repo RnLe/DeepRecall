@@ -205,7 +205,7 @@ export function LinkBlobDialog({
       {/* Dialog - 90% of viewport */}
       <div className="bg-neutral-900/80 rounded-xl shadow-2xl w-[90vw] h-[90vh] flex flex-col border border-neutral-700/50">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
+        <div className="shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-neutral-100">
@@ -220,7 +220,7 @@ export function LinkBlobDialog({
             </div>
             <button
               onClick={onCancel}
-              className="p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-lg transition-colors flex-shrink-0 ml-3"
+              className="p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-lg transition-colors shrink-0 ml-3"
               title="Close"
             >
               <svg
@@ -672,7 +672,7 @@ export function LinkBlobDialog({
 
         {/* Fixed Footer - Show on select step */}
         {step === "select" && (
-          <div className="flex-shrink-0 px-6 py-3 border-t border-neutral-800 bg-neutral-900/50">
+          <div className="shrink-0 px-6 py-3 border-t border-neutral-800 bg-neutral-900/50">
             <div className="flex justify-between items-center">
               <div className="text-xs text-neutral-500">
                 {mode === "link-to-existing" && selectedWorkId && (

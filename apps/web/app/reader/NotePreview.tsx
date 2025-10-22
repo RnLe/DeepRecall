@@ -169,7 +169,7 @@ export function NotePreview({ asset, onDelete }: NotePreviewProps) {
         {onDelete && (
           <button
             onClick={onDelete}
-            className="p-1 hover:bg-red-900/30 rounded text-gray-500 hover:text-red-400 transition-colors flex-shrink-0"
+            className="p-1 hover:bg-red-900/30 rounded text-gray-500 hover:text-red-400 transition-colors shrink-0"
             title="Delete note"
           >
             <Trash2 size={16} />

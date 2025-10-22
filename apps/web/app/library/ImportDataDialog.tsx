@@ -241,7 +241,7 @@ export function ImportDataDialog({
               {preview.warnings.length > 0 && (
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
                       {preview.warnings.map((warning, i) => (
                         <p

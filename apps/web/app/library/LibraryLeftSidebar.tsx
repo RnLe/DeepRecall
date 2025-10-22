@@ -33,7 +33,7 @@ export function LibraryLeftSidebar({
   // Handle converting blob to asset when dropped on unlinked assets section
   const handleConvertBlobToAsset = async (blob: BlobWithMetadata) => {
     try {
-      const { db } = await import("@/src/db/dexie");
+      const { db } = await import("@deeprecall/data/db");
       const { nanoid } = await import("nanoid");
 
       // Create asset from blob
@@ -64,7 +64,7 @@ export function LibraryLeftSidebar({
   // Handle move asset to inbox (remove from Dexie, becomes orphaned blob)
   const handleMoveToInbox = async (assetId: string) => {
     try {
-      const { db } = await import("@/src/db/dexie");
+      const { db } = await import("@deeprecall/data/db");
       await db.assets.delete(assetId);
 
       // Refresh data - asset will now appear as orphaned blob

@@ -290,7 +290,7 @@ export function DuplicateResolutionModal({
                 >
                   <div className="flex items-start gap-3">
                     <div
-                      className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
+                      className={`shrink-0 w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center ${
                         isSelected
                           ? "border-green-500 bg-green-500"
                           : "border-gray-600"

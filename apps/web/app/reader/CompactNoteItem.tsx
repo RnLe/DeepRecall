@@ -57,7 +57,7 @@ export function CompactNoteItem({
       }`}
     >
       {/* Icon */}
-      <div className="flex-shrink-0 mt-0.5">{getIcon()}</div>
+      <div className="shrink-0 mt-0.5">{getIcon()}</div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -67,7 +67,7 @@ export function CompactNoteItem({
             {title}
           </div>
           <div
-            className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0"
+            className="text-xs text-gray-500 whitespace-nowrap shrink-0"
             title={fullDate}
           >
             {timeAgo}

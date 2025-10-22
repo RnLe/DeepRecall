@@ -183,12 +183,12 @@ export function ActivityBanner({
       >
         {/* Left: Title and Info */}
         <div className="flex items-center gap-4 flex-1 min-w-0">
-          <span className="text-2xl flex-shrink-0">{icon}</span>
+          <span className="text-2xl shrink-0">{icon}</span>
           <div className="flex items-baseline gap-3 flex-1 min-w-0">
             <h3 className="text-lg font-bold text-white truncate">
               {activity.title}
             </h3>
-            <div className="flex items-center gap-3 text-sm text-amber-100 flex-shrink-0">
+            <div className="flex items-center gap-3 text-sm text-amber-100 shrink-0">
               {activity.institution && (
                 <span className="flex items-center gap-1">
                   <Building2 className="w-3.5 h-3.5" />

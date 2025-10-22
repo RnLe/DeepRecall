@@ -187,7 +187,7 @@ function FileListItem({
         <div className="flex items-center gap-1.5">
           {preset && (
             <span
-              className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded flex-shrink-0"
+              className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded shrink-0"
               style={{
                 backgroundColor: preset.color
                   ? `${preset.color}20`

@@ -96,7 +96,7 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
       {leftSidebarOpen && (
         <>
           <div
-            className="flex-shrink-0 overflow-hidden relative flex flex-col bg-gray-900"
+            className="shrink-0 overflow-hidden relative flex flex-col bg-gray-900"
             style={{ width: `${leftSidebarWidth}px` }}
           >
             {/* View Toggle with collapse button */}
@@ -161,7 +161,7 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
 
                     // Navigate to page with y-offset
                     const { navigateToPage } =
-                      require("@/src/stores/annotation-ui").useAnnotationUI.getState();
+                      require("@deeprecall/data/stores/annotation-ui").useAnnotationUI.getState();
                     navigateToPage(ann.page, minY);
                   }}
                 />
@@ -212,7 +212,7 @@ export function ReaderLayout({ children }: ReaderLayoutProps) {
           />
 
           <div
-            className="flex-shrink-0 bg-gray-800 border-l border-gray-700 overflow-hidden relative"
+            className="shrink-0 bg-gray-800 border-l border-gray-700 overflow-hidden relative"
             style={{ width: `${rightSidebarWidth}px` }}
           >
             {/* Annotation Editor */}

@@ -88,7 +88,7 @@ export function OrphanedBlobs() {
             >
               <div className="flex items-center gap-3">
                 {/* Mini thumbnail placeholder - left */}
-                <div className="flex-shrink-0 w-12 h-12 bg-neutral-800/50 rounded flex items-center justify-center border border-neutral-700/50">
+                <div className="shrink-0 w-12 h-12 bg-neutral-800/50 rounded flex items-center justify-center border border-neutral-700/50">
                   <FileText className="w-5 h-5 text-neutral-600" />
                 </div>
 
@@ -109,7 +109,7 @@ export function OrphanedBlobs() {
                 </div>
 
                 {/* MIME type */}
-                <div className="hidden md:block flex-shrink-0 w-32">
+                <div className="hidden md:block shrink-0 w-32">
                   <span className="text-xs text-neutral-500 truncate block">
                     {blob.mime}
                   </span>
@@ -118,7 +118,7 @@ export function OrphanedBlobs() {
                 {/* Link button - right */}
                 <button
                   onClick={() => setLinkingBlob(blob)}
-                  className="flex-shrink-0 p-2 text-amber-500 hover:bg-amber-500/10 rounded transition-colors"
+                  className="shrink-0 p-2 text-amber-500 hover:bg-amber-500/10 rounded transition-colors"
                   title="Link to work"
                 >
                   <Link className="w-4 h-4" />

@@ -36,7 +36,7 @@ export function TabBar() {
           >
             {/* Icon */}
             <FileText
-              className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-purple-400" : ""}`}
+              className={`w-4 h-4 shrink-0 ${isActive ? "text-purple-400" : ""}`}
             />
 
             {/* Title */}
@@ -52,7 +52,7 @@ export function TabBar() {
                 closeTab(tab.id);
               }}
               className={`
-                p-0.5 rounded hover:bg-gray-700 transition-colors flex-shrink-0 text-gray-400 hover:text-gray-200
+                p-0.5 rounded hover:bg-gray-700 transition-colors shrink-0 text-gray-400 hover:text-gray-200
                 ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
               `}
               aria-label="Close tab"

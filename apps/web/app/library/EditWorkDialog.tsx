@@ -172,10 +172,10 @@ export function EditWorkDialog({
       {/* Wide Dialog - 95% of viewport with horizontal split */}
       <div className="bg-neutral-900 rounded-xl shadow-2xl w-[95vw] max-h-[90vh] flex flex-col border border-neutral-800">
         {/* Fixed Header - Compact with Template Selector */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
+        <div className="shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
                 <svg
                   className="w-4 h-4 text-blue-400"
                   fill="none"
@@ -200,7 +200,7 @@ export function EditWorkDialog({
               </div>
 
               {/* Template Selector Dropdown */}
-              <div className="relative flex-shrink-0">
+              <div className="relative shrink-0">
                 <button
                   onClick={() => setIsPresetDropdownOpen(!isPresetDropdownOpen)}
                   className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-all hover:brightness-110"
@@ -340,7 +340,7 @@ export function EditWorkDialog({
 
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-lg transition-colors flex-shrink-0 ml-3"
+              className="p-1.5 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded-lg transition-colors shrink-0 ml-3"
               title="Close"
             >
               <svg

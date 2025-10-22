@@ -205,7 +205,7 @@ export function DynamicForm({
       {/* Preset info - Compact Header */}
       <div className="bg-neutral-800/30 border border-neutral-700 rounded-xl p-5">
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+          <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <svg
               className="w-5 h-5 text-blue-400"
               fill="none"

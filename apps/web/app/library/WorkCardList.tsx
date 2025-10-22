@@ -114,7 +114,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
           }
 
           // Update the asset to link it directly to this work (use raw Dexie update)
-          const { db } = await import("@/src/db/dexie");
+          const { db } = await import("@deeprecall/data/db");
           await db.assets.update(asset.id, {
             workId: work.id,
             updatedAt: new Date().toISOString(),
@@ -194,14 +194,14 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
           </div>
 
           {/* Authors */}
-          <div className="hidden md:flex items-center gap-1.5 text-xs text-neutral-400 flex-shrink-0 w-48">
+          <div className="hidden md:flex items-center gap-1.5 text-xs text-neutral-400 shrink-0 w-48">
             <Users className="w-3 h-3" />
             <span className="truncate">{authors}</span>
           </div>
 
           {/* Year */}
           {year && (
-            <div className="hidden lg:flex items-center gap-1.5 text-xs text-neutral-400 flex-shrink-0 w-20">
+            <div className="hidden lg:flex items-center gap-1.5 text-xs text-neutral-400 shrink-0 w-20">
               <Calendar className="w-3 h-3" />
               <span>{year}</span>
             </div>
@@ -209,14 +209,14 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
 
           {/* Journal */}
           {journal && (
-            <div className="hidden xl:flex items-center gap-1.5 text-xs text-neutral-500 flex-shrink-0 w-40">
+            <div className="hidden xl:flex items-center gap-1.5 text-xs text-neutral-500 shrink-0 w-40">
               <Building className="w-3 h-3" />
               <span className="truncate">{journal}</span>
             </div>
           )}
 
           {/* Assets */}
-          <div className="flex items-center gap-1.5 text-xs text-neutral-600 flex-shrink-0">
+          <div className="flex items-center gap-1.5 text-xs text-neutral-600 shrink-0">
             <FileText className="w-3 h-3" />
             <span>
               {assetCount} {assetCount === 1 ? "file" : "files"}
@@ -224,7 +224,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <div className="hidden lg:flex items-center gap-1.5 text-xs text-neutral-500">
               <FileText className="w-3 h-3" />
               <span>{assetCount}</span>

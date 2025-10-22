@@ -182,7 +182,7 @@ export function UnlinkedAssetsList({
       }
 
       // Update asset in Dexie
-      const { db } = await import("@/src/db/dexie");
+      const { db } = await import("@deeprecall/data/db");
       await db.assets.update(assetId, {
         filename: finalFilename,
         updatedAt: new Date().toISOString(),
@@ -204,7 +204,7 @@ export function UnlinkedAssetsList({
   const handleAssetDelete = async (assetId: string, hash: string) => {
     try {
       // Delete asset from Dexie
-      const { db } = await import("@/src/db/dexie");
+      const { db } = await import("@deeprecall/data/db");
       await db.assets.delete(assetId);
 
       // Also delete blob from server
@@ -440,7 +440,7 @@ export function UnlinkedAssetsList({
                         e.stopPropagation();
                         onLinkAsset(asset);
                       }}
-                      className="flex-shrink-0 p-1.5 text-blue-500 hover:bg-blue-500/10 rounded transition-colors"
+                      className="shrink-0 p-1.5 text-blue-500 hover:bg-blue-500/10 rounded transition-colors"
                       title="Link to work"
                     >
                       <Link className="w-4 h-4" />

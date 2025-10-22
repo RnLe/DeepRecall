@@ -5,7 +5,10 @@
 
 "use client";
 
-import type { CustomFieldDefinition, FieldType } from "@deeprecall/core/schemas/presets";
+import type {
+  CustomFieldDefinition,
+  FieldType,
+} from "@deeprecall/core/schemas/presets";
 import { getFieldDefaultValue } from "@/src/utils/presets";
 
 interface FieldRendererProps {
@@ -242,7 +245,7 @@ function MultiSelectField({
           )}
         </div>
         <svg
-          className={`w-4 h-4 text-neutral-400 flex-shrink-0 transition-transform ${
+          className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${
             isOpen ? "rotate-180" : ""
           }`}
           fill="none"

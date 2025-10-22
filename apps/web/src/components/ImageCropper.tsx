@@ -513,7 +513,7 @@ export function ImageCropper({
   return (
     <div className="flex flex-col h-full bg-neutral-900">
       {/* Header with buttons */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800">
+      <div className="shrink-0 px-6 py-4 border-b border-neutral-800">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-neutral-100">
             {initialImageUrl ? "Edit Avatar" : "Upload Avatar"}

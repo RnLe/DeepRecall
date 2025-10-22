@@ -134,7 +134,7 @@ export function LibraryHeader({
                 )
               ) {
                 try {
-                  const { db } = await import("@/src/db/dexie");
+                  const { db } = await import("@deeprecall/data/db");
                   await db.delete();
                   alert("Database cleared! Reloading page...");
                   window.location.reload();

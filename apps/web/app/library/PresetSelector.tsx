@@ -185,7 +185,7 @@ function PresetOption({ preset, isSelected, onClick }: PresetOptionProps) {
     >
       {/* Color indicator */}
       <div
-        className="w-3 h-3 rounded-full flex-shrink-0"
+        className="w-3 h-3 rounded-full shrink-0"
         style={{ backgroundColor: getPresetColor(preset.color) }}
       />
 
@@ -202,7 +202,7 @@ function PresetOption({ preset, isSelected, onClick }: PresetOptionProps) {
       {/* Selected indicator */}
       {isSelected && (
         <svg
-          className="w-5 h-5 text-green-500 flex-shrink-0"
+          className="w-5 h-5 text-green-500 shrink-0"
           fill="currentColor"
           viewBox="0 0 20 20"
         >

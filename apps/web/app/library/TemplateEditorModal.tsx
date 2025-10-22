@@ -217,7 +217,7 @@ export function TemplateEditorModal({
   const availableCoreFields = AVAILABLE_CORE_FIELDS[preset.targetEntity] || {};
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-80 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="bg-neutral-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-neutral-800">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-neutral-800">
@@ -257,8 +257,6 @@ export function TemplateEditorModal({
                   <p className="text-xs">
                     ({usageCount.works}{" "}
                     {usageCount.works === 1 ? "work" : "works"}
-                    {usageCount.versions > 0 &&
-                      `, ${usageCount.versions} ${usageCount.versions === 1 ? "version" : "versions"}`}
                     {usageCount.assets > 0 &&
                       `, ${usageCount.assets} ${usageCount.assets === 1 ? "asset" : "assets"}`}
                     )
@@ -271,7 +269,7 @@ export function TemplateEditorModal({
           {/* Warning or Lock message */}
           {hasLinkedEntities ? (
             <div className="p-3 bg-rose-900/20 border border-rose-700/40 rounded-lg flex items-start gap-3">
-              <Lock className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+              <Lock className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
               <div className="text-sm text-rose-200">
                 <p className="font-medium">Editing Locked</p>
                 <p className="text-rose-300/80 mt-1">
@@ -285,7 +283,7 @@ export function TemplateEditorModal({
             </div>
           ) : (
             <div className="p-3 bg-amber-900/20 border border-amber-700/40 rounded-lg flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div className="text-sm text-amber-200">
                 <p className="font-medium">Editing Warning</p>
                 <p className="text-amber-300/80 mt-1">

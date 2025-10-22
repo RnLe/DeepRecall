@@ -310,7 +310,7 @@ export function NoteBranch({
 
   return (
     <div
-      className={`flex-shrink-0 flex flex-col bg-gray-800/30 rounded-lg border transition-all relative ${
+      className={`shrink-0 flex flex-col bg-gray-800/30 rounded-lg border transition-all relative ${
         isDragging
           ? "opacity-50 border-purple-500"
           : isDragOver
@@ -346,7 +346,7 @@ export function NoteBranch({
       }}
     >
       {/* Fixed Header */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-700">
+      <div className="shrink-0 p-4 border-b border-gray-700">
         {/* Title Row */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -357,13 +357,13 @@ export function NoteBranch({
               </div>
             )}
             <div
-              className="w-3 h-3 rounded-full flex-shrink-0"
+              className="w-3 h-3 rounded-full shrink-0"
               style={{ backgroundColor: color }}
             />
             <h3 className="text-base font-semibold text-gray-200 truncate">
               {groupName}
             </h3>
-            <span className="text-sm text-gray-500 flex-shrink-0">
+            <span className="text-sm text-gray-500 shrink-0">
               ({notes.length})
             </span>
           </div>
@@ -592,11 +592,11 @@ function NoteCard({
             borderLeftColor: groupColor,
           }}
         >
-          <Icon size={14} className="text-gray-400 flex-shrink-0" />
+          <Icon size={14} className="text-gray-400 shrink-0" />
           <span className="text-sm text-gray-200 truncate flex-1 group-hover:text-purple-300">
             {title}
           </span>
-          <span className="text-xs text-gray-500 flex-shrink-0">
+          <span className="text-xs text-gray-500 shrink-0">
             {getRelativeTime(new Date(note.createdAt).getTime())}
           </span>
         </button>
@@ -644,7 +644,7 @@ function NoteCard({
         >
           {/* Thumbnail */}
           {thumbnailUrl ? (
-            <div className="flex-shrink-0 w-16 h-16 bg-gray-900 rounded overflow-hidden">
+            <div className="shrink-0 w-16 h-16 bg-gray-900 rounded overflow-hidden">
               {isImage ? (
                 <img
                   src={thumbnailUrl}
@@ -666,7 +666,7 @@ function NoteCard({
             </div>
           ) : (
             <div
-              className="flex-shrink-0 p-2 rounded self-start"
+              className="shrink-0 p-2 rounded self-start"
               style={{ backgroundColor: `${groupColor}33` }}
             >
               <Icon size={20} color={groupColor} />
@@ -722,9 +722,9 @@ function NoteCard({
         }}
       >
         {/* Header */}
-        <div className="flex items-start gap-3 mb-2 flex-shrink-0">
+        <div className="flex items-start gap-3 mb-2 shrink-0">
           <div
-            className="flex-shrink-0 p-1.5 rounded"
+            className="shrink-0 p-1.5 rounded"
             style={{ backgroundColor: `${groupColor}33` }}
           >
             <Icon size={18} color={groupColor} />
@@ -782,7 +782,7 @@ function NoteCard({
         </div>
 
         {/* Footer - outside scroll area */}
-        <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between text-xs text-gray-500 mt-2 pt-2 border-t border-gray-700 shrink-0">
           <span>{getRelativeTime(new Date(note.createdAt).getTime())}</span>
           {note.mime && (
             <span className="truncate ml-2">

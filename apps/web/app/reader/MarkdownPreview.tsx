@@ -378,7 +378,7 @@ export function MarkdownPreview({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Table of Contents Sidebar */}
-          <div className="w-64 flex-shrink-0 bg-neutral-950/50 border-r border-blue-500/20 flex flex-col">
+          <div className="w-64 shrink-0 bg-neutral-950/50 border-r border-blue-500/20 flex flex-col">
             {/* TOC Header */}
             <div className="px-4 py-3 border-b border-blue-500/20 bg-blue-500/5">
               <div className="flex items-center gap-2">
@@ -464,7 +464,7 @@ export function MarkdownPreview({
 
               <button
                 onClick={onClose}
-                className="flex-shrink-0 p-1.5 text-neutral-400 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                className="shrink-0 p-1.5 text-neutral-400 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
                 title="Close (Esc)"
               >
                 <X className="w-5 h-5" />

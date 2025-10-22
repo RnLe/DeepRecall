@@ -202,7 +202,7 @@ export function CompactDynamicForm({
       {/* Preset info - Very Compact Header */}
       <div className="bg-neutral-800/30 border border-neutral-700 rounded-lg p-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+          <div className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <svg
               className="w-4 h-4 text-blue-400"
               fill="none"
@@ -484,7 +484,7 @@ function CompactCoreFieldRenderer({
       {error ? (
         <p className="text-xs text-red-400 flex items-center gap-1">
           <svg
-            className="w-3 h-3 flex-shrink-0"
+            className="w-3 h-3 shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

@@ -106,7 +106,7 @@ function WorkSelectorItemDetailed({
     >
       <div className="flex items-start gap-3">
         <BookOpen
-          className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+          className={`w-5 h-5 shrink-0 mt-0.5 ${
             isSelected ? "text-blue-400" : "text-neutral-400"
           }`}
         />

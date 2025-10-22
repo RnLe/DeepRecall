@@ -10,8 +10,8 @@ RUN npm install -g pnpm
 # Set working directory to workspace root
 WORKDIR /workspace
 
-# Copy workspace config files
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+# Copy workspace config files (no root package.json in this workspace)
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 
 # Copy package.json files from all packages
 COPY packages/core/package.json ./packages/core/
@@ -19,7 +19,7 @@ COPY packages/data/package.json ./packages/data/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/pdf/package.json ./packages/pdf/
 
-# Copy apps/web package.json
+# Copy apps/web package.json and config
 COPY apps/web/package.json apps/web/.npmrc ./apps/web/
 
 # Copy entrypoint

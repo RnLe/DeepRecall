@@ -116,7 +116,7 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
           }
 
           // Update the asset to link it directly to this work (use raw Dexie update)
-          const { db } = await import("@/src/db/dexie");
+          const { db } = await import("@deeprecall/data/db");
           await db.assets.update(asset.id, {
             workId: work.id,
             updatedAt: new Date().toISOString(),
@@ -165,7 +165,7 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
         <div className="flex h-full overflow-hidden rounded-lg">
           {/* Thumbnail - Left (borderless on top, left, bottom) */}
           <div
-            className="flex-shrink-0 w-16 bg-neutral-800/50 flex items-center justify-center border-r border-neutral-800/50 -ml-px -mt-px -mb-px rounded-l-lg overflow-hidden cursor-pointer hover:bg-neutral-700/50 transition-colors"
+            className="shrink-0 w-16 bg-neutral-800/50 flex items-center justify-center border-r border-neutral-800/50 -ml-px -mt-px -mb-px rounded-l-lg overflow-hidden cursor-pointer hover:bg-neutral-700/50 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               if (work.assets?.[0]?.mime === "application/pdf") {
@@ -230,19 +230,19 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
             {/* Line 2: Authors, Year, Topics */}
             <div className="flex items-center gap-2 text-xs text-neutral-400 pr-12">
               <div className="flex items-center gap-1 min-w-0 flex-1">
-                <Users className="w-3 h-3 flex-shrink-0" />
+                <Users className="w-3 h-3 shrink-0" />
                 <span className="truncate">{authors}</span>
               </div>
               {year && (
                 <>
                   <span className="text-neutral-600">·</span>
-                  <span className="flex-shrink-0">{year}</span>
+                  <span className="shrink-0">{year}</span>
                 </>
               )}
               {work.topics && work.topics.length > 0 && (
                 <>
                   <span className="text-neutral-600">·</span>
-                  <span className="text-[10px] text-neutral-500 flex-shrink-0">
+                  <span className="text-[10px] text-neutral-500 shrink-0">
                     {work.topics.slice(0, 2).join(", ")}
                     {work.topics.length > 2 && ` +${work.topics.length - 2}`}
                   </span>
