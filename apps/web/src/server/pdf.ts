@@ -16,20 +16,38 @@ if (typeof window === "undefined") {
   
   // Try multiple possible paths (development vs production, monorepo structure)
   const possiblePaths = [
-    // Production build in .next
-    join(__dirname, "../../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-    // Development - from apps/web
-    join(__dirname, "../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-    // From workspace root
+    // From current working directory (Docker: /workspace/apps/web)
     join(process.cwd(), "node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-    join(process.cwd(), "apps/web/node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+    // From workspace root
+    join(process.cwd(), "../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+    join(process.cwd(), "../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+    // Production build in .next (relative to this file)
+    join(__dirname, "../../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+    // Development - from apps/web src/server
+    join(__dirname, "../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
   ];
   
   // Use the first path that exists
   const fs = require("fs");
-  const workerPath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
+  const workerPath = possiblePaths.find(p => {
+    const exists = fs.existsSync(p);
+    if (!exists) {
+      console.log(`[PDF Worker] Path not found: ${p}`);
+    } else {
+      console.log(`[PDF Worker] Using: ${p}`);
+    }
+    return exists;
+  });
   
-  PDFParse.setWorker(workerPath);
+  if (!workerPath) {
+    console.error(`[PDF Worker] No valid worker path found. Tried:`, possiblePaths);
+    console.error(`[PDF Worker] process.cwd() = ${process.cwd()}`);
+    console.error(`[PDF Worker] __dirname = ${__dirname}`);
+    // Use first path as fallback
+    PDFParse.setWorker(possiblePaths[0]);
+  } else {
+    PDFParse.setWorker(workerPath);
+  }
 }
 
 /**
