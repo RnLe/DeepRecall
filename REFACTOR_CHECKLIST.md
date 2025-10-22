@@ -32,11 +32,11 @@
 
 ### Extract packages/data
 
-- [ ] Move Dexie database setup and repositories from `frontend/src/repo/`
+- [x] Move Dexie database setup and repositories from `frontend/src/repo/`
 - [ ] Create unified data facade interface (useShape, write buffer)
 - [ ] Add ElectricSQL integration hooks
-- [ ] Move stores from `frontend/src/stores/` (refactor to be platform-agnostic)
-- [ ] Create package.json and tsconfig for packages/data
+- [x] Move stores from `frontend/src/stores/` (refactor to be platform-agnostic)
+- [x] Create package.json and tsconfig for packages/data
 
 ### Extract packages/pdf
 
