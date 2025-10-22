@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useCreateActivity } from "@/src/hooks/useLibrary";
-import type { ActivityType } from "@deeprecall/core/schemas/library";
+import type { ActivityType } from "@deeprecall/core";
 import { Calendar, Users, X } from "lucide-react";
 
 interface CreateActivityDialogProps {

@@ -106,7 +106,7 @@ export function WorkCardList({ work, onClick }: WorkCardListProps) {
 
     if (assetId) {
       // Handle existing asset being linked - update its workId
-      import("@/src/repo/assets")
+      import("@deeprecall/data/repos/assets")
         .then(async ({ getAsset }) => {
           const asset = await getAsset(assetId);
           if (!asset) {

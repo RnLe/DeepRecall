@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useCreatePreset } from "@/src/hooks/usePresets";
-import type { PresetTarget } from "@deeprecall/core/schemas/presets";
+import type { PresetTarget } from "@deeprecall/core";
 
 interface QuickPresetDialogProps {
   targetEntity: PresetTarget;

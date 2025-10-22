@@ -11,7 +11,7 @@ import type {
   PresetTarget,
   FieldType,
   CustomFieldDefinition,
-} from "@deeprecall/core/schemas/presets";
+} from "@deeprecall/core";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 interface PresetFormBuilderProps {

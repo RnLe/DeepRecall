@@ -187,7 +187,7 @@ export async function createWorkWithAsset(params: {
   const assetId = crypto.randomUUID();
 
   // Import schema
-  const { AssetSchema } = await import("@/src/schema/library");
+  const { AssetSchema } = await import("@deeprecall/core");
 
   // Create Work
   const work: Work = {

@@ -7,7 +7,7 @@
 
 "use client";
 
-import type { Preset, PresetTarget } from "@deeprecall/core/schemas/presets";
+import type { Preset, PresetTarget } from "@deeprecall/core";
 import {
   usePresets,
   useCreatePreset,

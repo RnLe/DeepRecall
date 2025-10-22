@@ -7,7 +7,7 @@
 "use client";
 
 import { BookOpen, Star, Users } from "lucide-react";
-import type { WorkExtended } from "@deeprecall/core/schemas/library";
+import type { WorkExtended } from "@deeprecall/core";
 import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
 import { useAuthorsByIds } from "@/src/hooks/useAuthors";
 import { useDeleteWork } from "@/src/hooks/useLibrary";
@@ -20,7 +20,7 @@ import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
 import { BibtexExportModal } from "./BibtexExportModal";
 import { SimplePDFViewer } from "../reader/SimplePDFViewer";
-import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
+import type { BlobWithMetadata } from "@deeprecall/core";
 import { PDFThumbnail } from "./PDFThumbnail";
 
 interface WorkCardCompactProps {

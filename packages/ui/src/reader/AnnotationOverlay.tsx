@@ -7,7 +7,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Annotation, NormalizedRect } from "@deeprecall/core/schemas/annotation";
+import type { Annotation, NormalizedRect } from "@deeprecall/core";
 import type { AnnotationTool } from "@deeprecall/data/stores/annotation-ui";
 import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
 import { useReaderUI } from "@deeprecall/data/stores/reader-ui";

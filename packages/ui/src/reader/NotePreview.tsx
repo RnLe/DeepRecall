@@ -14,7 +14,7 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
-import type { Asset } from "@deeprecall/core/schemas/library";
+import type { Asset } from "@deeprecall/core";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";

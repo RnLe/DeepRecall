@@ -15,7 +15,7 @@ import type {
   ImportPreview,
   ImportOptions,
   ImportStrategy,
-} from "@deeprecall/core/schemas/data-sync";
+} from "@deeprecall/core";
 import {
   Upload,
   X,

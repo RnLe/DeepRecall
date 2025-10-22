@@ -12,7 +12,7 @@
 
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
-import type { NormalizedRect } from "../schema/annotation";
+import type { NormalizedRect } from "@deeprecall/core";
 
 export type AnnotationTool =
   | "pan"

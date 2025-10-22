@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FileQuestion, Link, ChevronDown, ChevronUp } from "lucide-react";
 import { useOrphanedBlobs } from "@/src/hooks/useBlobs";
 import { MarkdownPreview } from "../reader/MarkdownPreview";
-import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
+import type { BlobWithMetadata } from "@deeprecall/core";
 
 interface FileInboxProps {
   onLinkBlob: (blob: BlobWithMetadata) => void;

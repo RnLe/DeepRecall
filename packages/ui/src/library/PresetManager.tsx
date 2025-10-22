@@ -6,7 +6,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Preset, PresetTarget } from "@deeprecall/core/schemas/presets";
+import type { Preset, PresetTarget } from "@deeprecall/core";
 import {
   usePresets,
   useCreatePreset,

@@ -6,7 +6,7 @@
 
 // Test 1: Create a rectangle annotation
 async function testCreateRectangle() {
-  const { createAnnotation } = await import("@/src/repo/annotations");
+  const { createAnnotation } = await import("@deeprecall/data/repos/annotations");
 
   const annotation = await createAnnotation({
     sha256: "test-pdf-hash-123",
@@ -29,7 +29,7 @@ async function testCreateRectangle() {
 
 // Test 2: Create a highlight annotation
 async function testCreateHighlight() {
-  const { createAnnotation } = await import("@/src/repo/annotations");
+  const { createAnnotation } = await import("@deeprecall/data/repos/annotations");
 
   const annotation = await createAnnotation({
     sha256: "test-pdf-hash-123",
@@ -56,7 +56,7 @@ async function testCreateHighlight() {
 // Test 3: Query annotations
 async function testQueryAnnotations() {
   const { getPageAnnotations, getPDFAnnotations } = await import(
-    "@/src/repo/annotations"
+    "@deeprecall/data/repos/annotations"
   );
 
   const page1 = await getPageAnnotations("test-pdf-hash-123", 1);
@@ -70,7 +70,7 @@ async function testQueryAnnotations() {
 
 // Test 4: Test deterministic IDs
 async function testDeterministicIDs() {
-  const { createAnnotation } = await import("@/src/repo/annotations");
+  const { createAnnotation } = await import("@deeprecall/data/repos/annotations");
 
   // Create same annotation twice
   const input = {

@@ -7,17 +7,20 @@ import {
   useCreateEdge,
 } from "@/src/hooks/useLibrary";
 import { useQueryClient } from "@tanstack/react-query";
-import { WorkCardDetailed } from "./WorkCardDetailed";
-import { WorkCardCompact } from "./WorkCardCompact";
-import { WorkCardList } from "./WorkCardList";
-import { LibraryHeader } from "./LibraryHeader";
-import { LibraryFilters, type ViewMode } from "./LibraryFilters";
-import { LibraryLeftSidebar } from "./LibraryLeftSidebar";
-import { CreateWorkDialog } from "./CreateWorkDialog";
-import { CreateActivityDialog } from "./CreateActivityDialog";
-import { ActivityBanner } from "./ActivityBanner";
-import { TemplateLibrary } from "./TemplateLibrary";
-import { AuthorLibrary } from "./AuthorLibrary";
+import {
+  WorkCardDetailed,
+  WorkCardCompact,
+  WorkCardList,
+  LibraryHeader,
+  LibraryFilters,
+  type ViewMode,
+  LibraryLeftSidebar,
+  CreateWorkDialog,
+  CreateActivityDialog,
+  ActivityBanner,
+  TemplateLibrary,
+  AuthorLibrary,
+} from "@deeprecall/ui/library";
 import { BookOpen, Link2 } from "lucide-react";
 import type {
   WorkType,
@@ -25,14 +28,13 @@ import type {
   ActivityExtended,
 } from "@deeprecall/core/schemas/library";
 import { compareWorksByTitle, compareWorksByDate } from "@/src/utils/library";
-import { LinkBlobDialog } from "./LinkBlobDialog";
+import { LinkBlobDialog } from "@deeprecall/ui/library";
 import * as activityRepo from "@deeprecall/data/repos/activities";
 import * as edgeRepo from "@deeprecall/data/repos/edges";
 import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
 import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
 import { useTemplateLibraryUI } from "@deeprecall/data/stores/template-library-ui";
-import { ExportDataDialog } from "./ExportDataDialog";
-import { ImportDataDialog } from "./ImportDataDialog";
+import { ExportDataDialog, ImportDataDialog } from "@deeprecall/ui/library";
 
 export default function LibraryPage() {
   const works = useWorksExtended();
@@ -144,7 +146,7 @@ export default function LibraryPage() {
       const blob = await response.json();
 
       // Create a standalone asset from the blob (no workId)
-      const { createAsset } = await import("@/src/repo/assets");
+      const { createAsset } = await import("@deeprecall/data/repos/assets");
       const asset = await createAsset({
         kind: "asset",
         sha256: blob.sha256,
@@ -223,7 +225,7 @@ export default function LibraryPage() {
         const { blob } = await response.json();
 
         // Create asset from uploaded blob
-        const { createAsset } = await import("@/src/repo/assets");
+        const { createAsset } = await import("@deeprecall/data/repos/assets");
         const asset = await createAsset({
           kind: "asset",
           sha256: blob.sha256,
@@ -535,7 +537,7 @@ export default function LibraryPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Fixed Header */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <div className="max-w-7xl mx-auto px-8 py-4">
             <LibraryHeader
               workCount={works?.length || 0}

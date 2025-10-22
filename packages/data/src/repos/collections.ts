@@ -64,13 +64,11 @@ export async function getCollectionExtended(
 
   // Resolve entities
   const works = await db.works.where("id").anyOf(entityIds).toArray();
-  const versions = await db.versions.where("id").anyOf(entityIds).toArray();
   const activities = await db.activities.where("id").anyOf(entityIds).toArray();
 
   return {
     ...collection,
     works,
-    versions,
     activities,
   };
 }

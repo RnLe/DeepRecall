@@ -13,7 +13,7 @@ import {
   List,
 } from "lucide-react";
 import { useState } from "react";
-import type { WorkType } from "@deeprecall/core/schemas/library";
+import type { WorkType } from "@deeprecall/core";
 
 export type ViewMode = "detailed" | "compact" | "list";
 

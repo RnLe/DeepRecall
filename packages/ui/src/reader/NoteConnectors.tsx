@@ -6,7 +6,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Annotation } from "@deeprecall/core";
 
 interface NoteConnectorsProps {
   /** Annotations with notes on current page */

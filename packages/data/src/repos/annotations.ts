@@ -11,10 +11,7 @@ import type {
   AnnotationFilters,
 } from "@deeprecall/core";
 import { AnnotationSchema } from "@deeprecall/core";
-import {
-  generateAnnotationId,
-  extractRectanglesForId,
-} from "@deeprecall/core";
+import { generateAnnotationId, extractRectanglesForId } from "@deeprecall/core";
 
 /**
  * Create a new annotation with deterministic ID

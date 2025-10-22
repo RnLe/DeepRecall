@@ -44,14 +44,14 @@ import {
 } from "@/src/hooks/useAuthors";
 import { useWorksExtended } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
-import { getAuthorFullName, type Author } from "@deeprecall/core/schemas/library";
+import { getAuthorFullName, type Author } from "@deeprecall/core";
 import { useRouter } from "next/navigation";
 import { SimplePDFViewer } from "../reader/SimplePDFViewer";
 import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 import { parseAuthorList } from "@/src/utils/nameParser";
 import { ImageCropper } from "@/src/components/ImageCropper";
 import { useUploadAvatar, useDeleteAvatar } from "@/src/hooks/useAvatars";
-import type { CropRegion } from "@deeprecall/core/schemas/library";
+import type { CropRegion } from "@deeprecall/core";
 
 interface AuthorLibraryProps {
   isOpen: boolean;

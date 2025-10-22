@@ -7,8 +7,8 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
-import type { Asset } from "@deeprecall/core/schemas/library";
+import type { Annotation } from "@deeprecall/core";
+import type { Asset } from "@deeprecall/core";
 import { NoteBranch } from "./NoteBranch";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import * as annotationRepo from "@deeprecall/data/repos/annotations";

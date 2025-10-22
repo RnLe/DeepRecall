@@ -23,7 +23,7 @@ import {
   StickyNote,
   HelpCircle,
 } from "lucide-react";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Annotation } from "@deeprecall/core";
 import { getRelativeTime } from "@/src/utils/date";
 import { loadPDFDocument } from "@deeprecall/pdf";
 import * as annotationRepo from "@deeprecall/data/repos/annotations";

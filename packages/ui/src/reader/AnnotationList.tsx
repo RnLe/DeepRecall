@@ -10,7 +10,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@deeprecall/data/db";
 import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
 import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Annotation } from "@deeprecall/core";
 import {
   Square,
   Highlighter,

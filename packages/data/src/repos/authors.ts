@@ -232,7 +232,7 @@ export async function findOrCreateAuthor(data: {
         contact: data.contact || existing.contact,
         website: data.website || existing.website,
         bio: data.bio || existing.bio,
-        title: data.title || existing.title,
+        titles: data.title ? [data.title] : existing.titles,
       });
     }
     return getAuthor(existing.id) as Promise<Author>;

@@ -7,8 +7,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
-import type { Preset } from "@deeprecall/core/schemas/presets";
+import type { BlobWithMetadata } from "@deeprecall/core";
+import type { Preset } from "@deeprecall/core";
 import { useWorkPresets } from "@/src/hooks/usePresets";
 import { useWorksExtended } from "@/src/hooks/useLibrary";
 import { PresetSelector } from "./PresetSelector";

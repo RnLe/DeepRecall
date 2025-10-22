@@ -5,7 +5,7 @@
 
 "use client";
 
-import type { CustomFieldDefinition, FieldType } from "@deeprecall/core/schemas/presets";
+import type { CustomFieldDefinition, FieldType } from "@deeprecall/core";
 import { getFieldDefaultValue } from "@/src/utils/presets";
 
 interface FieldRendererProps {
@@ -189,7 +189,7 @@ export function FieldRenderer({
  * Multi-select field component
  */
 import { useState } from "react";
-import type { SelectOption } from "@deeprecall/core/schemas/presets";
+import type { SelectOption } from "@deeprecall/core";
 
 interface MultiSelectFieldProps {
   options: SelectOption[];

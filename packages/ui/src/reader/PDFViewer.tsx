@@ -16,7 +16,7 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 import { AnnotationHandlers } from "./AnnotationHandlers";
 import { PDFScrollbar } from "./PDFScrollbar";
 import { CreateNoteDialog } from "./CreateNoteDialog";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Annotation } from "@deeprecall/core";
 import * as annotationRepo from "@deeprecall/data/repos/annotations";
 import {
   useAnnotationUI,

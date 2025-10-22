@@ -6,7 +6,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
-import type { NormalizedRect } from "@deeprecall/core/schemas/annotation";
+import type { NormalizedRect } from "@deeprecall/core";
 import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
 
 interface AnnotationHandlersProps {

@@ -6,7 +6,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import type { Annotation, NormalizedRect } from "@deeprecall/core/schemas/annotation";
+import type { Annotation, NormalizedRect } from "@deeprecall/core";
 
 interface PDFScrollbarProps {
   /** Total height of all PDF content in pixels (scaled) */

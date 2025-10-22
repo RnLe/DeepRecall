@@ -701,7 +701,7 @@ export function LinkBlobDialog({
                       try {
                         // Import the asset repo
                         const { createAsset } = await import(
-                          "@/src/repo/assets"
+                          "@deeprecall/data/repos/assets"
                         );
 
                         // Create asset linked directly to the work

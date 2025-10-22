@@ -7,8 +7,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
-import type { Asset } from "@deeprecall/core/schemas/library";
+import type { Annotation } from "@deeprecall/core";
+import type { Asset } from "@deeprecall/core";
 import { getAnnotationAssets } from "@deeprecall/data/repos/annotations";
 import {
   StickyNote,
