@@ -13,10 +13,22 @@ if (typeof window === "undefined") {
   // Get the worker path for Node.js
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  const workerPath = join(
-    __dirname,
-    "../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"
-  );
+  
+  // Try multiple possible paths (development vs production, monorepo structure)
+  const possiblePaths = [
+    // Production build in .next
+    join(__dirname, "../../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+    // Development - from apps/web
+    join(__dirname, "../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+    // From workspace root
+    join(process.cwd(), "node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+    join(process.cwd(), "apps/web/node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
+  ];
+  
+  // Use the first path that exists
+  const fs = require("fs");
+  const workerPath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
+  
   PDFParse.setWorker(workerPath);
 }
 
