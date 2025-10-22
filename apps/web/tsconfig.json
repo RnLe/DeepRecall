@@ -4,7 +4,13 @@
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+      "@deeprecall/core": ["../../packages/core/src"],
+      "@deeprecall/core/*": ["../../packages/core/src/*"],
+      "@deeprecall/ui": ["../../packages/ui/src"],
+      "@deeprecall/ui/*": ["../../packages/ui/src/*"],
+      "@deeprecall/data": ["../../packages/data/src"],
+      "@deeprecall/data/*": ["../../packages/data/src/*"]
     },
     "target": "ES2017",
     "lib": [

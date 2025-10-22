@@ -8,8 +8,8 @@
 
 - [x] Create `apps/` and `packages/` directory structure
 - [x] Set up pnpm workspace configuration
-- [ ] Move current Next.js app to `apps/web/`
-- [ ] Configure shared TypeScript config
+- [x] Move current Next.js app to `apps/web/`
+- [x] Configure shared TypeScript config
 
 ---
 
@@ -140,5 +140,11 @@
 
 ## Current Status
 
-**Active Phase:** Phase 1 — Monorepo Structure Setup  
-**Last Updated:** 2025-10-22
+**Active Phase:** Phase 2 — Domain A (UI Refactor)  
+**Next Steps:**
+
+1. Copy UI components to packages/ui
+2. Create packages/data for Dexie repos and stores
+3. Update frontend imports to use new packages
+
+**Last Updated:** 2025-10-22 (Completed packages/core extraction)

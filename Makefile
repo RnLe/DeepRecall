@@ -2,21 +2,19 @@
 
 # Start Docker containers
 run:
-	cd frontend
 	docker compose up
 
 # Start Docker containers with build
 runb:
-	cd frontend
 	docker compose up --build
 
 # Stop and remove containers + volumes (fresh start)
 down:
-	cd frontend && docker compose down -v
+	docker compose down -v
 
 # Stop containers (keep volumes - faster restart)
 stop:
-	cd frontend && docker compose down
+	docker compose down
 
 # Clean Docker build cache
 clean-docker:

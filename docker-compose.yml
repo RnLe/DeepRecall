@@ -1,13 +1,13 @@
 services:
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/web
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
       # Mount source code (read by Docker, written by host)
-      - ./frontend:/app/:delegated
+      - ./apps/web:/app/:delegated
 
       # Named volumes for build artifacts (written by Docker, never synced to host)
       - node_modules:/app/node_modules
