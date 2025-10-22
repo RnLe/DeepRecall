@@ -16,7 +16,6 @@ import {
   ChevronUp,
 } from "lucide-react";
 import type { BlobWithMetadata } from "../api/library/blobs/route";
-import Link from "next/link";
 import { DuplicateResolutionModal } from "./DuplicateResolutionModal";
 import { MarkdownPreview } from "../reader/MarkdownPreview";
 import { SimplePDFViewer } from "../reader/SimplePDFViewer";

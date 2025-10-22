@@ -7,34 +7,34 @@ import {
   useCreateEdge,
 } from "@/src/hooks/useLibrary";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  WorkCardDetailed,
-  WorkCardCompact,
-  WorkCardList,
-  LibraryHeader,
-  LibraryFilters,
-  type ViewMode,
-  LibraryLeftSidebar,
-  CreateWorkDialog,
-  CreateActivityDialog,
-  ActivityBanner,
-  TemplateLibrary,
-  AuthorLibrary,
-} from "@deeprecall/ui/library";
+import { WorkCardDetailed } from "./WorkCardDetailed";
+import { WorkCardCompact } from "./WorkCardCompact";
+import { WorkCardList } from "./WorkCardList";
+import { LibraryHeader } from "./LibraryHeader";
+import { LibraryFilters, type ViewMode } from "./LibraryFilters";
+import { LibraryLeftSidebar } from "./LibraryLeftSidebar";
+import { CreateWorkDialog } from "./CreateWorkDialog";
+import { CreateActivityDialog } from "./CreateActivityDialog";
+import { ActivityBanner } from "./ActivityBanner";
+import { TemplateLibrary } from "./TemplateLibrary";
+import { AuthorLibrary } from "./AuthorLibrary";
 import { BookOpen, Link2 } from "lucide-react";
 import type {
   WorkType,
   WorkExtended,
   ActivityExtended,
-} from "@deeprecall/core/schemas/library";
+} from "@deeprecall/core";
 import { compareWorksByTitle, compareWorksByDate } from "@/src/utils/library";
-import { LinkBlobDialog } from "@deeprecall/ui/library";
-import * as activityRepo from "@deeprecall/data/repos/activities";
-import * as edgeRepo from "@deeprecall/data/repos/edges";
+import { LinkBlobDialog } from "./LinkBlobDialog";
+import {
+  activities as activityRepo,
+  edges as edgeRepo,
+} from "@deeprecall/data/repos";
 import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
-import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
-import { useTemplateLibraryUI } from "@deeprecall/data/stores/template-library-ui";
-import { ExportDataDialog, ImportDataDialog } from "@deeprecall/ui/library";
+import type { BlobWithMetadata } from "@deeprecall/core";
+import { useTemplateLibraryUI } from "@deeprecall/data/stores";
+import { ExportDataDialog } from "./ExportDataDialog";
+import { ImportDataDialog } from "./ImportDataDialog";
 
 export default function LibraryPage() {
   const works = useWorksExtended();
