@@ -9,7 +9,7 @@ import type {
   CoreFieldConfig,
   PresetExpanded,
   FieldType,
-} from "@/src/schema/presets";
+} from "@deeprecall/core/schemas/presets";
 
 /**
  * Expand a preset into all fields for form rendering

@@ -19,14 +19,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { BlobWithMetadata } from "@/src/schema/blobs";
+import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
 import {
   BlobsResponseSchema,
   BlobWithMetadataSchema,
-} from "@/src/schema/blobs";
-import { db } from "@/src/db/dexie";
-import { createAsset } from "@/src/repo/assets";
-import type { Asset } from "@/src/schema/library";
+} from "@deeprecall/core/schemas/blobs";
+import { db } from "@deeprecall/data/db";
+import { createAsset } from "@deeprecall/data/repos/assets";
+import type { Asset } from "@deeprecall/core/schemas/library";
 
 /**
  * Fetch all blobs from server

@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/src/db/dexie";
+import { db } from "@deeprecall/data/db";
 
 export function DatabaseTest() {
   const [status, setStatus] = useState<string>("Testing...");

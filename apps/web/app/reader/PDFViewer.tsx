@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/src/db/dexie";
+import { db } from "@deeprecall/data/db";
 import { usePDF } from "@/src/hooks/usePDF";
 import { usePDFViewport } from "@/src/hooks/usePDFViewport";
 import { PDFPage } from "./PDFPage";
@@ -16,13 +16,13 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 import { AnnotationHandlers } from "./AnnotationHandlers";
 import { PDFScrollbar } from "./PDFScrollbar";
 import { CreateNoteDialog } from "./CreateNoteDialog";
-import type { Annotation } from "@/src/schema/annotation";
-import * as annotationRepo from "@/src/repo/annotations";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import * as annotationRepo from "@deeprecall/data/repos/annotations";
 import {
   useAnnotationUI,
   hasActiveSelection,
-} from "@/src/stores/annotation-ui";
-import { useReaderUI } from "@/src/stores/reader-ui";
+} from "@deeprecall/data/stores/annotation-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 import {
   ChevronLeft,
   ChevronRight,

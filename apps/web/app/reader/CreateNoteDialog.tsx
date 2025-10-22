@@ -7,8 +7,8 @@
 
 import { useState } from "react";
 import { X, FileText, Upload, Loader2 } from "lucide-react";
-import * as annotationRepo from "@/src/repo/annotations";
-import * as assetRepo from "@/src/repo/assets";
+import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import * as assetRepo from "@deeprecall/data/repos/assets";
 
 interface CreateNoteDialogProps {
   annotationId: string;

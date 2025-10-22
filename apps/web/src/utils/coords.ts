@@ -3,7 +3,7 @@
  * All annotation coordinates are stored as normalized (0..1) values
  */
 
-import type { NormalizedRect } from "@/src/schema/annotations";
+import type { NormalizedRect } from "@deeprecall/core/schemas/annotations";
 
 export interface PixelRect {
   x: number;

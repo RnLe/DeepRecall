@@ -4,7 +4,7 @@
  * Aligned with BibTeX standard entry types for import/export compatibility
  */
 
-import type { Preset } from "@/src/schema/presets";
+import type { Preset } from "@deeprecall/core/schemas/presets";
 import { v4 as uuidv4 } from "uuid";
 
 const now = new Date().toISOString();

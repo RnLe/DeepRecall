@@ -9,8 +9,8 @@ import {
   ExportPackageSchema,
   EXPORT_VERSION,
   ARCHIVE_STRUCTURE,
-} from "@/src/schema/data-sync";
-import type { ImportPreview, ExportPackage } from "@/src/schema/data-sync";
+} from "@deeprecall/core/schemas/data-sync";
+import type { ImportPreview, ExportPackage } from "@deeprecall/core/schemas/data-sync";
 import { writeFile, readFile, mkdir, rm } from "fs/promises";
 import path from "path";
 import { tmpdir } from "os";

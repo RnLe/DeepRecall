@@ -3,9 +3,9 @@
  * Encapsulates all Dexie operations for Collections
  */
 
-import { db } from "@/src/db/dexie";
-import type { Collection, CollectionExtended } from "@/src/schema/library";
-import { CollectionSchema } from "@/src/schema/library";
+import { db } from "@deeprecall/data/db";
+import type { Collection, CollectionExtended } from "@deeprecall/core/schemas/library";
+import { CollectionSchema } from "@deeprecall/core/schemas/library";
 
 /**
  * Create a new Collection

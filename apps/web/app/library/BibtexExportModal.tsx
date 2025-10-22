@@ -6,7 +6,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { WorkExtended } from "@/src/schema/library";
+import type { WorkExtended } from "@deeprecall/core/schemas/library";
 import { useAuthorsByIds } from "@/src/hooks/useAuthors";
 import { useWorkPresets } from "@/src/hooks/usePresets";
 import {

@@ -7,13 +7,13 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Annotation, NormalizedRect } from "@/src/schema/annotation";
-import type { AnnotationTool } from "@/src/stores/annotation-ui";
-import { useAnnotationUI } from "@/src/stores/annotation-ui";
-import { useReaderUI } from "@/src/stores/reader-ui";
+import type { Annotation, NormalizedRect } from "@deeprecall/core/schemas/annotation";
+import type { AnnotationTool } from "@deeprecall/data/stores/annotation-ui";
+import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 import { AnnotationContextMenu } from "./AnnotationContextMenu";
-import * as assetRepo from "@/src/repo/assets";
-import * as annotationRepo from "@/src/repo/annotations";
+import * as assetRepo from "@deeprecall/data/repos/assets";
+import * as annotationRepo from "@deeprecall/data/repos/annotations";
 import {
   Save,
   X,

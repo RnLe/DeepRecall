@@ -23,14 +23,14 @@ import type {
   WorkType,
   WorkExtended,
   ActivityExtended,
-} from "@/src/schema/library";
+} from "@deeprecall/core/schemas/library";
 import { compareWorksByTitle, compareWorksByDate } from "@/src/utils/library";
 import { LinkBlobDialog } from "./LinkBlobDialog";
-import * as activityRepo from "@/src/repo/activities";
-import * as edgeRepo from "@/src/repo/edges";
+import * as activityRepo from "@deeprecall/data/repos/activities";
+import * as edgeRepo from "@deeprecall/data/repos/edges";
 import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
-import type { BlobWithMetadata } from "@/src/schema/blobs";
-import { useTemplateLibraryUI } from "@/src/stores/template-library-ui";
+import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
+import { useTemplateLibraryUI } from "@deeprecall/data/stores/template-library-ui";
 import { ExportDataDialog } from "./ExportDataDialog";
 import { ImportDataDialog } from "./ImportDataDialog";
 

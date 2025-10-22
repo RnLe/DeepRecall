@@ -3,10 +3,10 @@
  * Called once on app startup to seed system presets
  */
 
-import { db } from "@/src/db/dexie";
+import { db } from "@deeprecall/data/db";
 import { DEFAULT_PRESETS, DEFAULT_PRESET_NAMES } from "./presets.default";
 import { listSystemPresets } from "./presets";
-import type { Preset } from "@/src/schema/presets";
+import type { Preset } from "@deeprecall/core/schemas/presets";
 
 /**
  * Initialize system presets if they don't exist

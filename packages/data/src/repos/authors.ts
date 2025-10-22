@@ -5,8 +5,8 @@
  * Handles author creation, search, deduplication, and relationship management.
  */
 
-import { db } from "@/src/db/dexie";
-import type { Author } from "@/src/schema/library";
+import { db } from "@deeprecall/data/db";
+import type { Author } from "@deeprecall/core/schemas/library";
 import { v4 as uuidv4 } from "uuid";
 
 /**

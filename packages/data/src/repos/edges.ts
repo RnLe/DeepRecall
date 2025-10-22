@@ -19,9 +19,9 @@
  *   Edge { fromId: activityId, toId: assetId, relation: "contains" }
  */
 
-import { db } from "@/src/db/dexie";
-import type { Edge, Relation } from "@/src/schema/library";
-import { EdgeSchema } from "@/src/schema/library";
+import { db } from "@deeprecall/data/db";
+import type { Edge, Relation } from "@deeprecall/core/schemas/library";
+import { EdgeSchema } from "@deeprecall/core/schemas/library";
 
 /**
  * Create a new Edge

@@ -6,11 +6,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useAnnotationUI } from "@/src/stores/annotation-ui";
-import { useReaderUI } from "@/src/stores/reader-ui";
-import * as annotationRepo from "@/src/repo/annotations";
-import type { Annotation } from "@/src/schema/annotation";
-import type { Asset } from "@/src/schema/library";
+import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Asset } from "@deeprecall/core/schemas/library";
 import { formatDate, getRelativeTime } from "@/src/utils/date";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -38,7 +38,7 @@ import {
   HelpCircle,
   Plus,
 } from "lucide-react";
-import { deleteNoteAsset } from "@/src/repo/assets";
+import { deleteNoteAsset } from "@deeprecall/data/repos/assets";
 import { CreateNoteDialog } from "@/app/reader/CreateNoteDialog";
 import { CompactNoteItem } from "@/app/reader/CompactNoteItem";
 import { NoteDetailModal } from "@/app/reader/NoteDetailModal";

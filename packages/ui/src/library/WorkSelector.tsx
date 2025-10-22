@@ -6,7 +6,7 @@
 "use client";
 
 import { useWorksExtended } from "@/src/hooks/useLibrary";
-import type { WorkExtended } from "@/src/schema/library";
+import type { WorkExtended } from "@deeprecall/core/schemas/library";
 import { BookOpen, Users } from "lucide-react";
 import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
 import { useAuthorsByIds } from "@/src/hooks/useAuthors";

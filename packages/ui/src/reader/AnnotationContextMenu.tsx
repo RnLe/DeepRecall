@@ -24,8 +24,8 @@ import {
   StickyNote,
   HelpCircle,
 } from "lucide-react";
-import type { Annotation } from "@/src/schema/annotation";
-import * as annotationRepo from "@/src/repo/annotations";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import * as annotationRepo from "@deeprecall/data/repos/annotations";
 
 const ANNOTATION_COLORS = [
   { name: "Amber", value: "#fbbf24" },

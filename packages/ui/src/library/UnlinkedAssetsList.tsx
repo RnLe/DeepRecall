@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Package, Link, ChevronDown, ChevronUp } from "lucide-react";
 import { useUnlinkedAssets } from "@/src/hooks/useBlobs";
 import { MarkdownPreview } from "../reader/MarkdownPreview";
-import type { Asset } from "@/src/schema/library";
+import type { Asset } from "@deeprecall/core/schemas/library";
 
 interface UnlinkedAssetsListProps {
   onLinkAsset: (asset: Asset) => void;

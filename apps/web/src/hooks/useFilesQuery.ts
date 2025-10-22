@@ -3,7 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FilesResponseSchema, type FilesResponse } from "@/src/schema/files";
+import { FilesResponseSchema, type FilesResponse } from "@deeprecall/core/schemas/files";
 
 export function useFilesQuery() {
   return useQuery({

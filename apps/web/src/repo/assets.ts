@@ -18,9 +18,9 @@
  * 3. Unlinked: No workId, no edges (standalone, needs linking)
  */
 
-import { db } from "@/src/db/dexie";
-import type { Asset, AssetExtended } from "@/src/schema/library";
-import { AssetSchema } from "@/src/schema/library";
+import { db } from "@deeprecall/data/db";
+import type { Asset, AssetExtended } from "@deeprecall/core/schemas/library";
+import { AssetSchema } from "@deeprecall/core/schemas/library";
 
 /**
  * Create a new Asset

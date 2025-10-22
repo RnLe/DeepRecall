@@ -6,7 +6,7 @@
  * The ts-fsrs library will be integrated when SRS features are built.
  */
 
-import type { Card } from "@/src/schema/cards";
+import type { Card } from "@deeprecall/core/schemas/cards";
 
 // Placeholder Rating type (1-4 scale)
 export type Rating = 1 | 2 | 3 | 4;

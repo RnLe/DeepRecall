@@ -9,13 +9,13 @@ import {
   ExportOptionsSchema,
   ARCHIVE_STRUCTURE,
   EXPORT_VERSION,
-} from "@/src/schema/data-sync";
+} from "@deeprecall/core/schemas/data-sync";
 import type {
   ExportPackage,
   ExportMetadata,
   SQLiteExport,
   FileManifest,
-} from "@/src/schema/data-sync";
+} from "@deeprecall/core/schemas/data-sync";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { readdir, readFile, stat } from "fs/promises";

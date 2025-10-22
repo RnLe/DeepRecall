@@ -3,7 +3,7 @@
  * Handles export/import of all DeepRecall data
  */
 
-import { db } from "@/src/db/dexie";
+import { db } from "@deeprecall/data/db";
 import type {
   ExportOptions,
   ImportOptions,
@@ -11,7 +11,7 @@ import type {
   ImportResult,
   DexieExportTyped,
   ImportStrategy,
-} from "@/src/schema/data-sync";
+} from "@deeprecall/core/schemas/data-sync";
 
 /**
  * Export all Dexie data to JSON

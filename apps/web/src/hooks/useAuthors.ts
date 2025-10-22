@@ -6,7 +6,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import type { Author } from "@/src/schema/library";
+import type { Author } from "@deeprecall/core/schemas/library";
 import {
   createAuthor,
   deleteAuthor,
@@ -17,7 +17,7 @@ import {
   listAuthors,
   searchAuthors,
   updateAuthor,
-} from "@/src/repo/authors";
+} from "@deeprecall/data/repos/authors";
 
 /**
  * Simple debounce hook

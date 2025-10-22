@@ -11,7 +11,7 @@ import type {
   LibraryEntity,
   WorkExtended,
   AssetExtended,
-} from "@/src/schema/library";
+} from "@deeprecall/core/schemas/library";
 
 // ============================================================================
 // Entity type utilities

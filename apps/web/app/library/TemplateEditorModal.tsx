@@ -13,7 +13,7 @@ import type {
   FieldType,
   CustomFieldDefinition,
   CoreFieldConfig,
-} from "@/src/schema/presets";
+} from "@deeprecall/core/schemas/presets";
 import {
   X,
   Plus,

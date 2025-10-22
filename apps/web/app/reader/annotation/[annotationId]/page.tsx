@@ -8,9 +8,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import type { Annotation } from "@/src/schema/annotation";
-import type { Asset } from "@/src/schema/library";
-import { getAnnotation, getAnnotationAssets } from "@/src/repo/annotations";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Asset } from "@deeprecall/core/schemas/library";
+import { getAnnotation, getAnnotationAssets } from "@deeprecall/data/repos/annotations";
 import { AnnotationPreview } from "./AnnotationPreview";
 import { NoteTreeView } from "./NoteTreeView";
 

@@ -7,12 +7,12 @@
 
 import { useState, useEffect } from "react";
 import { X, Loader2, Edit2, Save } from "lucide-react";
-import type { Asset } from "@/src/schema/library";
+import type { Asset } from "@deeprecall/core/schemas/library";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { updateAssetMetadata } from "@/src/repo/assets";
+import { updateAssetMetadata } from "@deeprecall/data/repos/assets";
 
 interface NoteDetailModalProps {
   asset: Asset;

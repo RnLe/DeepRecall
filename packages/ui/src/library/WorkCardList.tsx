@@ -14,19 +14,19 @@ import {
   FileText,
   Building,
 } from "lucide-react";
-import type { WorkExtended } from "@/src/schema/library";
+import type { WorkExtended } from "@deeprecall/core/schemas/library";
 import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
 import { useAuthorsByIds } from "@/src/hooks/useAuthors";
 import { useDeleteWork } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useReaderUI } from "@/src/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
 import { BibtexExportModal } from "./BibtexExportModal";
-import type { BlobWithMetadata } from "@/src/schema/blobs";
+import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
 
 interface WorkCardListProps {
   work: WorkExtended;

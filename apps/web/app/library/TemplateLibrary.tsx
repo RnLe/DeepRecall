@@ -7,7 +7,7 @@
 
 "use client";
 
-import type { Preset, PresetTarget } from "@/src/schema/presets";
+import type { Preset, PresetTarget } from "@deeprecall/core/schemas/presets";
 import {
   usePresets,
   useCreatePreset,
@@ -18,7 +18,7 @@ import {
   useResetSinglePreset,
 } from "@/src/hooks/usePresets";
 import { getPresetColor } from "@/src/utils/presets";
-import { DEFAULT_PRESET_NAMES } from "@/src/repo/presets.default";
+import { DEFAULT_PRESET_NAMES } from "@deeprecall/data/repos/presets.default";
 import {
   X,
   Plus,
@@ -32,7 +32,7 @@ import {
   Box,
   FileText,
 } from "lucide-react";
-import { useTemplateLibraryUI } from "@/src/stores/template-library-ui";
+import { useTemplateLibraryUI } from "@deeprecall/data/stores/template-library-ui";
 import { MessageModal } from "./MessageModal";
 import { InputModal } from "./InputModal";
 import { TemplateEditorModal } from "./TemplateEditorModal";

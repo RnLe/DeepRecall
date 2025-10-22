@@ -3,8 +3,8 @@
  * Convert Work entities to BibTeX format
  */
 
-import type { WorkExtended } from "@/src/schema/library";
-import type { Author } from "@/src/schema/library";
+import type { WorkExtended } from "@deeprecall/core/schemas/library";
+import type { Author } from "@deeprecall/core/schemas/library";
 
 /**
  * Map preset names to BibTeX entry types

@@ -11,8 +11,8 @@ import { FileInbox } from "./FileInbox";
 import { UnlinkedAssetsList } from "./UnlinkedAssetsList";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { SimplePDFViewer } from "../reader/SimplePDFViewer";
-import type { BlobWithMetadata } from "@/src/schema/blobs";
-import type { Asset } from "@/src/schema/library";
+import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
+import type { Asset } from "@deeprecall/core/schemas/library";
 
 interface LibraryLeftSidebarProps {
   onCreateWorkWithPreset?: (presetId: string) => void;

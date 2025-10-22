@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import * as d3Force from "d3-force";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/src/db/dexie";
+import { db } from "@deeprecall/data/db";
 import { ZoomIn, ZoomOut, Maximize2, RotateCcw } from "lucide-react";
 import { WorkCardCompact } from "@/app/library/WorkCardCompact";
-import type { WorkExtended } from "@/src/schema/library";
-import { useGraphUI, type GraphNode } from "@/src/stores/graph-ui";
+import type { WorkExtended } from "@deeprecall/core/schemas/library";
+import { useGraphUI, type GraphNode } from "@deeprecall/data/stores/graph-ui";
 import { useWorksExtended } from "@/src/hooks/useLibrary";
 import { useRouter } from "next/navigation";
-import { useReaderUI } from "@/src/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 
 interface GraphLink {
   source: GraphNode;

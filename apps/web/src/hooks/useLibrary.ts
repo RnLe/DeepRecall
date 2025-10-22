@@ -14,12 +14,12 @@ import type {
   AssetExtended,
   ActivityExtended,
   CollectionExtended,
-} from "@/src/schema/library";
-import * as workRepo from "@/src/repo/works";
-import * as assetRepo from "@/src/repo/assets";
-import * as activityRepo from "@/src/repo/activities";
-import * as collectionRepo from "@/src/repo/collections";
-import * as edgeRepo from "@/src/repo/edges";
+} from "@deeprecall/core/schemas/library";
+import * as workRepo from "@deeprecall/data/repos/works";
+import * as assetRepo from "@deeprecall/data/repos/assets";
+import * as activityRepo from "@deeprecall/data/repos/activities";
+import * as collectionRepo from "@deeprecall/data/repos/collections";
+import * as edgeRepo from "@deeprecall/data/repos/edges";
 
 // ============================================================================
 // Works

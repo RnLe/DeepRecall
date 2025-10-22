@@ -5,8 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { ImportOptionsSchema, ARCHIVE_STRUCTURE } from "@/src/schema/data-sync";
-import type { ExportPackage, ImportResult } from "@/src/schema/data-sync";
+import { ImportOptionsSchema, ARCHIVE_STRUCTURE } from "@deeprecall/core/schemas/data-sync";
+import type { ExportPackage, ImportResult } from "@deeprecall/core/schemas/data-sync";
 import { readFile, readdir, copyFile, mkdir, rm } from "fs/promises";
 import path from "path";
 import { tmpdir } from "os";

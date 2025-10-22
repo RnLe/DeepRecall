@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useReaderUI } from "@/src/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 import { PDFViewer } from "./PDFViewer";
 import { FileQuestion } from "lucide-react";
 

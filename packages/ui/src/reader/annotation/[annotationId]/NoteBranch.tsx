@@ -18,13 +18,13 @@ import {
   Grid3x3,
   GripVertical,
 } from "lucide-react";
-import type { Annotation } from "@/src/schema/annotation";
-import type { Asset } from "@/src/schema/library";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Asset } from "@deeprecall/core/schemas/library";
 import { NoteDetailModal } from "@/app/reader/NoteDetailModal";
 import { getRelativeTime } from "@/src/utils/date";
-import * as assetRepo from "@/src/repo/assets";
-import * as annotationRepo from "@/src/repo/annotations";
-import { db } from "@/src/db/dexie";
+import * as assetRepo from "@deeprecall/data/repos/assets";
+import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import { db } from "@deeprecall/data/db";
 import { SimplePDFViewer } from "../../SimplePDFViewer";
 
 interface NoteBranchProps {

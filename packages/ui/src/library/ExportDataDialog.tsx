@@ -11,7 +11,7 @@ import {
   estimateExportSize,
   formatBytes,
 } from "@/src/utils/data-sync";
-import type { ExportOptions } from "@/src/schema/data-sync";
+import type { ExportOptions } from "@deeprecall/core/schemas/data-sync";
 import {
   Download,
   X,

@@ -3,9 +3,9 @@
  * Encapsulates all Dexie operations for Activities
  */
 
-import { db } from "@/src/db/dexie";
-import type { Activity, ActivityExtended } from "@/src/schema/library";
-import { ActivitySchema } from "@/src/schema/library";
+import { db } from "@deeprecall/data/db";
+import type { Activity, ActivityExtended } from "@deeprecall/core/schemas/library";
+import { ActivitySchema } from "@deeprecall/core/schemas/library";
 
 /**
  * Create a new Activity

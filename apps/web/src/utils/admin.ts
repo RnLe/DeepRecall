@@ -3,8 +3,8 @@
  * Run this once to clean up duplicate presets
  */
 
-import { db } from "@/src/db/dexie";
-import { resetSystemPresets } from "@/src/repo/presets.init";
+import { db } from "@deeprecall/data/db";
+import { resetSystemPresets } from "@deeprecall/data/repos/presets.init";
 
 export async function cleanupDuplicatePresets() {
   console.log("🧹 Cleaning up duplicate presets...");

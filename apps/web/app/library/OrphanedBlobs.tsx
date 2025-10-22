@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useOrphanedBlobs } from "@/src/hooks/useBlobs";
 import { LinkBlobDialog } from "./LinkBlobDialog";
-import type { BlobWithMetadata } from "@/src/schema/blobs";
+import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
 
 export function OrphanedBlobs() {
   const { data: orphans } = useOrphanedBlobs();

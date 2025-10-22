@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { FileText, Image as ImageIcon, FileType } from "lucide-react";
-import type { Asset } from "@/src/schema/library";
+import type { Asset } from "@deeprecall/core/schemas/library";
 import { getRelativeTime } from "@/src/utils/date";
 
 interface CompactNoteItemProps {

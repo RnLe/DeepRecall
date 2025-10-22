@@ -8,7 +8,7 @@ import {
   getAuthorFullName,
   getAuthorCitationName,
   type Author,
-} from "@/src/schema/library";
+} from "@deeprecall/core/schemas/library";
 
 /**
  * Format authors for display in cards/lists

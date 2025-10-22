@@ -7,10 +7,10 @@
 
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/src/db/dexie";
-import { useAnnotationUI } from "@/src/stores/annotation-ui";
-import { useReaderUI } from "@/src/stores/reader-ui";
-import type { Annotation } from "@/src/schema/annotation";
+import { db } from "@deeprecall/data/db";
+import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
 import {
   Square,
   Highlighter,

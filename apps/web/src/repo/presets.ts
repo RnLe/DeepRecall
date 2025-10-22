@@ -3,12 +3,12 @@
  * CRUD operations for form template presets
  */
 
-import { db } from "@/src/db/dexie";
+import { db } from "@deeprecall/data/db";
 import {
   PresetSchema,
   type Preset,
   type PresetTarget,
-} from "@/src/schema/presets";
+} from "@deeprecall/core/schemas/presets";
 import { v4 as uuidv4 } from "uuid";
 
 /**

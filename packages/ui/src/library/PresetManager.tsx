@@ -6,7 +6,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Preset, PresetTarget } from "@/src/schema/presets";
+import type { Preset, PresetTarget } from "@deeprecall/core/schemas/presets";
 import {
   usePresets,
   useCreatePreset,
@@ -17,7 +17,7 @@ import {
   useResetSinglePreset,
 } from "@/src/hooks/usePresets";
 import { getPresetColor } from "@/src/utils/presets";
-import { DEFAULT_PRESET_NAMES } from "@/src/repo/presets.default";
+import { DEFAULT_PRESET_NAMES } from "@deeprecall/data/repos/presets.default";
 
 export function PresetManager() {
   const presets = usePresets();

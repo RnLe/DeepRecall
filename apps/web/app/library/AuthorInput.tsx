@@ -18,7 +18,7 @@ import {
   useFindOrCreateAuthor,
 } from "@/src/hooks/useAuthors";
 import { parseAuthorList, formatAuthorName } from "@/src/utils/nameParser";
-import { getAuthorFullName, type Author } from "@/src/schema/library";
+import { getAuthorFullName, type Author } from "@deeprecall/core/schemas/library";
 
 interface AuthorInputProps {
   value: string[]; // Array of author IDs

@@ -9,7 +9,7 @@
 import { useState, useMemo } from "react";
 import { useWorkPresets } from "@/src/hooks/usePresets";
 import { useUpdateWork } from "@/src/hooks/useLibrary";
-import type { WorkExtended } from "@/src/schema/library";
+import type { WorkExtended } from "@deeprecall/core/schemas/library";
 import { CompactDynamicForm } from "./CompactDynamicForm";
 import { PDFPreview } from "../reader/PDFPreview";
 import { AuthorInput } from "./AuthorInput";

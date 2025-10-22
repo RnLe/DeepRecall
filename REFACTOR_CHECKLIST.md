@@ -153,7 +153,7 @@
 
 **Next Steps:**
 
-1. Update imports in packages to use @deeprecall/* (remove relative paths)
+1. Update imports in packages to use @deeprecall/\* (remove relative paths)
 2. Update apps/web to import from packages instead of local files
 3. Remove duplicate files from apps/web after successful migration
 4. Test that apps/web builds and runs correctly

@@ -3,9 +3,9 @@
  * Encapsulates all Dexie operations for Works
  */
 
-import { db } from "@/src/db/dexie";
-import type { Work, WorkExtended, Asset } from "@/src/schema/library";
-import { WorkSchema } from "@/src/schema/library";
+import { db } from "@deeprecall/data/db";
+import type { Work, WorkExtended, Asset } from "@deeprecall/core/schemas/library";
+import { WorkSchema } from "@deeprecall/core/schemas/library";
 
 /**
  * Create a new Work

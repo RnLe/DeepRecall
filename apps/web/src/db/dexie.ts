@@ -4,8 +4,8 @@
  */
 
 import Dexie, { type EntityTable } from "dexie";
-import type { Annotation } from "@/src/schema/annotation";
-import type { Card, ReviewLog } from "@/src/schema/cards";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
+import type { Card, ReviewLog } from "@deeprecall/core/schemas/cards";
 import type {
   Work,
   Asset,
@@ -13,8 +13,8 @@ import type {
   Collection,
   Edge,
   Author,
-} from "@/src/schema/library";
-import type { Preset } from "@/src/schema/presets";
+} from "@deeprecall/core/schemas/library";
+import type { Preset } from "@deeprecall/core/schemas/presets";
 
 class DeepRecallDB extends Dexie {
   // Library entities

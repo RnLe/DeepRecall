@@ -5,7 +5,7 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as presetRepo from "@/src/repo/presets";
+import * as presetRepo from "@deeprecall/data/repos/presets";
 import {
   initializePresets,
   resetSystemPresets,
@@ -13,8 +13,8 @@ import {
   getMissingDefaultPresets,
   resetSinglePresetByName,
   getDefaultPresetsStatus,
-} from "@/src/repo/presets.init";
-import type { Preset, PresetTarget } from "@/src/schema/presets";
+} from "@deeprecall/data/repos/presets.init";
+import type { Preset, PresetTarget } from "@deeprecall/core/schemas/presets";
 
 // ============================================================================
 // Query Hooks (Live)

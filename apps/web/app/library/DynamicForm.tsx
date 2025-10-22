@@ -7,7 +7,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Preset, PresetTarget } from "@/src/schema/presets";
+import type { Preset, PresetTarget } from "@deeprecall/core/schemas/presets";
 import {
   expandPreset,
   groupFieldsByGroup,

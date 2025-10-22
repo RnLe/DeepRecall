@@ -8,7 +8,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActivityExtended } from "@/src/schema/library";
+import type { ActivityExtended } from "@deeprecall/core/schemas/library";
 import {
   Calendar,
   Building2,

@@ -26,7 +26,7 @@ import {
 import {
   useAnnotationUI,
   hasActiveSelection,
-} from "@/src/stores/annotation-ui";
+} from "@deeprecall/data/stores/annotation-ui";
 
 const ANNOTATION_KINDS = [
   { name: "Equation", icon: FunctionSquare },

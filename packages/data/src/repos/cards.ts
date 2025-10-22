@@ -3,8 +3,8 @@
  * Encapsulates Dexie operations for SRS cards
  */
 
-import { db } from "@/src/db/dexie";
-import type { Card, ReviewLog } from "@/src/schema/cards";
+import { db } from "@deeprecall/data/db";
+import type { Card, ReviewLog } from "@deeprecall/core/schemas/cards";
 
 export const cardRepo = {
   /** Get all cards for a document */
