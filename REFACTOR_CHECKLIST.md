@@ -24,11 +24,12 @@
 
 ### Extract packages/ui
 
-- [ ] Identify server-agnostic React components from `frontend/app/`
-- [ ] Move library components (LibraryFilters, PDFThumbnail, FileInbox, etc.)
-- [ ] Move reader components (viewer, annotation overlays, tools)
+- [x] Identify server-agnostic React components from `frontend/app/`
+- [x] Move library components (LibraryFilters, PDFThumbnail, FileInbox, etc.)
+- [x] Move reader components (viewer, annotation overlays, tools)
+- [x] Move study, admin, and shared components
 - [ ] Remove all `next/*` imports from extracted components
-- [ ] Create package.json and tsconfig for packages/ui
+- [x] Create package.json and tsconfig for packages/ui
 
 ### Extract packages/data
 

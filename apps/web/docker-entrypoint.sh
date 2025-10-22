@@ -11,7 +11,7 @@ fi
 
 # Always install dependencies to ensure native bindings are built
 echo "[entrypoint] Installing dependencies (this may take a moment)..."
-pnpm install --frozen-lockfile
+pnpm install
 
 # Approve build scripts for native modules (CRITICAL)
 echo "[entrypoint] Approving build scripts..."
