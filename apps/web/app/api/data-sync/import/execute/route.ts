@@ -5,8 +5,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { ImportOptionsSchema, ARCHIVE_STRUCTURE } from "@deeprecall/core/schemas/data-sync";
-import type { ExportPackage, ImportResult } from "@deeprecall/core/schemas/data-sync";
+import {
+  ImportOptionsSchema,
+  ARCHIVE_STRUCTURE,
+} from "@deeprecall/core/schemas/data-sync";
+import type {
+  ExportPackage,
+  ImportResult,
+} from "@deeprecall/core/schemas/data-sync";
 import { readFile, readdir, copyFile, mkdir, rm } from "fs/promises";
 import path from "path";
 import { tmpdir } from "os";
@@ -114,7 +120,9 @@ async function copyFiles(
   }
 
   const filesDir = path.join(extractDir, ARCHIVE_STRUCTURE.FILES_DIR);
-  const dataDir = path.join(process.cwd(), "data");
+  // In monorepo: process.cwd() is /workspace/apps/web, but data is at /workspace/data
+  const dataDir =
+    process.env.DATA_PATH || path.join(process.cwd(), "../../data");
 
   let copied = 0;
 

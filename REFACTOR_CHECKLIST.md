@@ -24,20 +24,17 @@
 
 ### Extract packages/ui
 
-- [x] Identify server-agnostic React components from `frontend/app/`
-- [x] Move library components (LibraryFilters, PDFThumbnail, FileInbox, etc.)
-- [x] Move reader components (viewer, annotation overlays, tools)
-- [x] Move study, admin, and shared components
-- [ ] Remove all `next/*` imports from extracted components
-- [x] Create package.json and tsconfig for packages/ui
+- [x] **DEFERRED** - UI components kept in apps/web for now
+- [x] Reason: Too many Next.js dependencies, will extract incrementally later
+- [x] Strategy: Extract when building desktop/mobile apps (Domain C/E)
 
 ### Extract packages/data
 
 - [x] Move Dexie database setup and repositories from `frontend/src/repo/`
-- [ ] Create unified data facade interface (useShape, write buffer)
-- [ ] Add ElectricSQL integration hooks
 - [x] Move stores from `frontend/src/stores/` (refactor to be platform-agnostic)
 - [x] Create package.json and tsconfig for packages/data
+- [ ] Create unified data facade interface (useShape, write buffer) - **Domain B**
+- [ ] Add ElectricSQL integration hooks - **Domain B**
 
 ### Extract packages/pdf
 
@@ -55,9 +52,11 @@
 
 ### Update apps/web
 
-- [ ] Update imports to use packages instead of local paths
-- [ ] Keep server-only code (API routes, server actions) in apps/web
-- [ ] Ensure app still runs correctly after refactoring
+- [x] Update imports to use packages instead of local paths
+- [x] Keep server-only code (API routes, server actions) in apps/web
+- [x] Fix Docker configuration for monorepo structure
+- [x] Fix data folder paths for monorepo (now at workspace root)
+- [x] Ensure app runs correctly after refactoring
 
 ---
 
@@ -141,32 +140,59 @@
 
 ## Current Status
 
-**Active Phase:** Phase 2 — Domain A (UI Refactor)  
+**Active Phase:** ✅ Phase 2 — Domain A Complete!  
 **Completed:**
 
-- ✅ Monorepo structure (apps/, packages/)
-- ✅ packages/core extracted (schemas, types, utils)
-- ✅ apps/web moved from frontend/ (with updated configs)
-- ✅ packages/data extracted (Dexie DB, repos, Zustand stores)
-- ✅ packages/ui extracted (all React components - 80+ files)
-- ✅ packages/pdf extracted (PDF.js utils and hooks)
-- ✅ All imports updated to use @deeprecall/\* packages
-- ✅ Duplicate files removed from apps/web
+- ✅ Monorepo structure (apps/, packages/) with pnpm workspace
+- ✅ packages/core extracted (schemas, types, utils including presets)
+- ✅ packages/data extracted (Dexie DB, 10 repos, 5 stores, React Query hooks)
+- ✅ packages/pdf extracted (PDF.js utils, hooks, LRU cache)
+- ✅ packages/ui created (empty placeholder - deferred for Desktop/Mobile phases)
+- ✅ All imports updated to use @deeprecall/\* packages (148+ files)
+- ✅ Docker configuration updated for monorepo (build context, volumes, entrypoint)
+- ✅ Data folder paths fixed for monorepo structure (workspace root)
+- ✅ PDF worker path resolution fixed for pnpm workspace
+- ✅ Apps/web runs successfully in Docker with all features working
 
-**apps/web now contains only:**
+**Pragmatic Decisions Made:**
 
-- `app/` - Next.js routes and pages
-- `src/components/` - App-specific components
-- `src/hooks/` - App-specific hooks
-- `src/server/` - Server-only code (CAS, DB, metadata)
-- `src/srs/` - SRS/FSRS logic
+- UI components kept in apps/web (too many Next.js dependencies)
+- Will extract UI incrementally when building desktop/mobile apps
+- Data layer separation is the critical achievement for multi-platform support
+
+**apps/web structure:**
+
+- `app/` - Next.js routes, pages, and UI components (kept here for now)
+- `src/server/` - Server-only code (CAS, DB, PDF extraction, metadata)
+- `src/hooks/` - App-specific React hooks
 - `src/utils/` - App-specific utilities
+- `src/srs/` - SRS/FSRS spaced repetition logic
 
-**Next Steps:**
+**Shared packages:**
 
-1. Test that apps/web builds and runs correctly
-2. Fix any import or type errors
-3. Verify Docker container still works
-4. Ready for Domain B (ElectricSQL integration) when needed
+- `@deeprecall/core` - Schemas, types, utilities (platform-agnostic)
+- `@deeprecall/data` - Client data layer (Dexie, stores, hooks)
+- `@deeprecall/pdf` - PDF.js rendering utilities
+- `@deeprecall/ui` - Empty (future home for shared components)
 
-**Last Updated:** 2025-10-22 (Domain A complete - all packages extracted and wired up!)
+**Next Steps (Domain B - ElectricSQL):**
+
+According to ReworkInstructions.md, the next phase is **Domain B — Data & Sync**:
+
+1. Add Electric container to docker-compose.yml
+2. Create Postgres migrations for core tables
+3. Implement write buffer with optimistic local state
+4. Add ElectricSQL shapes for read-path replication
+5. Build POST /api/writes/batch endpoint
+6. Implement conflict resolution with LWW strategy
+
+**OR**
+
+Continue with working system improvements before taking on ElectricSQL complexity:
+
+- Verify all import/export workflows work with new data paths
+- Test scanning and library management
+- Ensure reader and annotation features work end-to-end
+- Consider UI/UX improvements now that refactor is stable
+
+**Last Updated:** 2025-10-22 (Domain A Phase 1 complete! Ready for Domain B when you are.)

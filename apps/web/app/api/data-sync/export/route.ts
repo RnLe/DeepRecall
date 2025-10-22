@@ -62,7 +62,9 @@ async function exportSQLiteData(): Promise<SQLiteExport> {
  * Get file system manifest (what files exist)
  */
 async function getFileManifest(): Promise<FileManifest> {
-  const dataDir = path.join(process.cwd(), "data");
+  // In monorepo: process.cwd() is /workspace/apps/web, but data is at /workspace/data
+  const dataDir =
+    process.env.DATA_PATH || path.join(process.cwd(), "../../data");
 
   const manifest: FileManifest = {
     avatars: [],
@@ -214,7 +216,9 @@ async function createArchive(
       const filesDir = path.join(tempDir, ARCHIVE_STRUCTURE.FILES_DIR);
       await mkdir(filesDir, { recursive: true });
 
-      const dataDir = path.join(process.cwd(), "data");
+      // In monorepo: process.cwd() is /workspace/apps/web, but data is at /workspace/data
+      const dataDir =
+        process.env.DATA_PATH || path.join(process.cwd(), "../../data");
 
       // Copy avatars
       const avatarsDir = path.join(filesDir, "avatars");

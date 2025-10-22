@@ -15,10 +15,13 @@ if (typeof window === "undefined") {
     // Use createRequire to resolve pdf-parse location at runtime
     const require = createRequire(import.meta.url);
     const pdfParsePath = require.resolve("pdf-parse");
-    
+
     // pdf-parse resolves to .../pdf-parse/dist/pdf-parse/cjs/index.cjs
     // Worker is at .../pdf-parse/dist/worker/pdf.worker.mjs
-    const pdfParsePackageRoot = dirname(dirname(dirname(pdfParsePath)));
+    // Go up 4 levels: index.cjs -> cjs/ -> pdf-parse/ -> dist/ -> pdf-parse/
+    const pdfParsePackageRoot = dirname(
+      dirname(dirname(dirname(pdfParsePath)))
+    );
     const workerPath = join(pdfParsePackageRoot, "dist/worker/pdf.worker.mjs");
 
     console.log(`[PDF Worker] Using worker: ${workerPath}`);

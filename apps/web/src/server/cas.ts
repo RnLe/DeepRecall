@@ -15,9 +15,10 @@ import { extractFileMetadata, extractBufferMetadata } from "./metadata";
  * Get the library directory path from environment or default
  */
 export function getLibraryPath(): string {
-  return (
-    process.env.LIBRARY_PATH || path.join(process.cwd(), "data", "library")
-  );
+  // In monorepo: process.cwd() is /workspace/apps/web, but data is at /workspace/data
+  const dataPath =
+    process.env.DATA_PATH || path.join(process.cwd(), "../../data");
+  return process.env.LIBRARY_PATH || path.join(dataPath, "library");
 }
 
 /**
