@@ -1,8 +1,61 @@
 services:
+  # PostgreSQL database - authoritative data source
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: deeprecall
+      POSTGRES_USER: deeprecall
+      POSTGRES_PASSWORD: deeprecall
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deeprecall"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ElectricSQL sync service
+  electric:
+    image: electricsql/electric:latest
+    restart: unless-stopped
+    ports:
+      - "5133:3000" # Map internal 3000 to external 5133
+    environment:
+      DATABASE_URL: postgresql://deeprecall:deeprecall@db:5432/deeprecall
+      ELECTRIC_WRITE_TO_PG_MODE: "direct_writes"
+      LOGICAL_PUBLISHER_HOST: db
+      LOGICAL_PUBLISHER_PORT: 5432
+      PG_PROXY_PASSWORD: deeprecall
+      # Development mode - disable auth (NOT FOR PRODUCTION!)
+      ELECTRIC_INSECURE: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Health check disabled - Electric logs show when it's ready
+    # healthcheck:
+    #   test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/ || exit 1"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 10s
+
+  # Next.js web application
   frontend:
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
@@ -21,11 +74,23 @@ services:
       # Data directory bind mount
       - ./data:/workspace/data:consistent
     environment:
-      # Force better-sqlite3 to use the correct Node version
-      - npm_config_target_platform=linux
-      - npm_config_target_arch=x64
+      # Database connections
+      DATABASE_URL: postgresql://deeprecall:deeprecall@db:5432/deeprecall
+      ELECTRIC_URL: http://electric:3000
+
+      # Build configuration
+      npm_config_target_platform: linux
+      npm_config_target_arch: x64
+    depends_on:
+      db:
+        condition: service_healthy
+      electric:
+        condition: service_started # Just wait for it to start, not be healthy
 
 volumes:
+  # PostgreSQL data
+  postgres_data:
+
   # Named volumes are managed by Docker
   web_node_modules:
   next_cache:

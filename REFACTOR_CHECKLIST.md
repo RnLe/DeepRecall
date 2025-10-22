@@ -64,18 +64,20 @@
 
 ### Server Setup
 
-- [ ] Add Electric container to docker-compose.yml
-- [ ] Create Postgres migrations for core tables (documents, annotations, notes, assets)
-- [ ] Add `POST /api/writes/batch` endpoint in Next.js
+- [x] Add Electric container to docker-compose.yml
+- [x] Create Postgres migrations for core tables (works, assets, activities, collections, edges, presets, authors, annotations, cards, review_logs)
+- [x] Add `POST /api/writes/batch` endpoint in Next.js
+- [x] Configure Postgres with logical replication (wal_level=logical)
 - [ ] Configure Electric shapes for client replication
 
 ### Client SDK
 
-- [ ] Implement `initElectric({ url, auth })` in packages/data
-- [ ] Implement `useShape<T>(shapeSpec)` hook
-- [ ] Create write buffer with persistent queue (PGlite/SQLite)
-- [ ] Implement flush worker with backoff and checkpoints
+- [x] Implement `initElectric({ url, auth })` in packages/data
+- [x] Implement `useShape<T>(shapeSpec)` hook
+- [x] Create write buffer with persistent queue (Dexie)
+- [x] Implement flush worker with backoff and checkpoints
 - [ ] Create local view layer (`*_synced` + `*_local` overlay)
+- [ ] Wire up Works entity end-to-end (test case)
 
 ### Reconciliation
 
@@ -175,24 +177,35 @@
 - `@deeprecall/pdf` - PDF.js rendering utilities
 - `@deeprecall/ui` - Empty (future home for shared components)
 
-**Next Steps (Domain B - ElectricSQL):**
+**Domain B Progress (In Progress):**
 
-According to ReworkInstructions.md, the next phase is **Domain B — Data & Sync**:
+✅ **Infrastructure Complete:**
 
-1. Add Electric container to docker-compose.yml
-2. Create Postgres migrations for core tables
-3. Implement write buffer with optimistic local state
-4. Add ElectricSQL shapes for read-path replication
-5. Build POST /api/writes/batch endpoint
-6. Implement conflict resolution with LWW strategy
+- Postgres 16 with logical replication
+- ElectricSQL sync service (port 5133)
+- Migration runner (auto-runs on startup)
+- All 10 tables created with indices
 
-**OR**
+✅ **Client SDK Complete:**
 
-Continue with working system improvements before taking on ElectricSQL complexity:
+- `@deeprecall/data/electric` with `initElectric()` and `useShape()`
+- `@deeprecall/data/writeBuffer` with persistent queue
+- FlushWorker with exponential backoff
 
-- Verify all import/export workflows work with new data paths
-- Test scanning and library management
-- Ensure reader and annotation features work end-to-end
-- Consider UI/UX improvements now that refactor is stable
+✅ **Write API Complete:**
 
-**Last Updated:** 2025-10-22 (Domain A Phase 1 complete! Ready for Domain B when you are.)
+- `POST /api/writes/batch` with Zod validation
+- LWW conflict resolution by `updated_at`
+- Transaction support
+
+**Next Steps - Wire Up & Test:**
+
+1. Initialize Electric and FlushWorker on app startup
+2. Wire up Works entity as test case:
+   - Use `useShape()` for reading works from Postgres
+   - Use write buffer for creating/updating works
+3. Test end-to-end sync flow
+4. Build optimistic state layer (`*_synced` + `*_local`)
+5. Migrate remaining entities (assets, activities, etc.)
+
+**Last Updated:** 2025-10-22 (Domain B infrastructure complete! Now wiring up first entity.)

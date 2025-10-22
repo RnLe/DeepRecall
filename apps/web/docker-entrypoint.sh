@@ -20,6 +20,12 @@ pnpm install
 echo "[entrypoint] Approving build scripts..."
 echo "a\ny" | pnpm approve-builds || true
 
+# Run database migrations
+if [ -n "$DATABASE_URL" ]; then
+  echo "[entrypoint] Running database migrations..."
+  node /workspace/migrations/run.js || echo "[entrypoint] Warning: Migrations failed (database may not be ready yet)"
+fi
+
 # Go back to web app directory
 cd /workspace/apps/web
 
