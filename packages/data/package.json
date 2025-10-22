@@ -1,0 +1,30 @@
+{
+  "name": "@deeprecall/data",
+  "version": "0.1.0",
+  "description": "Client-side data layer for DeepRecall (Dexie repositories, stores, sync)",
+  "type": "module",
+  "exports": {
+    "./db": "./src/db/index.ts",
+    "./repos": "./src/repos/index.ts",
+    "./stores": "./src/stores/index.ts",
+    "./hooks": "./src/hooks/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deeprecall/core": "workspace:*",
+    "dexie": "^4.0.11",
+    "dexie-react-hooks": "^4.0.0",
+    "zustand": "^5.0.8",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}
