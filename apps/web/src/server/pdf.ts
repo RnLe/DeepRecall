@@ -16,10 +16,14 @@ if (typeof window === "undefined") {
     // This avoids Next.js build-time resolution issues
     const require = createRequire(import.meta.url);
     const pdfParsePath = require.resolve("pdf-parse");
-    const pdfParseDir = dirname(pdfParsePath);
-    const workerPath = join(pdfParseDir, "dist/node/pdf.worker.mjs");
+    
+    // pdf-parse resolves to .../pdf-parse/dist/pdf-parse/cjs/index.cjs
+    // We need to go up to the package root and then into dist/node/
+    const pdfParsePackageRoot = dirname(dirname(dirname(pdfParsePath)));
+    const workerPath = join(pdfParsePackageRoot, "dist/node/pdf.worker.mjs");
 
     console.log(`[PDF Worker] Resolved pdf-parse to: ${pdfParsePath}`);
+    console.log(`[PDF Worker] Package root: ${pdfParsePackageRoot}`);
     console.log(`[PDF Worker] Worker path: ${workerPath}`);
 
     // Verify it exists
