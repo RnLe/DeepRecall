@@ -12,6 +12,10 @@ services:
       # Named volumes for build artifacts (written by Docker, never synced to host)
       - node_modules:/app/node_modules
       - next_cache:/app/.next
+      - root_node_modules:/node_modules
+      - packages_core_node_modules:/packages/core/node_modules
+      - packages_data_node_modules:/packages/data/node_modules
+      - packages_ui_node_modules:/packages/ui/node_modules
 
       # Bind mount for shared data (both read/write)
       # This is outside the /app mount, so no permission conflicts
@@ -25,6 +29,10 @@ volumes:
   # Named volumes are managed by Docker
   node_modules:
   next_cache:
+  root_node_modules:
+  packages_core_node_modules:
+  packages_data_node_modules:
+  packages_ui_node_modules:
 
   # python:
   #   build:

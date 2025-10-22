@@ -142,12 +142,14 @@
 
 **Active Phase:** Phase 2 — Domain A (UI Refactor)  
 **Completed:**
+
 - ✅ Monorepo structure (apps/, packages/)
 - ✅ packages/core extracted (schemas, types, utils)
 - ✅ apps/web moved from frontend/ (with updated configs)
 - ✅ packages/data extracted (Dexie DB, repos, Zustand stores)
 
 **Next Steps:**
+
 1. Update imports in apps/web to use @deeprecall/core and @deeprecall/data
 2. Extract packages/ui (React components)
 3. Extract packages/pdf (PDF.js rendering)
