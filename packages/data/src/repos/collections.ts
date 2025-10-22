@@ -4,8 +4,8 @@
  */
 
 import { db } from "@deeprecall/data/db";
-import type { Collection, CollectionExtended } from "@deeprecall/core/schemas/library";
-import { CollectionSchema } from "@deeprecall/core/schemas/library";
+import type { Collection, CollectionExtended } from "@deeprecall/core";
+import { CollectionSchema } from "@deeprecall/core";
 
 /**
  * Create a new Collection

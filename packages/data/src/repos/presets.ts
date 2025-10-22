@@ -8,7 +8,7 @@ import {
   PresetSchema,
   type Preset,
   type PresetTarget,
-} from "@deeprecall/core/schemas/presets";
+} from "@deeprecall/core";
 import { v4 as uuidv4 } from "uuid";
 
 /**

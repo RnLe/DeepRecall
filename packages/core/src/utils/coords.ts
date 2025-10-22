@@ -1,9 +1,8 @@
 /**
- * Coordinate normalization utilities
- * All annotation coordinates are stored as normalized (0..1) values
+ * Coordinate conversion utilities for PDF annotations
  */
 
-import type { NormalizedRect } from "@/src/schema/annotations";
+import type { NormalizedRect } from "../schemas/annotation";
 
 export interface PixelRect {
   x: number;

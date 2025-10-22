@@ -4,7 +4,7 @@
  */
 
 import { db } from "@deeprecall/data/db";
-import type { Card, ReviewLog } from "@deeprecall/core/schemas/cards";
+import type { Card, ReviewLog } from "@deeprecall/core";
 
 export const cardRepo = {
   /** Get all cards for a document */

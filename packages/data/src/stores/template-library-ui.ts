@@ -5,7 +5,7 @@
  */
 
 import { create } from "zustand";
-import type { PresetTarget } from "@deeprecall/core/schemas/presets";
+import type { PresetTarget } from "@deeprecall/core";
 
 interface TemplateLibraryUIState {
   // Modal state

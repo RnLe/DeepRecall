@@ -6,7 +6,7 @@
  */
 
 import { db } from "@deeprecall/data/db";
-import type { Author } from "@deeprecall/core/schemas/library";
+import type { Author } from "@deeprecall/core";
 import { v4 as uuidv4 } from "uuid";
 
 /**

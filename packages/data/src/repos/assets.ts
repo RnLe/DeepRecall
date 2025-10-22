@@ -19,8 +19,8 @@
  */
 
 import { db } from "@deeprecall/data/db";
-import type { Asset, AssetExtended } from "@deeprecall/core/schemas/library";
-import { AssetSchema } from "@deeprecall/core/schemas/library";
+import type { Asset, AssetExtended } from "@deeprecall/core";
+import { AssetSchema } from "@deeprecall/core";
 
 /**
  * Create a new Asset

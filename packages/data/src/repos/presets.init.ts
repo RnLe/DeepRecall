@@ -6,7 +6,7 @@
 import { db } from "@deeprecall/data/db";
 import { DEFAULT_PRESETS, DEFAULT_PRESET_NAMES } from "./presets.default";
 import { listSystemPresets } from "./presets";
-import type { Preset } from "@deeprecall/core/schemas/presets";
+import type { Preset } from "@deeprecall/core";
 
 /**
  * Initialize system presets if they don't exist

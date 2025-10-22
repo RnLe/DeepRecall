@@ -9,12 +9,12 @@ import type {
   CreateAnnotationInput,
   UpdateAnnotationInput,
   AnnotationFilters,
-} from "../schema/annotation";
-import { AnnotationSchema } from "../schema/annotation";
+} from "@deeprecall/core";
+import { AnnotationSchema } from "@deeprecall/core";
 import {
   generateAnnotationId,
   extractRectanglesForId,
-} from "../utils/annotation-id";
+} from "@deeprecall/core";
 
 /**
  * Create a new annotation with deterministic ID

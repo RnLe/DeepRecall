@@ -4,8 +4,8 @@
  */
 
 import Dexie, { type EntityTable } from "dexie";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
-import type { Card, ReviewLog } from "@deeprecall/core/schemas/cards";
+import type { Annotation } from "@deeprecall/core";
+import type { Card, ReviewLog } from "@deeprecall/core";
 import type {
   Work,
   Asset,
@@ -13,8 +13,8 @@ import type {
   Collection,
   Edge,
   Author,
-} from "@deeprecall/core/schemas/library";
-import type { Preset } from "@deeprecall/core/schemas/presets";
+} from "@deeprecall/core";
+import type { Preset } from "@deeprecall/core";
 
 class DeepRecallDB extends Dexie {
   // Library entities
@@ -260,12 +260,12 @@ class DeepRecallDB extends Dexie {
 
               if (fullName.includes(",")) {
                 // "Last, First" format
-                const parts = fullName.split(",").map((s) => s.trim());
+                const parts = fullName.split(",").map((s: string) => s.trim());
                 lastName = parts[0] || "";
                 firstName = parts[1] || "";
               } else {
                 // "First Last" format (or single name)
-                const parts = fullName.split(" ").filter((s) => s);
+                const parts = fullName.split(" ").filter((s: string) => s);
                 if (parts.length === 1) {
                   lastName = parts[0];
                 } else {

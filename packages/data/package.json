@@ -17,6 +17,7 @@
     "@deeprecall/core": "workspace:*",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^4.0.0",
+    "uuid": "^11.0.5",
     "zustand": "^5.0.8",
     "zod": "^4.0.0"
   },

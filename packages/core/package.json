@@ -4,6 +4,7 @@
   "description": "Core domain models, schemas, and utilities for DeepRecall",
   "type": "module",
   "exports": {
+    ".": "./src/index.ts",
     "./schemas": "./src/schemas/index.ts",
     "./types": "./src/types/index.ts",
     "./utils": "./src/utils/index.ts"

@@ -4,8 +4,8 @@
  */
 
 import { db } from "@deeprecall/data/db";
-import type { Work, WorkExtended, Asset } from "@deeprecall/core/schemas/library";
-import { WorkSchema } from "@deeprecall/core/schemas/library";
+import type { Work, WorkExtended, Asset } from "@deeprecall/core";
+import { WorkSchema } from "@deeprecall/core";
 
 /**
  * Create a new Work

@@ -4,8 +4,8 @@
  */
 
 import { db } from "@deeprecall/data/db";
-import type { Activity, ActivityExtended } from "@deeprecall/core/schemas/library";
-import { ActivitySchema } from "@deeprecall/core/schemas/library";
+import type { Activity, ActivityExtended } from "@deeprecall/core";
+import { ActivitySchema } from "@deeprecall/core";
 
 /**
  * Create a new Activity

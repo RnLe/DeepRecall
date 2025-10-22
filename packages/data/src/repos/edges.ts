@@ -20,8 +20,8 @@
  */
 
 import { db } from "@deeprecall/data/db";
-import type { Edge, Relation } from "@deeprecall/core/schemas/library";
-import { EdgeSchema } from "@deeprecall/core/schemas/library";
+import type { Edge, Relation } from "@deeprecall/core";
+import { EdgeSchema } from "@deeprecall/core";
 
 /**
  * Create a new Edge
