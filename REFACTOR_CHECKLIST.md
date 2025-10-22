@@ -148,12 +148,14 @@
 - ✅ packages/core extracted (schemas, types, utils)
 - ✅ apps/web moved from frontend/ (with updated configs)
 - ✅ packages/data extracted (Dexie DB, repos, Zustand stores)
+- ✅ packages/ui extracted (all React components - 80+ files)
 
 **Next Steps:**
 
-1. Update imports in apps/web to use @deeprecall/core and @deeprecall/data
-2. Extract packages/ui (React components)
-3. Extract packages/pdf (PDF.js rendering)
-4. Test that apps/web still runs correctly
+1. Extract packages/pdf (PDF.js rendering logic)
+2. Update imports in all packages to use @deeprecall/* packages
+3. Handle Next.js router dependencies (abstraction or adapter)
+4. Remove duplicate files from apps/web after successful extraction
+5. Test that apps/web still runs correctly
 
-**Last Updated:** 2025-10-22 (Completed packages/data extraction)
+**Last Updated:** 2025-10-22 (Completed packages/ui extraction)
