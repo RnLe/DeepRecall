@@ -13,32 +13,25 @@ import { createRequire } from "module";
 if (typeof window === "undefined") {
   try {
     // Use createRequire to resolve pdf-parse location at runtime
-    // This avoids Next.js build-time resolution issues
     const require = createRequire(import.meta.url);
     const pdfParsePath = require.resolve("pdf-parse");
     
     // pdf-parse resolves to .../pdf-parse/dist/pdf-parse/cjs/index.cjs
-    // We need to go up to the package root and then into dist/node/
+    // Worker is at .../pdf-parse/dist/worker/pdf.worker.mjs
     const pdfParsePackageRoot = dirname(dirname(dirname(pdfParsePath)));
-    const workerPath = join(pdfParsePackageRoot, "dist/node/pdf.worker.mjs");
+    const workerPath = join(pdfParsePackageRoot, "dist/worker/pdf.worker.mjs");
 
-    console.log(`[PDF Worker] Resolved pdf-parse to: ${pdfParsePath}`);
-    console.log(`[PDF Worker] Package root: ${pdfParsePackageRoot}`);
-    console.log(`[PDF Worker] Worker path: ${workerPath}`);
+    console.log(`[PDF Worker] Using worker: ${workerPath}`);
 
     // Verify it exists
     const fs = require("fs");
     if (fs.existsSync(workerPath)) {
-      console.log(`[PDF Worker] Worker file exists, using it`);
       PDFParse.setWorker(workerPath);
     } else {
-      console.error(
-        `[PDF Worker] Worker file not found at resolved path: ${workerPath}`
-      );
       throw new Error(`PDF worker not found at ${workerPath}`);
     }
   } catch (error) {
-    console.error("[PDF Worker] Failed to resolve pdf-parse worker:", error);
+    console.error("[PDF Worker] Failed to configure worker:", error);
     throw error;
   }
 }
