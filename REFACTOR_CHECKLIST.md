@@ -150,13 +150,22 @@
 - ✅ packages/data extracted (Dexie DB, repos, Zustand stores)
 - ✅ packages/ui extracted (all React components - 80+ files)
 - ✅ packages/pdf extracted (PDF.js utils and hooks)
+- ✅ All imports updated to use @deeprecall/* packages
+- ✅ Duplicate files removed from apps/web
+
+**apps/web now contains only:**
+- `app/` - Next.js routes and pages
+- `src/components/` - App-specific components
+- `src/hooks/` - App-specific hooks  
+- `src/server/` - Server-only code (CAS, DB, metadata)
+- `src/srs/` - SRS/FSRS logic
+- `src/utils/` - App-specific utilities
 
 **Next Steps:**
 
-1. Update imports in packages to use @deeprecall/\* (remove relative paths)
-2. Update apps/web to import from packages instead of local files
-3. Remove duplicate files from apps/web after successful migration
-4. Test that apps/web builds and runs correctly
-5. packages/ink can be created later when Apple Pencil support is needed
+1. Test that apps/web builds and runs correctly
+2. Fix any import or type errors
+3. Verify Docker container still works
+4. Ready for Domain B (ElectricSQL integration) when needed
 
-**Last Updated:** 2025-10-22 (Completed packages/pdf extraction - Domain A extraction phase complete!)
+**Last Updated:** 2025-10-22 (Domain A complete - all packages extracted and wired up!)
