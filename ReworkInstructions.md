@@ -256,24 +256,6 @@ services:
 
 ---
 
-### Domain G — Security, Auth, Permissions
-
-- Use short-lived JWT from the Next API; clients attach token to Electric and write API requests.
-- Row-level security (RLS) on Postgres for `user_id` scoping where practical.
-- Sign Tauri builds; configure CSP; disable `eval` and remote module loading.
-- iOS entitlements: file access limited to app sandbox; ATS configured for HTTPS endpoints.
-
----
-
-### Domain H — Testing & QA
-
-- **Unit**: `packages/core`, `packages/data` write buffer, conflict handlers.
-- **Integration**: Electric shape hydration, flush worker against mocked API, migration tests.
-- **E2E**: Open a doc → add ink → add note → kill network → add edits → restore network → observe reconciliation across desktop and iPad.
-- **Perf**: Ink latency (<8ms input-to-draw target), PDF tile cache hit rates, initial shape hydration time.
-
----
-
 ## 2) Implementation Notes & Interfaces
 
 ### A) Client SDK surface (TypeScript)
@@ -387,7 +369,7 @@ export function flushWrites(
 - Capacitor plugins; implement on-device storage and ink; tune performance.
 - Configure ATS and TestFlight; end-to-end sync test with desktop.
 
-### Milestone 6 — QA + polish (≈ 3–5 days)
+### Milestone 6 — Polish (≈ 3–5 days)
 
 - Conflict UI, error handling, telemetry, crash reporting.
 

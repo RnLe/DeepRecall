@@ -1,0 +1,22 @@
+{
+  "name": "@deeprecall/core",
+  "version": "0.1.0",
+  "description": "Core domain models, schemas, and utilities for DeepRecall",
+  "type": "module",
+  "exports": {
+    "./schemas": "./src/schemas/index.ts",
+    "./types": "./src/types/index.ts",
+    "./utils": "./src/utils/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.0.0",
+    "nanoid": "^5.1.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
