@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import type { Annotation } from "@deeprecall/core/schemas/annotation";
 import { getRelativeTime } from "@/src/utils/date";
-import { loadPDFDocument } from "@/src/utils/pdf";
+import { loadPDFDocument } from "@deeprecall/pdf";
 import * as annotationRepo from "@deeprecall/data/repos/annotations";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";

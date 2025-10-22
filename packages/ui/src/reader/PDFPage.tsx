@@ -6,8 +6,8 @@
 "use client";
 
 import { useEffect, useRef, useRef as useRef2, useState } from "react";
-import { usePDFPage } from "@/src/hooks/usePDFPage";
-import { PDFDocumentProxy, PDFPageProxy } from "@/src/utils/pdf";
+import { usePDFPage } from "@deeprecall/pdf";
+import { PDFDocumentProxy, PDFPageProxy } from "@deeprecall/pdf";
 import { PDFTextLayer } from "./PDFTextLayer";
 
 export interface PDFPageProps {

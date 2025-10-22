@@ -8,7 +8,6 @@ export * from "./library";
 
 // Annotation schemas
 export * from "./annotation";
-export * from "./annotations";
 
 // Data schemas
 export * from "./blobs";

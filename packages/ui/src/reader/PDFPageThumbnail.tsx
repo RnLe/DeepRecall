@@ -1,14 +1,14 @@
 /**
- * PDFThumbnail - Lightweight thumbnail component
+ * PDFPageThumbnail - Lightweight thumbnail component
  * Renders a single page at low resolution for previews, sidebars, etc.
  */
 
 "use client";
 
-import { usePDF } from "@/src/hooks/usePDF";
+import { usePDF } from "@deeprecall/pdf";
 import { PDFPage } from "./PDFPage";
 
-export interface PDFThumbnailProps {
+export interface PDFPageThumbnailProps {
   source: string | Uint8Array | ArrayBuffer;
   pageNumber?: number;
   maxWidth?: number;
@@ -20,13 +20,13 @@ export interface PDFThumbnailProps {
  * Optimized thumbnail renderer for PDF previews
  * Automatically scales down for performance
  */
-export function PDFThumbnail({
+export function PDFPageThumbnail({
   source,
   pageNumber = 1,
   maxWidth = 150,
   className = "",
   onClick,
-}: PDFThumbnailProps) {
+}: PDFPageThumbnailProps) {
   const { pdf, isLoading, error } = usePDF(source);
 
   // Calculate low scale for thumbnail (assuming ~600px page width at scale 1)

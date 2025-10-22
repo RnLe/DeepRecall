@@ -21,7 +21,7 @@ export * from "./PDFPage";
 export * from "./PDFPreview";
 export * from "./PDFScrollbar";
 export * from "./PDFTextLayer";
-export * from "./PDFThumbnail";
+export * from "./PDFPageThumbnail";
 export * from "./PDFViewer";
 export * from "./ReaderLayout";
 export * from "./SimplePDFViewer";

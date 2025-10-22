@@ -7,8 +7,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { usePDF } from "@/src/hooks/usePDF";
-import { usePDFViewport } from "@/src/hooks/usePDFViewport";
+import { usePDF } from "@deeprecall/pdf";
+import { usePDFViewport } from "@deeprecall/pdf";
 import { PDFPage } from "./PDFPage";
 import {
   ChevronLeft,

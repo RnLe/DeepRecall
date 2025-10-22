@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePDF } from "@/src/hooks/usePDF";
+import { usePDF } from "@deeprecall/pdf";
 import { BookOpen } from "lucide-react";
 
 interface PDFThumbnailProps {
