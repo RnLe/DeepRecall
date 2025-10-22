@@ -7,46 +7,35 @@ import { PDFParse } from "pdf-parse";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { createRequire } from "module";
 
 // Configure worker for Node.js environment
 if (typeof window === "undefined") {
-  // Get the worker path for Node.js
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  
-  // Try multiple possible paths (development vs production, monorepo structure)
-  const possiblePaths = [
-    // From current working directory (Docker: /workspace/apps/web)
-    join(process.cwd(), "node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-    // From workspace root
-    join(process.cwd(), "../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-    join(process.cwd(), "../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-    // Production build in .next (relative to this file)
-    join(__dirname, "../../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-    // Development - from apps/web src/server
-    join(__dirname, "../../node_modules/pdf-parse/dist/node/pdf.worker.mjs"),
-  ];
-  
-  // Use the first path that exists
-  const fs = require("fs");
-  const workerPath = possiblePaths.find(p => {
-    const exists = fs.existsSync(p);
-    if (!exists) {
-      console.log(`[PDF Worker] Path not found: ${p}`);
+  try {
+    // Use createRequire to resolve pdf-parse location at runtime
+    // This avoids Next.js build-time resolution issues
+    const require = createRequire(import.meta.url);
+    const pdfParsePath = require.resolve("pdf-parse");
+    const pdfParseDir = dirname(pdfParsePath);
+    const workerPath = join(pdfParseDir, "dist/node/pdf.worker.mjs");
+
+    console.log(`[PDF Worker] Resolved pdf-parse to: ${pdfParsePath}`);
+    console.log(`[PDF Worker] Worker path: ${workerPath}`);
+
+    // Verify it exists
+    const fs = require("fs");
+    if (fs.existsSync(workerPath)) {
+      console.log(`[PDF Worker] Worker file exists, using it`);
+      PDFParse.setWorker(workerPath);
     } else {
-      console.log(`[PDF Worker] Using: ${p}`);
+      console.error(
+        `[PDF Worker] Worker file not found at resolved path: ${workerPath}`
+      );
+      throw new Error(`PDF worker not found at ${workerPath}`);
     }
-    return exists;
-  });
-  
-  if (!workerPath) {
-    console.error(`[PDF Worker] No valid worker path found. Tried:`, possiblePaths);
-    console.error(`[PDF Worker] process.cwd() = ${process.cwd()}`);
-    console.error(`[PDF Worker] __dirname = ${__dirname}`);
-    // Use first path as fallback
-    PDFParse.setWorker(possiblePaths[0]);
-  } else {
-    PDFParse.setWorker(workerPath);
+  } catch (error) {
+    console.error("[PDF Worker] Failed to resolve pdf-parse worker:", error);
+    throw error;
   }
 }
 
