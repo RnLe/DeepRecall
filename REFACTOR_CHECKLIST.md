@@ -41,10 +41,10 @@
 
 ### Extract packages/pdf
 
-- [ ] Move PDF.js rendering logic
-- [ ] Create facades for page tiling, viewport transforms
-- [ ] Create selection and layer mounting utilities
-- [ ] Create package.json and tsconfig for packages/pdf
+- [x] Move PDF.js rendering logic
+- [x] Create facades for page tiling, viewport transforms
+- [x] Move PDF-related hooks (usePDF, usePDFPage, usePDFViewport)
+- [x] Create package.json and tsconfig for packages/pdf
 
 ### Extract packages/ink
 
@@ -153,7 +153,7 @@
 **Next Steps:**
 
 1. Extract packages/pdf (PDF.js rendering logic)
-2. Update imports in all packages to use @deeprecall/* packages
+2. Update imports in all packages to use @deeprecall/\* packages
 3. Handle Next.js router dependencies (abstraction or adapter)
 4. Remove duplicate files from apps/web after successful extraction
 5. Test that apps/web still runs correctly
