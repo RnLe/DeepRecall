@@ -150,13 +150,14 @@
 - ✅ packages/data extracted (Dexie DB, repos, Zustand stores)
 - ✅ packages/ui extracted (all React components - 80+ files)
 - ✅ packages/pdf extracted (PDF.js utils and hooks)
-- ✅ All imports updated to use @deeprecall/* packages
+- ✅ All imports updated to use @deeprecall/\* packages
 - ✅ Duplicate files removed from apps/web
 
 **apps/web now contains only:**
+
 - `app/` - Next.js routes and pages
 - `src/components/` - App-specific components
-- `src/hooks/` - App-specific hooks  
+- `src/hooks/` - App-specific hooks
 - `src/server/` - Server-only code (CAS, DB, metadata)
 - `src/srs/` - SRS/FSRS logic
 - `src/utils/` - App-specific utilities
