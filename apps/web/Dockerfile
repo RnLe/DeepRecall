@@ -7,23 +7,32 @@ ENV CI=true
 # Install pnpm globally
 RUN npm install -g pnpm
 
-# Set working directory
-WORKDIR /app/
+# Set working directory to workspace root
+WORKDIR /workspace
 
-# Copy entrypoint to root (won't be overwritten by volume mount)
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+# Copy workspace config files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy package.json files from all packages
+COPY packages/core/package.json ./packages/core/
+COPY packages/data/package.json ./packages/data/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/pdf/package.json ./packages/pdf/
+
+# Copy apps/web package.json
+COPY apps/web/package.json apps/web/.npmrc ./apps/web/
+
+# Copy entrypoint
+COPY apps/web/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Copy package files
-COPY package*.json .npmrc ./
-
-# No need to install dependencies here; done in entrypoint to ensure native bindings are built
-
-# Copy application files
-COPY . .
+# Install dependencies will happen in entrypoint
 
 # Expose Next.js port
 EXPOSE 3000
+
+# Set working directory to web app
+WORKDIR /workspace/apps/web
 
 # Entrypoint ensures dependencies exist in mounted volume
 ENTRYPOINT ["/bin/sh", "/docker-entrypoint.sh"]

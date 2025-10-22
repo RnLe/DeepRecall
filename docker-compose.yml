@@ -1,26 +1,25 @@
 services:
   frontend:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/web/Dockerfile
     ports:
       - "3000:3000"
     volumes:
-      # Mount source code (read by Docker, written by host)
-      - ./apps/web:/app/:delegated
+      # Mount entire workspace (for monorepo packages)
+      - .:/workspace:delegated
 
-      # Named volumes for build artifacts (written by Docker, never synced to host)
-      - node_modules:/apps/web/node_modules
-      - next_cache:/apps/web/.next
-      - root_node_modules:/node_modules
-      - pnpm_store:/apps/web/.pnpm-store
-      - packages_core_node_modules:/packages/core/node_modules
-      - packages_data_node_modules:/packages/data/node_modules
-      - packages_ui_node_modules:/packages/ui/node_modules
+      # Named volumes for build artifacts (prevent host conflicts)
+      - web_node_modules:/workspace/apps/web/node_modules
+      - next_cache:/workspace/apps/web/.next
+      - pnpm_store:/workspace/.pnpm-store
+      - packages_core_node_modules:/workspace/packages/core/node_modules
+      - packages_data_node_modules:/workspace/packages/data/node_modules
+      - packages_ui_node_modules:/workspace/packages/ui/node_modules
+      - packages_pdf_node_modules:/workspace/packages/pdf/node_modules
 
-      # Bind mount for shared data (both read/write)
-      # This is outside the /app mount, so no permission conflicts
-      - ./data:/app/data:consistent
+      # Data directory bind mount
+      - ./data:/workspace/data:consistent
     environment:
       # Force better-sqlite3 to use the correct Node version
       - npm_config_target_platform=linux
@@ -28,13 +27,13 @@ services:
 
 volumes:
   # Named volumes are managed by Docker
-  node_modules:
+  web_node_modules:
   next_cache:
-  root_node_modules:
   pnpm_store:
   packages_core_node_modules:
   packages_data_node_modules:
   packages_ui_node_modules:
+  packages_pdf_node_modules:
 
   # python:
   #   build:
