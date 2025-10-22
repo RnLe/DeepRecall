@@ -149,13 +149,14 @@
 - ✅ apps/web moved from frontend/ (with updated configs)
 - ✅ packages/data extracted (Dexie DB, repos, Zustand stores)
 - ✅ packages/ui extracted (all React components - 80+ files)
+- ✅ packages/pdf extracted (PDF.js utils and hooks)
 
 **Next Steps:**
 
-1. Extract packages/pdf (PDF.js rendering logic)
-2. Update imports in all packages to use @deeprecall/\* packages
-3. Handle Next.js router dependencies (abstraction or adapter)
-4. Remove duplicate files from apps/web after successful extraction
-5. Test that apps/web still runs correctly
+1. Update imports in packages to use @deeprecall/* (remove relative paths)
+2. Update apps/web to import from packages instead of local files
+3. Remove duplicate files from apps/web after successful migration
+4. Test that apps/web builds and runs correctly
+5. packages/ink can be created later when Apple Pencil support is needed
 
-**Last Updated:** 2025-10-22 (Completed packages/ui extraction)
+**Last Updated:** 2025-10-22 (Completed packages/pdf extraction - Domain A extraction phase complete!)
