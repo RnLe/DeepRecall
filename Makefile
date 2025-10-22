@@ -50,12 +50,19 @@ reset-db:
 
 # Clean all generated files and caches
 clean:
-	@echo "Cleaning frontend..."
-	sudo rm -rf frontend/node_modules
-	sudo rm -rf frontend/.next
-	sudo rm -rf frontend/.pnpm-store
-	sudo rm -f frontend/pnpm-lock.yaml
+	@echo "Cleaning apps/web..."
+	sudo rm -rf apps/web/node_modules
+	sudo rm -rf apps/web/.next
+	sudo rm -rf apps/web/.pnpm-store
+	sudo rm -f apps/web/pnpm-lock.yaml
+	@echo "Cleaning packages..."
+	sudo rm -rf packages/*/node_modules
+	sudo rm -rf packages/*/.pnpm-store
+	@echo "Cleaning root..."
+	sudo rm -rf node_modules
+	sudo rm -rf .pnpm-store
+	sudo rm -f pnpm-lock.yaml
 	@echo "Cleaning python..."
 	sudo rm -rf python/__pycache__
 	sudo rm -rf python/**/__pycache__
-	@echo "Clean complete!"
+	@echo "✅ Clean complete!"
