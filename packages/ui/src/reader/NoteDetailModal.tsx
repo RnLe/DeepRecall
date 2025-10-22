@@ -12,7 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { updateAssetMetadata } from "@deeprecall/data/repos/assets";
+import { updateAssetMetadata } from "@deeprecall/data/repos";
 
 interface NoteDetailModalProps {
   asset: Asset;

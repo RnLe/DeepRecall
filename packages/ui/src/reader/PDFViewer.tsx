@@ -17,12 +17,12 @@ import { AnnotationHandlers } from "./AnnotationHandlers";
 import { PDFScrollbar } from "./PDFScrollbar";
 import { CreateNoteDialog } from "./CreateNoteDialog";
 import type { Annotation } from "@deeprecall/core";
-import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import * as annotationRepo from "@deeprecall/data/repos";
 import {
   useAnnotationUI,
   hasActiveSelection,
-} from "@deeprecall/data/stores/annotation-ui";
-import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+} from "@deeprecall/data/stores";
+import { useReaderUI } from "@deeprecall/data/stores";
 import {
   ChevronLeft,
   ChevronRight,

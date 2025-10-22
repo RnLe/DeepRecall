@@ -7,9 +7,9 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@deeprecall/data/db";
-import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores";
 import { FileText, File, Loader2, FileQuestion, Bookmark } from "lucide-react";
-import { countPDFAnnotations } from "@deeprecall/data/repos/annotations";
+import { countPDFAnnotations } from "@deeprecall/data/repos";
 
 export function FileList() {
   const { openTab, hasTab, activeTabId, getActiveTab } = useReaderUI();

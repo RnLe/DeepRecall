@@ -13,3 +13,7 @@ export * as edges from "./edges";
 export * as library from "./library";
 export * as presets from "./presets";
 export * as works from "./works";
+
+// Export preset utilities
+export * from "./presets.init";
+export * from "./presets.default";

@@ -11,7 +11,7 @@ import type { Annotation } from "@deeprecall/core";
 import type { Asset } from "@deeprecall/core";
 import { NoteBranch } from "./NoteBranch";
 import { CreateGroupDialog } from "./CreateGroupDialog";
-import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import * as annotationRepo from "@deeprecall/data/repos";
 
 interface NoteTreeViewProps {
   annotation: Annotation;

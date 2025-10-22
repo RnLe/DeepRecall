@@ -14,7 +14,7 @@ import { useDeleteWork } from "@/src/hooks/useLibrary";
 import { usePresets } from "@/src/hooks/usePresets";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores";
 import { LinkBlobDialog } from "./LinkBlobDialog";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";

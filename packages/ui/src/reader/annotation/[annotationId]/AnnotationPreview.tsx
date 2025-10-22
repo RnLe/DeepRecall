@@ -26,7 +26,7 @@ import {
 import type { Annotation } from "@deeprecall/core";
 import { getRelativeTime } from "@/src/utils/date";
 import { loadPDFDocument } from "@deeprecall/pdf";
-import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import * as annotationRepo from "@deeprecall/data/repos";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";

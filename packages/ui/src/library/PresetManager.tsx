@@ -17,7 +17,7 @@ import {
   useResetSinglePreset,
 } from "@/src/hooks/usePresets";
 import { getPresetColor } from "@/src/utils/presets";
-import { DEFAULT_PRESET_NAMES } from "@deeprecall/data/repos/presets.default";
+import { DEFAULT_PRESET_NAMES } from "@deeprecall/data/repos";
 
 export function PresetManager() {
   const presets = usePresets();

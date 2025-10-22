@@ -16,9 +16,9 @@ import {
   useInitializePresets,
   useMissingDefaultPresets,
   useResetSinglePreset,
-} from "@/src/hooks/usePresets";
-import { getPresetColor } from "@/src/utils/presets";
-import { DEFAULT_PRESET_NAMES } from "@deeprecall/data/repos/presets.default";
+} from "@deeprecall/data/hooks";
+import { getPresetColor } from "@deeprecall/core";
+import { DEFAULT_PRESET_NAMES } from "@deeprecall/data/repos";
 import {
   X,
   Plus,
@@ -32,7 +32,7 @@ import {
   Box,
   FileText,
 } from "lucide-react";
-import { useTemplateLibraryUI } from "@deeprecall/data/stores/template-library-ui";
+import { useTemplateLibraryUI } from "@deeprecall/data/stores";
 import { MessageModal } from "./MessageModal";
 import { InputModal } from "./InputModal";
 import { TemplateEditorModal } from "./TemplateEditorModal";
@@ -152,7 +152,11 @@ export function TemplateLibrary() {
     setMessageModal({
       isOpen: true,
       title: "Initialize Default Templates",
-      message: `Initialize ${missing.length} missing default template(s):\n\n${missing.join("\n")}\n\nThis will NOT affect existing templates.`,
+      message: `Initialize ${
+        missing.length
+      } missing default template(s):\n\n${missing.join(
+        "\n"
+      )}\n\nThis will NOT affect existing templates.`,
       confirmText: "Initialize",
       variant: "info",
       onConfirm: async () => {
@@ -734,8 +738,8 @@ function TemplateCard({
         isSelected
           ? "border-blue-500 border-[3px] shadow-lg shadow-blue-500/20"
           : isSelectable
-            ? "border-neutral-600"
-            : "border-neutral-700"
+          ? "border-neutral-600"
+          : "border-neutral-700"
       }`}
     >
       {/* Top-right action icons (hidden in select mode) */}
@@ -828,7 +832,7 @@ function TemplateCard({
       {/* Header */}
       <div className="flex items-start gap-3">
         <div
-          className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
+          className="w-3 h-3 rounded-full mt-1 shrink-0"
           style={{ backgroundColor: getPresetColor(preset.color) }}
         />
         <div className="flex-1 min-w-0">

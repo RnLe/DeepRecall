@@ -47,7 +47,7 @@ import { usePresets } from "@/src/hooks/usePresets";
 import { getAuthorFullName, type Author } from "@deeprecall/core";
 import { useRouter } from "next/navigation";
 import { SimplePDFViewer } from "../reader/SimplePDFViewer";
-import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores";
 import { parseAuthorList } from "@/src/utils/nameParser";
 import { ImageCropper } from "@/src/components/ImageCropper";
 import { useUploadAvatar, useDeleteAvatar } from "@/src/hooks/useAvatars";

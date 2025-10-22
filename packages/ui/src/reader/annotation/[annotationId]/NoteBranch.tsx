@@ -22,8 +22,8 @@ import type { Annotation } from "@deeprecall/core";
 import type { Asset } from "@deeprecall/core";
 import { NoteDetailModal } from "@/app/reader/NoteDetailModal";
 import { getRelativeTime } from "@/src/utils/date";
-import * as assetRepo from "@deeprecall/data/repos/assets";
-import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import * as assetRepo from "@deeprecall/data/repos";
+import * as annotationRepo from "@deeprecall/data/repos";
 import { db } from "@deeprecall/data/db";
 import { SimplePDFViewer } from "../../SimplePDFViewer";
 

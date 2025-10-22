@@ -6,7 +6,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores";
 import { FileList } from "./FileList";
 import { AnnotationList } from "./AnnotationList";
 import { AnnotationEditor } from "./AnnotationEditor";

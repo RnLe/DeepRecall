@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
+import { useReaderUI } from "@deeprecall/data/stores";
 import { X, FileText } from "lucide-react";
 
 export function TabBar() {

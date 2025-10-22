@@ -25,7 +25,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import type { Annotation } from "@deeprecall/core";
-import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import * as annotationRepo from "@deeprecall/data/repos";
 
 const ANNOTATION_COLORS = [
   { name: "Amber", value: "#fbbf24" },

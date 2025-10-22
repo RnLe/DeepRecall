@@ -71,10 +71,10 @@ export function BibtexExportModal({
       {/* Dialog */}
       <div className="bg-neutral-900 rounded-xl shadow-2xl w-[90vw] max-w-3xl max-h-[85vh] flex flex-col border border-neutral-800">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
+        <div className="shrink-0 px-6 py-4 border-b border-neutral-800 bg-neutral-900/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
                 <FileCode className="w-5 h-5 text-emerald-400" />
               </div>
               <div>
@@ -143,7 +143,7 @@ export function BibtexExportModal({
         </div>
 
         {/* Fixed Footer */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-neutral-800 bg-neutral-900/50">
+        <div className="shrink-0 px-6 py-4 border-t border-neutral-800 bg-neutral-900/50">
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}

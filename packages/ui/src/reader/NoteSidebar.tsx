@@ -6,10 +6,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
+import { useAnnotationUI } from "@deeprecall/data/stores";
 import type { Annotation } from "@deeprecall/core";
 import type { Asset } from "@deeprecall/core";
-import { getAnnotationAssets } from "@deeprecall/data/repos/annotations";
+import { getAnnotationAssets } from "@deeprecall/data/repos";
 import {
   StickyNote,
   X,

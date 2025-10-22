@@ -7,7 +7,7 @@
 
 import { useRef, useCallback } from "react";
 import type { NormalizedRect } from "@deeprecall/core";
-import { useAnnotationUI } from "@deeprecall/data/stores/annotation-ui";
+import { useAnnotationUI } from "@deeprecall/data/stores";
 
 interface AnnotationHandlersProps {
   /** Current page number */
