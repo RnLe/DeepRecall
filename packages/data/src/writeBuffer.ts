@@ -124,6 +124,18 @@ export interface WriteBuffer {
 
   /** Remove a specific change */
   remove(id: string): Promise<void>;
+
+  /** Get detailed stats about the buffer */
+  getStats(): Promise<{
+    total: number;
+    byStatus: Record<WriteStatus, number>;
+    byTable: Record<string, number>;
+    maxRetries: number;
+    stuckChanges: WriteChange[];
+  }>;
+
+  /** Clear all failed/stuck changes */
+  clearFailed(): Promise<number>;
 }
 
 /**
@@ -156,7 +168,10 @@ export function createWriteBuffer(): WriteBuffer {
         .equals("error") // Retry failed changes
         .sortBy("created_at");
 
-      return pending.slice(0, limit);
+      // Filter out changes that exceeded max retries (shouldn't be in peek)
+      const retryable = pending.filter((c) => c.retry_count < 5);
+
+      return retryable.slice(0, limit);
     },
 
     async markApplied(ids, serverResponses) {
@@ -212,6 +227,49 @@ export function createWriteBuffer(): WriteBuffer {
       await writeBufferDB.changes.delete(id);
       console.log(`[WriteBuffer] Removed change ${id}`);
     },
+
+    /**
+     * Get detailed stats about the buffer
+     */
+    async getStats() {
+      const all = await writeBufferDB.changes.toArray();
+      const byStatus = {
+        pending: all.filter((c) => c.status === "pending").length,
+        syncing: all.filter((c) => c.status === "syncing").length,
+        applied: all.filter((c) => c.status === "applied").length,
+        error: all.filter((c) => c.status === "error").length,
+      };
+      const byTable = all.reduce((acc, c) => {
+        acc[c.table] = (acc[c.table] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const maxRetries = Math.max(...all.map((c) => c.retry_count), 0);
+
+      return {
+        total: all.length,
+        byStatus,
+        byTable,
+        maxRetries,
+        stuckChanges: all.filter((c) => c.retry_count >= 5),
+      };
+    },
+
+    /**
+     * Clear all failed/stuck changes
+     */
+    async clearFailed() {
+      const failed = await writeBufferDB.changes
+        .where("status")
+        .equals("error")
+        .toArray();
+
+      for (const change of failed) {
+        await writeBufferDB.changes.delete(change.id);
+      }
+
+      console.log(`[WriteBuffer] Cleared ${failed.length} failed changes`);
+      return failed.length;
+    },
   };
 }
 
@@ -246,7 +304,7 @@ export class FlushWorker {
   private config: Required<FlushWorkerConfig>;
   private buffer: WriteBuffer;
   private isRunning = false;
-  private intervalId?: NodeJS.Timeout;
+  private intervalId?: ReturnType<typeof setInterval>;
 
   constructor(config: FlushWorkerConfig) {
     this.config = {
@@ -306,6 +364,17 @@ export class FlushWorker {
     const pending = await this.buffer.peek(this.config.batchSize);
 
     if (pending.length === 0) {
+      // Check if there are stuck changes and clean them up
+      const stats = await this.buffer.getStats();
+      if (stats.stuckChanges.length > 0) {
+        console.warn(
+          `[FlushWorker] Found ${stats.stuckChanges.length} stuck changes (exceeded max retries), clearing them...`
+        );
+        await this.buffer.clearFailed();
+        console.log(
+          "[FlushWorker] Stuck changes cleared, will retry fresh changes on next flush"
+        );
+      }
       return;
     }
 
@@ -318,14 +387,29 @@ export class FlushWorker {
 
     if (retryable.length === 0) {
       console.warn(
-        `[FlushWorker] ${pending.length} changes exceeded max retries`
+        `[FlushWorker] ${pending.length} changes exceeded max retries, clearing them...`
       );
+      // Clear them instead of leaving them stuck
+      for (const change of pending) {
+        await this.buffer.remove(change.id);
+        console.error(`[FlushWorker] Removed stuck change ${change.id}:`, {
+          table: change.table,
+          op: change.op,
+          retries: change.retry_count,
+          error: change.error,
+        });
+      }
       return;
     }
 
     try {
       // Send batch to server
-      const response = await fetch(`${this.config.apiBase}/api/writes/batch`, {
+      const url = `${this.config.apiBase}/api/writes/batch`;
+      console.log(
+        `[FlushWorker] POSTing to ${url} with ${retryable.length} changes`
+      );
+
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -339,22 +423,49 @@ export class FlushWorker {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `[FlushWorker] Server error (${response.status}):`,
+          errorText
+        );
         throw new Error(
           `Server returned ${response.status}: ${response.statusText}`
         );
       }
 
       const result = await response.json();
+      console.log("[FlushWorker] Server response:", result);
+
+      // Check if there were errors
+      if (result.errors && result.errors.length > 0) {
+        console.error("[FlushWorker] Server reported errors:", result.errors);
+
+        // Mark failed changes as failed
+        const failedIds = result.errors.map((e: any) => e.id);
+        const errorMessages = result.errors.map((e: any) => e.error);
+        await this.buffer.markFailed(failedIds, errorMessages);
+
+        console.warn(
+          `[FlushWorker] Marked ${failedIds.length} changes as failed`
+        );
+      }
 
       // Mark successful changes as applied
-      const successIds = result.applied || retryable.map((c: any) => c.id);
-      await this.buffer.markApplied(successIds, result.responses);
-
-      console.log(
-        `[FlushWorker] Successfully applied ${successIds.length} changes`
-      );
+      const successIds = result.applied || [];
+      if (successIds.length > 0) {
+        await this.buffer.markApplied(successIds, result.responses);
+        console.log(
+          `[FlushWorker] Successfully applied ${successIds.length} changes`
+        );
+      } else {
+        console.warn("[FlushWorker] No changes were successfully applied");
+      }
     } catch (error) {
       console.error("[FlushWorker] Flush failed:", error);
+      console.error("[FlushWorker] Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
 
       // Mark all as failed (will be retried with exponential backoff)
       const ids = retryable.map((c) => c.id);

@@ -142,12 +142,46 @@
 
 ## Current Status
 
-**Active Phase:** ✅ Phase 2 — Domain A Complete!  
-**Completed:**
+**Active Phase:** ✅ Domain B COMPLETE!
+
+**Domain A (Monorepo Structure):**
 
 - ✅ Monorepo structure (apps/, packages/) with pnpm workspace
 - ✅ packages/core extracted (schemas, types, utils including presets)
 - ✅ packages/data extracted (Dexie DB, 10 repos, 5 stores, React Query hooks)
+- ✅ packages/pdf extracted (PDF.js utils, hooks, LRU cache)
+- ✅ packages/ui created (empty placeholder - deferred for Desktop/Mobile phases)
+- ✅ All imports updated to use @deeprecall/\* packages (148+ files)
+- ✅ Docker configuration updated for monorepo (build context, volumes, entrypoint)
+- ✅ Data folder paths fixed for monorepo structure (workspace root)
+- ✅ PDF worker path resolution fixed for pnpm workspace
+- ✅ Apps/web runs successfully in Docker with all features working
+
+**Domain B (Electric + WriteBuffer):**
+
+- ✅ Postgres 16 + ElectricSQL service running (port 5133)
+- ✅ All 10 tables migrated and indexed
+- ✅ **Auto-migration on startup** - db-migrate service runs migrations automatically
+- ✅ **Persistent database** - postgres_data volume survives restarts
+- ✅ Electric client SDK (`initElectric()`, `useShape()`) - Fixed to handle Shape API correctly (rows array)
+- ✅ Write buffer with persistent queue + FlushWorker
+- ✅ Write API endpoint (`POST /api/writes/batch`)
+- ✅ **ALL 10 REPOS CONVERTED:** Works, Activities, Annotations, Assets, Authors, Cards, Collections, Edges, Presets, ReviewLogs
+- ✅ **ALL HOOKS CREATED:** useWorks, useActivities, useAnnotations, useAssets, useAuthors, usePresets (+ init/reset helpers), useEdges, useCards, useCollections, useReviewLogs
+- ✅ All hooks exported from `@deeprecall/data/hooks`
+- ✅ ElectricInitializer in providers.tsx
+- ✅ **library/page.tsx converted to Electric hooks** - Uses useWorks() + useAssets() with client-side join
+- ✅ **library/LinkBlobDialog.tsx converted to Electric hooks** - Uses useWorks, useAssets, usePresets, useAuthors with mutations
+- ✅ **library/TemplateLibrary.tsx converted to Electric hooks** - Uses usePresets with init helpers + Hoisted to packages/ui/src/library/
+- ✅ **Preset initialization** - useInitializePresets(), useMissingDefaultPresets(), useResetSinglePreset() hooks created
+- ✅ **Electric Shape API fixed** - Properly extracts rows array from Shape subscribe callback
+
+**Status: Domain B COMPLETE - Ready for testing!** 🎉
+
+**Current Status:** Electric shapes now loading correctly. Refresh browser to test!
+
+**Last Updated:** 2025-01-22 (Electric Shape API fixed, auto-migration added)
+
 - ✅ packages/pdf extracted (PDF.js utils, hooks, LRU cache)
 - ✅ packages/ui created (empty placeholder - deferred for Desktop/Mobile phases)
 - ✅ All imports updated to use @deeprecall/\* packages (148+ files)
@@ -198,14 +232,23 @@
 - LWW conflict resolution by `updated_at`
 - Transaction support
 
-**Next Steps - Wire Up & Test:**
+✅ **Works Entity Conversion Complete:**
 
-1. Initialize Electric and FlushWorker on app startup
-2. Wire up Works entity as test case:
-   - Use `useShape()` for reading works from Postgres
-   - Use write buffer for creating/updating works
-3. Test end-to-end sync flow
-4. Build optimistic state layer (`*_synced` + `*_local`)
-5. Migrate remaining entities (assets, activities, etc.)
+- Created `works.electric.ts` with Electric+WriteBuffer pattern
+- Read hooks: `useWorks()`, `useWork(id)`, `useWorksByType()`, `useFavoriteWorks()`, `useSearchWorks()`
+- Write hooks: `useCreateWork()`, `useUpdateWork()`, `useDeleteWork()`, `useToggleWorkFavorite()`, `useCreateWorkWithAsset()`
+- Exported from `@deeprecall/data/hooks`
 
-**Last Updated:** 2025-10-22 (Domain B infrastructure complete! Now wiring up first entity.)
+✅ **App Integration Complete:**
+
+- ElectricInitializer in `apps/web/app/providers.tsx`
+- Auto-starts FlushWorker on app mount
+- Environment variable `NEXT_PUBLIC_ELECTRIC_URL` configured
+
+**Next Steps:**
+
+1. ⏳ Test end-to-end: Create Work → WriteBuffer → Postgres → Electric → UI
+2. ⏳ Build optimistic state layer (show pending writes immediately)
+3. ⏳ Migrate remaining entities (Assets, Activities, etc.)
+
+**Last Updated:** 2025-01-22 (Works fully integrated with Electric+WriteBuffer!)

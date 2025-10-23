@@ -14,6 +14,54 @@ interface ElectricConfig {
   token?: string; // Optional auth token
 }
 
+/**
+ * JSONB columns per table that need parsing
+ * Maps table names to their JSONB column names (snake_case)
+ */
+const JSONB_COLUMNS_BY_TABLE: Record<string, string[]> = {
+  presets: ["core_field_config", "custom_fields"],
+  works: ["authors", "metadata"],
+  annotations: ["geometry", "style"],
+  authors: ["avatar_crop_region"],
+  // Add more tables as needed
+};
+
+/**
+ * Convert snake_case to camelCase
+ */
+function toCamelCase(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+/**
+ * Convert row keys from snake_case to camelCase and parse JSONB columns
+ */
+function parseJsonbColumns<T>(table: string, row: any): T {
+  const jsonbColumns = JSONB_COLUMNS_BY_TABLE[table];
+  const result: any = {};
+
+  for (const [key, value] of Object.entries(row)) {
+    const camelKey = toCamelCase(key);
+
+    // Parse JSONB columns
+    if (jsonbColumns?.includes(key) && value && typeof value === "string") {
+      try {
+        result[camelKey] = JSON.parse(value);
+      } catch (error) {
+        console.warn(
+          `[Electric] Failed to parse JSONB column ${key} in ${table}:`,
+          error
+        );
+        result[camelKey] = value;
+      }
+    } else {
+      result[camelKey] = value;
+    }
+  }
+
+  return result as T;
+}
+
 let electricConfig: ElectricConfig | null = null;
 
 /**
@@ -47,9 +95,6 @@ export interface ShapeSpec<T = any> {
 
   /** Optional columns to select (default: all) */
   columns?: string[];
-
-  /** Optional parser for type conversion */
-  parser?: Record<string, (value: string) => unknown>;
 }
 
 /**
@@ -118,7 +163,6 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     // Create shape stream
     const stream = new ShapeStream({
       url: shapeUrl,
-      parser: spec.parser,
       headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
     });
 
@@ -130,10 +174,19 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
 
     // Subscribe to shape changes
     const unsubscribe = shape.subscribe((shapeData) => {
+      // Shape.subscribe returns { value: Map, rows: Array }
+      // Use rows array directly
+      const rows = shapeData.rows || [];
       console.log(
-        `[Electric] Shape updated: ${spec.table} (${shapeData.length} rows)`
+        `[Electric] Shape updated: ${spec.table} (${rows.length} rows)`
       );
-      setData(shapeData as T[]);
+
+      // Parse JSONB columns
+      const parsedRows = rows.map((row) =>
+        parseJsonbColumns<T>(spec.table, row)
+      );
+
+      setData(parsedRows);
       setIsLoading(false);
       setSyncStatus("synced");
     });
@@ -205,7 +258,6 @@ export async function queryShape<T = any>(spec: ShapeSpec<T>): Promise<T[]> {
   // Create temporary stream and shape
   const stream = new ShapeStream({
     url: shapeUrl,
-    parser: spec.parser,
     headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
   });
 
@@ -214,7 +266,14 @@ export async function queryShape<T = any>(spec: ShapeSpec<T>): Promise<T[]> {
   // Wait for first data update
   return new Promise((resolve, reject) => {
     const unsubscribe = shape.subscribe((shapeData) => {
-      resolve(shapeData as T[]);
+      const rows = shapeData.rows || [];
+
+      // Parse JSONB columns
+      const parsedRows = rows.map((row) =>
+        parseJsonbColumns<T>(spec.table, row)
+      );
+
+      resolve(parsedRows);
       unsubscribe();
     });
 

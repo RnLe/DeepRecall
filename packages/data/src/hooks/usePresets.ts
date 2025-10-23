@@ -1,61 +1,56 @@
 /**
- * React Query hooks for Presets
- * Live queries with mutations for preset management
+ * React hooks for Presets using Electric + WriteBuffer
+ * Platform-agnostic data access with real-time sync
  */
 
-import { useLiveQuery } from "dexie-react-hooks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as presetRepo from "@deeprecall/data/repos/presets";
-import {
-  initializePresets,
-  resetSystemPresets,
-  resetDefaultPresetsByName,
-  getMissingDefaultPresets,
-  resetSinglePresetByName,
-  getDefaultPresetsStatus,
-} from "@deeprecall/data/repos/presets.init";
-import type { Preset, PresetTarget } from "@deeprecall/core/schemas/presets";
+import type { Preset, PresetTarget } from "@deeprecall/core";
+import * as presetsElectric from "../repos/presets.electric";
+import { DEFAULT_PRESET_NAMES } from "../repos/presets.default";
 
 // ============================================================================
-// Query Hooks (Live)
+// Query Hooks (Electric-based, live-synced)
 // ============================================================================
 
 /**
- * Hook to get all presets (live query)
+ * Hook to get all presets (live-synced from Postgres via Electric)
  */
 export function usePresets() {
-  return useLiveQuery(() => presetRepo.listPresets(), []);
+  return presetsElectric.usePresets();
 }
 
 /**
- * Hook to get presets for a specific target entity (live query)
- */
-export function usePresetsForTarget(targetEntity: PresetTarget) {
-  return useLiveQuery(
-    () => presetRepo.listPresetsForTarget(targetEntity),
-    [targetEntity]
-  );
-}
-
-/**
- * Hook to get a single preset (live query)
+ * Hook to get a single preset by ID (live-synced)
  */
 export function usePreset(id: string | undefined) {
-  return useLiveQuery(() => (id ? presetRepo.getPreset(id) : undefined), [id]);
+  const result = presetsElectric.usePreset(id);
+
+  // Transform to return single preset or undefined (not array)
+  return {
+    ...result,
+    data: result.data?.[0],
+  };
 }
 
 /**
- * Hook to get system presets only (live query)
+ * Hook to get presets for a specific target entity (live-synced)
+ */
+export function usePresetsForTarget(targetEntity: PresetTarget) {
+  return presetsElectric.usePresetsForTarget(targetEntity);
+}
+
+/**
+ * Hook to get system presets only (live-synced)
  */
 export function useSystemPresets() {
-  return useLiveQuery(() => presetRepo.listSystemPresets(), []);
+  return presetsElectric.useSystemPresets();
 }
 
 /**
- * Hook to get user presets only (live query)
+ * Hook to get user presets only (live-synced)
  */
 export function useUserPresets() {
-  return useLiveQuery(() => presetRepo.listUserPresets(), []);
+  return presetsElectric.useUserPresets();
 }
 
 // ============================================================================
@@ -72,17 +67,17 @@ export function useCreatePreset() {
     mutationFn: async (
       data: Omit<Preset, "id" | "kind" | "createdAt" | "updatedAt">
     ) => {
-      return presetRepo.createPreset(data);
+      return presetsElectric.createPreset(data);
     },
     onSuccess: () => {
-      // Invalidate relevant queries (live queries will auto-update)
+      // Electric shapes will auto-update, but invalidate for consistency
       queryClient.invalidateQueries({ queryKey: ["presets"] });
     },
   });
 }
 
 /**
- * Hook to update a preset
+ * Hook to update an existing preset
  */
 export function useUpdatePreset() {
   const queryClient = useQueryClient();
@@ -95,7 +90,7 @@ export function useUpdatePreset() {
       id: string;
       updates: Partial<Omit<Preset, "id" | "kind" | "createdAt">>;
     }) => {
-      return presetRepo.updatePreset(id, updates);
+      return presetsElectric.updatePreset(id, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["presets"] });
@@ -111,47 +106,27 @@ export function useDeletePreset() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return presetRepo.deletePreset(id);
+      return presetsElectric.deletePreset(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["presets"] });
     },
   });
 }
-
-/**
- * Hook to search presets
- */
-export function useSearchPresets(query: string) {
-  return useLiveQuery(() => presetRepo.searchPresets(query), [query]);
-}
-
-// ============================================================================
-// Initialization Hook
-// ============================================================================
 
 /**
  * Hook to initialize default system presets
- * Call this once on app startup
+ * Checks for missing defaults and creates them
  */
 export function useInitializePresets() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async () => {
+      // Import the initialization function
+      const { initializePresets } = await import("../repos/presets.init");
       return initializePresets();
     },
-  });
-}
-
-/**
- * Hook to reset all system presets to defaults
- */
-export function useResetSystemPresets() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      return resetSystemPresets();
-    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["presets"] });
     },
@@ -159,49 +134,38 @@ export function useResetSystemPresets() {
 }
 
 /**
- * Hook to reset specific default presets by name
- */
-export function useResetDefaultPresets() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (names?: readonly string[]) => {
-      return resetDefaultPresetsByName(names);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["presets"] });
-    },
-  });
-}
-
-/**
- * Hook to check which default presets are missing
+ * Hook to get list of missing default presets
+ * Returns array of preset names that should exist but don't
  */
 export function useMissingDefaultPresets() {
-  return useLiveQuery(() => getMissingDefaultPresets(), []);
+  const { data: allPresets = [] } = usePresets();
+
+  const existingNames = new Set(
+    allPresets.filter((p) => p.isSystem).map((p) => p.name)
+  );
+
+  const missing = DEFAULT_PRESET_NAMES.filter(
+    (name: string) => !existingNames.has(name)
+  );
+
+  return missing;
 }
 
 /**
- * Hook to reset a single preset by name
+ * Hook to reset a single preset to its default configuration
  */
 export function useResetSinglePreset() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (name: string) => {
+      const { resetSinglePresetByName } = await import("../repos/presets.init");
       return resetSinglePresetByName(name);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["presets"] });
     },
   });
-}
-
-/**
- * Hook to get status of all default presets
- */
-export function useDefaultPresetsStatus() {
-  return useLiveQuery(() => getDefaultPresetsStatus(), []);
 }
 
 // ============================================================================
@@ -212,12 +176,7 @@ export function useDefaultPresetsStatus() {
  * Hook to get work presets grouped by system/user
  */
 export function useWorkPresets() {
-  const presets = useLiveQuery(
-    () => presetRepo.listPresetsForTarget("work"),
-    []
-  );
-
-  if (!presets) return { system: [], user: [] };
+  const { data: presets = [] } = usePresetsForTarget("work");
 
   return {
     system: presets.filter((p) => p.isSystem),
@@ -229,12 +188,7 @@ export function useWorkPresets() {
  * Hook to get version presets grouped by system/user
  */
 export function useVersionPresets() {
-  const presets = useLiveQuery(
-    () => presetRepo.listPresetsForTarget("version"),
-    []
-  );
-
-  if (!presets) return { system: [], user: [] };
+  const { data: presets = [] } = usePresetsForTarget("version");
 
   return {
     system: presets.filter((p) => p.isSystem),
@@ -246,23 +200,10 @@ export function useVersionPresets() {
  * Hook to get asset presets grouped by system/user
  */
 export function useAssetPresets() {
-  const presets = useLiveQuery(
-    () => presetRepo.listPresetsForTarget("asset"),
-    []
-  );
-
-  if (!presets) return { system: [], user: [] };
+  const { data: presets = [] } = usePresetsForTarget("asset");
 
   return {
     system: presets.filter((p) => p.isSystem),
     user: presets.filter((p) => !p.isSystem),
   };
-}
-
-/**
- * Hook to check if a preset is a system preset
- */
-export function useIsSystemPreset(id: string | undefined) {
-  const preset = usePreset(id);
-  return preset?.isSystem ?? false;
 }

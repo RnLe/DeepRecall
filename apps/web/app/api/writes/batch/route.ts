@@ -93,12 +93,38 @@ function toSnakeCase(str: string): string {
 }
 
 /**
- * Convert object keys to snake_case
+ * JSONB columns that need JSON stringification
+ * These columns store complex objects/arrays as JSONB in Postgres
+ */
+const JSONB_COLUMNS = new Set([
+  "core_field_config",
+  "custom_fields",
+  "metadata",
+  "authors", // legacy field
+  "geometry",
+  "style",
+  "avatar_crop_region",
+]);
+
+/**
+ * Convert object keys to snake_case and prepare values for Postgres
  */
 function keysToSnakeCase(obj: Record<string, any>): Record<string, any> {
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
-    result[toSnakeCase(key)] = value;
+    const snakeKey = toSnakeCase(key);
+
+    // Handle JSONB columns - serialize objects/arrays to JSON strings
+    if (JSONB_COLUMNS.has(snakeKey) && value !== null && value !== undefined) {
+      if (typeof value === "object") {
+        result[snakeKey] = JSON.stringify(value);
+      } else {
+        result[snakeKey] = value;
+      }
+    } else {
+      // Pass through as-is (handles primitives, TEXT[], etc.)
+      result[snakeKey] = value;
+    }
   }
   return result;
 }
@@ -109,7 +135,7 @@ function keysToSnakeCase(obj: Record<string, any>): Record<string, any> {
 async function applyInsert(pool: Pool, change: WriteChange): Promise<any> {
   const schema = getSchemaForTable(change.table);
   const validated = schema.parse(change.payload);
-  const data = keysToSnakeCase(validated);
+  const data = keysToSnakeCase(validated as Record<string, any>);
 
   // Build INSERT query
   const columns = Object.keys(data);
@@ -134,7 +160,7 @@ async function applyInsert(pool: Pool, change: WriteChange): Promise<any> {
 async function applyUpdate(pool: Pool, change: WriteChange): Promise<any> {
   const schema = getSchemaForTable(change.table);
   const validated = schema.parse(change.payload);
-  const data = keysToSnakeCase(validated);
+  const data = keysToSnakeCase(validated as Record<string, any>);
 
   // Check if record exists and compare timestamps
   const existing = await pool.query(

@@ -4,10 +4,13 @@
   "description": "Client-side data layer for DeepRecall (Dexie repositories, stores, sync)",
   "type": "module",
   "exports": {
+    ".": "./src/index.ts",
     "./db": "./src/db/index.ts",
     "./repos": "./src/repos/index.ts",
+    "./repos/worksElectric": "./src/repos/works.electric.ts",
     "./stores": "./src/stores/index.ts",
     "./hooks": "./src/hooks/index.ts",
+    "./hooks/useWorks": "./src/hooks/useWorks.ts",
     "./electric": "./src/electric.ts",
     "./writeBuffer": "./src/writeBuffer.ts"
   },
@@ -29,6 +32,7 @@
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0",
     "react": "^19.0.0"
   }
 }

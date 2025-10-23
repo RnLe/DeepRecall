@@ -269,16 +269,21 @@ CREATE TABLE presets (
     description TEXT,
     
     -- Target entity type
-    target_entity TEXT NOT NULL, -- 'work', 'asset', 'activity', etc.
+    target_entity TEXT NOT NULL, -- 'work', 'version', 'asset'
     
-    -- System vs user-created
+    -- Configuration for core schema fields
+    -- Keys are field names from the target schema (e.g., "title", "authors")
+    core_field_config JSONB DEFAULT '{}',
+    
+    -- Custom fields to add to metadata
+    custom_fields JSONB DEFAULT '[]',
+    
+    -- UI layout hints
+    form_layout TEXT, -- 'single-column', 'two-column'
+    field_order TEXT[], -- Order of fields in form
+    
+    -- System preset (cannot be edited/deleted by user)
     is_system BOOLEAN DEFAULT false,
-    
-    -- Form configuration (JSON schema for fields)
-    form_fields JSONB NOT NULL,
-    
-    -- Default values
-    default_values JSONB,
     
     -- UI metadata
     icon TEXT,

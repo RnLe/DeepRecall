@@ -25,6 +25,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Database migration runner - runs once on startup
+  db-migrate:
+    image: postgres:16-alpine
+    volumes:
+      - ./migrations:/migrations:ro
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: deeprecall
+      POSTGRES_USER: deeprecall
+      POSTGRES_PASSWORD: deeprecall
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/migrations/init-db.sh"]
+    restart: "no" # Only run once
+
   # ElectricSQL sync service
   electric:
     image: electricsql/electric:latest
@@ -42,6 +58,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     # Health check disabled - Electric logs show when it's ready
     # healthcheck:
     #   test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/ || exit 1"]
@@ -84,6 +102,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       electric:
         condition: service_started # Just wait for it to start, not be healthy
 

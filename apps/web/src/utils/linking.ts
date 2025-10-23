@@ -4,7 +4,11 @@
  */
 
 import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
-import type { Work, Version, WorkExtended } from "@deeprecall/core/schemas/library";
+import type {
+  Work,
+  Version,
+  WorkExtended,
+} from "@deeprecall/core/schemas/library";
 import { createWork } from "@deeprecall/data/repos/works";
 import { createVersion } from "@deeprecall/data/repos/versions";
 import { createAssetFromBlob } from "@/src/hooks/useBlobs";

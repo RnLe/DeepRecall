@@ -6,26 +6,26 @@
  *   → Source of truth: Server SQLite database
  *   → Queried via: React Query (remote data)
  *
- * - Assets: Metadata entities in Dexie that reference blobs via sha256
- *   → Source of truth: Browser IndexedDB (Dexie)
- *   → Queried via: useLiveQuery (local durable data)
+ * - Assets: Metadata entities that reference blobs via sha256
+ *   → Source of truth: Postgres (synced via Electric)
+ *   → Queried via: Electric hooks (real-time sync)
  *   → Can be:
  *     1. Linked to Work (has workId) - part of a Work
- *     2. Standalone but linked (no versionId, has edges) - in Activities/Collections
- *     3. Unlinked (no versionId, no edges) - needs linking
+ *     2. Standalone but linked (no workId, has edges) - in Activities/Collections
+ *     3. Unlinked (no workId, no edges) - needs linking
  *
  * This file bridges server CAS (blobs) with client library schema (assets)
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useMemo } from "react";
 import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
 import {
   BlobsResponseSchema,
   BlobWithMetadataSchema,
 } from "@deeprecall/core/schemas/blobs";
-import { db } from "@deeprecall/data/db";
-import { createAsset } from "@deeprecall/data/repos/assets";
+import { useAssets, useEdges } from "@deeprecall/data/hooks";
+import { createAsset } from "@deeprecall/data/repos/assets.electric";
 import type { Asset } from "@deeprecall/core/schemas/library";
 
 /**
@@ -76,78 +76,69 @@ export function useBlobMetadata(hash: string | undefined) {
 }
 
 /**
- * Get blobs that have no corresponding Assets in Dexie (orphaned blobs)
- * These are "New Files" that have never been processed into the library
- *
- * MENTAL MODEL: Blobs exist on server, but no Asset entity created yet in Dexie
- */
-export async function getOrphanedBlobs(): Promise<BlobWithMetadata[]> {
-  // Step 1: Get all blobs from server
-  const response = await fetch("/api/library/blobs/");
-  if (!response.ok) throw new Error("Failed to fetch blobs");
-  const serverBlobs: BlobWithMetadata[] = await response.json();
-
-  // Step 2: Get all asset references from local Dexie
-  const assets = await db.assets.toArray();
-  const assetHashes = new Set(assets.map((a) => a.sha256.slice(0, 8)));
-
-  // Step 3: Filter out blobs that are already linked to assets
-  const orphanedBlobs = serverBlobs.filter((blob) => {
-    const blobHash8 = blob.sha256.slice(0, 8);
-    return !assetHashes.has(blobHash8);
-  });
-
-  return orphanedBlobs;
-}
-
-/**
  * Hook to get orphaned blobs (blobs without assets) - "New Files / Inbox"
  * Uses React Query because blobs are remote data (server CAS)
+ * Combines server blobs with Electric-synced assets
  */
 export function useOrphanedBlobs() {
+  // Get assets from Electric
+  const { data: assets = [] } = useAssets();
+
   const query = useQuery<BlobWithMetadata[], Error>({
-    queryKey: ["orphanedBlobs"],
+    queryKey: ["orphanedBlobs", assets.length], // Depend on assets
     queryFn: async () => {
-      const result = await getOrphanedBlobs();
-      return result;
+      // Step 1: Get all blobs from server
+      const response = await fetch("/api/library/blobs/");
+      if (!response.ok) throw new Error("Failed to fetch blobs");
+      const serverBlobs: BlobWithMetadata[] = await response.json();
+
+      // Step 2: Get asset hashes (first 8 chars)
+      const assetHashes = new Set(assets.map((a) => a.sha256.slice(0, 8)));
+
+      // Step 3: Filter out blobs that are already linked to assets
+      const orphanedBlobs = serverBlobs.filter((blob) => {
+        const blobHash8 = blob.sha256.slice(0, 8);
+        return !assetHashes.has(blobHash8);
+      });
+
+      return orphanedBlobs;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     refetchInterval: false,
+    enabled: true, // Always enabled since assets come from Electric
   });
 
   return query;
 }
 
-/**\n * Hook to get unlinked standalone assets - \"Unlinked Assets\"
+/**
+ * Hook to get unlinked standalone assets - "Unlinked Assets"
  *
- * MENTAL MODEL: Assets that exist in Dexie but are not connected to anything:
+ * MENTAL MODEL: Assets that exist but are not connected to anything:
  * - No workId (not part of any Work)
  * - No edges with relation="contains" (not in any Activity/Collection)
  *
  * These Assets represent "data" that can be moved around and linked.
  * They reference blobs (raw files) via sha256, but have their own lifecycle.
  *
- * Uses useLiveQuery (not React Query) because Assets are local durable data in Dexie.
- * This ensures the UI automatically updates when edges are created/deleted.
+ * Uses Electric hooks for real-time sync with automatic UI updates.
  */
 export function useUnlinkedAssets() {
-  return useLiveQuery(async () => {
-    // Get all standalone assets (no workId)
-    const standaloneAssets = await db.assets
-      .filter((asset) => !asset.workId)
-      .toArray();
+  const { data: allAssets = [] } = useAssets();
+  const { data: allEdges = [] } = useEdges();
 
-    // Get all edges to find which assets are linked via "contains" relation
+  // Use useMemo to compute unlinked assets efficiently
+  return useMemo(() => {
+    // Get all standalone assets (no workId)
+    const standaloneAssets = allAssets.filter((asset) => !asset.workId);
+
+    // Get asset IDs that are linked via "contains" relation
     // (Activities and Collections use "contains" edges to link to Assets)
-    const edges = await db.edges.toArray();
-    // Only consider edges that point to actual asset IDs to avoid false positives
-    const assetIds = new Set(
-      (await db.assets.toCollection().primaryKeys()) as string[]
-    );
+    const assetIds = new Set(allAssets.map((a) => a.id));
     const linkedAssetIds = new Set(
-      edges
+      allEdges
         .filter(
           (edge) => edge.relation === "contains" && assetIds.has(edge.toId)
         )
@@ -164,7 +155,7 @@ export function useUnlinkedAssets() {
     }
 
     return Array.from(unlinkedMap.values());
-  }, []);
+  }, [allAssets, allEdges]);
 }
 
 /**
@@ -175,18 +166,21 @@ export function useUnlinkedAssets() {
  * Assets are "data" entities separate from blobs; they may outlive the blob.
  *
  * Note: This needs React Query because it queries server blobs (remote data)
+ * Combined with Electric-synced assets
  */
 export function useOrphanedAssets() {
+  const { data: assets = [] } = useAssets();
+
   return useQuery({
-    queryKey: ["orphanedAssets"],
+    queryKey: ["orphanedAssets", assets.length], // Depend on assets
     queryFn: async (): Promise<Asset[]> => {
       const blobs = await fetchBlobs();
       const blobHashes = new Set(blobs.map((b) => b.sha256));
-      const assets = await db.assets.toArray();
 
       return assets.filter((asset) => !blobHashes.has(asset.sha256));
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: true, // Always enabled since assets come from Electric
   });
 }
 
@@ -257,76 +251,77 @@ export function useCreateAssetFromBlob() {
 }
 
 /**
- * Get duplicates: multiple assets pointing to the same blob
- */
-export async function getDuplicateAssets(): Promise<Map<string, Asset[]>> {
-  const assets = await db.assets.toArray();
-  const hashToAssets = new Map<string, Asset[]>();
-
-  for (const asset of assets) {
-    const existing = hashToAssets.get(asset.sha256) || [];
-    existing.push(asset);
-    hashToAssets.set(asset.sha256, existing);
-  }
-
-  // Filter to only hashes with multiple assets
-  const duplicates = new Map<string, Asset[]>();
-  for (const [hash, assets] of hashToAssets.entries()) {
-    if (assets.length > 1) {
-      duplicates.set(hash, assets);
-    }
-  }
-
-  return duplicates;
-}
-
-/**
  * Hook to get duplicate assets (multiple assets with same hash)
+ * Uses Electric-synced assets
  */
 export function useDuplicateAssets() {
+  const { data: assets = [] } = useAssets();
+
   return useQuery({
-    queryKey: ["duplicateAssets"],
-    queryFn: getDuplicateAssets,
+    queryKey: ["duplicateAssets", assets.length], // Depend on assets
+    queryFn: async (): Promise<Map<string, Asset[]>> => {
+      const hashToAssets = new Map<string, Asset[]>();
+
+      for (const asset of assets) {
+        const existing = hashToAssets.get(asset.sha256) || [];
+        existing.push(asset);
+        hashToAssets.set(asset.sha256, existing);
+      }
+
+      // Filter to only hashes with multiple assets
+      const duplicates = new Map<string, Asset[]>();
+      for (const [hash, assetList] of hashToAssets.entries()) {
+        if (assetList.length > 1) {
+          duplicates.set(hash, assetList);
+        }
+      }
+
+      return duplicates;
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: true, // Always enabled since assets come from Electric
   });
 }
 
 /**
- * Get blob statistics
- */
-export async function getBlobStats(): Promise<{
-  totalBlobs: number;
-  totalSize: number;
-  orphanedBlobs: number;
-  linkedAssets: number;
-  duplicateAssets: number;
-  pdfCount: number;
-}> {
-  const blobs = await fetchBlobs();
-  const orphaned = await getOrphanedBlobs();
-  const duplicates = await getDuplicateAssets();
-  const assets = await db.assets.toArray();
-
-  const pdfCount = blobs.filter((b) => b.mime === "application/pdf").length;
-  const totalSize = blobs.reduce((sum, b) => sum + b.size, 0);
-
-  return {
-    totalBlobs: blobs.length,
-    totalSize,
-    orphanedBlobs: orphaned.length,
-    linkedAssets: assets.length,
-    duplicateAssets: duplicates.size,
-    pdfCount,
-  };
-}
-
-/**
  * Hook to get blob statistics
+ * Combines server blob data with Electric-synced assets
  */
 export function useBlobStats() {
+  const { data: assets = [] } = useAssets();
+  const { data: orphanedBlobs } = useOrphanedBlobs();
+  const { data: duplicates } = useDuplicateAssets();
+
   return useQuery({
-    queryKey: ["blobStats"],
-    queryFn: getBlobStats,
+    queryKey: [
+      "blobStats",
+      assets.length,
+      orphanedBlobs?.length,
+      duplicates?.size,
+    ],
+    queryFn: async (): Promise<{
+      totalBlobs: number;
+      totalSize: number;
+      orphanedBlobs: number;
+      linkedAssets: number;
+      duplicateAssets: number;
+      pdfCount: number;
+    }> => {
+      const blobs = await fetchBlobs();
+
+      const pdfCount = blobs.filter((b) => b.mime === "application/pdf").length;
+      const totalSize = blobs.reduce((sum, b) => sum + b.size, 0);
+
+      return {
+        totalBlobs: blobs.length,
+        totalSize,
+        orphanedBlobs: orphanedBlobs?.length || 0,
+        linkedAssets: assets.length,
+        duplicateAssets: duplicates?.size || 0,
+        pdfCount,
+      };
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: true, // Always enabled since assets come from Electric
   });
 }

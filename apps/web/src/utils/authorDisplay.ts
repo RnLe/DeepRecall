@@ -218,8 +218,8 @@ export function formatAuthorsChicago(authors: Author[]): string {
 export function getAuthorTooltip(author: Author): string {
   const lines: string[] = [getAuthorFullName(author)];
 
-  if (author.title) {
-    lines[0] = `${author.title} ${lines[0]}`;
+  if (author.titles) {
+    lines[0] = `${author.titles} ${lines[0]}`;
   }
 
   if (author.affiliation) {

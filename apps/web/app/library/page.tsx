@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import {
-  useWorksExtended,
+  useWorks,
+  useAssets,
   useActivities,
   useCreateEdge,
-} from "@/src/hooks/useLibrary";
+} from "@deeprecall/data/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { WorkCardDetailed } from "./WorkCardDetailed";
 import { WorkCardCompact } from "./WorkCardCompact";
@@ -21,6 +22,8 @@ import { AuthorLibrary } from "./AuthorLibrary";
 import { BookOpen, Link2 } from "lucide-react";
 import type {
   WorkType,
+  Work,
+  Asset,
   WorkExtended,
   ActivityExtended,
 } from "@deeprecall/core";
@@ -37,13 +40,30 @@ import { ExportDataDialog } from "./ExportDataDialog";
 import { ImportDataDialog } from "./ImportDataDialog";
 
 export default function LibraryPage() {
-  const works = useWorksExtended();
-  const activities = useActivities();
+  // Electric hooks - real-time synced data
+  const { data: worksData, isLoading: worksLoading } = useWorks();
+  const { data: assetsData } = useAssets();
+  const { data: activitiesData, isLoading: activitiesLoading } =
+    useActivities();
   const createEdgeMutation = useCreateEdge();
   const queryClient = useQueryClient();
-  // useLiveQuery returns undefined during initial load, then returns the actual data
-  const isLoading = works === undefined;
-  const error = null; // useLiveQuery doesn't expose errors directly
+
+  // Client-side join: Combine works with their assets to create "extended" works
+  const works = useMemo(() => {
+    if (!worksData || !assetsData) return undefined;
+
+    return worksData.map((work): WorkExtended => {
+      const workAssets = assetsData.filter((asset) => asset.workId === work.id);
+      return {
+        ...work,
+        assets: workAssets,
+      };
+    });
+  }, [worksData, assetsData]);
+
+  const activities = activitiesData;
+  const isLoading = worksLoading || activitiesLoading;
+  const error = null; // Electric handles errors internally
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -532,7 +552,7 @@ export default function LibraryPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left Sidebar */}
-      <LibraryLeftSidebar onCreateWorkWithPreset={handleCreateWorkWithPreset} />
+      <LibraryLeftSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
