@@ -20,16 +20,7 @@ interface ScanResult {
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
-  const [isOptimisticallySyncing, setIsOptimisticallySyncing] = useState(false);
-  const isMountedRef = useRef(true);
-
-  // Track component mount state
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // CAS layer (platform-local storage)
   const { data: blobs, isLoading, error, refetch } = useBlobs();
@@ -86,33 +77,19 @@ export default function AdminPage() {
     },
 
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
-      // Optimistic update: Show loading state immediately
-      if (isMountedRef.current) {
-        setIsOptimisticallySyncing(true);
-      }
-
+      setIsSyncing(true);
       try {
+        // Trigger the sync - Electric will propagate changes automatically
         const response = await fetch("/api/admin/sync-to-electric", {
           method: "POST",
         });
         if (!response.ok) throw new Error("Sync failed");
         const result = await response.json();
 
-        // Force immediate refetch of Electric data after successful sync
-        // This triggers Electric to re-query the shape and get fresh data
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["electric-blobs-meta"] }),
-          queryClient.invalidateQueries({
-            queryKey: ["electric-device-blobs"],
-          }),
-        ]);
-
+        // Electric hooks will reactively update when new data arrives
         return result;
       } finally {
-        // Only update state if component is still mounted
-        if (isMountedRef.current) {
-          setIsOptimisticallySyncing(false);
-        }
+        setIsSyncing(false);
       }
     },
 
@@ -156,7 +133,8 @@ export default function AdminPage() {
       MarkdownPreview={MarkdownPreview}
       PDFViewer={SimplePDFViewer}
       blobs={blobs}
-      isLoading={isLoading || isOptimisticallySyncing}
+      isLoading={isLoading}
+      isSyncing={isSyncing}
       error={error || null}
       onRefresh={handleRefresh}
       blobsMeta={electricBlobsMeta.data || []}

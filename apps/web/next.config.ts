@@ -1,6 +1,7 @@
 import { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@deeprecall/ui"], // Compile workspace packages
   images: {
     unoptimized: true, // Required for static export
   },

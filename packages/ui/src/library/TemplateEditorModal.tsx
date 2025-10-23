@@ -661,8 +661,8 @@ export function TemplateEditorModal({
             {hasLinkedEntities
               ? "Locked"
               : isSaving
-              ? "Saving..."
-              : "Save Changes"}
+                ? "Saving..."
+                : "Save Changes"}
           </button>
         </div>
       </div>

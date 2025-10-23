@@ -88,6 +88,7 @@ export interface AdminPanelProps {
   // Data from hooks
   blobs: BlobWithMetadata[] | undefined;
   isLoading: boolean;
+  isSyncing?: boolean; // Optional: shows "Synchronizing..." on sync button
   error: Error | null;
   onRefresh: () => void;
 
@@ -114,13 +115,13 @@ export function AdminPanel({
   PDFViewer,
   blobs,
   isLoading,
+  isSyncing = false,
   error,
   onRefresh,
   blobsMeta,
   deviceBlobs,
   currentDeviceId,
 }: AdminPanelProps) {
-  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
   const [editingHash, setEditingHash] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [viewingMarkdown, setViewingMarkdown] = useState<{
@@ -141,8 +142,8 @@ export function AdminPanel({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [isScanning, setIsScanning] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
 
   // Helper to get filename without extension for display
   const getDisplayName = (filename: string | null) => {
@@ -319,31 +320,19 @@ export function AdminPanel({
     }
   };
 
-  // Handle sync to Electric
+  // Handle sync to Electric (optimistic - no dialog, no loading state)
   const handleSyncToElectric = async () => {
-    if (
-      !confirm(
-        "This will create Electric coordination entries for all existing CAS blobs. Continue?"
-      )
-    ) {
-      return;
-    }
-
-    setIsSyncing(true);
+    // Just trigger the sync silently - Electric will propagate changes automatically
+    // No loading state needed - the Electric hooks will update reactively
     try {
-      const result = await operations.syncToElectric();
-      alert(
-        `Synced ${result.synced} blobs to Electric. ${result.failed} failed.`
-      );
-      onRefresh();
+      await operations.syncToElectric();
+      // No need to show success message or refresh - optimistic updates handle it!
     } catch (error) {
       console.error("Sync failed:", error);
       alert(
         "Sync failed: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -513,7 +502,7 @@ export function AdminPanel({
               <Network
                 className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`}
               />
-              {isSyncing ? "Syncing..." : "Sync to Electric"}
+              {isSyncing ? "Synchronizing..." : "Sync to Electric"}
             </button>
             <button
               onClick={handleClear}

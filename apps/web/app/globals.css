@@ -1,5 +1,10 @@
 @import "tailwindcss";
+
 @plugin "@tailwindcss/typography";
+@plugin "@tailwindcss/forms";
+
+/* Make Tailwind scan UI package sources */
+@source "../../../packages/ui/src";
 
 @layer base {
   * {

@@ -14,7 +14,7 @@ import type {
   Edge,
   Author,
 } from "@deeprecall/core";
-import type { Preset } from "@deeprecall/core";
+import type { Preset, BlobMeta, DeviceBlob } from "@deeprecall/core";
 
 class DeepRecallDB extends Dexie {
   // Library entities (synced from Electric)
@@ -25,6 +25,10 @@ class DeepRecallDB extends Dexie {
   edges!: EntityTable<Edge, "id">;
   presets!: EntityTable<Preset, "id">;
   authors!: EntityTable<Author, "id">;
+
+  // Blob coordination (synced from Electric)
+  blobsMeta!: EntityTable<BlobMeta, "sha256">;
+  deviceBlobs!: EntityTable<DeviceBlob, "id">;
 
   // Local optimistic changes (pending sync)
   presets_local!: EntityTable<
@@ -930,6 +934,56 @@ class DeepRecallDB extends Dexie {
         // No data migration needed - new table starts empty
         console.log(
           "✅ Database upgraded to v17 - reviewLogs optimistic updates enabled"
+        );
+      });
+
+    // Version 18: Add blobsMeta and deviceBlobs tables for blob coordination
+    this.version(18)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Blob coordination (synced from Electric)
+        blobsMeta: "sha256, mime, createdAt",
+        deviceBlobs: "id, deviceId, sha256, present, health, createdAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+        edges_local: "++_localId, id, _op, _status, _timestamp",
+        annotations_local: "++_localId, id, _op, _status, _timestamp",
+        cards_local: "++_localId, id, _op, _status, _timestamp",
+        reviewLogs_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 18 (adding blobsMeta and deviceBlobs tables)"
+        );
+        // No data migration needed - new tables start empty
+        console.log(
+          "✅ Database upgraded to v18 - blob coordination tables enabled"
         );
       });
   }
