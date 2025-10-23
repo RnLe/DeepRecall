@@ -204,12 +204,14 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
         // This happens during database clear operations and is expected
         const error = err as any;
         if (error.status === 409 || error.message?.includes("409")) {
-          console.log(`[Electric] Shape conflict for ${spec.table} (table cleared)`);
+          console.log(
+            `[Electric] Shape conflict for ${spec.table} (table cleared)`
+          );
           setSyncStatus("error");
           setIsLoading(false);
           return;
         }
-        
+
         console.error(`[Electric] Shape error for ${spec.table}:`, err);
         setError(err as Error);
         setSyncStatus("error");

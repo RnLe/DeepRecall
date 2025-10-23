@@ -38,7 +38,7 @@ export async function DELETE() {
       const dirPath = path.join(libraryPath, dir);
       try {
         const files = await readdir(dirPath, { recursive: true });
-        
+
         for (const file of files) {
           const filePath = path.join(dirPath, file);
           try {
@@ -51,7 +51,7 @@ export async function DELETE() {
             // Skip directories silently
           } catch (error: any) {
             // Ignore ENOENT (file disappeared between readdir and stat)
-            if (error.code !== 'ENOENT') {
+            if (error.code !== "ENOENT") {
               console.warn(`  ⚠️  Failed to delete ${filePath}:`, error);
               failedCount++;
             }
@@ -63,7 +63,9 @@ export async function DELETE() {
       }
     }
 
-    console.log(`✅ Deleted ${deletedCount} blob files (${failedCount} failed)`);
+    console.log(
+      `✅ Deleted ${deletedCount} blob files (${failedCount} failed)`
+    );
 
     return NextResponse.json({
       success: true,

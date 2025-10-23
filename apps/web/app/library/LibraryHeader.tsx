@@ -33,11 +33,11 @@ export function LibraryHeader({
     if (
       confirm(
         "⚠️ This will DELETE ALL DATA in your library (works, versions, assets, activities, collections, presets, annotations, and cards). This action will:\n\n" +
-        "1. Clear all data from Postgres (permanent)\n" +
-        "2. Clear all data from Electric sync\n" +
-        "3. Clear local Dexie cache\n" +
-        "4. Delete all blob files from disk\n\n" +
-        "This CANNOT be undone!\n\nAre you absolutely sure?"
+          "1. Clear all data from Postgres (permanent)\n" +
+          "2. Clear all data from Electric sync\n" +
+          "3. Clear local Dexie cache\n" +
+          "4. Delete all blob files from disk\n\n" +
+          "This CANNOT be undone!\n\nAre you absolutely sure?"
       )
     ) {
       try {
@@ -46,11 +46,11 @@ export function LibraryHeader({
         const pgResponse = await fetch("/api/admin/database", {
           method: "DELETE",
         });
-        
+
         if (!pgResponse.ok) {
           throw new Error("Failed to clear Postgres database");
         }
-        
+
         console.log("✅ Postgres database cleared");
 
         // Step 2: Delete blob files from disk
@@ -59,7 +59,7 @@ export function LibraryHeader({
           const blobResponse = await fetch("/api/admin/database/blobs", {
             method: "DELETE",
           });
-          
+
           if (blobResponse.ok) {
             console.log("✅ Blob files deleted");
           } else {
@@ -73,20 +73,20 @@ export function LibraryHeader({
         // IMPORTANT: Do this last to avoid "DatabaseClosedError" from Electric hooks
         console.log("Clearing local Dexie database...");
         const { db } = await import("@deeprecall/data/db");
-        
+
         // Close all connections first to prevent errors
         try {
           db.close();
         } catch (e) {
           // Ignore close errors
         }
-        
+
         // Delete the database
         await db.delete();
         console.log("✅ Dexie database cleared");
 
         alert("✅ All data cleared successfully!");
-        
+
         // No page refresh needed - optimistic updates will handle it! 🚀
       } catch (error) {
         console.error("Failed to clear database:", error);

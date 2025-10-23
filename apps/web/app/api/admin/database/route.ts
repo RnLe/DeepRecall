@@ -10,7 +10,8 @@ import { Pool } from "pg";
 // Postgres connection for admin operations
 async function clearPostgres() {
   const connectionString =
-    process.env.DATABASE_URL || "postgresql://postgres:password@localhost:5432/postgres";
+    process.env.DATABASE_URL ||
+    "postgresql://postgres:password@localhost:5432/postgres";
 
   const pool = new Pool({ connectionString });
 
