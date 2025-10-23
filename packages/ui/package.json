@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@deeprecall/blob-storage": "workspace:*",
     "@deeprecall/core": "workspace:*",
     "@deeprecall/data": "workspace:*",
     "@deeprecall/pdf": "workspace:*",

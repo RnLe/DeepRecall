@@ -20,7 +20,7 @@ import { useAuthors, useFindOrCreateAuthor } from "@deeprecall/data/hooks";
 import { Plus, Link2, FileCode } from "lucide-react";
 
 // Component imports
-import { WorkSelector } from "./WorkSelector";
+import { WorkSelector, type WorkSelectorOperations } from "./WorkSelector";
 import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
 import { BibtexImportModal, BibtexImportOperations } from "./BibtexImportModal";
@@ -53,6 +53,8 @@ interface LinkBlobDialogProps {
   authorOps: AuthorOperations;
   /** BibTeX operations */
   bibtexOps: BibtexImportOperations;
+  /** Work selector operations */
+  workSelectorOps: WorkSelectorOperations;
   /** PDF Preview component */
   PDFPreview: React.ComponentType<{
     source: string;
@@ -74,6 +76,7 @@ export function LinkBlobDialog({
   operations,
   authorOps,
   bibtexOps,
+  workSelectorOps,
   PDFPreview,
 }: LinkBlobDialogProps) {
   // Electric hooks - real-time synced data
@@ -379,6 +382,8 @@ export function LinkBlobDialog({
                   onChange={(workId: string | null) => {
                     setSelectedWorkId(workId);
                   }}
+                  works={worksExtended}
+                  operations={workSelectorOps}
                 />
 
                 {worksExtended && worksExtended.length === 0 && (

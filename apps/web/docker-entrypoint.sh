@@ -26,8 +26,8 @@ if [ -n "$DATABASE_URL" ]; then
   node /workspace/migrations/run.js || echo "[entrypoint] Warning: Migrations failed (database may not be ready yet)"
 fi
 
-# Go back to web app directory
-cd /workspace/apps/web
-
 echo "[entrypoint] Dependencies installed. Starting Next.js..."
+
+# Stay in workspace root so pnpm can find binaries in node_modules/.bin
+# Use pnpm's --filter to run commands in specific workspace
 exec "$@"

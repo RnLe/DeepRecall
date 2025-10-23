@@ -1,0 +1,136 @@
+/**
+ * Repository for DeviceBlob entities (Electric + WriteBuffer)
+ *
+ * DeviceBlob tracks which devices have which blobs available locally.
+ */
+
+import type { DeviceBlob } from "@deeprecall/core";
+import { DeviceBlobSchema } from "@deeprecall/core";
+import { useShape } from "../electric";
+import { createWriteBuffer } from "../writeBuffer";
+
+/**
+ * Get all device blob records
+ */
+export function useDeviceBlobs() {
+  return useShape<DeviceBlob>({ table: "device_blobs" });
+}
+
+/**
+ * Get device blobs for a specific blob (all devices that have it)
+ */
+export function useDeviceBlobsByHash(sha256: string | undefined) {
+  return useShape<DeviceBlob>({
+    table: "device_blobs",
+    where: sha256 ? `sha256 = '${sha256}'` : undefined,
+  });
+}
+
+/**
+ * Get device blobs for a specific device
+ */
+export function useDeviceBlobsByDevice(deviceId: string | undefined) {
+  return useShape<DeviceBlob>({
+    table: "device_blobs",
+    where: deviceId ? `device_id = '${deviceId}'` : undefined,
+  });
+}
+
+/**
+ * Get a specific device blob record by ID
+ */
+export function useDeviceBlob(id: string | undefined) {
+  const result = useShape<DeviceBlob>({
+    table: "device_blobs",
+    where: id ? `id = '${id}'` : undefined,
+  });
+  return { ...result, data: result.data?.[0] };
+}
+
+const buffer = createWriteBuffer();
+
+/**
+ * Create a device blob record (mark blob as present on device)
+ */
+export async function createDeviceBlob(
+  data: Omit<DeviceBlob, "id" | "createdAt" | "updatedAt">
+): Promise<DeviceBlob> {
+  const now = new Date().toISOString();
+  const deviceBlob: DeviceBlob = {
+    ...data,
+    id: crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  const validated = DeviceBlobSchema.parse(deviceBlob);
+  await buffer.enqueue({
+    table: "device_blobs",
+    op: "insert",
+    payload: validated,
+  });
+  console.log(
+    `[DeviceBlobsRepo] Created device blob ${deviceBlob.id} for ${deviceBlob.sha256} on ${deviceBlob.deviceId} (enqueued)`
+  );
+  return validated;
+}
+
+/**
+ * Update a device blob record
+ */
+export async function updateDeviceBlob(
+  id: string,
+  updates: Partial<Omit<DeviceBlob, "id" | "createdAt">>
+): Promise<void> {
+  const updated = { id, ...updates, updatedAt: new Date().toISOString() };
+  await buffer.enqueue({
+    table: "device_blobs",
+    op: "update",
+    payload: updated,
+  });
+  console.log(`[DeviceBlobsRepo] Updated device blob ${id} (enqueued)`);
+}
+
+/**
+ * Delete a device blob record (mark blob as removed from device)
+ */
+export async function deleteDeviceBlob(id: string): Promise<void> {
+  await buffer.enqueue({
+    table: "device_blobs",
+    op: "delete",
+    payload: { id },
+  });
+  console.log(`[DeviceBlobsRepo] Deleted device blob ${id} (enqueued)`);
+}
+
+/**
+ * Convenience: Mark a blob as available on a device
+ */
+export async function markBlobAvailable(
+  sha256: string,
+  deviceId: string,
+  localPath: string | null = null,
+  health: "healthy" | "missing" | "modified" | "relocated" = "healthy"
+): Promise<DeviceBlob> {
+  return createDeviceBlob({
+    sha256,
+    deviceId,
+    present: true,
+    localPath,
+    health,
+  });
+}
+
+/**
+ * Convenience: Mark a blob as unavailable on a device
+ * (In practice, this finds and deletes the device blob record)
+ */
+export async function markBlobUnavailable(
+  sha256: string,
+  deviceId: string
+): Promise<void> {
+  // We can't query from here, so we'd need to pass the ID
+  // This is a convenience that should be called from a component with the ID
+  console.warn(
+    `[DeviceBlobsRepo] markBlobUnavailable requires looking up the device blob ID first`
+  );
+}

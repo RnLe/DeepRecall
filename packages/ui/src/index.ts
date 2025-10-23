@@ -50,6 +50,13 @@ export * from "./library/WorkCardDetailed";
 export * from "./library/WorkCardList";
 export * from "./library/WorkContextMenu";
 export * from "./library/WorkSelector";
+export { AdminPanel } from "./library/AdminPanel";
+export type { AdminPanelOperations } from "./library/AdminPanel";
+export { DuplicateResolutionModal } from "./library/DuplicateResolutionModal";
+export type {
+  DuplicateGroup,
+  DuplicateResolutionModalProps,
+} from "./library/DuplicateResolutionModal";
 
 // Utils
 export * from "./utils/presets";

@@ -1,6 +1,6 @@
 /**
  * LinkBlobDialog Wrapper (Next.js)
- * 
+ *
  * Implements LinkBlobDialogOperations for the Next.js platform
  */
 
@@ -10,7 +10,11 @@ import {
   LinkBlobDialog as LinkBlobDialogUI,
   LinkBlobDialogOperations,
 } from "@deeprecall/ui";
-import { AuthorOperations, BibtexImportOperations } from "@deeprecall/ui";
+import {
+  AuthorOperations,
+  BibtexImportOperations,
+  WorkSelectorOperations,
+} from "@deeprecall/ui";
 import type { BlobWithMetadata } from "@deeprecall/core";
 import { bibtexToWorkFormValues } from "@/src/utils/bibtex";
 import { parseAuthorList, formatAuthorName } from "@/src/utils/nameParser";
@@ -20,7 +24,12 @@ import {
   getPresetForBibtexEntry,
 } from "@/src/utils/bibtex";
 import { getAuthorFullName } from "@deeprecall/core/schemas/library";
-import { useAuthors, useFindOrCreateAuthor } from "@deeprecall/data/hooks";
+import {
+  useAuthors,
+  useFindOrCreateAuthor,
+  useAuthorsByIds,
+} from "@deeprecall/data/hooks";
+import { getPrimaryAuthors, getDisplayYear } from "@/src/utils/library";
 import { PDFPreview } from "../reader/PDFPreview";
 
 interface LinkBlobDialogProps {
@@ -69,6 +78,12 @@ export function LinkBlobDialog({
     onImport: () => {}, // Will be overridden by LinkBlobDialog
   };
 
+  const workSelectorOps: WorkSelectorOperations = {
+    useAuthorsByIds,
+    getPrimaryAuthors,
+    getDisplayYear,
+  };
+
   const getBlobUrl = (sha256: string) => `/api/blob/${sha256}`;
 
   return (
@@ -81,6 +96,7 @@ export function LinkBlobDialog({
       operations={operations}
       authorOps={authorOps}
       bibtexOps={bibtexOps}
+      workSelectorOps={workSelectorOps}
       PDFPreview={PDFPreview}
     />
   );

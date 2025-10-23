@@ -223,7 +223,7 @@ function MultiSelectField({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`${inputClass} flex items-center justify-between gap-2 min-h-[40px]`}
+        className={`${inputClass} flex items-center justify-between gap-2 min-h-10`}
       >
         <div className="flex flex-wrap gap-1.5 flex-1">
           {selectedLabels.length > 0 ? (

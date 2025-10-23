@@ -8,7 +8,9 @@
       "@deeprecall/ui": ["../../packages/ui/src"],
       "@deeprecall/ui/*": ["../../packages/ui/src/*"],
       "@deeprecall/data": ["../../packages/data/src"],
-      "@deeprecall/data/*": ["../../packages/data/src/*"]
+      "@deeprecall/data/*": ["../../packages/data/src/*"],
+      "@deeprecall/blob-storage": ["../../packages/blob-storage/src"],
+      "@deeprecall/blob-storage/*": ["../../packages/blob-storage/src/*"]
     },
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],

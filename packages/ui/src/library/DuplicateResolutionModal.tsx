@@ -1,10 +1,8 @@
 /**
- * DuplicateResolutionModal
+ * DuplicateResolutionModal (Platform-agnostic)
  * Allows users to resolve duplicate files found during library scan
  * Shows one duplicate group at a time, user selects which file to keep
  */
-
-"use client";
 
 import { useState } from "react";
 import { AlertTriangle, Check, X, FileWarning } from "lucide-react";
@@ -16,12 +14,12 @@ interface DuplicateFile {
   isExisting: boolean;
 }
 
-interface DuplicateGroup {
+export interface DuplicateGroup {
   hash: string;
   files: DuplicateFile[];
 }
 
-interface DuplicateResolutionModalProps {
+export interface DuplicateResolutionModalProps {
   duplicates: DuplicateGroup[];
   onResolve: (
     mode: "user-selection" | "auto-resolve",

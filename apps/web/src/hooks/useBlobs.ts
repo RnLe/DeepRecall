@@ -4,7 +4,7 @@
  * MENTAL MODEL:
  * - Blobs: Raw files stored on server (CAS); identified by sha256 hash
  *   → Source of truth: Server SQLite database
- *   → Queried via: React Query (remote data)
+ *   → Accessed via: BlobCAS adapter (platform-agnostic)
  *
  * - Assets: Metadata entities that reference blobs via sha256
  *   → Source of truth: Postgres (synced via Electric)
@@ -19,57 +19,34 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-import type { BlobWithMetadata } from "@deeprecall/core/schemas/blobs";
-import {
-  BlobsResponseSchema,
-  BlobWithMetadataSchema,
-} from "@deeprecall/core/schemas/blobs";
+import type { BlobWithMetadata } from "@deeprecall/blob-storage";
 import { useAssets, useEdges } from "@deeprecall/data/hooks";
 import { createAsset } from "@deeprecall/data/repos/assets.electric";
 import type { Asset } from "@deeprecall/core/schemas/library";
+import { useWebBlobStorage } from "./useBlobStorage";
 
 /**
- * Fetch all blobs from server
- */
-async function fetchBlobs(): Promise<BlobWithMetadata[]> {
-  const response = await fetch("/api/library/blobs");
-  if (!response.ok) {
-    throw new Error("Failed to fetch blobs");
-  }
-  const data = await response.json();
-  return BlobsResponseSchema.parse(data);
-}
-
-/**
- * Fetch a single blob by hash
- */
-async function fetchBlobMetadata(hash: string): Promise<BlobWithMetadata> {
-  const response = await fetch(`/api/library/metadata/${hash}`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch blob metadata");
-  }
-  const data = await response.json();
-  return BlobWithMetadataSchema.parse(data);
-}
-
-/**
- * Hook to fetch all blobs from server
+ * Hook to fetch all blobs from server via CAS adapter
  */
 export function useBlobs() {
+  const cas = useWebBlobStorage();
+
   return useQuery({
     queryKey: ["blobs"],
-    queryFn: fetchBlobs,
+    queryFn: () => cas.list(),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
 /**
- * Hook to fetch a single blob by hash
+ * Hook to fetch a single blob by hash via CAS adapter
  */
 export function useBlobMetadata(hash: string | undefined) {
+  const cas = useWebBlobStorage();
+
   return useQuery({
     queryKey: ["blob", hash],
-    queryFn: () => (hash ? fetchBlobMetadata(hash) : null),
+    queryFn: () => (hash ? cas.stat(hash) : null),
     enabled: !!hash,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
@@ -80,17 +57,19 @@ export function useBlobMetadata(hash: string | undefined) {
  * Uses React Query because blobs are remote data (server CAS)
  * Combines server blobs with Electric-synced assets
  */
+/**
+ * Hook to get orphaned blobs (blobs without assets) - "New Files / Inbox"
+ * Uses CAS adapter for blobs combined with Electric-synced assets
+ */
 export function useOrphanedBlobs() {
-  // Get assets from Electric
+  const cas = useWebBlobStorage();
   const { data: assets = [] } = useAssets();
 
   const query = useQuery<BlobWithMetadata[], Error>({
     queryKey: ["orphanedBlobs", assets.length], // Depend on assets
     queryFn: async () => {
-      // Step 1: Get all blobs from server
-      const response = await fetch("/api/library/blobs/");
-      if (!response.ok) throw new Error("Failed to fetch blobs");
-      const serverBlobs: BlobWithMetadata[] = await response.json();
+      // Step 1: Get all blobs from CAS
+      const serverBlobs = await cas.list();
 
       // Step 2: Get asset hashes (first 8 chars)
       const assetHashes = new Set(assets.map((a) => a.sha256.slice(0, 8)));
@@ -165,16 +144,17 @@ export function useUnlinkedAssets() {
  * This can happen if files are deleted from the data directory.
  * Assets are "data" entities separate from blobs; they may outlive the blob.
  *
- * Note: This needs React Query because it queries server blobs (remote data)
+ * Note: This uses CAS adapter to query server blobs (remote data)
  * Combined with Electric-synced assets
  */
 export function useOrphanedAssets() {
+  const cas = useWebBlobStorage();
   const { data: assets = [] } = useAssets();
 
   return useQuery({
     queryKey: ["orphanedAssets", assets.length], // Depend on assets
     queryFn: async (): Promise<Asset[]> => {
-      const blobs = await fetchBlobs();
+      const blobs = await cas.list();
       const blobHashes = new Set(blobs.map((b) => b.sha256));
 
       return assets.filter((asset) => !blobHashes.has(asset.sha256));
@@ -285,9 +265,10 @@ export function useDuplicateAssets() {
 
 /**
  * Hook to get blob statistics
- * Combines server blob data with Electric-synced assets
+ * Combines server blob data via CAS with Electric-synced assets
  */
 export function useBlobStats() {
+  const cas = useWebBlobStorage();
   const { data: assets = [] } = useAssets();
   const { data: orphanedBlobs } = useOrphanedBlobs();
   const { data: duplicates } = useDuplicateAssets();
@@ -307,7 +288,7 @@ export function useBlobStats() {
       duplicateAssets: number;
       pdfCount: number;
     }> => {
-      const blobs = await fetchBlobs();
+      const blobs = await cas.list();
 
       const pdfCount = blobs.filter((b) => b.mime === "application/pdf").length;
       const totalSize = blobs.reduce((sum, b) => sum + b.size, 0);

@@ -8,6 +8,7 @@ export * from "./db";
 export * from "./repos";
 export * from "./stores";
 export * from "./hooks";
+export * from "./utils";
 
 // Export Electric sync and write buffer
 export * from "./electric";

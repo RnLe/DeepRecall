@@ -74,10 +74,27 @@ export async function PUT(
       );
     }
 
-    // Update database records
+    // Update CAS database records
     await db.update(blobs).set({ filename }).where(eq(blobs.hash, hash));
 
     await db.update(paths).set({ path: newPath }).where(eq(paths.hash, hash));
+
+    // Also update Electric coordination (async, non-blocking)
+    try {
+      const { updateBlobMetaServer } = await import(
+        "@deeprecall/data/repos/blobs.server"
+      );
+      await updateBlobMetaServer(hash, { filename });
+      console.log(
+        `[RenameAPI] Updated Electric metadata for blob ${hash.slice(0, 16)}...`
+      );
+    } catch (electricError) {
+      console.warn(
+        `[RenameAPI] Failed to update Electric metadata for ${hash.slice(0, 16)}...`,
+        electricError
+      );
+      // Continue anyway - CAS update succeeded
+    }
 
     return NextResponse.json({
       success: true,

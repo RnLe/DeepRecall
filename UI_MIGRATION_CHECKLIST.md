@@ -4,6 +4,17 @@
 
 ---
 
+## 🚨 CRITICAL PRIORITY: UI & Functionality Verification
+
+**Before continuing migration, ALL hoisted components must be verified:**
+
+1. **UI Match (1:1):** Tailwind classes in `packages/ui` components MUST exactly match original `apps/web` versions. No visual regressions.
+2. **Functionality Test:** All features (create/edit/delete works, presets, etc.) must work identically to pre-migration state.
+
+**Verification Checklist:** See `UI_VERIFICATION_CHECKLIST.md` for detailed component-by-component testing.
+
+---
+
 ## Strategy
 
 ### Phase 1: Identify & Categorize
@@ -117,6 +128,11 @@
 
 - [ ] **`page.tsx`** - Next.js page wrapper
 
+**admin/**
+
+- [x] **`page.tsx (AdminPanel)`** - ✅ Hoisted to packages/ui/src/library/AdminPanel.tsx + Converted to Electric hooks (useBlobsMeta, useDeviceBlobs) + Shows multi-device blob coordination + Zero UI regression
+- [x] **`DuplicateResolutionModal.tsx`** - ✅ Hoisted to packages/ui/src/library/DuplicateResolutionModal.tsx + Platform-agnostic modal for duplicate file resolution + Exported types (DuplicateGroup, DuplicateResolutionModalProps)
+
 ### ❌ Cannot Move (Server/Next.js-specific)
 
 **Root:**
@@ -215,8 +231,13 @@ uploadFile(...)
 **Architecture:**
 
 - **Electric Repos**: `packages/data/src/repos/*.electric.ts` - Direct Electric SQL operations (create, update, delete)
-- **Electric Hooks**: `packages/data/src/hooks/*.ts` - React hooks wrapping Electric repos with React Query
+  - Import via `@deeprecall/data/repos`
+- **Electric Hooks & Stores**: `packages/data/src/hooks/*.ts` - React hooks wrapping Electric repos with React Query
+  - Import via `@deeprecall/data/hooks`
+- **Core Types & Schemas**: `packages/core/src/` - Shared types, Zod schemas, and utilities
+  - Import via `@deeprecall/core` or `@deeprecall/core/schemas/library`
 - **Platform-Agnostic UI**: `packages/ui/src/**` - Pure React components with operations interfaces
+  - Import via `@deeprecall/ui` or `@deeprecall/ui/library/*`
 - **Platform Wrappers**: `apps/web/app/**` - Next.js-specific wrappers that inject Electric hooks into UI components
 
 **Web-Specific Infrastructure Hooks** (remain in `apps/web/src/hooks/`):

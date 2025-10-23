@@ -651,6 +651,21 @@ export async function storeBlob(
       console.log(`  Reusing existing file at: ${existingPath}`);
       console.log(`  Skipping duplicate upload (no new file written to disk)`);
 
+      // Ensure Electric coordination exists for this blob
+      // (It might not if this was uploaded before Electric coordination was implemented)
+      ensureBlobCoordination(
+        hash,
+        existingBlob.size,
+        existingBlob.mime,
+        existingBlob.filename || filename,
+        existingPath
+      ).catch((error) => {
+        console.error(
+          `[CAS] Failed to ensure Electric coordination for duplicate ${hash.slice(0, 16)}...`,
+          error
+        );
+      });
+
       // Return existing blob info (no new file created)
       return {
         hash,
@@ -711,7 +726,129 @@ export async function storeBlob(
       set: { hash },
     });
 
+  // Create Electric coordination entries (blobs_meta + device_blobs)
+  // This happens asynchronously - we don't await it to avoid blocking the upload
+  createBlobCoordination(
+    hash,
+    size,
+    mime,
+    filename,
+    targetPath,
+    metadata
+  ).catch((error) => {
+    console.error(
+      `[CAS] Failed to create Electric coordination for ${hash.slice(0, 16)}...`,
+      error
+    );
+    // Don't fail the upload if Electric coordination fails
+  });
+
   return { hash, path: targetPath, size };
+}
+
+/**
+ * Create blob coordination entries in Electric (blobs_meta + device_blobs)
+ * Called asynchronously after storing blob in CAS
+ */
+async function createBlobCoordination(
+  sha256: string,
+  size: number,
+  mime: string,
+  filename: string,
+  localPath: string,
+  metadata: {
+    pageCount?: number;
+    imageWidth?: number;
+    imageHeight?: number;
+    lineCount?: number;
+  }
+): Promise<void> {
+  try {
+    // Call the blob coordination API route (avoids importing React hooks on server)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/writes/blobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sha256,
+        size,
+        mime,
+        filename,
+        localPath,
+        deviceId: "server",
+        pageCount: metadata.pageCount,
+        imageWidth: metadata.imageWidth,
+        imageHeight: metadata.imageHeight,
+        lineCount: metadata.lineCount,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API error: ${response.status} - ${errorText}`);
+    }
+
+    console.log(
+      `[CAS] Created Electric coordination for ${sha256.slice(0, 16)}... on device server`
+    );
+  } catch (error) {
+    console.error(
+      `[CAS] Electric coordination failed for ${sha256.slice(0, 16)}...`,
+      error
+    );
+    // Don't re-throw - coordination failure shouldn't break blob storage
+  }
+}
+
+/**
+ * Ensure Electric coordination exists for a blob (idempotent)
+ * Used for existing blobs that might not have coordination entries yet
+ */
+async function ensureBlobCoordination(
+  sha256: string,
+  size: number,
+  mime: string,
+  filename: string,
+  localPath: string
+): Promise<void> {
+  try {
+    // Call the blob coordination API route
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/writes/blobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sha256,
+        size,
+        mime,
+        filename,
+        localPath,
+        deviceId: "server",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(
+        `[CAS] Could not ensure Electric coordination: ${response.status} - ${errorText}`
+      );
+      return;
+    }
+
+    console.log(
+      `[CAS] Ensured Electric coordination for ${sha256.slice(0, 16)}...`
+    );
+  } catch (error) {
+    // Silently fail - this is a best-effort operation
+    console.warn(
+      `[CAS] Could not ensure Electric coordination for ${sha256.slice(0, 16)}...`,
+      error
+    );
+  }
 }
 
 /**

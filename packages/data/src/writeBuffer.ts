@@ -37,7 +37,10 @@ export type WriteTable =
   | "authors"
   | "annotations"
   | "cards"
-  | "review_logs";
+  | "review_logs"
+  | "blobs_meta"
+  | "device_blobs"
+  | "replication_jobs";
 
 /**
  * A single write change to be synced

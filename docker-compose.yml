@@ -80,16 +80,13 @@ services:
       # Mount entire workspace (for monorepo packages)
       - .:/workspace:delegated
 
-      # Named volumes for build artifacts (prevent host conflicts)
-      - web_node_modules:/workspace/apps/web/node_modules
-      - next_cache:/workspace/apps/web/.next
-      - pnpm_store:/workspace/.pnpm-store
-      - packages_core_node_modules:/workspace/packages/core/node_modules
-      - packages_data_node_modules:/workspace/packages/data/node_modules
-      - packages_ui_node_modules:/workspace/packages/ui/node_modules
-      - packages_pdf_node_modules:/workspace/packages/pdf/node_modules
+      # Named volume for ALL node_modules (hoisted mode = single node_modules at root)
+      - node_modules:/workspace/node_modules
 
-      # Data directory bind mount
+      # Named volume for Next.js build cache
+      - next_cache:/workspace/apps/web/.next
+
+      # Data directory bind mount (outside workspace mount to avoid conflicts)
       - ./data:/workspace/data:consistent
     environment:
       # Database connections
@@ -112,13 +109,8 @@ volumes:
   postgres_data:
 
   # Named volumes are managed by Docker
-  web_node_modules:
+  node_modules: # Single hoisted node_modules at workspace root
   next_cache:
-  pnpm_store:
-  packages_core_node_modules:
-  packages_data_node_modules:
-  packages_ui_node_modules:
-  packages_pdf_node_modules:
 
   # python:
   #   build:

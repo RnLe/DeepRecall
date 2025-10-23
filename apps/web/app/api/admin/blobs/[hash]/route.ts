@@ -11,10 +11,10 @@ import { eq } from "drizzle-orm";
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { hash: string } }
+  { params }: { params: Promise<{ hash: string }> }
 ) {
   try {
-    const { hash } = params;
+    const { hash } = await params;
 
     if (!hash) {
       return NextResponse.json(
@@ -28,8 +28,31 @@ export async function DELETE(
     // Delete path mappings first (foreign key constraint)
     await db.delete(paths).where(eq(paths.hash, hash));
 
-    // Delete the blob
+    // Delete the blob from CAS
     const result = await db.delete(blobs).where(eq(blobs.hash, hash));
+
+    // Also delete from Electric coordination (async, non-blocking)
+    try {
+      const { deleteBlobMetaServer, deleteDeviceBlobServer } = await import(
+        "@deeprecall/data/repos/blobs.server"
+      );
+
+      // Delete device blob entries (will cascade to all devices via Electric)
+      await deleteDeviceBlobServer(hash, "server");
+
+      // Delete blob metadata (will cascade delete device_blobs via FK)
+      await deleteBlobMetaServer(hash);
+
+      console.log(
+        `[AdminAPI] Deleted Electric entries for blob ${hash.slice(0, 16)}...`
+      );
+    } catch (electricError) {
+      console.warn(
+        `[AdminAPI] Failed to delete Electric entries for ${hash.slice(0, 16)}...`,
+        electricError
+      );
+      // Continue anyway - CAS deletion succeeded
+    }
 
     return NextResponse.json({
       success: true,

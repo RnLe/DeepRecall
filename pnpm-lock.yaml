@@ -160,6 +160,12 @@ importers:
         specifier: ^4.20.6
         version: 4.20.6
 
+  packages/blob-storage:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/core:
     dependencies:
       nanoid:
@@ -231,6 +237,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@deeprecall/blob-storage':
+        specifier: workspace:*
+        version: link:../blob-storage
       '@deeprecall/core':
         specifier: workspace:*
         version: link:../core
