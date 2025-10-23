@@ -122,7 +122,7 @@ export default function LibraryPage() {
   }, []);
 
   // Load extended activity data
-  useMemo(() => {
+  useEffect(() => {
     if (!activities) return;
 
     Promise.all(
@@ -771,7 +771,9 @@ export default function LibraryPage() {
           blob={linkingBlob}
           onSuccess={() => {
             setLinkingBlob(null);
-            // Works and unlinkedAssets will auto-refresh via useLiveQuery
+            // Force refresh of merged works query to show new work immediately
+            queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
+            queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
           }}
           onCancel={() => setLinkingBlob(null)}
         />

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AdminPanel, DuplicateResolutionModal } from "@deeprecall/ui";
 import type { DuplicateGroup } from "@deeprecall/ui";
 import { MarkdownPreview } from "../reader/MarkdownPreview";
@@ -20,49 +20,24 @@ interface ScanResult {
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
+  const [isOptimisticallySyncing, setIsOptimisticallySyncing] = useState(false);
+  const isMountedRef = useRef(true);
+
+  // Track component mount state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // CAS layer (platform-local storage)
   const { data: blobs, isLoading, error, refetch } = useBlobs();
 
   // Electric coordination layer (multi-device metadata)
-  // Use Electric hooks directly
   const electricBlobsMeta = useBlobsMeta();
   const electricDeviceBlobs = useDeviceBlobs();
   const currentDeviceId = getDeviceId();
-
-  // Cache Electric data in React Query to persist across client-side navigations
-  // Update cache whenever Electric data changes
-  useEffect(() => {
-    if (electricBlobsMeta.data) {
-      queryClient.setQueryData(["electric-blobs-meta"], electricBlobsMeta.data);
-    }
-  }, [electricBlobsMeta.data, queryClient]);
-
-  useEffect(() => {
-    if (electricDeviceBlobs.data) {
-      queryClient.setQueryData(
-        ["electric-device-blobs"],
-        electricDeviceBlobs.data
-      );
-    }
-  }, [electricDeviceBlobs.data, queryClient]);
-
-  // Get cached Electric data (will be available even during remounts)
-  const { data: blobsMeta } = useQuery({
-    queryKey: ["electric-blobs-meta"],
-    queryFn: () => [], // Will be populated by the effect above
-    staleTime: Infinity,
-    gcTime: Infinity,
-    placeholderData: (previousData) => previousData, // Keep old data while loading
-  });
-
-  const { data: deviceBlobs } = useQuery({
-    queryKey: ["electric-device-blobs"],
-    queryFn: () => [],
-    staleTime: Infinity,
-    gcTime: Infinity,
-    placeholderData: (previousData) => previousData,
-  });
 
   // Operations implementation
   const operations = {
@@ -111,11 +86,34 @@ export default function AdminPage() {
     },
 
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
-      const response = await fetch("/api/admin/sync-to-electric", {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error("Sync failed");
-      return response.json();
+      // Optimistic update: Show loading state immediately
+      if (isMountedRef.current) {
+        setIsOptimisticallySyncing(true);
+      }
+
+      try {
+        const response = await fetch("/api/admin/sync-to-electric", {
+          method: "POST",
+        });
+        if (!response.ok) throw new Error("Sync failed");
+        const result = await response.json();
+
+        // Force immediate refetch of Electric data after successful sync
+        // This triggers Electric to re-query the shape and get fresh data
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["electric-blobs-meta"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["electric-device-blobs"],
+          }),
+        ]);
+
+        return result;
+      } finally {
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          setIsOptimisticallySyncing(false);
+        }
+      }
     },
 
     resolveDuplicates: async (
@@ -145,13 +143,11 @@ export default function AdminPage() {
     },
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     refetch();
     queryClient.invalidateQueries({ queryKey: ["blobs"] });
     queryClient.invalidateQueries({ queryKey: ["files"] });
-    queryClient.invalidateQueries({ queryKey: ["electric-blobs-meta"] });
-    queryClient.invalidateQueries({ queryKey: ["electric-device-blobs"] });
-  };
+  }, [refetch, queryClient]);
 
   return (
     <AdminPanel
@@ -160,11 +156,11 @@ export default function AdminPage() {
       MarkdownPreview={MarkdownPreview}
       PDFViewer={SimplePDFViewer}
       blobs={blobs}
-      isLoading={isLoading}
+      isLoading={isLoading || isOptimisticallySyncing}
       error={error || null}
       onRefresh={handleRefresh}
-      blobsMeta={blobsMeta}
-      deviceBlobs={deviceBlobs}
+      blobsMeta={electricBlobsMeta.data || []}
+      deviceBlobs={electricDeviceBlobs.data || []}
       currentDeviceId={currentDeviceId}
     />
   );

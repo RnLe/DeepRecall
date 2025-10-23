@@ -107,11 +107,14 @@ function useAssetOperations(): AssetOperations {
 export function LibraryLeftSidebar() {
   const blobOps = useBlobOperations();
   const assetOps = useAssetOperations();
+  const orphanedBlobsQuery = useOrphanedBlobs();
 
   return (
     <LibraryLeftSidebarUI
       blobOps={blobOps}
       assetOps={assetOps}
+      orphanedBlobs={orphanedBlobsQuery.data || []}
+      isLoadingBlobs={orphanedBlobsQuery.isLoading}
       FileInbox={FileInbox}
       UnlinkedAssetsList={UnlinkedAssetsList}
       LinkBlobDialog={LinkBlobDialog}

@@ -19,6 +19,10 @@ services:
       - "max_replication_slots=10"
       - "-c"
       - "max_wal_senders=10"
+      - "-c"
+      - "synchronous_commit=on" # Force immediate WAL flush (slower but immediate)
+      - "-c"
+      - "fsync=on" # Force disk sync
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U deeprecall"]
       interval: 5s

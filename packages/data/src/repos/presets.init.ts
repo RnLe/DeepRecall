@@ -1,13 +1,14 @@
 /**
  * Initialize default system presets
  * Called once on app startup to seed system presets
- * UPDATED: Uses Electric+WriteBuffer instead of Dexie
+ * UPDATED: Uses local layer for instant seeding (no blocking)
  */
 
 import { DEFAULT_PRESETS, DEFAULT_PRESET_NAMES } from "./presets.default";
 import type { Preset } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
-import { queryShape } from "../electric";
+import { db } from "../db";
+import * as presetsLocal from "./presets.local";
 
 /**
  * Get write buffer instance
@@ -16,14 +17,35 @@ const buffer = createWriteBuffer();
 
 /**
  * Initialize system presets if they don't exist
+ * NON-BLOCKING: Seeds locally first, syncs in background
  * Idempotent - safe to call multiple times
  */
 export async function initializePresets(): Promise<void> {
   try {
-    // Query current presets from Electric
-    const existingPresets = await queryShape<Preset>({ table: "presets" });
-    const existingSystemPresets = existingPresets.filter((p) => p.isSystem);
-    const existingNames = new Set(existingSystemPresets.map((p) => p.name));
+    // Check existing presets from Dexie (both synced + local)
+    const [syncedPresets, localChanges] = await Promise.all([
+      db.presets.toArray(),
+      db.presets_local.toArray(),
+    ]);
+
+    // Combine to get full picture (excluding pending deletes)
+    const existingNames = new Set<string>();
+    const deletedIds = new Set<string>();
+
+    // Track pending deletes
+    localChanges
+      .filter((c) => c._op === "delete")
+      .forEach((c) => deletedIds.add(c.id));
+
+    // Add synced preset names (excluding pending deletes)
+    syncedPresets
+      .filter((p) => p.isSystem && !deletedIds.has(p.id))
+      .forEach((p) => existingNames.add(p.name));
+
+    // Add pending local inserts (only inserts, not deletes)
+    localChanges
+      .filter((c) => c._op === "insert" && c.data?.isSystem)
+      .forEach((c) => c.data && existingNames.add(c.data.name));
 
     // Only seed presets that don't exist by name
     const presetsToAdd = DEFAULT_PRESETS.filter(
@@ -32,24 +54,20 @@ export async function initializePresets(): Promise<void> {
 
     if (presetsToAdd.length > 0) {
       console.log(
-        `Seeding ${presetsToAdd.length} default system presets... (found ${existingSystemPresets.length}, total ${DEFAULT_PRESETS.length})`
+        `[Init] Seeding ${presetsToAdd.length} system presets locally...`
       );
 
-      // Enqueue all presets to write buffer
+      // Write to local layer (instant, non-blocking)
       for (const preset of presetsToAdd) {
-        await buffer.enqueue({
-          table: "presets",
-          op: "insert",
-          payload: preset,
-        });
+        await presetsLocal.createPresetLocal(preset);
       }
 
       console.log(
-        `✅ Seeded ${presetsToAdd.length} system presets (enqueued to write buffer)`
+        `✅ [Init] Seeded ${presetsToAdd.length} system presets (syncing in background)`
       );
     } else {
       console.log(
-        `✓ System presets already initialized (${existingSystemPresets.length} found)`
+        `✓ [Init] System presets already initialized (${existingNames.size} found)`
       );
     }
   } catch (error) {
@@ -65,31 +83,27 @@ export async function initializePresets(): Promise<void> {
  */
 export async function resetSystemPresets(): Promise<void> {
   try {
-    // Query current system presets from Electric
-    const existingPresets = await queryShape<Preset>({ table: "presets" });
-    const systemPresets = existingPresets.filter((p) => p.isSystem);
+    // Query current system presets from Dexie
+    const systemPresets = await db.presets
+      .where("isSystem")
+      .equals(1)
+      .toArray();
 
-    // Delete existing system presets
+    // Delete existing system presets using local layer
     for (const preset of systemPresets) {
-      await buffer.enqueue({
-        table: "presets",
-        op: "delete",
-        payload: { id: preset.id },
-      });
+      await presetsLocal.deletePresetLocal(preset.id);
     }
 
-    console.log(`Deleted ${systemPresets.length} system presets (enqueued)`);
+    console.log(`Deleted ${systemPresets.length} system presets (local)`);
 
-    // Re-seed defaults
+    // Re-seed defaults using local layer
     for (const preset of DEFAULT_PRESETS) {
-      await buffer.enqueue({
-        table: "presets",
-        op: "insert",
-        payload: preset,
-      });
+      await presetsLocal.createPresetLocal(preset);
     }
 
-    console.log(`✅ Reset ${DEFAULT_PRESETS.length} system presets (enqueued)`);
+    console.log(
+      `✅ Reset ${DEFAULT_PRESETS.length} system presets (syncing in background)`
+    );
   } catch (error) {
     console.error("Failed to reset system presets:", error);
     throw error;
@@ -112,36 +126,28 @@ export async function resetDefaultPresetsByName(
       names && names.length > 0 ? names : DEFAULT_PRESET_NAMES;
     const nameSet = new Set(namesToReset);
 
-    // Find existing presets with matching names
-    const allPresets = await queryShape<Preset>({ table: "presets" });
+    // Find existing presets with matching names from Dexie
+    const allPresets = await db.presets.toArray();
     const presetsToDelete = allPresets.filter(
-      (p) => p.isSystem && nameSet.has(p.name)
+      (p: Preset) => p.isSystem && nameSet.has(p.name)
     );
 
-    // Delete matching presets
+    // Delete matching presets using local layer
     if (presetsToDelete.length > 0) {
       for (const preset of presetsToDelete) {
-        await buffer.enqueue({
-          table: "presets",
-          op: "delete",
-          payload: { id: preset.id },
-        });
+        await presetsLocal.deletePresetLocal(preset.id);
       }
       console.log(
         `Deleted ${presetsToDelete.length} existing presets:`,
-        presetsToDelete.map((p) => p.name)
+        presetsToDelete.map((p: Preset) => p.name)
       );
     }
 
-    // Re-add the default versions
+    // Re-add the default versions using local layer
     const defaultsToAdd = DEFAULT_PRESETS.filter((p) => nameSet.has(p.name));
     if (defaultsToAdd.length > 0) {
       for (const preset of defaultsToAdd) {
-        await buffer.enqueue({
-          table: "presets",
-          op: "insert",
-          payload: preset,
-        });
+        await presetsLocal.createPresetLocal(preset);
       }
       console.log(
         `✅ Reset ${defaultsToAdd.length} default presets:`,
@@ -161,8 +167,8 @@ export async function resetDefaultPresetsByName(
  * Check if presets have been initialized
  */
 export async function arePresetsInitialized(): Promise<boolean> {
-  const presets = await queryShape<Preset>({ table: "presets" });
-  const systemPresets = presets.filter((p) => p.isSystem);
+  const presets = await db.presets.toArray();
+  const systemPresets = presets.filter((p: Preset) => p.isSystem);
   return systemPresets.length > 0;
 }
 
@@ -170,8 +176,8 @@ export async function arePresetsInitialized(): Promise<boolean> {
  * Check which default presets are missing
  */
 export async function getMissingDefaultPresets(): Promise<string[]> {
-  const existing = await queryShape<Preset>({ table: "presets" });
-  const existingNames = new Set(existing.map((p) => p.name));
+  const existing = await db.presets.toArray();
+  const existingNames = new Set(existing.map((p: Preset) => p.name));
   return DEFAULT_PRESET_NAMES.filter((name) => !existingNames.has(name));
 }
 
@@ -195,26 +201,20 @@ export async function resetSinglePresetByName(name: string): Promise<boolean> {
     }
 
     // Find and delete existing preset with this name
-    const allPresets = await queryShape<Preset>({ table: "presets" });
-    const existing = allPresets.filter((p) => p.name === name && p.isSystem);
+    const allPresets = await db.presets.toArray();
+    const existing = allPresets.filter(
+      (p: Preset) => p.name === name && p.isSystem
+    );
 
     if (existing.length > 0) {
       for (const preset of existing) {
-        await buffer.enqueue({
-          table: "presets",
-          op: "delete",
-          payload: { id: preset.id },
-        });
+        await presetsLocal.deletePresetLocal(preset.id);
       }
       console.log(`Deleted existing "${name}" preset`);
     }
 
-    // Add the default version
-    await buffer.enqueue({
-      table: "presets",
-      op: "insert",
-      payload: defaultPreset,
-    });
+    // Add the default version using local layer
+    await presetsLocal.createPresetLocal(defaultPreset);
     console.log(`✅ Reset "${name}" preset to default (enqueued)`);
 
     return true;
@@ -234,9 +234,9 @@ export async function getDefaultPresetsStatus(): Promise<
     isDefault: boolean; // true if name matches exactly
   }>
 > {
-  const allPresets = await queryShape<Preset>({ table: "presets" });
-  const systemPresets = allPresets.filter((p) => p.isSystem);
-  const existingMap = new Map(systemPresets.map((p) => [p.name, p]));
+  const allPresets = await db.presets.toArray();
+  const systemPresets = allPresets.filter((p: Preset) => p.isSystem);
+  const existingMap = new Map(systemPresets.map((p: Preset) => [p.name, p]));
 
   return DEFAULT_PRESET_NAMES.map((name) => ({
     name,

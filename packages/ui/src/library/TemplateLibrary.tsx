@@ -772,8 +772,8 @@ function TemplateCard({
         isSelected
           ? "border-blue-500 border-[3px] shadow-lg shadow-blue-500/20"
           : isSelectable
-          ? "border-neutral-600"
-          : "border-neutral-700"
+            ? "border-neutral-600"
+            : "border-neutral-700"
       }`}
     >
       {/* Top-right action icons */}

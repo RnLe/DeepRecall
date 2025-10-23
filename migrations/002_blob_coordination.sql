@@ -118,5 +118,5 @@ CREATE INDEX idx_replication_jobs_status ON replication_jobs(status);
 CREATE INDEX idx_replication_jobs_destination ON replication_jobs(to_destination);
 CREATE INDEX idx_replication_jobs_priority ON replication_jobs(priority DESC);
 
--- Note: Electric SQL will automatically detect and sync these tables
--- No explicit ENABLE ELECTRIC needed
+-- Note: Electric SQL will automatically sync these tables in "direct_writes" mode
+

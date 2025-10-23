@@ -17,7 +17,7 @@ import type {
 import type { Preset } from "@deeprecall/core";
 
 class DeepRecallDB extends Dexie {
-  // Library entities
+  // Library entities (synced from Electric)
   works!: EntityTable<Work, "id">;
   assets!: EntityTable<Asset, "id">;
   activities!: EntityTable<Activity, "id">;
@@ -25,6 +25,137 @@ class DeepRecallDB extends Dexie {
   edges!: EntityTable<Edge, "id">;
   presets!: EntityTable<Preset, "id">;
   authors!: EntityTable<Author, "id">;
+
+  // Local optimistic changes (pending sync)
+  presets_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Preset;
+    },
+    "_localId"
+  >;
+
+  works_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Work;
+    },
+    "_localId"
+  >;
+
+  assets_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Asset;
+    },
+    "_localId"
+  >;
+
+  activities_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Activity;
+    },
+    "_localId"
+  >;
+
+  authors_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Author;
+    },
+    "_localId"
+  >;
+
+  collections_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Collection;
+    },
+    "_localId"
+  >;
+
+  edges_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Edge;
+    },
+    "_localId"
+  >;
+
+  annotations_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Annotation;
+    },
+    "_localId"
+  >;
+
+  cards_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Card;
+    },
+    "_localId"
+  >;
+
+  reviewLogs_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: ReviewLog;
+    },
+    "_localId"
+  >;
 
   // Annotations & cards
   annotations!: EntityTable<Annotation, "id">;
@@ -385,6 +516,420 @@ class DeepRecallDB extends Dexie {
 
         console.log(
           `✅ Database upgraded to v7: Migrated ${migrated} authors with titles`
+        );
+      });
+
+    // Version 8: Add local optimistic tables for instant UI feedback
+    this.version(8)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 8 (adding local optimistic tables for two-layer architecture)"
+        );
+        // No data migration needed - new tables start empty
+        // Local changes will be written on next user interaction
+        console.log("✅ Database upgraded to v8 - optimistic updates enabled");
+      });
+
+    // Version 9: Add works_local table for optimistic Work updates
+    this.version(9)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 9 (adding works_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v9 - works optimistic updates enabled"
+        );
+      });
+
+    // Version 10: Add assets_local table for optimistic Asset updates
+    this.version(10)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 10 (adding assets_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v10 - assets optimistic updates enabled"
+        );
+      });
+
+    // Version 11: Add activities_local table for optimistic Activity updates
+    this.version(11)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 11 (adding activities_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v11 - activities optimistic updates enabled"
+        );
+      });
+
+    // Version 12: Add authors_local table for optimistic Author updates
+    this.version(12)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 12 (adding authors_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v12 - authors optimistic updates enabled"
+        );
+      });
+
+    // Version 13: Add collections_local table for optimistic Collection updates
+    this.version(13)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 13 (adding collections_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v13 - collections optimistic updates enabled"
+        );
+      });
+
+    // Version 14: Add edges_local table for optimistic Edge updates
+    this.version(14)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+        edges_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 14 (adding edges_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v14 - edges optimistic updates enabled"
+        );
+      });
+
+    // Version 15: Add annotations_local table for optimistic Annotation updates
+    this.version(15)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+        edges_local: "++_localId, id, _op, _status, _timestamp",
+        annotations_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 15 (adding annotations_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v15 - annotations optimistic updates enabled"
+        );
+      });
+
+    // Version 16: Add cards_local table for optimistic Card updates
+    this.version(16)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+        edges_local: "++_localId, id, _op, _status, _timestamp",
+        annotations_local: "++_localId, id, _op, _status, _timestamp",
+        cards_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 16 (adding cards_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v16 - cards optimistic updates enabled"
+        );
+      });
+
+    // Version 17: Add reviewLogs_local table for optimistic ReviewLog updates
+    this.version(17)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Local optimistic tables (instant writes, pending sync)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+        edges_local: "++_localId, id, _op, _status, _timestamp",
+        annotations_local: "++_localId, id, _op, _status, _timestamp",
+        cards_local: "++_localId, id, _op, _status, _timestamp",
+        reviewLogs_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 17 (adding reviewLogs_local table for optimistic updates)"
+        );
+        // No data migration needed - new table starts empty
+        console.log(
+          "✅ Database upgraded to v17 - reviewLogs optimistic updates enabled"
         );
       });
   }

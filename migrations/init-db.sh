@@ -12,31 +12,37 @@ done
 
 echo "✓ Database is ready"
 
-# Check if migrations table exists
-MIGRATIONS_EXIST=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema='public' AND table_name='schema_migrations')")
-
-if [ "$MIGRATIONS_EXIST" = "f" ]; then
-  echo "→ Running initial schema migration..."
-  PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" < /migrations/001_initial_schema.sql
-  
-  # Create migrations tracking table
-  PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version TEXT PRIMARY KEY,
-      applied_at TIMESTAMP DEFAULT NOW()
-    );
-    INSERT INTO schema_migrations (version) VALUES ('001_initial_schema');
+# Create migrations tracking table if it doesn't exist
+PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
+  CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT NOW()
+  );
 EOSQL
-  echo "✓ Initial schema migration applied"
+
+# Run all pending migrations
+for migration_file in /migrations/*.sql; do
+  migration_name=$(basename "$migration_file" .sql)
   
-  # Initialize default presets
-  echo "→ Initializing default presets..."
-  # We'll call the Node.js initialization script here
-  # For now, presets will be initialized on first app startup via the UI button
-  # TODO: Add preset initialization to migration
-  echo "⊘ Preset initialization deferred to app startup"
-else
-  echo "⊘ Migrations already applied"
-fi
+  # Check if migration has been applied
+  APPLIED=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version='$migration_name')")
+  
+  if [ "$APPLIED" = "f" ]; then
+    echo "→ Running migration: $migration_name"
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" < "$migration_file"
+    
+    # Mark migration as applied
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
+      INSERT INTO schema_migrations (version) VALUES ('$migration_name');
+EOSQL
+    echo "✓ Migration applied: $migration_name"
+  fi
+done
+
+echo "✓ All migrations up to date"
+
+# Initialize default presets (deferred to app startup)
+echo "⊘ Preset initialization deferred to app startup"
 
 echo "✓ Database initialization complete"
+

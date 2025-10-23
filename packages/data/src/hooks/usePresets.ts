@@ -1,64 +1,207 @@
 /**
- * React hooks for Presets using Electric + WriteBuffer
- * Platform-agnostic data access with real-time sync
+ * React hooks for Presets using Two-Layer Architecture
+ * - Read: Merged data (synced + local) for instant feedback
+ * - Write: Local layer (optimistic) with background sync
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Preset, PresetTarget } from "@deeprecall/core";
 import * as presetsElectric from "../repos/presets.electric";
+import * as presetsLocal from "../repos/presets.local";
+import * as presetsMerged from "../repos/presets.merged";
+import * as presetsCleanup from "../repos/presets.cleanup";
 import { DEFAULT_PRESET_NAMES } from "../repos/presets.default";
+import { db } from "../db";
+import { useEffect } from "react";
 
 // ============================================================================
-// Query Hooks (Electric-based, live-synced)
+// Helper Functions
 // ============================================================================
 
 /**
- * Hook to get all presets (live-synced from Postgres via Electric)
+ * Sync Electric data to Dexie presets table
+ * Replaces entire table to ensure deletions are reflected
+ *
+ * CRITICAL: Must handle empty arrays to clear stale data
  */
-export function usePresets() {
-  return presetsElectric.usePresets();
+async function syncElectricToDexie(electricData: Preset[]): Promise<void> {
+  await db.transaction("rw", db.presets, async () => {
+    // Get current IDs in Dexie
+    const currentIds = new Set(await db.presets.toCollection().primaryKeys());
+
+    // Get IDs from Electric
+    const electricIds = new Set(electricData.map((p) => p.id));
+
+    // Find IDs to delete (in Dexie but not in Electric)
+    const idsToDelete = Array.from(currentIds).filter(
+      (id) => !electricIds.has(id)
+    );
+
+    // Delete stale records
+    if (idsToDelete.length > 0) {
+      await db.presets.bulkDelete(idsToDelete);
+      console.log(
+        `[Electric→Dexie] Deleted ${idsToDelete.length} stale preset(s)`
+      );
+    }
+
+    // Add/update records from Electric
+    if (electricData.length > 0) {
+      await db.presets.bulkPut(electricData);
+      console.log(`[Electric→Dexie] Synced ${electricData.length} preset(s)`);
+    }
+
+    // Log final state
+    if (idsToDelete.length === 0 && electricData.length === 0) {
+      console.log(`[Electric→Dexie] Presets table cleared (0 rows)`);
+    }
+  });
 }
 
-/**
- * Hook to get a single preset by ID (live-synced)
- */
-export function usePreset(id: string | undefined) {
-  const result = presetsElectric.usePreset(id);
+// ============================================================================
+// Query Hooks (Merged Layer: Synced + Local)
+// ============================================================================
 
-  // Transform to return single preset or undefined (not array)
+/**
+ * Hook to get all presets (merged: synced + pending local changes)
+ * Returns instant feedback with _local metadata for sync status
+ * Auto-cleanup when Electric confirms sync
+ */
+export function usePresets() {
+  const electricResult = presetsElectric.usePresets();
+
+  // Sync Electric data to Dexie presets table (for merge layer)
+  // CRITICAL: Must sync even when empty to clear stale data
+  useEffect(() => {
+    if (electricResult.data !== undefined) {
+      // Replace entire Dexie presets table with Electric data
+      // This ensures deletions are properly reflected
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[usePresets] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data]);
+
+  // Query merged data from Dexie
+  const mergedQuery = useQuery({
+    queryKey: ["presets", "merged"],
+    queryFn: async () => {
+      return presetsMerged.getAllMergedPresets();
+    },
+    staleTime: 0, // Always check for local changes
+  });
+
+  // Auto-cleanup and refresh when Electric data changes (synced)
+  useEffect(() => {
+    if (electricResult.data) {
+      // Cleanup confirmed syncs
+      presetsCleanup.cleanupSyncedPresets(electricResult.data).then(() => {
+        // Refresh merged view after cleanup
+        mergedQuery.refetch();
+      });
+    }
+  }, [electricResult.data]);
+
   return {
-    ...result,
-    data: result.data?.[0],
+    ...mergedQuery,
+    isLoading: electricResult.isLoading || mergedQuery.isLoading,
   };
 }
 
 /**
- * Hook to get presets for a specific target entity (live-synced)
+ * Hook to get a single preset by ID (merged)
+ */
+export function usePreset(id: string | undefined) {
+  const electricResult = presetsElectric.usePreset(id);
+
+  const mergedQuery = useQuery({
+    queryKey: ["presets", "merged", id],
+    queryFn: async () => {
+      if (!id) return undefined;
+      return presetsMerged.getMergedPreset(id);
+    },
+    enabled: !!id,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data && id) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data, id]);
+
+  return mergedQuery;
+}
+
+/**
+ * Hook to get presets for a specific target entity (merged)
  */
 export function usePresetsForTarget(targetEntity: PresetTarget) {
-  return presetsElectric.usePresetsForTarget(targetEntity);
+  const electricResult = presetsElectric.usePresetsForTarget(targetEntity);
+
+  const mergedQuery = useQuery({
+    queryKey: ["presets", "merged", "target", targetEntity],
+    queryFn: async () => {
+      return presetsMerged.getMergedPresetsForTarget(targetEntity);
+    },
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data]);
+
+  return mergedQuery;
 }
 
 /**
- * Hook to get system presets only (live-synced)
+ * Hook to get system presets only (merged)
  */
 export function useSystemPresets() {
-  return presetsElectric.useSystemPresets();
+  const electricResult = presetsElectric.useSystemPresets();
+
+  const mergedQuery = useQuery({
+    queryKey: ["presets", "merged", "system"],
+    queryFn: async () => {
+      return presetsMerged.getMergedSystemPresets();
+    },
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data]);
+
+  return mergedQuery;
 }
 
 /**
- * Hook to get user presets only (live-synced)
+ * Hook to get user presets only (merged)
  */
 export function useUserPresets() {
-  return presetsElectric.useUserPresets();
+  const allPresets = usePresets();
+
+  return {
+    ...allPresets,
+    data: allPresets.data?.filter((p) => !p.isSystem) ?? [],
+  };
 }
 
 // ============================================================================
-// Mutation Hooks
+// Mutation Hooks (Local Layer: Optimistic Writes)
 // ============================================================================
 
 /**
- * Hook to create a new preset
+ * Hook to create a new preset (optimistic)
+ * Writes locally first, syncs in background
  */
 export function useCreatePreset() {
   const queryClient = useQueryClient();
@@ -67,17 +210,18 @@ export function useCreatePreset() {
     mutationFn: async (
       data: Omit<Preset, "id" | "kind" | "createdAt" | "updatedAt">
     ) => {
-      return presetsElectric.createPreset(data);
+      // Write to local layer (instant)
+      return presetsLocal.createPresetLocal(data);
     },
     onSuccess: () => {
-      // Electric shapes will auto-update, but invalidate for consistency
-      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      // Invalidate merged queries to refetch immediately
+      queryClient.invalidateQueries({ queryKey: ["presets", "merged"] });
     },
   });
 }
 
 /**
- * Hook to update an existing preset
+ * Hook to update an existing preset (optimistic)
  */
 export function useUpdatePreset() {
   const queryClient = useQueryClient();
@@ -90,33 +234,35 @@ export function useUpdatePreset() {
       id: string;
       updates: Partial<Omit<Preset, "id" | "kind" | "createdAt">>;
     }) => {
-      return presetsElectric.updatePreset(id, updates);
+      // Write to local layer (instant)
+      return presetsLocal.updatePresetLocal(id, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      queryClient.invalidateQueries({ queryKey: ["presets", "merged"] });
     },
   });
 }
 
 /**
- * Hook to delete a preset
+ * Hook to delete a preset (optimistic)
  */
 export function useDeletePreset() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return presetsElectric.deletePreset(id);
+      // Write to local layer (instant)
+      return presetsLocal.deletePresetLocal(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      queryClient.invalidateQueries({ queryKey: ["presets", "merged"] });
     },
   });
 }
 
 /**
  * Hook to initialize default system presets
- * Checks for missing defaults and creates them
+ * NON-BLOCKING: Seeds locally first, syncs in background
  */
 export function useInitializePresets() {
   const queryClient = useQueryClient();
@@ -125,10 +271,15 @@ export function useInitializePresets() {
     mutationFn: async () => {
       // Import the initialization function
       const { initializePresets } = await import("../repos/presets.init");
-      return initializePresets();
+      await initializePresets();
+      // No blocking wait - local seeding is instant
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      // Invalidate merged queries to show new presets immediately
+      queryClient.invalidateQueries({ queryKey: ["presets", "merged"] });
+      console.log(
+        "[useInitializePresets] Preset initialization complete (syncing in background)"
+      );
     },
   });
 }

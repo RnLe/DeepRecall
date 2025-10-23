@@ -40,6 +40,10 @@ export interface AssetOperations {
 }
 
 interface LibraryLeftSidebarProps {
+  // Data
+  orphanedBlobs: BlobWithMetadata[];
+  isLoadingBlobs: boolean;
+
   // Operations
   blobOps: BlobOperations;
   assetOps: AssetOperations;
@@ -90,6 +94,8 @@ interface LibraryLeftSidebarProps {
 }
 
 export function LibraryLeftSidebar({
+  orphanedBlobs,
+  isLoadingBlobs,
   blobOps,
   assetOps,
   FileInbox,
@@ -104,22 +110,15 @@ export function LibraryLeftSidebar({
   const [isUploading, setIsUploading] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
-  const [orphanedBlobs, setOrphanedBlobs] = useState<BlobWithMetadata[]>([]);
 
-  // Fetch orphaned blobs
+  // Refetch function for when blobs are modified
   const refreshOrphanedBlobs = async () => {
     try {
-      const blobs = await blobOps.fetchOrphanedBlobs();
-      setOrphanedBlobs(blobs);
+      await blobOps.fetchOrphanedBlobs();
     } catch (error) {
-      console.error("Failed to fetch orphaned blobs:", error);
+      console.error("Failed to refresh orphaned blobs:", error);
     }
   };
-
-  // Initial fetch
-  useEffect(() => {
-    refreshOrphanedBlobs();
-  }, []);
 
   // Handle converting blob to asset when dropped on unlinked assets section
   const handleConvertBlobToAsset = async (blob: BlobWithMetadata) => {

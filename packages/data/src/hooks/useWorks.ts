@@ -1,98 +1,248 @@
 /**
- * React hooks for Works using Electric + WriteBuffer
- * Platform-agnostic data access with real-time sync
+ * React hooks for Works using Two-Layer Architecture
+ * - Read: Merged data (synced + local) for instant feedback
+ * - Write: Local layer (optimistic) with background sync
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Work, WorkExtended } from "@deeprecall/core";
 import * as worksElectric from "../repos/works.electric";
+import * as worksLocal from "../repos/works.local";
+import * as worksMerged from "../repos/works.merged";
+import * as worksCleanup from "../repos/works.cleanup";
+import { db } from "../db";
+import { useEffect } from "react";
 
 // ============================================================================
-// Query Hooks (Electric-based, live-synced)
+// Helper Functions
 // ============================================================================
 
 /**
- * Hook to get all works (live-synced from Postgres via Electric)
- * Returns: { data, isLoading, error, syncStatus }
+ * Sync Electric data to Dexie works table
+ * Replaces entire table to ensure deletions are reflected
+ *
+ * CRITICAL: Must handle empty arrays to clear stale data
+ */
+async function syncElectricToDexie(electricData: Work[]): Promise<void> {
+  await db.transaction("rw", db.works, async () => {
+    // Get current IDs in Dexie
+    const currentIds = new Set(await db.works.toCollection().primaryKeys());
+
+    // Get IDs from Electric
+    const electricIds = new Set(electricData.map((w) => w.id));
+
+    // Find IDs to delete (in Dexie but not in Electric)
+    const idsToDelete = Array.from(currentIds).filter(
+      (id) => !electricIds.has(id)
+    );
+
+    // Delete stale records
+    if (idsToDelete.length > 0) {
+      await db.works.bulkDelete(idsToDelete);
+      console.log(
+        `[Electric→Dexie] Deleted ${idsToDelete.length} stale work(s)`
+      );
+    }
+
+    // Add/update records from Electric
+    if (electricData.length > 0) {
+      await db.works.bulkPut(electricData);
+      console.log(`[Electric→Dexie] Synced ${electricData.length} work(s)`);
+    }
+
+    // Log final state
+    if (idsToDelete.length === 0 && electricData.length === 0) {
+      console.log(`[Electric→Dexie] Works table cleared (0 rows)`);
+    }
+  });
+}
+
+// ============================================================================
+// Query Hooks (Merged Layer: Synced + Local)
+// ============================================================================
+
+// ============================================================================
+// Query Hooks (Merged Layer: Synced + Local)
+// ============================================================================
+
+/**
+ * Hook to get all works (merged: synced + pending local changes)
+ * Returns instant feedback with _local metadata for sync status
+ * Auto-cleanup when Electric confirms sync
  */
 export function useWorks() {
-  return worksElectric.useWorks();
+  const electricResult = worksElectric.useWorks();
+
+  // Sync Electric data to Dexie works table (for merge layer)
+  // CRITICAL: Must sync even when empty to clear stale data
+  useEffect(() => {
+    if (electricResult.data !== undefined) {
+      // Replace entire Dexie works table with Electric data
+      // This ensures deletions are properly reflected
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        // Ignore DatabaseClosedError (happens during db.delete())
+        if (error.name === "DatabaseClosedError") {
+          return;
+        }
+        console.error(
+          "[useWorks] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data]);
+
+  // Query merged data from Dexie
+  const mergedQuery = useQuery({
+    queryKey: ["works", "merged"],
+    queryFn: async () => {
+      return worksMerged.getAllMergedWorks();
+    },
+    staleTime: 0, // Always check for local changes
+    initialData: [], // Start with empty array to prevent loading state
+  });
+
+  // Auto-cleanup and refresh when Electric data changes (synced)
+  useEffect(() => {
+    if (electricResult.data) {
+      // Cleanup confirmed syncs
+      worksCleanup.cleanupSyncedWorks(electricResult.data).then(() => {
+        // Refresh merged view after cleanup
+        mergedQuery.refetch();
+      });
+    }
+  }, [electricResult.data]);
+
+  return {
+    ...mergedQuery,
+    // Only show loading if merged query is loading (not Electric)
+    // This allows instant feedback from Dexie cache
+    isLoading: mergedQuery.isLoading,
+  };
 }
 
 /**
- * Hook to get a single work by ID (live-synced)
+ * Hook to get a single work by ID (merged)
  */
 export function useWork(id: string | undefined) {
-  const result = worksElectric.useWork(id);
+  const electricResult = worksElectric.useWork(id);
 
-  // Transform to return single work or undefined (not array)
-  return {
-    ...result,
-    data: result.data?.[0],
-  };
+  const mergedQuery = useQuery({
+    queryKey: ["works", "merged", id],
+    queryFn: async () => {
+      if (!id) return undefined;
+      return worksMerged.getMergedWork(id);
+    },
+    enabled: !!id,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data && id) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data, id]);
+
+  return mergedQuery;
 }
 
 /**
- * Hook to get works by type (live-synced)
+ * Hook to get works by type (merged)
  */
 export function useWorksByType(workType: string) {
-  return worksElectric.useWorksByType(workType);
+  const electricResult = worksElectric.useWorksByType(workType);
+
+  const mergedQuery = useQuery({
+    queryKey: ["works", "merged", "type", workType],
+    queryFn: async () => {
+      return worksMerged.getMergedWorksByType(workType);
+    },
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data]);
+
+  return mergedQuery;
 }
 
 /**
- * Hook to get favorite works (live-synced)
+ * Hook to get favorite works (merged)
  */
 export function useFavoriteWorks() {
-  return worksElectric.useFavoriteWorks();
+  const electricResult = worksElectric.useFavoriteWorks();
+
+  const mergedQuery = useQuery({
+    queryKey: ["works", "merged", "favorites"],
+    queryFn: async () => {
+      return worksMerged.getMergedFavoriteWorks();
+    },
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data]);
+
+  return mergedQuery;
 }
 
 /**
- * Hook to search works by title (client-side filtering)
- * Note: Requires loading all works first
+ * Hook to search works by title (client-side filtering on merged data)
  */
 export function useSearchWorks(query: string) {
-  const { data, isLoading, error, syncStatus } = useWorks();
+  const mergedQuery = useQuery({
+    queryKey: ["works", "merged", "search", query],
+    queryFn: async () => {
+      return worksMerged.searchMergedWorksByTitle(query);
+    },
+    staleTime: 0,
+  });
 
-  return {
-    data: data ? worksElectric.searchWorksByTitle(data, query) : undefined,
-    isLoading,
-    error,
-    syncStatus,
-  };
+  return mergedQuery;
 }
 
 // ============================================================================
-// Mutation Hooks (WriteBuffer-based, optimistic)
+// Mutation Hooks (Local Layer: Optimistic Writes)
+// ============================================================================
+
+// ============================================================================
+// Mutation Hooks (Local Layer: Optimistic Writes)
 // ============================================================================
 
 /**
- * Hook to create a new work
- * Writes to buffer immediately, syncs in background
+ * Hook to create a new work (instant local write)
+ * Writes to local Dexie immediately, syncs in background
  */
 export function useCreateWork() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Omit<Work, "id" | "createdAt" | "updatedAt">) => {
-      return worksElectric.createWork(data);
+    mutationFn: async (
+      data: Omit<Work, "id" | "kind" | "createdAt" | "updatedAt">
+    ) => {
+      return worksLocal.createWorkLocal(data);
     },
     onSuccess: (newWork: Work) => {
       console.log(
-        `[useCreateWork] Created work ${newWork.id} (queued for sync)`
+        `✅ [useCreateWork] Created work ${newWork.id} (pending sync)`
       );
-
-      // Optimistically invalidate queries (Electric will sync back)
-      queryClient.invalidateQueries({ queryKey: ["works"] });
+      // Invalidate merged queries to show new work immediately
+      queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("[useCreateWork] Failed to create work:", error);
+      console.error("❌ [useCreateWork] Failed to create work:", error);
     },
   });
 }
 
 /**
- * Hook to update a work
- * Writes to buffer immediately, syncs in background
+ * Hook to update a work (instant local write)
  */
 export function useUpdateWork() {
   const queryClient = useQueryClient();
@@ -105,65 +255,58 @@ export function useUpdateWork() {
       id: string;
       updates: Partial<Omit<Work, "id" | "kind" | "createdAt">>;
     }) => {
-      await worksElectric.updateWork(id, updates);
+      await worksLocal.updateWorkLocal(id, updates);
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Work> }) => {
-      console.log(`[useUpdateWork] Updated work ${id} (queued for sync)`);
-
-      // Optimistically invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["works"] });
-      queryClient.invalidateQueries({ queryKey: ["work", id] });
+      console.log(`✅ [useUpdateWork] Updated work ${id} (pending sync)`);
+      // Invalidate merged queries
+      queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("[useUpdateWork] Failed to update work:", error);
+      console.error("❌ [useUpdateWork] Failed to update work:", error);
     },
   });
 }
 
 /**
- * Hook to delete a work
- * Writes to buffer immediately, syncs in background
+ * Hook to delete a work (instant local write)
  */
 export function useDeleteWork() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await worksElectric.deleteWork(id);
+      await worksLocal.deleteWorkLocal(id);
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(`[useDeleteWork] Deleted work ${id} (queued for sync)`);
-
-      // Optimistically invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["works"] });
-      queryClient.invalidateQueries({ queryKey: ["work", id] });
+      console.log(`✅ [useDeleteWork] Deleted work ${id} (pending sync)`);
+      // Invalidate merged queries to remove immediately
+      queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("[useDeleteWork] Failed to delete work:", error);
+      console.error("❌ [useDeleteWork] Failed to delete work:", error);
     },
   });
 }
 
 /**
- * Hook to toggle favorite status
- * Convenience wrapper around updateWork
+ * Hook to toggle favorite status (instant local write)
  */
 export function useToggleWorkFavorite() {
   const updateWork = useUpdateWork();
 
   return useMutation({
     mutationFn: async (work: Work) => {
-      await worksElectric.toggleWorkFavorite(work);
-      return work;
-    },
-    onSuccess: (work: Work) => {
-      console.log(`[useToggleWorkFavorite] Toggled favorite for ${work.id}`);
+      return updateWork.mutateAsync({
+        id: work.id,
+        updates: { favorite: !work.favorite },
+      });
     },
     onError: (error: Error) => {
       console.error(
-        "[useToggleWorkFavorite] Failed to toggle favorite:",
+        "❌ [useToggleWorkFavorite] Failed to toggle favorite:",
         error
       );
     },
@@ -172,7 +315,8 @@ export function useToggleWorkFavorite() {
 
 /**
  * Hook to create a work with its first asset
- * Both operations enqueued as separate writes
+ * TEMPORARY: Uses Electric repo directly until Assets are migrated
+ * Both work and asset operations are enqueued as separate writes
  */
 export function useCreateWorkWithAsset() {
   const queryClient = useQueryClient();
@@ -197,22 +341,25 @@ export function useCreateWorkWithAsset() {
         metadata?: Record<string, unknown>;
       };
     }) => {
+      // Use Electric repo's implementation (which handles both work and asset)
+      // Once Assets are migrated, this will be refactored to use worksLocal + assetsLocal
       return worksElectric.createWorkWithAsset(params);
     },
-    onSuccess: ({ work, asset }: { work: Work; asset: any }) => {
+    onSuccess: ({ work, asset }: { work: any; asset: any }) => {
       console.log(
-        `[useCreateWorkWithAsset] Created work ${work.id}${
+        `✅ [useCreateWorkWithAsset] Created work ${work.id}${
           asset ? ` with asset ${asset.id}` : ""
-        } (queued for sync)`
+        } (pending sync)`
       );
 
       // Invalidate both works and assets queries
-      queryClient.invalidateQueries({ queryKey: ["works"] });
+      queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
     },
     onError: (error: Error) => {
       console.error(
-        "[useCreateWorkWithAsset] Failed to create work with asset:",
+        "❌ [useCreateWorkWithAsset] Failed to create work with asset:",
         error
       );
     },

@@ -49,8 +49,11 @@ export function InputModal({
   };
 
   return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-neutral-850 border border-neutral-700 rounded-lg shadow-2xl max-w-md w-full">
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      style={{ zIndex: 9999 }}
+    >
+      <div className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl max-w-md w-full relative">
         <form onSubmit={handleSubmit}>
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-neutral-700">

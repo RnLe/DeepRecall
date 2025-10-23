@@ -119,6 +119,9 @@ export interface WriteBuffer {
   /** Get total number of pending changes */
   size(): Promise<number>;
 
+  /** Manually flush pending changes to server */
+  flush(): Promise<void>;
+
   /** Get all changes (for debugging) */
   getAll(): Promise<WriteChange[]>;
 
@@ -242,10 +245,13 @@ export function createWriteBuffer(): WriteBuffer {
         applied: all.filter((c) => c.status === "applied").length,
         error: all.filter((c) => c.status === "error").length,
       };
-      const byTable = all.reduce((acc, c) => {
-        acc[c.table] = (acc[c.table] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byTable = all.reduce(
+        (acc, c) => {
+          acc[c.table] = (acc[c.table] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
       const maxRetries = Math.max(...all.map((c) => c.retry_count), 0);
 
       return {
@@ -272,6 +278,21 @@ export function createWriteBuffer(): WriteBuffer {
 
       console.log(`[WriteBuffer] Cleared ${failed.length} failed changes`);
       return failed.length;
+    },
+
+    /**
+     * Manually flush pending changes to server
+     * Uses the global FlushWorker if available
+     */
+    async flush() {
+      const worker = getFlushWorker();
+      if (worker) {
+        await worker.flush();
+      } else {
+        console.warn(
+          "[WriteBuffer] No FlushWorker initialized, changes will flush on next scheduled interval"
+        );
+      }
     },
   };
 }
@@ -406,8 +427,8 @@ export class FlushWorker {
     }
 
     try {
-      // Send batch to server
-      const url = `${this.config.apiBase}/api/writes/batch`;
+      // Send batch to server (with trailing slash for Next.js compatibility)
+      const url = `${this.config.apiBase}/api/writes/batch/`;
       console.log(
         `[FlushWorker] POSTing to ${url} with ${retryable.length} changes`
       );

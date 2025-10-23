@@ -1,99 +1,235 @@
 /**
- * React hooks for Activities using Electric + WriteBuffer
- * Platform-agnostic data access with real-time sync
+ * React hooks for Activities using Two-Layer Architecture
+ * - Read: Merged data (synced + local) for instant feedback
+ * - Write: Local layer (optimistic) with background sync
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Activity } from "@deeprecall/core";
 import * as activitiesElectric from "../repos/activities.electric";
+import * as activitiesLocal from "../repos/activities.local";
+import * as activitiesMerged from "../repos/activities.merged";
+import * as activitiesCleanup from "../repos/activities.cleanup";
+import { db } from "../db";
+import { useEffect } from "react";
 
 // ============================================================================
-// Query Hooks (Electric-based, live-synced)
+// Helper Functions
 // ============================================================================
 
 /**
- * Hook to get all activities (live-synced from Postgres via Electric)
+ * Sync Electric data to Dexie activities table
+ * Replaces entire table to ensure deletions are reflected
+ *
+ * CRITICAL: Must handle empty arrays to clear stale data
+ */
+async function syncElectricToDexie(electricData: Activity[]): Promise<void> {
+  await db.transaction("rw", db.activities, async () => {
+    // Get current IDs in Dexie
+    const currentIds = new Set(
+      await db.activities.toCollection().primaryKeys()
+    );
+
+    // Get IDs from Electric
+    const electricIds = new Set(electricData.map((a) => a.id));
+
+    // Find IDs to delete (in Dexie but not in Electric)
+    const idsToDelete = Array.from(currentIds).filter(
+      (id) => !electricIds.has(id)
+    );
+
+    // Delete stale records
+    if (idsToDelete.length > 0) {
+      await db.activities.bulkDelete(idsToDelete);
+      console.log(
+        `[Electric→Dexie] Deleted ${idsToDelete.length} stale activity/activities`
+      );
+    }
+
+    // Add/update records from Electric
+    if (electricData.length > 0) {
+      await db.activities.bulkPut(electricData);
+      console.log(
+        `[Electric→Dexie] Synced ${electricData.length} activity/activities`
+      );
+    }
+
+    // Log final state
+    if (idsToDelete.length === 0 && electricData.length === 0) {
+      console.log(`[Electric→Dexie] Activities table cleared (0 rows)`);
+    }
+  });
+}
+
+// ============================================================================
+// Query Hooks (Merged Layer: Synced + Local)
+// ============================================================================
+
+/**
+ * Hook to get all activities (merged: synced + pending local changes)
+ * Returns instant feedback with _local metadata for sync status
+ * Auto-cleanup when Electric confirms sync
  */
 export function useActivities() {
-  return activitiesElectric.useActivities();
+  const electricResult = activitiesElectric.useActivities();
+
+  // Sync Electric data to Dexie activities table (for merge layer)
+  // CRITICAL: Must sync even when empty to clear stale data
+  useEffect(() => {
+    if (electricResult.data !== undefined) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[useActivities] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data]);
+
+  // Query merged data from Dexie
+  const mergedQuery = useQuery({
+    queryKey: ["activities", "merged"],
+    queryFn: async () => {
+      return activitiesMerged.getAllMergedActivities();
+    },
+    staleTime: 0, // Always check for local changes
+    initialData: [], // Start with empty array to prevent loading state
+  });
+
+  // Auto-cleanup and refresh when Electric data changes (synced)
+  useEffect(() => {
+    if (electricResult.data) {
+      activitiesCleanup
+        .cleanupSyncedActivities(electricResult.data)
+        .then(() => {
+          mergedQuery.refetch();
+        });
+    }
+  }, [electricResult.data]);
+
+  return {
+    ...mergedQuery,
+    // Only show loading if merged query is loading (not Electric)
+    // This allows instant feedback from Dexie cache
+    isLoading: mergedQuery.isLoading,
+  };
 }
 
 /**
- * Hook to get a single activity by ID (live-synced)
+ * Hook to get a single activity by ID (merged)
  */
 export function useActivity(id: string | undefined) {
-  return activitiesElectric.useActivity(id);
+  const electricResult = activitiesElectric.useActivity(id);
+
+  const mergedQuery = useQuery({
+    queryKey: ["activities", "merged", id],
+    queryFn: async () => {
+      if (!id) return undefined;
+      return activitiesMerged.getMergedActivity(id);
+    },
+    enabled: !!id,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data && id) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data, id]);
+
+  return mergedQuery;
 }
 
 /**
- * Hook to get activities by type (live-synced)
+ * Hook to get activities by type (merged)
  */
 export function useActivitiesByType(activityType: string) {
-  return activitiesElectric.useActivitiesByType(activityType);
+  const electricResult = activitiesElectric.useActivitiesByType(activityType);
+
+  const mergedQuery = useQuery({
+    queryKey: ["activities", "merged", "type", activityType],
+    queryFn: async () => {
+      return activitiesMerged.getMergedActivitiesByType(activityType);
+    },
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (electricResult.data) {
+      mergedQuery.refetch();
+    }
+  }, [electricResult.data]);
+
+  return mergedQuery;
 }
 
 /**
- * Hook to search activities by title (client-side filtering)
+ * Hook to search activities by title (client-side filtering on merged data)
  */
 export function useSearchActivities(query: string) {
-  const { data, isLoading, error, syncStatus } = useActivities();
+  const mergedQuery = useQuery({
+    queryKey: ["activities", "merged", "search", query],
+    queryFn: async () => {
+      return activitiesMerged.searchMergedActivitiesByTitle(query);
+    },
+    staleTime: 0,
+  });
 
-  return {
-    data: data
-      ? activitiesElectric.searchActivitiesByTitle(data, query)
-      : undefined,
-    isLoading,
-    error,
-    syncStatus,
-  };
+  return mergedQuery;
 }
 
 /**
- * Hook to get activities in date range (client-side filtering)
+ * Hook to get activities in date range (client-side filtering on merged data)
  */
 export function useActivitiesInRange(startDate: string, endDate: string) {
-  const { data, isLoading, error, syncStatus } = useActivities();
+  const mergedQuery = useQuery({
+    queryKey: ["activities", "merged", "range", startDate, endDate],
+    queryFn: async () => {
+      return activitiesMerged.getMergedActivitiesInRange(startDate, endDate);
+    },
+    staleTime: 0,
+  });
 
-  return {
-    data: data
-      ? activitiesElectric.listActivitiesInRange(data, startDate, endDate)
-      : undefined,
-    isLoading,
-    error,
-    syncStatus,
-  };
+  return mergedQuery;
 }
 
 // ============================================================================
-// Mutation Hooks (WriteBuffer-based, optimistic)
+// Mutation Hooks (Local Layer: Optimistic Writes)
+// ============================================================================
+
+// ============================================================================
+// Mutation Hooks (Local Layer: Optimistic Writes)
 // ============================================================================
 
 /**
- * Hook to create a new activity
+ * Hook to create a new activity (instant local write)
+ * Writes to local Dexie immediately, syncs in background
  */
 export function useCreateActivity() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (
-      data: Omit<Activity, "id" | "createdAt" | "updatedAt">
+      data: Omit<Activity, "id" | "kind" | "createdAt" | "updatedAt">
     ) => {
-      return activitiesElectric.createActivity(data);
+      return activitiesLocal.createActivityLocal(data);
     },
     onSuccess: (newActivity: Activity) => {
       console.log(
-        `[useCreateActivity] Created activity ${newActivity.id} (queued for sync)`
+        `✅ [useCreateActivity] Created activity ${newActivity.id} (pending sync)`
       );
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      // Invalidate merged queries to show new activity immediately
+      queryClient.invalidateQueries({ queryKey: ["activities", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("[useCreateActivity] Failed to create activity:", error);
+      console.error("❌ [useCreateActivity] Failed to create activity:", error);
     },
   });
 }
 
 /**
- * Hook to update an activity
+ * Hook to update an activity (instant local write)
  */
 export function useUpdateActivity() {
   const queryClient = useQueryClient();
@@ -106,42 +242,42 @@ export function useUpdateActivity() {
       id: string;
       updates: Partial<Omit<Activity, "id" | "kind" | "createdAt">>;
     }) => {
-      await activitiesElectric.updateActivity(id, updates);
+      await activitiesLocal.updateActivityLocal(id, updates);
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Activity> }) => {
       console.log(
-        `[useUpdateActivity] Updated activity ${id} (queued for sync)`
+        `✅ [useUpdateActivity] Updated activity ${id} (pending sync)`
       );
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
-      queryClient.invalidateQueries({ queryKey: ["activity", id] });
+      // Invalidate merged queries
+      queryClient.invalidateQueries({ queryKey: ["activities", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("[useUpdateActivity] Failed to update activity:", error);
+      console.error("❌ [useUpdateActivity] Failed to update activity:", error);
     },
   });
 }
 
 /**
- * Hook to delete an activity
+ * Hook to delete an activity (instant local write)
  */
 export function useDeleteActivity() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await activitiesElectric.deleteActivity(id);
+      await activitiesLocal.deleteActivityLocal(id);
       return id;
     },
     onSuccess: (id: string) => {
       console.log(
-        `[useDeleteActivity] Deleted activity ${id} (queued for sync)`
+        `✅ [useDeleteActivity] Deleted activity ${id} (pending sync)`
       );
-      queryClient.invalidateQueries({ queryKey: ["activities"] });
-      queryClient.invalidateQueries({ queryKey: ["activity", id] });
+      // Invalidate merged queries to remove immediately
+      queryClient.invalidateQueries({ queryKey: ["activities", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("[useDeleteActivity] Failed to delete activity:", error);
+      console.error("❌ [useDeleteActivity] Failed to delete activity:", error);
     },
   });
 }

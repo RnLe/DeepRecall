@@ -26,7 +26,7 @@ import {
  * Write change schema
  */
 const WriteChangeSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1), // Accept any non-empty string ID (UUIDs from uuid library may have different formats)
   table: z.enum([
     "works",
     "assets",
@@ -261,6 +261,9 @@ async function applyChange(
  * POST handler
  */
 export async function POST(request: NextRequest) {
+  console.log("[WritesBatch] API endpoint called!");
+  console.log("[WritesBatch] DATABASE_URL:", process.env.DATABASE_URL);
+
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
   });

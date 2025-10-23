@@ -49,9 +49,9 @@ function ElectricInitializer() {
       maxRetryDelay: 30000,
       maxRetries: 5,
     });
-    worker.start(5000); // Check every 5 seconds
+    worker.start(1000); // Check every 1 second for responsive sync
     workerRef.current = worker;
-    console.log("[FlushWorker] Started (interval: 5000ms)");
+    console.log("[FlushWorker] Started (interval: 1000ms)");
     console.log(`[FlushWorker] API endpoint: ${apiBase}/api/writes/batch`);
 
     // Expose for debugging in browser console

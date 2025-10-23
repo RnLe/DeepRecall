@@ -336,7 +336,10 @@ export function UnlinkedAssetsList({
             const displayName = getDisplayName(asset.filename);
             const fileExt = getFileExtension(asset.filename, asset.mime);
             const colors = getFileTypeColor(fileExt);
-            const metadata = getFileMetadata(asset.mime, asset.pageCount);
+            const metadata = getFileMetadata(
+              asset.mime,
+              asset.pageCount ? Number(asset.pageCount) : undefined
+            );
 
             return (
               <div
@@ -348,10 +351,12 @@ export function UnlinkedAssetsList({
                   // Also set blob data for library area drops
                   const blobData = {
                     sha256: asset.sha256,
-                    size: asset.bytes,
+                    size: Number(asset.bytes),
                     mime: asset.mime,
                     filename: asset.filename,
-                    pageCount: asset.pageCount,
+                    pageCount: asset.pageCount
+                      ? Number(asset.pageCount)
+                      : undefined,
                     path: null,
                   };
                   e.dataTransfer.setData(
@@ -441,7 +446,9 @@ export function UnlinkedAssetsList({
                         >
                           {fileExt}
                         </span>
-                        <span>{(asset.bytes / 1024 / 1024).toFixed(2)} MB</span>
+                        <span>
+                          {(Number(asset.bytes) / 1024 / 1024).toFixed(2)} MB
+                        </span>
                         {metadata && (
                           <>
                             <span>·</span>

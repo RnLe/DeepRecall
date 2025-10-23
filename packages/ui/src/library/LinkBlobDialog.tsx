@@ -138,19 +138,34 @@ export function LinkBlobDialog({
     (p: Preset) => p.targetEntity === "work"
   );
 
+  // Debug: Log preset filtering
+  console.log("[LinkBlobDialog] All presets:", allPresets.length);
+  console.log(
+    "[LinkBlobDialog] System presets (work):",
+    systemPresetsFiltered.length
+  );
+  console.log(
+    "[LinkBlobDialog] User presets (work):",
+    userPresetsFiltered.length
+  );
+  console.log(
+    "[LinkBlobDialog] User presets details:",
+    userPresets.map((p) => ({ name: p.name, target: p.targetEntity }))
+  );
+
   // Extract initial values from blob pdfMetadata or prefillValues
   const initialValues =
     Object.keys(prefillValues).length > 0
       ? prefillValues
       : blob.pdfMetadata
-      ? {
-          title: blob.pdfMetadata.title || blob.filename || "Untitled",
-          // PDF author field is a string, would need parsing for multiple authors
-          // Add more metadata mappings as needed
-        }
-      : {
-          title: blob.filename || "Untitled",
-        };
+        ? {
+            title: blob.pdfMetadata.title || blob.filename || "Untitled",
+            // PDF author field is a string, would need parsing for multiple authors
+            // Add more metadata mappings as needed
+          }
+        : {
+            title: blob.filename || "Untitled",
+          };
 
   // Handle preset selection
   const handlePresetSelect = (presetId: string | null) => {
@@ -218,7 +233,6 @@ export function LinkBlobDialog({
 
       // Create Work first
       const work = await createWork.mutateAsync({
-        kind: "work" as const,
         title: (coreFields.title as string) || "Untitled",
         subtitle: coreFields.subtitle as string | undefined,
         authorIds,
@@ -236,11 +250,10 @@ export function LinkBlobDialog({
 
       // Then create Asset linked to the work
       await createAsset.mutateAsync({
-        kind: "asset" as const,
         workId: work.id,
         sha256: blob.sha256,
         filename: blob.filename || "unknown.pdf",
-        bytes: blob.size,
+        bytes: typeof blob.size === "bigint" ? Number(blob.size) : blob.size,
         mime: blob.mime,
         role: "main",
         pageCount: blob.pageCount,
@@ -266,11 +279,10 @@ export function LinkBlobDialog({
     try {
       // Create asset linked directly to the work
       await createAsset.mutateAsync({
-        kind: "asset" as const,
         workId: selectedWorkId,
         sha256: blob.sha256,
         filename: blob.filename || "unknown.pdf",
-        bytes: blob.size,
+        bytes: typeof blob.size === "bigint" ? Number(blob.size) : blob.size,
         mime: blob.mime,
         role: "main",
         pageCount: blob.pageCount,
