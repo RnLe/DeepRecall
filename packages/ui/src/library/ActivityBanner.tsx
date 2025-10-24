@@ -3,12 +3,14 @@
  * Displays an activity as a full-width banner that can accept dropped works/assets
  * Empty state: Thin banner with title and info in one line
  * Populated state: Expands to show contained materials in a grid
+ *
+ * Uses Electric hooks and imported WorkCard components directly
  */
 
 "use client";
 
 import { useState } from "react";
-import type { ActivityExtended, Work, Asset } from "@deeprecall/core";
+import type { Activity, Work, Asset } from "@deeprecall/core";
 import {
   Calendar,
   Building2,
@@ -18,19 +20,24 @@ import {
   Grid3x3,
   List,
 } from "lucide-react";
+import { useCreateEdge, useDeleteEdgesBetween } from "@deeprecall/data/hooks";
+import { WorkCardCompact } from "./WorkCardCompact";
+import { WorkCardList } from "./WorkCardList";
+
+// Extended activity with resolved edges
+interface ActivityExtended extends Activity {
+  works?: Work[];
+  assets?: Asset[];
+}
+
+// Platform-specific operations interface (minimal)
+export interface ActivityBannerOperations {
+  onDropFiles: (activityId: string, files: FileList) => void;
+}
 
 interface ActivityBannerProps {
   activity: ActivityExtended;
-  onDropWork: (activityId: string, workId: string) => void;
-  onDropBlob: (activityId: string, blobId: string) => void;
-  onDropAsset: (activityId: string, assetId: string) => void;
-  onDropFiles: (activityId: string, files: FileList) => void;
-  onUnlinkWork: (activityId: string, workId: string) => void;
-  onUnlinkAsset: (activityId: string, assetId: string) => void;
-
-  // Card components - injected for platform independence
-  WorkCardCompact: React.ComponentType<{ work: Work; onClick: () => void }>;
-  WorkCardList: React.ComponentType<{ work: Work; onClick: () => void }>;
+  operations: ActivityBannerOperations;
 }
 
 const ACTIVITY_TYPE_ICONS: Record<string, string> = {
@@ -53,17 +60,7 @@ const ACTIVITY_TYPE_COLORS: Record<string, string> = {
   conference: "border-amber-600/50",
 };
 
-export function ActivityBanner({
-  activity,
-  onDropWork,
-  onDropBlob,
-  onDropAsset,
-  onDropFiles,
-  onUnlinkWork,
-  onUnlinkAsset,
-  WorkCardCompact,
-  WorkCardList,
-}: ActivityBannerProps) {
+export function ActivityBanner({ activity, operations }: ActivityBannerProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [workViewMode, setWorkViewMode] = useState<"compact" | "list">(
@@ -73,6 +70,40 @@ export function ActivityBanner({
   const works = activity.works || [];
   const assets = activity.assets || [];
   const hasContent = works.length > 0 || assets.length > 0;
+
+  // Electric hooks for linking/unlinking
+  const createEdgeMutation = useCreateEdge();
+  const deleteEdgesBetweenMutation = useDeleteEdgesBetween();
+
+  const handleDropWork = async (activityId: string, workId: string) => {
+    await createEdgeMutation.mutateAsync({
+      fromId: activityId,
+      toId: workId,
+      relation: "contains",
+    });
+  };
+
+  const handleDropAsset = async (activityId: string, assetId: string) => {
+    await createEdgeMutation.mutateAsync({
+      fromId: activityId,
+      toId: assetId,
+      relation: "contains",
+    });
+  };
+
+  const handleUnlinkWork = async (activityId: string, workId: string) => {
+    await deleteEdgesBetweenMutation.mutateAsync({
+      fromId: activityId,
+      toId: workId,
+    });
+  };
+
+  const handleUnlinkAsset = async (activityId: string, assetId: string) => {
+    await deleteEdgesBetweenMutation.mutateAsync({
+      fromId: activityId,
+      toId: assetId,
+    });
+  };
 
   const colorClass =
     ACTIVITY_TYPE_COLORS[activity.activityType] ||
@@ -137,7 +168,7 @@ export function ActivityBanner({
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -145,26 +176,23 @@ export function ActivityBanner({
     // Priority 1: Check for external files
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      onDropFiles(activity.id, files);
+      operations.onDropFiles(activity.id, files);
       return;
     }
 
     // Priority 2: Check for drag data
     const workId = e.dataTransfer.getData("application/x-work-id");
-    const blobId = e.dataTransfer.getData("application/x-blob-id");
     const assetId = e.dataTransfer.getData("application/x-asset-id");
 
     if (workId) {
-      onDropWork(activity.id, workId);
+      await handleDropWork(activity.id, workId);
     } else if (assetId) {
       // Prefer linking existing Assets by ID when available
       // This avoids accidentally creating a duplicate Asset from the same blob
       // Edge: { fromId: activityId, toId: assetId, relation: "contains" }
-      onDropAsset(activity.id, assetId);
-    } else if (blobId) {
-      // Fallback: Blob dropped (e.g., from New Files inbox) → create Asset then link
-      onDropBlob(activity.id, blobId);
+      await handleDropAsset(activity.id, assetId);
     }
+    // Note: Blob drops (from New Files inbox) are not yet supported - would need createAsset + link
   };
 
   return (
@@ -298,6 +326,10 @@ export function ActivityBanner({
                       onClick={() => {
                         /* TODO: navigate to work detail */
                       }}
+                      operations={{
+                        navigate: () => {},
+                        getBlobUrl: (sha256) => `/api/blob/${sha256}`,
+                      }}
                     />
                   ) : (
                     <WorkCardList
@@ -305,11 +337,15 @@ export function ActivityBanner({
                       onClick={() => {
                         /* TODO: navigate to work detail */
                       }}
+                      operations={{
+                        navigate: () => {},
+                        getBlobUrl: (sha256) => `/api/blob/${sha256}`,
+                      }}
                     />
                   )}
                   {/* Remove Work button positioned with its center at the card's corner */}
                   <button
-                    onClick={() => onUnlinkWork(activity.id, work.id)}
+                    onClick={() => handleUnlinkWork(activity.id, work.id)}
                     className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-red-600 text-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover/work:opacity-100 transition-all hover:bg-red-500 z-10"
                     title="Remove from activity"
                   >
@@ -334,7 +370,7 @@ export function ActivityBanner({
                   >
                     <span className="truncate flex-1">{asset.filename}</span>
                     <button
-                      onClick={() => onUnlinkAsset(activity.id, asset.id)}
+                      onClick={() => handleUnlinkAsset(activity.id, asset.id)}
                       className="ml-2 p-1 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded opacity-0 group-hover/asset:opacity-100 transition-all"
                       title="Remove from activity"
                     >

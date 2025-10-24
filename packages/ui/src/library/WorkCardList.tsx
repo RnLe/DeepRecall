@@ -2,91 +2,83 @@
  * WorkCardList Component (Platform-agnostic)
  * Compact list view without thumbnail, horizontal layout
  * Best for scanning many works quickly
+ * Uses Electric hooks directly for all data fetching
  */
 
 import { Star, Users, Calendar, FileText, Building } from "lucide-react";
-import type { WorkExtended, BlobWithMetadata } from "@deeprecall/core";
-import { useState } from "react";
+import type { Work, Asset, BlobWithMetadata } from "@deeprecall/core";
+import { useState, useMemo } from "react";
+import {
+  useAuthorsByIds,
+  useDeleteWork,
+  usePresets,
+} from "@deeprecall/data/hooks";
+import { useReaderUI } from "@deeprecall/data/stores";
+import { assetsElectric } from "@deeprecall/data/repos";
+import { getPrimaryAuthors, getDisplayYear } from "../utils/library";
+import { WorkContextMenu } from "./WorkContextMenu";
+import { EditWorkDialog } from "./EditWorkDialog";
+import { BibtexExportModal } from "./BibtexExportModal";
 
-interface WorkCardListProps {
-  work: WorkExtended;
-  onClick?: () => void;
-
-  // Platform-specific data
-  authors: string;
-  year: string | null;
-  presets: any[];
-
-  // Platform-specific actions
-  onDelete: () => Promise<void>;
-  onDoubleClick: () => void;
-  onEdit: () => void;
-  onExportBibtex: () => void;
-  onDropBlob: (blob: BlobWithMetadata) => void;
-  onDropAsset: (assetId: string) => Promise<void>;
+// Platform-specific operations interface
+export interface WorkCardListOperations {
+  navigate: (path: string) => void;
   getBlobUrl: (sha256: string) => string;
-
-  // Platform-specific components (passed as props)
-  WorkContextMenu: React.ComponentType<{
-    workId: string;
-    onDelete: () => void;
-    onEdit: () => void;
-    onExportBibtex: () => void;
-  }>;
-  LinkBlobDialog: React.ComponentType<{
-    blob: BlobWithMetadata;
-    preselectedWorkId: string;
-    onSuccess: () => void;
-    onCancel: () => void;
-  }>;
-  EditWorkDialog: React.ComponentType<{
-    work: WorkExtended;
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-    getBlobUrl: (sha256: string) => string;
-  }>;
-  BibtexExportModal: React.ComponentType<{
-    work: WorkExtended;
-    isOpen: boolean;
-    onClose: () => void;
-  }>;
 }
 
-export function WorkCardList({
-  work,
-  onClick,
-  authors,
-  year,
-  presets,
-  onDelete,
-  onDoubleClick,
-  onEdit,
-  onExportBibtex,
-  onDropBlob,
-  onDropAsset,
-  getBlobUrl,
-  WorkContextMenu,
-  LinkBlobDialog,
-  EditWorkDialog,
-  BibtexExportModal,
-}: WorkCardListProps) {
+// Extended work with assets
+interface WorkWithAssets extends Work {
+  assets?: Asset[];
+}
+
+interface WorkCardListProps {
+  work: WorkWithAssets;
+  onClick?: () => void;
+  operations: WorkCardListOperations;
+}
+
+export function WorkCardList({ work, onClick, operations }: WorkCardListProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [droppedBlob, setDroppedBlob] = useState<BlobWithMetadata | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
+  // Electric hooks for data
+  const { data: authorEntities = [] } = useAuthorsByIds(work.authorIds || []);
+  const { data: allPresets = [] } = usePresets();
+  const deleteWorkMutation = useDeleteWork();
+  const { openTab, setLeftSidebarView } = useReaderUI();
+
+  // Compute display values
+  const authors = useMemo(
+    () => getPrimaryAuthors(authorEntities, 3),
+    [authorEntities]
+  );
+  const year = useMemo(() => getDisplayYear(work), [work]);
   const assetCount = work.assets?.length || 0;
   const journal = work.journal;
 
   // Find the preset for this work
   const preset = work.presetId
-    ? presets?.find((p) => p.id === work.presetId)
+    ? allPresets.find((p) => p.id === work.presetId)
     : null;
 
   const handleDelete = async () => {
     if (!confirm(`Delete "${work.title}"?`)) return;
-    await onDelete();
+    await deleteWorkMutation.mutateAsync(work.id);
+  };
+
+  const handleDoubleClick = () => {
+    // Find first PDF asset
+    const pdfAsset = work.assets?.find(
+      (asset) => asset.mime === "application/pdf"
+    );
+    if (!pdfAsset) return;
+
+    // Open in reader
+    openTab(pdfAsset.sha256, work.title || pdfAsset.filename);
+    setLeftSidebarView("annotations");
+    operations.navigate("/reader");
   };
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -113,6 +105,16 @@ export function WorkCardList({
     setIsDragOver(false);
   };
 
+  const handleDropAsset = async (assetId: string) => {
+    try {
+      await assetsElectric.updateAsset(assetId, { workId: work.id });
+      console.log("✅ Asset linked to work successfully!");
+    } catch (error) {
+      console.error("Failed to link asset to work:", error);
+      alert("Failed to link asset to work");
+    }
+  };
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -122,7 +124,7 @@ export function WorkCardList({
     const assetId = e.dataTransfer.getData("application/x-asset-id");
 
     if (assetId) {
-      await onDropAsset(assetId);
+      await handleDropAsset(assetId);
     } else if (blobData) {
       try {
         const blob = JSON.parse(blobData) as BlobWithMetadata;
@@ -137,7 +139,7 @@ export function WorkCardList({
     <>
       <div
         onClick={onClick}
-        onDoubleClick={onDoubleClick}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -243,14 +245,28 @@ export function WorkCardList({
         </div>
       </div>
 
-      {/* Link dialog */}
+      {/* Link dialog - TODO: LinkBlobDialog needs full optimization separately */}
       {droppedBlob && (
-        <LinkBlobDialog
-          blob={droppedBlob}
-          preselectedWorkId={work.id}
-          onSuccess={() => setDroppedBlob(null)}
-          onCancel={() => setDroppedBlob(null)}
-        />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-neutral-900 p-6 rounded-lg border border-neutral-700 max-w-md">
+            <h3 className="text-lg font-semibold text-neutral-100 mb-4">
+              Link File to Work
+            </h3>
+            <p className="text-sm text-neutral-400 mb-4">
+              File dropped: {droppedBlob.filename || droppedBlob.sha256}
+            </p>
+            <p className="text-sm text-neutral-400 mb-6">
+              LinkBlobDialog needs separate optimization. For now, use
+              drag-and-drop from UnlinkedAssetsList.
+            </p>
+            <button
+              onClick={() => setDroppedBlob(null)}
+              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Edit dialog */}
@@ -262,7 +278,7 @@ export function WorkCardList({
           onSuccess={() => {
             setIsEditDialogOpen(false);
           }}
-          getBlobUrl={getBlobUrl}
+          getBlobUrl={operations.getBlobUrl}
         />
       )}
 

@@ -2,9 +2,26 @@
  * TemplateLibrary Component (Platform-Agnostic)
  *
  * Library for managing templates (presets) for creating works
+ *
+ * Uses Electric hooks and Zustand store directly - fully hoisted!
  */
 
 import { useState } from "react";
+import {
+  usePresets,
+  useCreatePreset,
+  useUpdatePreset,
+  useDeletePreset,
+  useInitializePresets,
+  useMissingDefaultPresets,
+  useResetSinglePreset,
+} from "@deeprecall/data";
+import { useTemplateLibraryUI } from "@deeprecall/data/stores";
+import { DEFAULT_PRESET_NAMES } from "@deeprecall/data/repos";
+import { getPresetColor } from "../utils/presets";
+import { MessageModal } from "./MessageModal";
+import { InputModal } from "./InputModal";
+import { TemplateEditorModal } from "./TemplateEditorModal";
 import {
   X,
   Copy,
@@ -32,75 +49,41 @@ interface Preset {
   [key: string]: any;
 }
 
-export interface TemplateLibraryUIState {
-  isOpen: boolean;
-  searchQuery: string;
-  selectedTarget: PresetTarget | "all";
-  isSelectMode: boolean;
-  selectedIds: Set<string>;
-}
+export function TemplateLibrary() {
+  // UI state from Zustand store
+  const isOpen = useTemplateLibraryUI((state) => state.isOpen);
+  const closeModal = useTemplateLibraryUI((state) => state.closeModal);
+  const searchQuery = useTemplateLibraryUI((state) => state.searchQuery);
+  const setSearchQuery = useTemplateLibraryUI((state) => state.setSearchQuery);
+  const selectedTarget = useTemplateLibraryUI((state) => state.selectedTarget);
+  const setSelectedTarget = useTemplateLibraryUI(
+    (state) => state.setSelectedTarget
+  );
+  const isSelectMode = useTemplateLibraryUI((state) => state.isSelectMode);
+  const enableSelectMode = useTemplateLibraryUI(
+    (state) => state.enableSelectMode
+  );
+  const disableSelectMode = useTemplateLibraryUI(
+    (state) => state.disableSelectMode
+  );
+  const selectedIds = useTemplateLibraryUI((state) => state.selectedIds);
+  const toggleSelection = useTemplateLibraryUI(
+    (state) => state.toggleSelection
+  );
+  const selectAllVisible = useTemplateLibraryUI(
+    (state) => state.selectAllVisible
+  );
+  const clearSelection = useTemplateLibraryUI((state) => state.clearSelection);
+  const isSelected = useTemplateLibraryUI((state) => state.isSelected);
 
-export interface TemplateLibraryUIActions {
-  closeModal: () => void;
-  setSearchQuery: (query: string) => void;
-  setSelectedTarget: (target: PresetTarget | "all") => void;
-  enableSelectMode: () => void;
-  disableSelectMode: () => void;
-  toggleSelection: (id: string) => void;
-  selectAllVisible: (ids: string[]) => void;
-  clearSelection: () => void;
-  isSelected: (id: string) => boolean;
-}
-
-export interface TemplateLibraryOperations {
-  // Data operations
-  getPresets: () => Preset[];
-  getMissingDefaults: () => string[] | undefined;
-  getDefaultPresetNames: () => string[];
-  getPresetColor: (color?: string) => string;
-
-  // CRUD operations
-  createPreset: (
-    preset: Omit<Preset, "id" | "kind" | "createdAt" | "updatedAt">
-  ) => Promise<void>;
-  updatePreset: (id: string, updates: Partial<Preset>) => Promise<void>;
-  deletePreset: (id: string) => Promise<void>;
-
-  // Initialization operations
-  initializePresets: () => Promise<void>;
-  resetSinglePreset: (name: string) => Promise<boolean>;
-
-  // Modal components (injected)
-  MessageModal: React.ComponentType<any>;
-  InputModal: React.ComponentType<any>;
-  TemplateEditorModal: React.ComponentType<any>;
-}
-
-export interface TemplateLibraryProps {
-  uiState: TemplateLibraryUIState;
-  uiActions: TemplateLibraryUIActions;
-  operations: TemplateLibraryOperations;
-}
-
-export function TemplateLibrary({
-  uiState,
-  uiActions,
-  operations,
-}: TemplateLibraryProps) {
-  const { isOpen, searchQuery, selectedTarget, isSelectMode, selectedIds } =
-    uiState;
-
-  const {
-    closeModal,
-    setSearchQuery,
-    setSelectedTarget,
-    enableSelectMode,
-    disableSelectMode,
-    toggleSelection,
-    selectAllVisible,
-    clearSelection,
-    isSelected,
-  } = uiActions;
+  // Data from Electric
+  const { data: allPresets = [] } = usePresets();
+  const createPresetMutation = useCreatePreset();
+  const updatePresetMutation = useUpdatePreset();
+  const deletePresetMutation = useDeletePreset();
+  const initializePresetsMutation = useInitializePresets();
+  const missingDefaultsData = useMissingDefaultPresets();
+  const resetSinglePresetMutation = useResetSinglePreset();
 
   // Message modal state
   const [messageModal, setMessageModal] = useState<{
@@ -142,9 +125,9 @@ export function TemplateLibrary({
 
   if (!isOpen) return null;
 
-  const presets = operations.getPresets();
-  const missingDefaults = operations.getMissingDefaults();
-  const defaultPresetNames = operations.getDefaultPresetNames();
+  const presets = allPresets || [];
+  const missingDefaults = missingDefaultsData;
+  const defaultPresetNames = Array.from(DEFAULT_PRESET_NAMES);
 
   // Filter presets
   const filteredPresets = (presets || []).filter((preset) => {
@@ -193,7 +176,7 @@ export function TemplateLibrary({
       variant: "info",
       onConfirm: async () => {
         try {
-          await operations.initializePresets();
+          await initializePresetsMutation.mutateAsync();
           setMessageModal({
             isOpen: true,
             title: "Success",
@@ -222,7 +205,7 @@ export function TemplateLibrary({
       variant: "warning",
       onConfirm: async () => {
         try {
-          const success = await operations.resetSinglePreset(name);
+          const success = await resetSinglePresetMutation.mutateAsync(name);
           if (success) {
             setMessageModal({
               isOpen: true,
@@ -264,7 +247,7 @@ export function TemplateLibrary({
       delete (newPreset as any).createdAt;
       delete (newPreset as any).updatedAt;
 
-      await operations.createPreset(newPreset);
+      await createPresetMutation.mutateAsync(newPreset as any);
       console.log(`✅ Duplicated template: ${preset.name}`);
     } catch (error) {
       console.error("Failed to duplicate template:", error);
@@ -286,7 +269,7 @@ export function TemplateLibrary({
       variant: "danger",
       onConfirm: async () => {
         try {
-          await operations.deletePreset(preset.id);
+          await deletePresetMutation.mutateAsync(preset.id);
           console.log(`✅ Deleted template: ${preset.name}`);
           // Remove from selection
           if (isSelected(preset.id)) {
@@ -321,7 +304,10 @@ export function TemplateLibrary({
     if (!editorModal.preset) return;
 
     try {
-      await operations.updatePreset(editorModal.preset.id, updates);
+      await updatePresetMutation.mutateAsync({
+        id: editorModal.preset.id,
+        updates,
+      });
       console.log(`✅ Updated template: ${editorModal.preset.name}`);
       setEditorModal({ isOpen: false, preset: null });
     } catch (error) {
@@ -351,7 +337,9 @@ export function TemplateLibrary({
       onConfirm: async () => {
         try {
           await Promise.all(
-            Array.from(selectedIds).map((id) => operations.deletePreset(id))
+            Array.from(selectedIds).map((id) =>
+              deletePresetMutation.mutateAsync(id)
+            )
           );
           console.log(`✅ Deleted ${count} template(s)`);
           clearSelection();
@@ -379,7 +367,10 @@ export function TemplateLibrary({
         if (newName === preset.name) return;
 
         try {
-          await operations.updatePreset(preset.id, { name: newName });
+          await updatePresetMutation.mutateAsync({
+            id: preset.id,
+            updates: { name: newName },
+          });
           console.log(`✅ Renamed template to: ${newName}`);
         } catch (error) {
           console.error("Failed to rename template:", error);
@@ -394,9 +385,7 @@ export function TemplateLibrary({
     });
   };
 
-  const MessageModal = operations.MessageModal;
-  const InputModal = operations.InputModal;
-  const TemplateEditorModal = operations.TemplateEditorModal;
+  // Modal components imported directly at top of file
 
   return (
     <>
@@ -423,7 +412,6 @@ export function TemplateLibrary({
         <TemplateEditorModal
           isOpen={editorModal.isOpen}
           onClose={() => setEditorModal({ isOpen: false, preset: null })}
-          onSave={handleSaveEdit}
           preset={editorModal.preset}
         />
       )}
@@ -647,14 +635,14 @@ export function TemplateLibrary({
                           onRename={() => handleRename(preset)}
                           onDelete={() => handleDelete(preset)}
                           onReset={
-                            defaultPresetNames.includes(preset.name)
+                            defaultPresetNames.includes(preset.name as any)
                               ? () => handleResetSingle(preset.name)
                               : undefined
                           }
                           isSelectable={isSelectMode}
                           isSelected={isSelected(preset.id)}
                           onToggleSelect={() => toggleSelection(preset.id)}
-                          getPresetColor={operations.getPresetColor}
+                          getPresetColor={getPresetColor}
                         />
                       ))}
                     </div>
@@ -695,7 +683,7 @@ export function TemplateLibrary({
                           isSelectable={isSelectMode}
                           isSelected={isSelected(preset.id)}
                           onToggleSelect={() => toggleSelection(preset.id)}
-                          getPresetColor={operations.getPresetColor}
+                          getPresetColor={getPresetColor}
                         />
                       ))}
                     </div>

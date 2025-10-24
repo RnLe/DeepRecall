@@ -2,69 +2,27 @@
  * EditWorkDialog Component (Platform-agnostic)
  * Compact dialog for editing an existing Work
  * Similar to CreateWorkDialog but optimized for smaller size
+ *
+ * Uses Electric hooks directly - only needs getBlobUrl platform wrapper!
  */
 
 import { useState, useMemo } from "react";
 import type { WorkExtended, Preset, Author, Asset } from "@deeprecall/core";
-import type { AuthorOperations } from "./AuthorInput";
+import {
+  useWorkPresets,
+  useUpdateWork,
+  useAuthorsByIds,
+} from "@deeprecall/data";
 import { AuthorInput } from "./AuthorInput";
-
-// Platform-agnostic operations interfaces
-export interface EditWorkOperations {
-  // Get work presets (filtered)
-  useWorkPresets: () => { system: Preset[]; user: Preset[] };
-
-  // Get authors by IDs - already resolved
-  authors: Author[];
-  authorsLoading: boolean;
-
-  // Update work
-  updateWork: (updates: {
-    id: string;
-    updates: Partial<WorkExtended>;
-  }) => Promise<void>;
-
-  // Blob URL resolver
-  getBlobUrl: (sha256: string) => string;
-
-  // Author operations
-  authorOps: AuthorOperations;
-
-  // Author IDs management
-  authorIds: string[];
-  onAuthorIdsChange: (ids: string[]) => void;
-}
+import { CompactDynamicForm } from "./CompactDynamicForm";
+import { PDFPreview } from "../components/PDFPreview";
 
 export interface EditWorkDialogProps {
   work: WorkExtended;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  operations: EditWorkOperations;
-
-  // Platform-specific form component (not yet hoisted)
-  CompactDynamicForm: React.ComponentType<{
-    preset: Preset;
-    initialValues?: Record<string, unknown>;
-    onSubmit: (data: {
-      coreFields: Record<string, unknown>;
-      metadata: Record<string, unknown>;
-    }) => void | Promise<void>;
-    onCancel?: () => void;
-    submitLabel?: string;
-    cancelLabel?: string;
-    isSubmitting?: boolean;
-  }>;
-
-  // Platform-specific PDF preview component (not yet hoisted)
-  PDFPreview: React.ComponentType<{
-    source: string | Uint8Array | ArrayBuffer;
-    sha256?: string;
-    className?: string;
-    showToolbar?: boolean;
-    autoFitToWidth?: boolean;
-    autoFitToHeight?: boolean;
-  }>;
+  getBlobUrl: (sha256: string) => string;
 }
 
 export function EditWorkDialog({
@@ -72,23 +30,19 @@ export function EditWorkDialog({
   isOpen,
   onClose,
   onSuccess,
-  operations,
-  CompactDynamicForm,
-  PDFPreview,
+  getBlobUrl,
 }: EditWorkDialogProps) {
-  const { system: systemPresetsRaw, user: userPresetsRaw } =
-    operations.useWorkPresets();
+  const { system: systemPresetsRaw, user: userPresetsRaw } = useWorkPresets();
+  const updateWorkMutation = useUpdateWork();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState(false);
   const [selectedPresetIdState, setSelectedPresetIdState] = useState<
     string | null
   >(null);
+  const [authorIds, setAuthorIds] = useState<string[]>(work.authorIds || []);
 
-  // Use operations for author state
-  const authorIds = operations.authorIds;
-  const setAuthorIds = operations.onAuthorIdsChange;
-  const selectedAuthors = operations.authors;
+  const { data: selectedAuthors = [] } = useAuthorsByIds(authorIds);
 
   // Flatten system and user presets into single array
   const allPresets = useMemo(
@@ -175,7 +129,7 @@ export function EditWorkDialog({
         metadata,
       };
 
-      await operations.updateWork({
+      await updateWorkMutation.mutateAsync({
         id: work.id,
         updates,
       });
@@ -426,7 +380,6 @@ export function EditWorkDialog({
                 authors={selectedAuthors}
                 onChange={setAuthorIds}
                 placeholder="Search or add authors (e.g., 'Smith, John and Doe, Jane')..."
-                authorOps={operations.authorOps}
               />
             </div>
 
@@ -444,7 +397,7 @@ export function EditWorkDialog({
           <div className="w-[45%] flex flex-col bg-neutral-950">
             {mainAsset ? (
               <PDFPreview
-                source={operations.getBlobUrl(mainAsset.sha256)}
+                source={getBlobUrl(mainAsset.sha256)}
                 sha256={mainAsset.sha256}
                 showToolbar={true}
                 autoFitToWidth={true}

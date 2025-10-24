@@ -130,12 +130,61 @@ function keysToSnakeCase(obj: Record<string, any>): Record<string, any> {
 }
 
 /**
+ * Transform annotation data from client schema to Postgres schema
+ * Client: { data: { type, rects/ranges }, metadata: {...} }
+ * Postgres: { type, geometry, style, content, metadata, attached_assets }
+ */
+function transformAnnotationData(validated: any): Record<string, any> {
+  const { data, metadata, ...rest } = validated;
+
+  // Extract type from data
+  const type = data.type;
+
+  // Build geometry JSONB (contains rects or ranges)
+  const geometry =
+    data.type === "rectangle" ? { rects: data.rects } : { ranges: data.ranges };
+
+  // Build style JSONB from metadata
+  const style = metadata?.color ? { color: metadata.color } : undefined;
+
+  // Extract content (notes)
+  const content = metadata?.notes || metadata?.title;
+
+  // Extract attached assets
+  const attachedAssets = metadata?.attachedAssets || [];
+
+  // Build metadata JSONB (remaining metadata)
+  const pgMetadata: any = {};
+  if (metadata?.kind) pgMetadata.kind = metadata.kind;
+  if (metadata?.tags) pgMetadata.tags = metadata.tags;
+  if (metadata?.noteGroups) pgMetadata.noteGroups = metadata.noteGroups;
+
+  return {
+    ...rest,
+    kind: "annotation", // Postgres has a kind column that must be 'annotation'
+    type,
+    geometry,
+    style,
+    content,
+    attachedAssets,
+    metadata: Object.keys(pgMetadata).length > 0 ? pgMetadata : undefined,
+  };
+}
+
+/**
  * Apply insert operation
  */
 async function applyInsert(pool: Pool, change: WriteChange): Promise<any> {
   const schema = getSchemaForTable(change.table);
   const validated = schema.parse(change.payload);
-  const data = keysToSnakeCase(validated as Record<string, any>);
+
+  // Special handling for annotations - transform schema
+  const transformed =
+    change.table === "annotations"
+      ? transformAnnotationData(validated)
+      : validated;
+
+  const data = keysToSnakeCase(transformed as Record<string, any>);
 
   // Build INSERT query
   const columns = Object.keys(data);
@@ -160,7 +209,14 @@ async function applyInsert(pool: Pool, change: WriteChange): Promise<any> {
 async function applyUpdate(pool: Pool, change: WriteChange): Promise<any> {
   const schema = getSchemaForTable(change.table);
   const validated = schema.parse(change.payload);
-  const data = keysToSnakeCase(validated as Record<string, any>);
+
+  // Special handling for annotations - transform schema
+  const transformed =
+    change.table === "annotations"
+      ? transformAnnotationData(validated)
+      : validated;
+
+  const data = keysToSnakeCase(transformed as Record<string, any>);
 
   // Check if record exists and compare timestamps
   const existing = await pool.query(

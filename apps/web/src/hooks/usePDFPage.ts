@@ -8,7 +8,7 @@ import {
   PDFPageProxy,
   renderPageToCanvas,
 } from "../utils/pdf";
-import { globalPageCache } from "../utils/cache";
+import { globalPageCache } from "@deeprecall/ui/utils";
 
 export interface UsePDFPageResult {
   canvas: HTMLCanvasElement | null;

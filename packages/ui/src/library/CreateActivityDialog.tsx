@@ -8,22 +8,12 @@
 import { useState } from "react";
 import type { ActivityType } from "@deeprecall/core";
 import { Calendar, X } from "lucide-react";
+import { useCreateActivity } from "@deeprecall/data/hooks";
 
 interface CreateActivityDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  onCreateActivity: (activity: {
-    kind: "activity";
-    title: string;
-    activityType: ActivityType;
-    description?: string;
-    institution?: string;
-    participants: { name: string; orcid?: string; affiliation?: string }[];
-    startsAt?: string;
-    endsAt?: string;
-  }) => Promise<void>;
-  isCreating?: boolean;
 }
 
 const ACTIVITY_TYPES: { value: ActivityType; label: string; icon: string }[] = [
@@ -40,9 +30,8 @@ export function CreateActivityDialog({
   isOpen,
   onClose,
   onSuccess,
-  onCreateActivity,
-  isCreating = false,
 }: CreateActivityDialogProps) {
+  const createActivityMutation = useCreateActivity();
   const [title, setTitle] = useState("");
   const [activityType, setActivityType] = useState<ActivityType>("course");
   const [description, setDescription] = useState("");
@@ -63,8 +52,7 @@ export function CreateActivityDialog({
     const endsAtISO = endsAt ? `${endsAt}T23:59:59Z` : undefined;
 
     try {
-      await onCreateActivity({
-        kind: "activity" as const,
+      await createActivityMutation.mutateAsync({
         title: title.trim(),
         activityType,
         description: description.trim() || undefined,
@@ -270,10 +258,10 @@ export function CreateActivityDialog({
             <button
               type="submit"
               onClick={handleSubmit}
-              disabled={isCreating}
+              disabled={createActivityMutation.isPending}
               className="px-6 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
             >
-              {isCreating ? (
+              {createActivityMutation.isPending ? (
                 <>
                   <svg
                     className="animate-spin h-4 w-4"

@@ -1,6 +1,8 @@
 /**
  * CreateWorkDialog Component (Platform-Agnostic)
  * Full-featured dialog for creating a new Work with Version (and optionally Asset)
+ *
+ * Uses Electric hooks directly - zero platform-specific code!
  */
 
 import { useState, useMemo } from "react";
@@ -9,45 +11,30 @@ import {
   useCreateWorkWithAsset,
   useAuthorsByIds,
   useFindOrCreateAuthor,
-} from "@deeprecall/data/hooks";
+  useAuthors,
+} from "@deeprecall/data";
+import { getAuthorFullName } from "@deeprecall/core";
 import { PresetSelector } from "./PresetSelector";
 import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
-import {
-  BibtexImportModal,
-  BibtexEntry,
-  BibtexImportOperations,
-} from "./BibtexImportModal";
-import { AuthorInput, AuthorOperations } from "./AuthorInput";
+import { BibtexImportModal, type BibtexEntry } from "./BibtexImportModal";
+import { AuthorInput } from "./AuthorInput";
 import { FileCode } from "lucide-react";
+import {
+  parseAuthorList,
+  formatAuthorName,
+  bibtexToWorkFormValues,
+  type ParsedAuthor,
+} from "../utils";
 
-export interface ParsedAuthor {
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  orcid?: string;
-}
-
-export interface CreateWorkDialogOperations {
-  bibtexToWorkFormValues: (entry: BibtexEntry) => Record<string, unknown>;
-  parseAuthorList: (input: string) => ParsedAuthor[];
-  // BibTeX operations
-  parseBibtex: (text: string) => {
-    success: boolean;
-    entries: BibtexEntry[];
-    errors: string[];
-  };
-  validateBibtexString: (text: string) => { valid: boolean; message?: string };
-  getPresetForBibtexEntry: (entry: BibtexEntry) => string;
-}
+// Re-export for convenience
+export type { ParsedAuthor, BibtexEntry };
 
 interface CreateWorkDialogProps {
   isOpen: boolean;
   preselectedPresetId?: string | null;
   onClose: () => void;
   onSuccess: () => void;
-  operations: CreateWorkDialogOperations;
-  authorOps: AuthorOperations;
 }
 
 type Step = "select" | "form" | "create-preset";
@@ -57,11 +44,11 @@ export function CreateWorkDialog({
   preselectedPresetId,
   onClose,
   onSuccess,
-  operations,
-  authorOps,
 }: CreateWorkDialogProps) {
   const { system: systemPresetsRaw, user: userPresetsRaw } = useWorkPresets();
   const createWorkMutation = useCreateWorkWithAsset();
+  const { data: allAuthors = [] } = useAuthors();
+  const findOrCreateAuthorMutation = useFindOrCreateAuthor();
 
   const [step, setStep] = useState<Step>(
     preselectedPresetId ? "form" : "select"
@@ -76,7 +63,6 @@ export function CreateWorkDialog({
   const [authorIds, setAuthorIds] = useState<string[]>([]);
 
   const { data: selectedAuthors = [] } = useAuthorsByIds(authorIds);
-  const findOrCreateAuthor = useFindOrCreateAuthor();
 
   // Flatten system and user presets into single array
   const allPresets = useMemo(
@@ -113,16 +99,16 @@ export function CreateWorkDialog({
     }
 
     // Convert BibTeX to form values
-    const formValues = operations.bibtexToWorkFormValues(entry);
+    const formValues = bibtexToWorkFormValues(entry);
 
     // Parse and create authors if present
     const newAuthorIds: string[] = [];
     if (formValues.authors && typeof formValues.authors === "string") {
-      const parsedAuthors = operations.parseAuthorList(formValues.authors);
+      const parsedAuthors = parseAuthorList(formValues.authors);
 
       for (const parsed of parsedAuthors) {
         try {
-          const author = await findOrCreateAuthor.mutateAsync({
+          const author = await findOrCreateAuthorMutation.mutateAsync({
             firstName: parsed.firstName,
             lastName: parsed.lastName,
             middleName: parsed.middleName,
@@ -233,12 +219,7 @@ export function CreateWorkDialog({
       <BibtexImportModal
         isOpen={bibtexModalOpen}
         onClose={() => setBibtexModalOpen(false)}
-        operations={{
-          parseBibtex: operations.parseBibtex,
-          validateBibtexString: operations.validateBibtexString,
-          getPresetForBibtexEntry: operations.getPresetForBibtexEntry,
-          onImport: handleBibtexImport,
-        }}
+        onImport={handleBibtexImport}
       />
 
       {/* Dialog - 80% of viewport */}
@@ -581,7 +562,6 @@ export function CreateWorkDialog({
                   value={authorIds}
                   authors={selectedAuthors}
                   onChange={setAuthorIds}
-                  authorOps={authorOps}
                   placeholder="Search or add authors (e.g., 'Smith, John and Doe, Jane')..."
                 />
               </div>

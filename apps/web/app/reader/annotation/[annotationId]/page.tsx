@@ -7,12 +7,34 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+
+// ========================================
+// PURE UI IMPORTS (from @deeprecall/ui)
+// ========================================
+import {
+  AnnotationPreview,
+  type AnnotationPreviewOperations,
+} from "@deeprecall/ui";
+import { NoteTreeView, type NoteTreeViewOperations } from "@deeprecall/ui";
 import type { Annotation } from "@deeprecall/core/schemas/annotation";
 import type { Asset } from "@deeprecall/core/schemas/library";
-import { getAnnotation, getAnnotationAssets } from "@deeprecall/data/repos/annotations";
-import { AnnotationPreview } from "./AnnotationPreview";
-import { NoteTreeView } from "./NoteTreeView";
+
+// ========================================
+// PLATFORM WRAPPERS (from ./_components)
+// ========================================
+// (None - this page directly implements operations)
+
+// ========================================
+// PLATFORM HOOKS & UTILITIES
+// ========================================
+import {
+  getAnnotation,
+  getAnnotationAssets,
+} from "@deeprecall/data/repos/annotations";
+import { updateAnnotationLocal } from "@deeprecall/data/repos/annotations.local";
+import { updateAssetLocal } from "@deeprecall/data/repos/assets.local";
+import { loadPDFDocument } from "../../../../src/utils/pdf";
 
 export default function AnnotationDetailPage() {
   const router = useRouter();
@@ -23,6 +45,141 @@ export default function AnnotationDetailPage() {
   const [notes, setNotes] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ============================================================================
+  // Platform-specific Operations
+  // ============================================================================
+
+  // Annotation Preview Operations
+  const annotationPreviewOps: AnnotationPreviewOperations = {
+    getBlobUrl: (sha256) => `/api/blob/${sha256}`,
+    loadPDFDocument: loadPDFDocument,
+    updateAnnotationMetadata: async (id, metadata) => {
+      await updateAnnotationLocal({
+        id,
+        metadata,
+      });
+    },
+  };
+
+  // Note Tree View Operations (extends NoteBranch operations)
+  const noteTreeViewOps: NoteTreeViewOperations = {
+    // Blob operations
+    getBlobUrl: (sha256) => `/api/blob/${sha256}`,
+
+    fetchBlobContent: async (sha256) => {
+      const response = await fetch(`/api/blob/${sha256}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch blob content");
+      }
+      return await response.text();
+    },
+
+    // File upload
+    uploadFile: async (file, metadata) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("metadata", JSON.stringify(metadata));
+
+      const response = await fetch("/api/library/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      const result = await response.json();
+      return {
+        blob: {
+          sha256: result.blob.sha256,
+          filename: result.blob.filename,
+          size: result.blob.size,
+          mime: result.blob.mime,
+        },
+      };
+    },
+
+    // Asset metadata updates (optimistic)
+    updateAssetMetadata: async (assetId, updates) => {
+      await updateAssetLocal(assetId, {
+        metadata: updates,
+      });
+    },
+
+    // Group management operations
+    createNoteGroup: async (annotationId, name, color) => {
+      const ann = await getAnnotation(annotationId);
+      if (!ann) throw new Error("Annotation not found");
+
+      const existingGroups = ann.metadata.noteGroups || [];
+      const newGroup = {
+        id: crypto.randomUUID(),
+        name,
+        color,
+        order: existingGroups.length,
+        viewMode: "compact" as const,
+        columns: 1 as const,
+      };
+
+      await updateAnnotationLocal({
+        id: annotationId,
+        metadata: {
+          ...ann.metadata,
+          noteGroups: [...existingGroups, newGroup],
+        },
+      });
+    },
+
+    updateNoteGroup: async (annotationId, groupId, updates) => {
+      const ann = await getAnnotation(annotationId);
+      if (!ann) throw new Error("Annotation not found");
+
+      const groups = ann.metadata.noteGroups || [];
+      const updatedGroups = groups.map((g) =>
+        g.id === groupId ? { ...g, ...updates } : g
+      );
+
+      await updateAnnotationLocal({
+        id: annotationId,
+        metadata: {
+          ...ann.metadata,
+          noteGroups: updatedGroups,
+        },
+      });
+    },
+
+    deleteNoteGroup: async (annotationId, groupId) => {
+      const ann = await getAnnotation(annotationId);
+      if (!ann) throw new Error("Annotation not found");
+
+      const groups = ann.metadata.noteGroups || [];
+      const filteredGroups = groups.filter((g) => g.id !== groupId);
+
+      await updateAnnotationLocal({
+        id: annotationId,
+        metadata: {
+          ...ann.metadata,
+          noteGroups: filteredGroups,
+        },
+      });
+    },
+
+    moveNoteToGroup: async (assetId, groupId) => {
+      await updateAssetLocal(assetId, {
+        metadata: {
+          groupId,
+        },
+      });
+    },
+
+    onRefreshNeeded: async () => {
+      // Reload notes when operations complete
+      await loadAnnotation();
+    },
+  };
 
   useEffect(() => {
     loadAnnotation();
@@ -93,6 +250,7 @@ export default function AnnotationDetailPage() {
         <AnnotationPreview
           annotation={annotation}
           onBack={() => router.back()}
+          operations={annotationPreviewOps}
         />
       </div>
 
@@ -102,6 +260,7 @@ export default function AnnotationDetailPage() {
           annotation={annotation}
           notes={notes}
           onNotesChange={handleNotesChange}
+          operations={noteTreeViewOps}
         />
       </div>
     </div>

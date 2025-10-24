@@ -1,25 +1,20 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import {
-  useWorks,
-  useAssets,
-  useActivities,
-  useCreateEdge,
-} from "@deeprecall/data/hooks";
-import { useQueryClient } from "@tanstack/react-query";
-import { WorkCardDetailed } from "./WorkCardDetailed";
-import { WorkCardCompact } from "./WorkCardCompact";
-import { WorkCardList } from "./WorkCardList";
-import { LibraryHeader } from "./LibraryHeader";
-import { LibraryFilters, type ViewMode } from "./LibraryFilters";
-import { LibraryLeftSidebar } from "./LibraryLeftSidebar";
-import { CreateWorkDialog } from "./CreateWorkDialog";
-import { CreateActivityDialog } from "./CreateActivityDialog";
-import { ActivityBanner } from "./ActivityBanner";
-import { TemplateLibrary } from "./TemplateLibrary";
-import { AuthorLibrary } from "./AuthorLibrary";
 import { BookOpen, Link2 } from "lucide-react";
+import type { BlobWithMetadata } from "@deeprecall/core";
+
+// ========================================
+// PURE UI IMPORTS (from @deeprecall/ui)
+// ========================================
+import {
+  LibraryFilters,
+  type ViewMode,
+  CreateWorkDialog,
+  CreateActivityDialog,
+  TemplateLibrary,
+} from "@deeprecall/ui";
+import { compareWorksByTitle, compareWorksByDate } from "@deeprecall/ui/utils";
 import type {
   WorkType,
   Work,
@@ -27,17 +22,37 @@ import type {
   WorkExtended,
   ActivityExtended,
 } from "@deeprecall/core";
-import { compareWorksByTitle, compareWorksByDate } from "@/src/utils/library";
-import { LinkBlobDialog } from "./LinkBlobDialog";
+
+// ========================================
+// PLATFORM WRAPPERS (from ./_components)
+// ========================================
+import { LibraryHeader } from "./_components/LibraryHeader";
+import { LibraryLeftSidebar } from "./_components/LibraryLeftSidebar";
+import { WorkCardDetailed } from "./_components/WorkCardDetailed";
+import { WorkCardCompact } from "./_components/WorkCardCompact";
+import { WorkCardList } from "./_components/WorkCardList";
+import { ActivityBanner } from "./_components/ActivityBanner";
+import { AuthorLibrary } from "./_components/AuthorLibrary";
+import { LinkBlobDialog } from "./_components/LinkBlobDialog";
+import { ExportDataDialog } from "./_components/ExportDataDialog";
+import { ImportDataDialog } from "./_components/ImportDataDialog";
+
+// ========================================
+// PLATFORM HOOKS & UTILITIES
+// ========================================
+import {
+  useWorks,
+  useAssets,
+  useActivities,
+  useCreateEdge,
+} from "@deeprecall/data/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   activities as activityRepo,
   edges as edgeRepo,
 } from "@deeprecall/data/repos";
-import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
-import type { BlobWithMetadata } from "@deeprecall/core";
 import { useTemplateLibraryUI } from "@deeprecall/data/stores";
-import { ExportDataDialog } from "./ExportDataDialog";
-import { ImportDataDialog } from "./ImportDataDialog";
+import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
 
 export default function LibraryPage() {
   // Electric hooks - real-time synced data
@@ -87,17 +102,12 @@ export default function LibraryPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   // Template Library UI state from Zustand
-  const openTemplateLibrary = useTemplateLibraryUI((state) => state.openModal);
+  const templateLibraryUI = useTemplateLibraryUI();
+  const openTemplateLibrary = templateLibraryUI.openModal;
 
   const handleCreateWorkWithPreset = (presetId: string) => {
     setPreselectedPresetId(presetId);
     setIsCreateDialogOpen(true);
-  };
-
-  const handleImportSuccess = () => {
-    // Refresh the library after import
-    queryClient.invalidateQueries();
-    window.location.reload(); // Full reload to ensure all data is fresh
   };
 
   // Enrich activities with their contained works/assets
@@ -560,7 +570,6 @@ export default function LibraryPage() {
         <div className="shrink-0">
           <div className="max-w-7xl mx-auto px-8 py-4">
             <LibraryHeader
-              workCount={works?.length || 0}
               onCreateActivity={() => setIsCreateActivityDialogOpen(true)}
               onCreateWork={() => setIsCreateDialogOpen(true)}
               onOpenTemplates={openTemplateLibrary}
@@ -623,12 +632,7 @@ export default function LibraryPage() {
                   <ActivityBanner
                     key={activity.id}
                     activity={activity}
-                    onDropWork={handleDropWorkToActivity}
-                    onDropBlob={handleDropBlobToActivity}
-                    onDropAsset={handleDropAssetToActivity}
                     onDropFiles={handleDropFilesToActivity}
-                    onUnlinkWork={handleUnlinkWorkFromActivity}
-                    onUnlinkAsset={handleUnlinkAssetFromActivity}
                   />
                 ))}
               </div>
@@ -798,7 +802,6 @@ export default function LibraryPage() {
       <ImportDataDialog
         isOpen={isImportDialogOpen}
         onClose={() => setIsImportDialogOpen(false)}
-        onSuccess={handleImportSuccess}
       />
     </div>
   );

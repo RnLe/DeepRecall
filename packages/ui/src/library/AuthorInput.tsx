@@ -7,19 +7,97 @@
  * - Smart name parsing with auto-capitalization
  * - ORCID support
  * - Multi-author management with ordering
+ *
+ * Uses Electric hooks directly - zero platform-specific code!
  */
 
 import { useState, useRef, useEffect } from "react";
 import { X, Plus, User, Search } from "lucide-react";
 import type { Author } from "@deeprecall/core";
+import { getAuthorFullName } from "@deeprecall/core";
+import { queryShape, useCreateAuthor } from "@deeprecall/data";
+import { parseAuthorList, formatAuthorName } from "../utils";
 
-// Platform-agnostic author operations interface
-export interface AuthorOperations {
-  // Search for authors
-  searchAuthors: (query: string) => Promise<Author[]>;
+interface AuthorInputProps {
+  value: string[]; // Array of author IDs
+  authors: Author[]; // Full author objects (from useAuthorsByIds)
+  onChange: (authorIds: string[]) => void;
+  placeholder?: string;
+  className?: string;
+}
 
-  // Find or create author
-  findOrCreateAuthor: (data: {
+export function AuthorInput({
+  value,
+  authors,
+  onChange,
+  placeholder = "Search or add authors...",
+  className = "",
+}: AuthorInputProps) {
+  const createAuthorMutation = useCreateAuthor();
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [results, setResults] = useState<Author[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Search authors using Electric
+  const searchAuthors = async (query: string): Promise<Author[]> => {
+    if (!query.trim()) return [];
+
+    const lowerQuery = query.toLowerCase();
+    const allAuthors = await queryShape<Author>({ table: "authors" });
+
+    // Filter and sort results
+    const filtered = allAuthors.filter((author) => {
+      const fullName = getAuthorFullName(author).toLowerCase();
+      const firstName = author.firstName.toLowerCase();
+      const lastName = author.lastName.toLowerCase();
+
+      return (
+        fullName.includes(lowerQuery) ||
+        firstName.includes(lowerQuery) ||
+        lastName.includes(lowerQuery) ||
+        author.orcid?.toLowerCase().includes(lowerQuery)
+      );
+    });
+
+    // Sort by relevance
+    return filtered
+      .sort((a, b) => {
+        const aLastName = a.lastName.toLowerCase();
+        const bLastName = b.lastName.toLowerCase();
+        const aFirstName = a.firstName.toLowerCase();
+        const bFirstName = b.firstName.toLowerCase();
+
+        // Prioritize exact matches
+        if (aLastName === lowerQuery) return -1;
+        if (bLastName === lowerQuery) return 1;
+        if (aFirstName === lowerQuery) return -1;
+        if (bFirstName === lowerQuery) return 1;
+
+        // Then prioritize starts-with
+        if (
+          aLastName.startsWith(lowerQuery) &&
+          !bLastName.startsWith(lowerQuery)
+        )
+          return -1;
+        if (
+          bLastName.startsWith(lowerQuery) &&
+          !aLastName.startsWith(lowerQuery)
+        )
+          return 1;
+
+        // Finally alphabetical
+        return aLastName.localeCompare(bLastName);
+      })
+      .slice(0, 10); // Limit to 10 results
+  };
+
+  // Find or create author using Electric
+  const findOrCreateAuthor = async (data: {
     firstName: string;
     lastName: string;
     middleName?: string;
@@ -29,51 +107,54 @@ export interface AuthorOperations {
     contact?: string;
     website?: string;
     bio?: string;
-  }) => Promise<Author>;
+  }): Promise<Author> => {
+    // Try to find by ORCID first (most reliable)
+    if (data.orcid) {
+      const existingByOrcid = await queryShape<Author>({
+        table: "authors",
+        where: `orcid = '${data.orcid.replace(/'/g, "''")}'`,
+      });
 
-  // Get full author name
-  getAuthorFullName: (author: Author) => string;
+      if (existingByOrcid.length > 0) {
+        return existingByOrcid[0];
+      }
+    }
 
-  // Parse author list from string
-  parseAuthorList: (input: string) => Array<{
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    orcid?: string;
-  }>;
+    // Try to find by exact name match (case-insensitive)
+    const allAuthors = await queryShape<Author>({ table: "authors" });
+    const firstName = data.firstName.toLowerCase();
+    const lastName = data.lastName.toLowerCase();
+    const middleName = data.middleName?.toLowerCase() || "";
 
-  // Format author name
-  formatAuthorName: (parsed: {
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-  }) => string;
-}
+    const existing = allAuthors.find((author) => {
+      const aFirstName = author.firstName.toLowerCase();
+      const aLastName = author.lastName.toLowerCase();
+      const aMiddleName = author.middleName?.toLowerCase() || "";
 
-interface AuthorInputProps {
-  value: string[]; // Array of author IDs
-  authors: Author[]; // Full author objects (from useAuthorsByIds)
-  onChange: (authorIds: string[]) => void;
-  placeholder?: string;
-  className?: string;
-  authorOps: AuthorOperations;
-}
+      return (
+        aFirstName === firstName &&
+        aLastName === lastName &&
+        aMiddleName === middleName
+      );
+    });
 
-export function AuthorInput({
-  value,
-  authors,
-  onChange,
-  placeholder = "Search or add authors...",
-  className = "",
-  authorOps,
-}: AuthorInputProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState("");
-  const [results, setResults] = useState<Author[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+    if (existing) {
+      return existing;
+    }
+
+    // Create new author
+    return await createAuthorMutation.mutateAsync({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      middleName: data.middleName,
+      titles: data.title ? [data.title] : undefined,
+      affiliation: data.affiliation,
+      orcid: data.orcid,
+      contact: data.contact,
+      website: data.website,
+      bio: data.bio,
+    });
+  };
 
   // Debounced search
   useEffect(() => {
@@ -86,7 +167,7 @@ export function AuthorInput({
     setIsLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const searchResults = await authorOps.searchAuthors(inputValue);
+        const searchResults = await searchAuthors(inputValue);
         setResults(searchResults);
       } catch (error) {
         console.error("Search failed:", error);
@@ -97,7 +178,7 @@ export function AuthorInput({
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [inputValue, authorOps]);
+  }, [inputValue]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -135,13 +216,13 @@ export function AuthorInput({
     setIsCreating(true);
     try {
       // Parse the input - could be single or multiple authors
-      const parsedAuthors = authorOps.parseAuthorList(inputValue);
+      const parsedAuthors = parseAuthorList(inputValue);
 
       const newAuthorIds = [...value];
 
       for (const parsed of parsedAuthors) {
         // Find or create each author
-        const author = await authorOps.findOrCreateAuthor({
+        const author = await findOrCreateAuthor({
           firstName: parsed.firstName,
           lastName: parsed.lastName,
           middleName: parsed.middleName,
@@ -199,7 +280,7 @@ export function AuthorInput({
               className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 border border-blue-600/30 text-blue-200 rounded-lg text-sm"
             >
               <User className="w-3.5 h-3.5" />
-              <span>{authorOps.getAuthorFullName(author)}</span>
+              <span>{getAuthorFullName(author)}</span>
               {author.orcid && (
                 <span className="text-blue-400 text-xs">({author.orcid})</span>
               )}
@@ -262,7 +343,7 @@ export function AuthorInput({
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-sm font-medium text-neutral-100">
-                              {authorOps.getAuthorFullName(author)}
+                              {getAuthorFullName(author)}
                             </div>
                             {author.affiliation && (
                               <div className="text-xs text-neutral-400 mt-0.5">
@@ -302,15 +383,14 @@ export function AuthorInput({
                         <div>
                           <div className="text-sm font-medium text-neutral-100">
                             Create:{" "}
-                            {authorOps
-                              .parseAuthorList(inputValue)
-                              .map((a) => authorOps.formatAuthorName(a))
+                            {parseAuthorList(inputValue)
+                              .map((a) => formatAuthorName(a))
                               .join(", ")}
                           </div>
                           <div className="text-xs text-neutral-400 mt-0.5">
-                            {authorOps.parseAuthorList(inputValue).length > 1
+                            {parseAuthorList(inputValue).length > 1
                               ? `Add ${
-                                  authorOps.parseAuthorList(inputValue).length
+                                  parseAuthorList(inputValue).length
                                 } new authors`
                               : "Add as new author"}
                           </div>

@@ -4,6 +4,20 @@
 
 ---
 
+## 🎯 ARCHITECTURE PHILOSOPHY
+
+**Electric SQL IS the Platform Abstraction Layer**
+
+- ✅ **@deeprecall/data** provides platform-agnostic hooks (useAuthors, useWorks, etc.)
+- ✅ **@deeprecall/core** provides shared types and schemas
+- ✅ **@deeprecall/ui** provides pure UI components that use @deeprecall/data hooks directly
+- ❌ **NO operations interfaces needed** - Electric hooks are already platform-agnostic
+- ⚠️ **Thin wrappers ONLY for**: Platform-specific APIs (filesystem, PDF.js, routing, native features)
+
+**If you can swap Electric for another sync layer by only rewriting @deeprecall/data internals, the architecture is correct.**
+
+---
+
 ## 🚨 CRITICAL PRIORITY: UI & Functionality Verification
 
 **Before continuing migration, ALL hoisted components must be verified:**
@@ -12,6 +26,16 @@
 2. **Functionality Test:** All features (create/edit/delete works, presets, etc.) must work identically to pre-migration state.
 
 **Verification Checklist:** See `UI_VERIFICATION_CHECKLIST.md` for detailed component-by-component testing.
+
+---
+
+## 📊 Hoisting Progress Legend
+
+- **[x]** - Initially hoisted (may use operations pattern, not yet revisited)
+- **[✓]** - Revisited and optimized for Electric Everywhere architecture
+- **🎯** - Fully hoisted (uses @deeprecall packages directly, zero platform-specific code)
+- **⚠️** - Needs platform wrapper (requires platform-specific features: filesystem, PDF.js, routing, native APIs)
+- **❌** - Cannot move (Next.js/server-specific)
 
 ---
 
@@ -46,83 +70,114 @@
 
 ## Component Audit
 
-### ✅ Can Move As-Is (No Next.js dependencies)
+### ✅ Utilities & Helpers
 
-**library/**
+**packages/ui/src/utils/** (100% platform-agnostic)
 
-- [x] `AuthorInput.tsx` - ✅ Converted with AuthorOperations interface + Hoisted
-- [x] `BibtexExportModal.tsx` - ✅ Converted with BibtexExportOperations interface + Electric hooks + Hoisted
-- [x] `BibtexImportModal.tsx` - ✅ Converted with BibtexImportOperations interface + Hoisted
-- [x] `CompactDynamicForm.tsx` - ✅ Hoisted (pure form using preset utilities)
-- [x] `DynamicForm.tsx` - ✅ Hoisted (pure form using preset utilities)
-- [x] `FieldRenderer.tsx` - ✅ Hoisted (pure field renderer)
-- [x] `InputModal.tsx` - ✅ Pure component + Hoisted
-- [x] `MessageModal.tsx` - ✅ Pure component + Hoisted
-- [x] `PDFThumbnail.tsx` - ✅ Hoisted with getBlobUrl and usePDF injection
-- [x] `PresetFormBuilder.tsx` - ✅ Hoisted (already uses Electric hooks)
-- [x] `PresetSelector.tsx` - ✅ Pure component + Hoisted (with utility function)
-- [x] `WorkCardCompact.tsx` - ✅ Converted to use Electric hooks (useDeleteWork, usePresets, useAuthorsByIds) from @deeprecall/data/hooks + Hoisted to packages/ui/src/library/
-- [x] `WorkCardDetailed.tsx` - ✅ Converted to use Electric hooks (useDeleteWork, usePresets) from @deeprecall/data/hooks
-- [x] `WorkCardList.tsx` - ✅ Hoisted with navigation adapter
+- 🎯 `admin.ts` - Admin utilities
+- 🎯 `authorDisplay.ts` - Author name formatting
+- 🎯 `bibtex.ts` - BibTeX parsing and validation
+- 🎯 `bibtexExport.ts` - Work-to-BibTeX conversion
+- 🎯 `cache.ts` - Cache utilities
+- 🎯 `data-sync.ts` - Data sync helpers
+- 🎯 `date.ts` - Date formatting
+- 🎯 `library.ts` - Library entity display utilities (getPrimaryAuthors, formatWorkStats, etc.)
+- 🎯 `nameParser.ts` - Smart author name parsing
+- 🎯 `presets.ts` - Preset utilities
+- 🎯 `viewport.ts` - Viewport utilities
 
-**reader/**
+**packages/ui/src/components/** (100% platform-agnostic)
 
-- [ ] `AnnotationEditor.tsx` - Pure editor
-- [ ] `AnnotationList.tsx` - Pure list
-- [ ] `AnnotationToolbar.tsx` - Pure toolbar
-- [ ] `CompactNoteItem.tsx` - Pure item
-- [ ] `CreateNoteDialog.tsx` - Pure dialog
-- [ ] `MarkdownPreview.tsx` - Pure preview
-- [ ] `NoteConnectors.tsx` - Pure visual
-- [ ] `NoteDetailModal.tsx` - Pure modal
-- [ ] `NotePreview.tsx` - Pure preview
-- [ ] `PDFPage.tsx` - PDF.js wrapper (check deps)
-- [ ] `PDFPreview.tsx` - PDF.js wrapper
-- [ ] `PDFScrollbar.tsx` - Pure scrollbar
-- [ ] `PDFTextLayer.tsx` - PDF.js layer
-- [ ] `PDFThumbnail.tsx` - Pure thumbnail
-- [ ] `SimplePDFViewer.tsx` - PDF.js viewer
+- 🎯 `ImageCropper.tsx` - Image cropping component
+- 🎯 `PDFPreview.tsx` - Lightweight PDF viewer using @deeprecall/pdf (moved from reader/)
+- 🎯 `SimplePDFViewer.tsx` - Floating modal wrapper for PDFPreview (moved from reader/)
 
-### ⚠️ Need Adapter (Next.js dependencies)
+### Library Components
 
-**library/**
+**library/** - ✅ COMPLETED (all components hoisted + organized with wrapper pattern)
 
-- [x] `ActivityBanner.tsx` - ✅ Hoisted with card components as props
-- [x] `AuthorLibrary.tsx` - ✅ Split into multiple components + Hoisted with AuthorLibraryOperations interface
-- [x] `CreateActivityDialog.tsx` - ✅ Hoisted with Electric mutation injection
-- [x] `CreateWorkDialog.tsx` - ✅ Converted to Electric hooks (useWorkPresets, useCreateWorkWithAsset, useAuthorsByIds, useFindOrCreateAuthor) + Hoisted to packages/ui/src/library/
-- [x] `EditWorkDialog.tsx` - Check for routing
-- [x] `ExportDataDialog.tsx` - ✅ Converted with ExportOperations interface + Hoisted
-- [x] `FileInbox.tsx` - ✅ Converted to platform-agnostic with props + Hoisted
-- [x] `ImportDataDialog.tsx` - ✅ Converted with ImportOperations interface + Hoisted
-- [x] `LibraryFilters.tsx` - ✅ Hoisted (pure component)
-- [x] `LibraryHeader.tsx` - ✅ Hoisted with BlobStats interface
-- [x] `LibraryLeftSidebar.tsx` - ✅ Converted to Electric + BlobOperations pattern + Hoisted
-- [x] `LinkBlobDialog.tsx` - ✅ Converted to Electric hooks + Hoisted
-- [x] `OrphanedBlobs.tsx` - ✅ Hoisted with OrphanedBlobsOperations pattern
-- [x] `PDFPreviewModal.tsx` - ✅ Hoisted with PDFPreview component injection
-- [x] `PresetManager.tsx` - ✅ Hoisted (already uses Electric hooks)
-- [x] `QuickPresetDialog.tsx` - ✅ Hoisted (already uses Electric hooks)
-- [x] `TemplateEditorModal.tsx` - ✅ Converted with TemplateEditorOperations interface + Hoisted
-- [x] `TemplateLibrary.tsx` - ✅ Converted to Electric hooks + Hoisted
-- [x] `UnlinkedAssetsList.tsx` - ✅ Converted to Electric hooks + UnlinkedAssetsOperations pattern + Hoisted
-- [x] `WorkContextMenu.tsx` - Check for navigation
-- [x] `WorkSelector.tsx` - ✅ Converted to use Electric hooks (useAuthorsByIds) + Hoisted to packages/ui/src/library/ (still uses useWorksExtended until full Assets migration)
-- [x] **`page.tsx`** - ✅ Main library page - Already uses Electric hooks (useWorks, useAssets, useActivities, useCreateEdge) and composes all hoisted components. Orchestration component kept in apps/web as Next.js page.
+- [✓] `AuthorInput.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `BibtexExportModal.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `BibtexImportModal.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `CompactDynamicForm.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure form using preset utilities
+- [✓] `CreateActivityDialog.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `CreateWorkDialog.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `DynamicForm.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure form using preset utilities
+- [✓] `EditWorkDialog.tsx` - ⚠️ Hoisted to packages/ui/src/library/, wrapper in \_components/ provides 1 platform op (getBlobUrl)
+- [✓] `FieldRenderer.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure field renderer
+- [✓] `FileInbox.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `InputModal.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure component
+- [✓] `LibraryFilters.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure component
+- [✓] `MessageModal.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure component
+- [✓] `PresetFormBuilder.tsx` - 🎯 Hoisted to packages/ui/src/library/, uses Electric hooks directly
+- [✓] `PresetManager.tsx` - 🎯 Hoisted to packages/ui/src/library/, uses Electric hooks directly
+- [✓] `PresetSelector.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure component with utility function
+- [✓] `QuickPresetDialog.tsx` - 🎯 Hoisted to packages/ui/src/library/, uses Electric hooks directly
+- [✓] `TemplateEditorModal.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `TemplateLibrary.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] `WorkContextMenu.tsx` - 🎯 Hoisted to packages/ui/src/library/, pure component
+- [✓] `WorkSelector.tsx` - 🎯 Hoisted to packages/ui/src/library/, wrapper is pure re-export (ZERO platform code!)
+- [✓] **`page.tsx`** - ✅ Next.js orchestrator - cleaned up with 3-section import pattern, uses wrappers from \_components/
 
-**reader/**
+**library/\_components/** (Platform Wrappers - Web-specific)
 
-- [ ] `AnnotationContextMenu.tsx` - Pure menu likely
-- [ ] `AnnotationHandlers.tsx` - Event handlers
-- [ ] `AnnotationOverlay.tsx` - SVG overlay
-- [ ] `FileList.tsx` - Check for Link usage
-- [ ] `NoteSidebar.tsx` - Check for navigation
-- [ ] **`page.tsx`** - Next.js page wrapper
-- [ ] `PDFViewer.tsx` - Main viewer component
-- [ ] `ReaderLayout.tsx` - Layout component
-- [ ] `TabBar.tsx` - Pure tabs likely
-- [ ] `TabContent.tsx` - Pure content likely
-- [ ] `annotation/[annotationId]/page.tsx` - Next.js dynamic route
+- [✓] `ActivityBanner.tsx` - ⚠️ Wrapper provides 1 platform op (onDropFiles)
+- [✓] `AuthorLibrary.tsx` - ⚠️ Wrapper provides 3 platform ops (avatars, getBlobUrl, navigation)
+- [✓] `ExportDataDialog.tsx` - ⚠️ Wrapper provides ExportOperations (server API + Dexie access)
+- [✓] `ImportDataDialog.tsx` - ⚠️ Wrapper provides ImportOperations (server API)
+- [✓] `LibraryHeader.tsx` - ⚠️ Wrapper provides 2 platform ops (blobStats from server CAS, onClearDatabase for API access)
+- [✓] `LibraryLeftSidebar.tsx` - ⚠️ Wrapper provides 7 platform ops (fetchOrphanedBlobs, orphanedBlobs, isLoadingBlobs, fetchBlobContent, renameBlob, deleteBlob, uploadFiles, getBlobUrl)
+- [✓] `LinkBlobDialog.tsx` - ⚠️ Wrapper provides 1 platform op (getBlobUrl)
+- [✓] `OrphanedBlobs.tsx` - ⚠️ Wrapper provides 3 platform ops (orphanedBlobs data from server CAS, isLoading state, getBlobUrl)
+- [✓] `PDFPreviewModal.tsx` - ⚠️ Wrapper provides 1 platform op (getBlobUrl)
+- [✓] `PDFThumbnail.tsx` - ⚠️ Wrapper provides 1 platform op (getBlobUrl)
+- [✓] `UnlinkedAssetsList.tsx` - ⚠️ Wrapper provides 2 platform ops (renameBlob, fetchBlobContent)
+- [✓] `WorkCardCompact.tsx` - ⚠️ Wrapper provides 2 platform ops (navigate, getBlobUrl)
+- [✓] `WorkCardDetailed.tsx` - ⚠️ Wrapper provides 2 platform ops (navigate, getBlobUrl)
+- [✓] `WorkCardList.tsx` - ⚠️ Wrapper provides 2 platform ops (navigate, getBlobUrl)
+
+**reader/** - ✅ COMPLETED (all components hoisted + organized with wrapper pattern)
+
+- [✓] `AnnotationList.tsx` - 🎯 Hoisted to packages/ui/src/reader/, uses Electric hooks directly
+- [✓] `AnnotationToolbar.tsx` - 🎯 Hoisted to packages/ui/src/reader/, pure UI component (Zustand store)
+- [✓] `AnnotationContextMenu.tsx` - 🎯 Hoisted to packages/ui/src/reader/, uses Electric hooks directly
+- [✓] `AnnotationHandlers.tsx` - 🎯 Hoisted to packages/ui/src/reader/, pure UI component (Zustand store)
+- [✓] `FileList.tsx` - 🎯 Hoisted to packages/ui/src/reader/, uses Electric hooks directly
+- [✓] `NoteConnectors.tsx` - 🎯 Hoisted to packages/ui/src/reader/, pure visual component
+- [✓] `PDFPage.tsx` - 🎯 Hoisted to packages/ui/src/reader/, uses @deeprecall/pdf hooks
+- [✓] `PDFScrollbar.tsx` - 🎯 Hoisted to packages/ui/src/reader/, pure UI component
+- [✓] `PDFTextLayer.tsx` - 🎯 Hoisted to packages/ui/src/reader/, pure PDF.js wrapper
+- [✓] `ReaderLayout.tsx` - 🎯 Hoisted to packages/ui/src/reader/, requires AnnotationEditorComponent injection
+- [✓] `TabBar.tsx` - 🎯 Hoisted to packages/ui/src/reader/, uses @deeprecall/data stores
+- [✓] **`PDFViewer.tsx`** - ✅ Platform-specific orchestrator - cleaned up with 3-section import pattern, uses wrappers from \_components/
+- [✓] **`page.tsx`** - ✅ Next.js orchestrator - uses wrappers from \_components/ and PDFViewer
+
+**reader/\_components/** (Platform Wrappers - Web-specific)
+
+- [✓] `AnnotationEditor.tsx` - ⚠️ Wrapper provides AnnotationEditorOperations (getBlobUrl, fetchBlobContent, createMarkdown, uploadFile, createNoteAsset, attachAssetToAnnotation, updateAssetMetadata)
+- [✓] `AnnotationOverlay.tsx` - ⚠️ Wrapper provides 2 platform ops (navigateToAnnotation, uploadAndAttachNote)
+- [✓] `CompactNoteItem.tsx` - ⚠️ Wrapper provides 1 platform op (getBlobUrl)
+- [✓] `CreateNoteDialog.tsx` - ⚠️ Wrapper provides CreateNoteDialogOperations (createMarkdown, uploadFile, createNoteAsset, attachAssetToAnnotation)
+- [✓] `MarkdownPreview.tsx` - ⚠️ Wrapper provides MarkdownPreviewOperations (rendering/fetching)
+- [✓] `NoteDetailModal.tsx` - ⚠️ Wrapper provides NoteDetailModalOperations (platform features)
+- [✓] `NotePreview.tsx` - ⚠️ Wrapper provides NotePreviewOperations (platform features)
+- [✓] `NoteSidebar.tsx` - ⚠️ Wrapper extends NotePreviewOperations
+- [✓] `SimplePDFViewer.tsx` - ⚠️ Wrapper provides 1 platform op (getBlobUrl)
+- [✓] `TabContent.tsx` - ⚠️ Wrapper injects PDFViewer component and getBlobUrl
+
+### Need Platform Wrappers
+
+**library/** - ✅ COMPLETED (see above for full component list + \_components/ wrappers)
+
+**reader/** - ✅ COMPLETED (see above for full component list + \_components/ wrappers)
+
+**reader/annotation/[annotationId]/**
+
+- [x] `CreateGroupDialog.tsx` - Pure UI component (imported directly from @deeprecall/ui)
+- [x] `NoteBranch.tsx` - Needs wrapper (NoteBranchOperations: uploadFile, getBlobUrl, fetchBlobContent - platform-specific)
+- [x] `NoteTreeView.tsx` - Needs wrapper (NoteTreeViewOperations extends NoteBranchOperations + group management)
+- [x] `AnnotationPreview.tsx` - Needs wrapper (AnnotationPreviewOperations: getBlobUrl, loadPDFDocument - platform-specific)
+- [ ] `page.tsx` - Next.js dynamic route (implements operations for all annotation components)
 
 **study/**
 
@@ -130,8 +185,9 @@
 
 **admin/**
 
-- [x] **`page.tsx (AdminPanel)`** - ✅ Hoisted to packages/ui/src/library/AdminPanel.tsx + Converted to Electric hooks (useBlobsMeta, useDeviceBlobs) + Shows multi-device blob coordination + Zero UI regression
-- [x] **`DuplicateResolutionModal.tsx`** - ✅ Hoisted to packages/ui/src/library/DuplicateResolutionModal.tsx + Platform-agnostic modal for duplicate file resolution + Exported types (DuplicateGroup, DuplicateResolutionModalProps)
+- [x] **`AdminPanel.tsx`** - Uses Electric hooks (useBlobsMeta, useDeviceBlobs) directly
+- [x] **`DuplicateResolutionModal.tsx`** - Platform-agnostic modal
+- [x] **`page.tsx`** - Next.js page wrapper
 
 ### ❌ Cannot Move (Server/Next.js-specific)
 
@@ -226,60 +282,94 @@ uploadFile(...)
 
 ## Current Focus
 
-**Goal:** Create Next.js-agnostic and platform-agnostic UI components that use Electric SQL for real-time sync
+**Goal:** Maximize hoisting - only keep platform-specific code in apps/web
 
 **Architecture:**
 
-- **Electric Repos**: `packages/data/src/repos/*.electric.ts` - Direct Electric SQL operations (create, update, delete)
-  - Import via `@deeprecall/data/repos`
-- **Electric Hooks & Stores**: `packages/data/src/hooks/*.ts` - React hooks wrapping Electric repos with React Query
-  - Import via `@deeprecall/data/hooks`
-- **Core Types & Schemas**: `packages/core/src/` - Shared types, Zod schemas, and utilities
-  - Import via `@deeprecall/core` or `@deeprecall/core/schemas/library`
-- **Platform-Agnostic UI**: `packages/ui/src/**` - Pure React components with operations interfaces
-  - Import via `@deeprecall/ui` or `@deeprecall/ui/library/*`
-- **Platform Wrappers**: `apps/web/app/**` - Next.js-specific wrappers that inject Electric hooks into UI components
+- **@deeprecall/data** - Platform-agnostic Electric hooks (useAuthors, useWorks, etc.)
+- **@deeprecall/core** - Shared types, Zod schemas, utilities
+- **@deeprecall/ui** - Pure React components using @deeprecall packages directly
+- **apps/web/app** - Ultra-thin wrappers ONLY for platform-specific features
+
+**Platform-Specific Features (require wrappers):**
+
+- **Filesystem Access**: Blob storage, file uploads, avatar management
+- **PDF.js**: Document loading, rendering (will move to @deeprecall/pdf)
+- **Routing**: Next.js navigation, dynamic routes
+- **Native APIs**: Desktop/Mobile-specific features
+
+**Hoisting Strategy:**
+
+1. ✅ **Utilities**: Move all .ts files to packages/ui/src/utils
+2. ✅ **Pure Components**: Move components using only @deeprecall packages
+3. 🔄 **Reduce Operations**: Minimize operations interfaces - use Electric hooks directly
+4. ⚠️ **Thin Wrappers**: Keep only truly platform-specific code in apps/web
 
 **Web-Specific Infrastructure Hooks** (remain in `apps/web/src/hooks/`):
-These hooks bridge server-side APIs with Electric-synced data and are specific to the Next.js web app:
 
-- `useBlobs.ts` - Bridges server blob storage API (`/api/library/blobs`) with Electric-synced assets
-  - `useBlobStats()` - Combines server blob API + Electric assets for statistics
-  - `useOrphanedBlobs()` - Server blobs not yet in asset database (uses Electric `useAssets()` internally)
-  - `useUnlinkedAssets()` - Assets not linked to works/activities (uses Electric `useAssets()` + `useEdges()`)
+- `useBlobs.ts` - Server blob storage API bridge
+  - `useBlobStats()` - Server blob API + Electric assets
+  - `useOrphanedBlobs()` - Server blobs not in asset database
+  - `useUnlinkedAssets()` - Assets not linked to works/activities
   - `useOrphanedAssets()` - Assets referencing deleted blobs
   - `useDuplicateAssets()` - Multiple assets with same hash
-- `usePDF.ts` - PDF.js integration (local implementation, will move to `@deeprecall/pdf`)
-- `useWorksExtended()` - Complex join query (pending full migration to Electric)
+- `usePDF.ts` - PDF.js integration (will move to @deeprecall/pdf)
+- `useWorksExtended()` - Complex join query (pending migration)
 
 **Task:** Incremental UI migration - convert components to use Electric hooks first, extract to packages/ui second
 
 **Completed:**
 
-1. ✅ `library/page.tsx` - Converted to use Electric hooks (useWorks, useAssets, useActivities, useCreateEdge) from @deeprecall/data/hooks
-2. ✅ `library/LinkBlobDialog.tsx` - Converted to use Electric hooks + Hoisted to packages/ui/src/library/
-3. ✅ `library/TemplateLibrary.tsx` - Converted to use Electric hooks (all presets operations) from @deeprecall/data/hooks + Hoisted to packages/ui/src/library/
-4. ✅ `library/WorkCardList.tsx` - Converted to use Electric hooks + Hoisted to packages/ui/src/library/
-5. ✅ `library/FileInbox.tsx` - Made platform-agnostic + Hoisted to packages/ui/src/library/
-6. ✅ `library/LibraryLeftSidebar.tsx` - Converted to use Electric hooks + Hoisted to packages/ui/src/library/
-7. ✅ `library/ImportDataDialog.tsx` - Made platform-agnostic + Hoisted to packages/ui/src/library/
-8. ✅ `library/ExportDataDialog.tsx` - Made platform-agnostic + Hoisted to packages/ui/src/library/
-9. ✅ `library/AuthorInput.tsx` - Made platform-agnostic + Hoisted to packages/ui/src/library/
-10. ✅ `library/AuthorLibrary.tsx` - Split into modular components + Hoisted to packages/ui/src/library/
-11. ✅ `library/BibtexImportModal.tsx` - Made platform-agnostic + Hoisted to packages/ui/src/library/
-12. ✅ `library/BibtexExportModal.tsx` - Made platform-agnostic + Hoisted to packages/ui/src/library/
-13. ✅ `library/InputModal.tsx` - Pure component + Hoisted to packages/ui/src/library/
-14. ✅ `library/MessageModal.tsx` - Pure component + Hoisted to packages/ui/src/library/
-15. ✅ `library/TemplateEditorModal.tsx` - Made platform-agnostic + Hoisted to packages/ui/src/library/
-16. ✅ `library/WorkCardDetailed.tsx` - Converted to use Electric hooks (useDeleteWork, usePresets, useAuthorsByIds) from @deeprecall/data/hooks + Hoisted to packages/ui/src/library/
-17. ✅ `library/WorkCardCompact.tsx` - Converted to use Electric hooks (useDeleteWork, usePresets, useAuthorsByIds) from @deeprecall/data/hooks + Hoisted to packages/ui/src/library/
-18. ✅ `library/CreateActivityDialog.tsx` - Converted to use Electric hooks (useCreateActivity) from @deeprecall/data/hooks
-19. ✅ `library/EditWorkDialog.tsx` - Converted to use Electric hooks (useUpdateWork, useWorkPresets, useAuthorsByIds) from @deeprecall/data/hooks + Hoisted to packages/ui/src/library/
-20. ✅ `library/CreateWorkDialog.tsx` - Converted to use Electric hooks (useCreateWorkWithAsset, useWorkPresets, useAuthorsByIds, useFindOrCreateAuthor) from @deeprecall/data/hooks + Hoisted to packages/ui/src/library/
-21. ✅ `library/PresetFormBuilder.tsx` - Converted to use Electric hooks (useCreatePreset) from @deeprecall/data/hooks
-22. ✅ `library/QuickPresetDialog.tsx` - Converted to use Electric hooks (useCreatePreset) from @deeprecall/data/hooks
-23. ✅ `library/PresetManager.tsx` - Converted to use Electric hooks (all preset operations) from @deeprecall/data/hooks
-24. ✅ `library/WorkSelector.tsx` - Converted to use Electric hooks (useAuthorsByIds) from @deeprecall/data/hooks + Hoisted to packages/ui/src/library/
+**library/ - FULL MIGRATION COMPLETE ✅**
+
+_All 28 library components migrated with wrapper pattern established:_
+
+**Platform-Agnostic Components (packages/ui/src/library/):**
+
+1. ✅ `AuthorInput.tsx` - Pure component, uses Electric hooks
+2. ✅ `BibtexExportModal.tsx` - Pure component, uses Electric hooks
+3. ✅ `BibtexImportModal.tsx` - Pure component, uses utilities
+4. ✅ `CompactDynamicForm.tsx` - Pure form using preset utilities
+5. ✅ `CreateActivityDialog.tsx` - Pure component, uses Electric hooks
+6. ✅ `CreateWorkDialog.tsx` - Pure component, uses Electric hooks
+7. ✅ `DynamicForm.tsx` - Pure form using preset utilities
+8. ✅ `EditWorkDialog.tsx` - Pure component, uses Electric hooks
+9. ✅ `FieldRenderer.tsx` - Pure field renderer
+10. ✅ `FileInbox.tsx` - Pure component, imports MarkdownPreview
+11. ✅ `InputModal.tsx` - Pure component
+12. ✅ `LibraryFilters.tsx` - Pure component
+13. ✅ `MessageModal.tsx` - Pure component
+14. ✅ `PresetFormBuilder.tsx` - Pure component, uses Electric hooks
+15. ✅ `PresetManager.tsx` - Pure component, uses Electric hooks
+16. ✅ `PresetSelector.tsx` - Pure component with utility function
+17. ✅ `QuickPresetDialog.tsx` - Pure component, uses Electric hooks
+18. ✅ `TemplateEditorModal.tsx` - Pure component, uses Electric hooks
+19. ✅ `TemplateLibrary.tsx` - Pure component, uses Electric hooks + Zustand
+20. ✅ `WorkContextMenu.tsx` - Pure component
+21. ✅ `WorkSelector.tsx` - Pure component, uses Electric hooks
+
+**Platform Wrappers (apps/web/app/library/\_components/):** 22. ✅ `ActivityBanner.tsx` - Wrapper provides 1 platform op (onDropFiles) 23. ✅ `AuthorLibrary.tsx` - Wrapper provides 3 platform ops (avatars, getBlobUrl, navigation) 24. ✅ `ExportDataDialog.tsx` - Wrapper provides ExportOperations (server API + Dexie) 25. ✅ `ImportDataDialog.tsx` - Wrapper provides ImportOperations (server API) 26. ✅ `LibraryHeader.tsx` - Wrapper provides 2 platform ops (blobStats, onClearDatabase) 27. ✅ `LibraryLeftSidebar.tsx` - Wrapper provides 7 platform ops (blob operations + uploads) 28. ✅ `LinkBlobDialog.tsx` - Wrapper provides 1 platform op (getBlobUrl) 29. ✅ `OrphanedBlobs.tsx` - Wrapper provides 3 platform ops (orphanedBlobs, isLoading, getBlobUrl) 30. ✅ `PDFPreviewModal.tsx` - Wrapper provides 1 platform op (getBlobUrl) 31. ✅ `PDFThumbnail.tsx` - Wrapper provides 1 platform op (getBlobUrl) 32. ✅ `UnlinkedAssetsList.tsx` - Wrapper provides 2 platform ops (renameBlob, fetchBlobContent) 33. ✅ `WorkCardCompact.tsx` - Wrapper provides 2 platform ops (navigate, getBlobUrl) 34. ✅ `WorkCardDetailed.tsx` - Wrapper provides 2 platform ops (navigate, getBlobUrl) 35. ✅ `WorkCardList.tsx` - Wrapper provides 2 platform ops (navigate, getBlobUrl)
+
+**Orchestrator:** 36. ✅ `page.tsx` - Cleaned up with 3-section import pattern, uses wrappers from \_components/
+
+**reader/ - FULL MIGRATION COMPLETE ✅**
+
+_All reader components migrated with wrapper pattern established:_
+
+**Platform-Agnostic Components (packages/ui/src/reader/):** 37. ✅ `AnnotationList.tsx` - Pure component, uses Electric hooks 38. ✅ `AnnotationToolbar.tsx` - Pure UI component, Zustand store 39. ✅ `AnnotationContextMenu.tsx` - Pure component, uses Electric hooks 40. ✅ `AnnotationHandlers.tsx` - Pure UI component, Zustand store 41. ✅ `FileList.tsx` - Pure component, uses Electric hooks 42. ✅ `NoteConnectors.tsx` - Pure visual component 43. ✅ `PDFPage.tsx` - Pure component, uses @deeprecall/pdf 44. ✅ `PDFScrollbar.tsx` - Pure UI component 45. ✅ `PDFTextLayer.tsx` - Pure PDF.js wrapper 46. ✅ `ReaderLayout.tsx` - Pure component, requires AnnotationEditorComponent injection 47. ✅ `TabBar.tsx` - Pure component, uses @deeprecall/data stores
+
+**Platform Wrappers (apps/web/app/reader/\_components/):** 48. ✅ `AnnotationEditor.tsx` - Wrapper provides 7 platform ops (blob operations + file upload) 49. ✅ `AnnotationOverlay.tsx` - Wrapper provides 2 platform ops (navigation, uploadAndAttachNote) 50. ✅ `CompactNoteItem.tsx` - Wrapper provides 1 platform op (getBlobUrl) 51. ✅ `CreateNoteDialog.tsx` - Wrapper provides 4 platform ops (createMarkdown, uploadFile, createNoteAsset, attachAssetToAnnotation) 52. ✅ `MarkdownPreview.tsx` - Wrapper provides MarkdownPreviewOperations 53. ✅ `NoteDetailModal.tsx` - Wrapper provides NoteDetailModalOperations 54. ✅ `NotePreview.tsx` - Wrapper provides NotePreviewOperations 55. ✅ `NoteSidebar.tsx` - Wrapper extends NotePreviewOperations 56. ✅ `SimplePDFViewer.tsx` - Wrapper provides 1 platform op (getBlobUrl) 57. ✅ `TabContent.tsx` - Wrapper injects PDFViewer + getBlobUrl
+
+**Orchestrators:** 58. ✅ `PDFViewer.tsx` - Platform-specific orchestrator with 3-section import pattern, reduced by 135+ lines (removed operations now handled by wrappers) 59. ✅ `page.tsx` - Next.js orchestrator with 3-section import pattern, uses wrappers from \_components/
+
+**Architecture Established:**
+
+- ✅ PLATFORM_WRAPPER_PATTERN.md blueprint created
+- ✅ \_components/ subfolder pattern implemented in library/ AND reader/
+- ✅ 3-section import pattern in all page.tsx files (Pure UI / Platform Wrappers / Platform Hooks)
+- ✅ All components use Electric hooks from @deeprecall/data
+- ✅ Zero operations.ts dependencies (removed legacy aggregation pattern)
+- ✅ PDFViewer.tsx cleaned up (removed 135+ lines of operations code)
 
 **Web-Specific Hooks (Remain in @/src/hooks):**
 

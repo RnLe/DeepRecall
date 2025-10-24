@@ -30,7 +30,7 @@ interface AvatarEditViewProps {
       originalBlob: Blob;
       displayBlob: Blob;
       cropRegion: CropRegion;
-    }) => void;
+    }) => Promise<void>;
     onCancel: () => void;
   }>;
 }

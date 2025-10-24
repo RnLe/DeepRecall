@@ -1,9 +1,12 @@
 /**
  * ImportDataDialog Component (Platform-agnostic)
  * Dialog for importing DeepRecall data from an archive
+ *
+ * Uses useQueryClient directly to invalidate Electric queries after import!
  */
 
 import { useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   ImportPreview,
   ImportOptions,
@@ -32,10 +35,9 @@ export interface ImportOperations {
   formatBytes: (bytes: number) => string;
 }
 
-interface ImportDataDialogProps {
+export interface ImportDataDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
   importOps: ImportOperations;
 }
 
@@ -44,9 +46,9 @@ type Step = "upload" | "preview" | "importing" | "complete";
 export function ImportDataDialog({
   isOpen,
   onClose,
-  onSuccess,
   importOps,
 }: ImportDataDialogProps) {
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -109,10 +111,27 @@ export function ImportDataDialog({
 
       if (result.success) {
         setStep("complete");
+
+        // Invalidate all merged queries to show imported data immediately
+        queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["assets", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["activities", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["collections", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["edges", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["presets", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["authors", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["annotations", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["cards", "merged"] });
+        queryClient.invalidateQueries({ queryKey: ["reviewLogs", "merged"] });
+
+        // Also invalidate blobs and files queries (CAS layer)
+        queryClient.invalidateQueries({ queryKey: ["blobs"] });
+        queryClient.invalidateQueries({ queryKey: ["files"] });
+
+        // Wait before closing to show success message
         setTimeout(() => {
-          onSuccess();
           handleClose();
-        }, 2000);
+        }, 1500);
       } else {
         setError(result.errors.join(", ") || "Import failed");
         setStep("preview");

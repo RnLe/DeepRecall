@@ -3,9 +3,12 @@
  *
  * Full editor for modifying preset/template configuration
  * Allows editing: name, description, icon, color, core fields, and custom fields
+ *
+ * Uses Electric hooks directly - fully hoisted!
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useWorks, useAssets, useUpdatePreset } from "@deeprecall/data";
 import {
   X,
   Plus,
@@ -55,25 +58,10 @@ interface Preset {
   [key: string]: any;
 }
 
-interface UsageCount {
-  total: number;
-  works: number;
-  assets: number;
-}
-
-export interface TemplateEditorOperations {
-  // Get usage count for preset
-  getPresetUsageCount: (presetId: string) => UsageCount | undefined;
-
-  // Save template updates
-  onSave: (presetId: string, updates: Partial<Preset>) => Promise<void>;
-}
-
 export interface TemplateEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   preset: Preset;
-  operations: TemplateEditorOperations;
 }
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
@@ -126,8 +114,26 @@ export function TemplateEditorModal({
   isOpen,
   onClose,
   preset,
-  operations,
 }: TemplateEditorModalProps) {
+  const allWorksQuery = useWorks();
+  const allAssetsQuery = useAssets();
+  const updatePresetMutation = useUpdatePreset();
+
+  // Compute usage count client-side
+  const usageCount = useMemo(() => {
+    const works = (allWorksQuery.data || []).filter(
+      (work) => work.presetId === preset.id
+    ).length;
+    const assets = (allAssetsQuery.data || []).filter(
+      (asset) => asset.presetId === preset.id
+    ).length;
+
+    return {
+      works,
+      assets,
+      total: works + assets,
+    };
+  }, [allWorksQuery.data, allAssetsQuery.data, preset.id]);
   const [name, setName] = useState(preset.name);
   const [description, setDescription] = useState(preset.description || "");
   const [color, setColor] = useState(preset.color || "#6b7280");
@@ -151,7 +157,7 @@ export function TemplateEditorModal({
   const [isSaving, setIsSaving] = useState(false);
 
   // Get usage count for this preset
-  const usageCount = operations.getPresetUsageCount(preset.id);
+  // usageCount is now computed above with useMemo
   const hasLinkedEntities = (usageCount?.total || 0) > 0;
 
   // Reset form when preset changes
@@ -243,12 +249,15 @@ export function TemplateEditorModal({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await operations.onSave(preset.id, {
-        name: name.trim(),
-        description: description.trim(),
-        color,
-        coreFieldConfig,
-        customFields,
+      await updatePresetMutation.mutateAsync({
+        id: preset.id,
+        updates: {
+          name: name.trim(),
+          description: description.trim(),
+          color,
+          coreFieldConfig,
+          customFields: customFields as any,
+        },
       });
       onClose();
     } catch (error) {

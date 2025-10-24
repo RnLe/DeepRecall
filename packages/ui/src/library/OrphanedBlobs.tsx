@@ -2,7 +2,7 @@
  * Orphaned blobs section
  * Shows files in the system that aren't linked to any works
  * Compact list view with mini thumbnails
- * Platform-agnostic - receives data and operations via props
+ * Platform-agnostic - receives server blob data via props, imports LinkBlobDialog directly
  */
 
 import { useState } from "react";
@@ -14,32 +14,23 @@ import {
   ChevronUp,
 } from "lucide-react";
 import type { BlobWithMetadata } from "@deeprecall/core";
+import { LinkBlobDialog } from "./LinkBlobDialog";
 
-// Platform-agnostic operations interface
+// Platform-specific operations interface (minimal)
 export interface OrphanedBlobsOperations {
-  // Data
+  // Server blob data (requires CAS adapter)
   orphanedBlobs: BlobWithMetadata[];
   isLoading?: boolean;
-
-  // Callback when blob should be linked
-  onLinkBlob?: (blob: BlobWithMetadata) => void;
+  // Platform-specific getBlobUrl for LinkBlobDialog
+  getBlobUrl: (sha256: string) => string;
 }
 
-interface OrphanedBlobsProps extends OrphanedBlobsOperations {
-  // Optional LinkBlobDialog component (platform-specific)
-  LinkBlobDialog?: React.ComponentType<{
-    blob: BlobWithMetadata;
-    onSuccess: () => void;
-    onCancel: () => void;
-  }>;
+interface OrphanedBlobsProps {
+  operations: OrphanedBlobsOperations;
 }
 
-export function OrphanedBlobs({
-  orphanedBlobs,
-  isLoading,
-  onLinkBlob,
-  LinkBlobDialog,
-}: OrphanedBlobsProps) {
+export function OrphanedBlobs({ operations }: OrphanedBlobsProps) {
+  const { orphanedBlobs, isLoading, getBlobUrl } = operations;
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -52,9 +43,6 @@ export function OrphanedBlobs({
   }
 
   const handleLinkClick = (blob: BlobWithMetadata) => {
-    if (onLinkBlob) {
-      onLinkBlob(blob);
-    }
     setLinkingBlob(blob);
   };
 
@@ -162,9 +150,10 @@ export function OrphanedBlobs({
       )}
 
       {/* Link dialog */}
-      {linkingBlob && LinkBlobDialog && (
+      {linkingBlob && (
         <LinkBlobDialog
           blob={linkingBlob}
+          operations={{ getBlobUrl }}
           onSuccess={() => {
             setLinkingBlob(null);
             // Query will auto-refresh via React Query

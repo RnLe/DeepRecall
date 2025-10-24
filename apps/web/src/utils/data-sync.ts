@@ -4,6 +4,7 @@
  */
 
 import { db } from "@deeprecall/data/db";
+import { createWriteBuffer } from "@deeprecall/data/writeBuffer";
 import type {
   ExportOptions,
   ImportOptions,
@@ -11,7 +12,7 @@ import type {
   ImportResult,
   DexieExportTyped,
   ImportStrategy,
-} from "@deeprecall/core/schemas/data-sync";
+} from "@deeprecall/core/schemas";
 
 /**
  * Export all Dexie data to JSON
@@ -214,7 +215,7 @@ export async function executeImport(
 
     const { result, dexieData } = await response.json();
 
-    // Import Dexie data on client side
+    // Import Dexie data on client side using optimistic local layer
     if (options.importDexie && dexieData) {
       const dexieResult = await importDexieData(dexieData, options.strategy);
 
@@ -231,6 +232,58 @@ export async function executeImport(
       result.imported.reviewLogs = dexieResult.reviewLogs;
     }
 
+    // Trigger CAS rescan if files were imported
+    if (options.importFiles && result.imported.files > 0) {
+      console.log("[Import] Triggering CAS rescan...");
+      try {
+        const scanResponse = await fetch("/api/scan", { method: "POST" });
+        if (scanResponse.ok) {
+          const scanResult = await scanResponse.json();
+          console.log(
+            `[Import] CAS rescan complete: ${scanResult.added} blobs added`
+          );
+        } else {
+          console.warn(
+            "[Import] CAS rescan failed:",
+            await scanResponse.text()
+          );
+        }
+      } catch (scanError) {
+        console.warn("[Import] CAS rescan error:", scanError);
+        result.warnings = result.warnings || [];
+        result.warnings.push(
+          "CAS rescan failed - you may need to manually rescan from the admin page"
+        );
+      }
+    }
+
+    // Trigger Electric sync to propagate changes
+    if (options.importDexie || options.importSQLite) {
+      console.log("[Import] Triggering Electric sync...");
+      try {
+        const syncResponse = await fetch("/api/admin/sync-to-electric", {
+          method: "POST",
+        });
+        if (syncResponse.ok) {
+          const syncResult = await syncResponse.json();
+          console.log(
+            `[Import] Electric sync complete: ${syncResult.synced} records synced`
+          );
+        } else {
+          console.warn(
+            "[Import] Electric sync failed:",
+            await syncResponse.text()
+          );
+        }
+      } catch (syncError) {
+        console.warn("[Import] Electric sync error:", syncError);
+        result.warnings = result.warnings || [];
+        result.warnings.push(
+          "Electric sync failed - data will sync in background"
+        );
+      }
+    }
+
     return result;
   } catch (error) {
     console.error("Import execution failed:", error);
@@ -239,7 +292,10 @@ export async function executeImport(
 }
 
 /**
- * Import Dexie data with merge/replace strategy
+ * Import Dexie data with merge/replace strategy using optimistic local layer
+ * This ensures instant UI updates and proper sync through WriteBuffer
+ *
+ * IMPORTANT: Preserves original IDs to maintain relationships (e.g., asset.workId)
  */
 async function importDexieData(
   data: DexieExportTyped,
@@ -262,7 +318,8 @@ async function importDexieData(
   };
 
   if (strategy === "replace") {
-    // Clear all tables
+    // For replace strategy: clear synced tables first
+    console.log("[Import] Replace strategy: clearing existing data...");
     await db.transaction(
       "rw",
       [
@@ -290,127 +347,141 @@ async function importDexieData(
         await db.reviewLogs.clear();
       }
     );
+  }
 
-    // Bulk add all data
-    await db.transaction(
-      "rw",
-      [
-        db.works,
-        db.assets,
-        db.activities,
-        db.collections,
-        db.edges,
-        db.presets,
-        db.authors,
-        db.annotations,
-        db.cards,
-        db.reviewLogs,
-      ],
-      async () => {
-        if (data.works?.length) {
-          await db.works.bulkAdd(data.works);
-          imported.works = data.works.length;
-        }
-        if (data.assets?.length) {
-          await db.assets.bulkAdd(data.assets);
-          imported.assets = data.assets.length;
-        }
-        if (data.activities?.length) {
-          await db.activities.bulkAdd(data.activities);
-          imported.activities = data.activities.length;
-        }
-        if (data.collections?.length) {
-          await db.collections.bulkAdd(data.collections);
-          imported.collections = data.collections.length;
-        }
-        if (data.edges?.length) {
-          await db.edges.bulkAdd(data.edges);
-          imported.edges = data.edges.length;
-        }
-        if (data.presets?.length) {
-          await db.presets.bulkAdd(data.presets);
-          imported.presets = data.presets.length;
-        }
-        if (data.authors?.length) {
-          await db.authors.bulkAdd(data.authors);
-          imported.authors = data.authors.length;
-        }
-        if (data.annotations?.length) {
-          await db.annotations.bulkAdd(data.annotations);
-          imported.annotations = data.annotations.length;
-        }
-        if (data.cards?.length) {
-          await db.cards.bulkAdd(data.cards);
-          imported.cards = data.cards.length;
-        }
-        if (data.reviewLogs?.length) {
-          await db.reviewLogs.bulkAdd(data.reviewLogs);
-          imported.reviewLogs = data.reviewLogs.length;
-        }
+  // Import in dependency order to avoid FK violations:
+  // 1. Works (no dependencies)
+  // 2. Assets (depends on Works)
+  // 3. Other entities
+  console.log(
+    "[Import] Importing data with preserved IDs in dependency order..."
+  );
+
+  // Helper to import entity preserving ID
+  const importWithPreservedId = async (
+    dexieTable: string,
+    postgresTable: string,
+    entity: any
+  ): Promise<boolean> => {
+    try {
+      // Write directly to synced Dexie table (instant UI)
+      const table = (db as any)[dexieTable];
+      if (!table) {
+        console.warn(`[Import] Unknown Dexie table: ${dexieTable}`);
+        return false;
       }
-    );
-  } else {
-    // Merge strategy: use put() which updates if exists, adds if not
-    await db.transaction(
-      "rw",
-      [
-        db.works,
-        db.assets,
-        db.activities,
-        db.collections,
-        db.edges,
-        db.presets,
-        db.authors,
-        db.annotations,
-        db.cards,
-        db.reviewLogs,
-      ],
-      async () => {
-        // For merge, we use bulkPut which updates existing or adds new
-        if (data.works?.length) {
-          await db.works.bulkPut(data.works);
-          imported.works = data.works.length;
-        }
-        if (data.assets?.length) {
-          await db.assets.bulkPut(data.assets);
-          imported.assets = data.assets.length;
-        }
-        if (data.activities?.length) {
-          await db.activities.bulkPut(data.activities);
-          imported.activities = data.activities.length;
-        }
-        if (data.collections?.length) {
-          await db.collections.bulkPut(data.collections);
-          imported.collections = data.collections.length;
-        }
-        if (data.edges?.length) {
-          await db.edges.bulkPut(data.edges);
-          imported.edges = data.edges.length;
-        }
-        if (data.presets?.length) {
-          await db.presets.bulkPut(data.presets);
-          imported.presets = data.presets.length;
-        }
-        if (data.authors?.length) {
-          await db.authors.bulkPut(data.authors);
-          imported.authors = data.authors.length;
-        }
-        if (data.annotations?.length) {
-          await db.annotations.bulkPut(data.annotations);
-          imported.annotations = data.annotations.length;
-        }
-        if (data.cards?.length) {
-          await db.cards.bulkPut(data.cards);
-          imported.cards = data.cards.length;
-        }
-        if (data.reviewLogs?.length) {
-          await db.reviewLogs.bulkPut(data.reviewLogs);
-          imported.reviewLogs = data.reviewLogs.length;
-        }
+
+      if (strategy === "replace") {
+        await table.add(entity);
+      } else {
+        await table.put(entity); // Merge: update or insert
       }
+
+      // Enqueue to WriteBuffer for Postgres sync (preserving ID)
+      const buffer = createWriteBuffer();
+      await buffer.enqueue({
+        table: postgresTable as any, // Use Postgres table name (snake_case)
+        op: "insert", // Use insert with ON CONFLICT DO UPDATE
+        payload: entity,
+      });
+
+      return true;
+    } catch (error) {
+      console.warn(
+        `[Import] Failed to import ${dexieTable} ${entity.id}:`,
+        error
+      );
+      return false;
+    }
+  };
+
+  // Import works first (no dependencies)
+  if (data.works?.length) {
+    for (const work of data.works) {
+      if (await importWithPreservedId("works", "works", work)) {
+        imported.works++;
+      }
+    }
+  }
+
+  // Import assets second (depends on works)
+  if (data.assets?.length) {
+    for (const asset of data.assets) {
+      if (await importWithPreservedId("assets", "assets", asset)) {
+        imported.assets++;
+      }
+    }
+  }
+
+  // Import remaining entities (order doesn't matter as much)
+  if (data.activities?.length) {
+    for (const activity of data.activities) {
+      if (await importWithPreservedId("activities", "activities", activity)) {
+        imported.activities++;
+      }
+    }
+  }
+
+  if (data.collections?.length) {
+    for (const collection of data.collections) {
+      if (
+        await importWithPreservedId("collections", "collections", collection)
+      ) {
+        imported.collections++;
+      }
+    }
+  }
+
+  if (data.edges?.length) {
+    for (const edge of data.edges) {
+      if (await importWithPreservedId("edges", "edges", edge)) {
+        imported.edges++;
+      }
+    }
+  }
+
+  if (data.presets?.length) {
+    for (const preset of data.presets) {
+      if (await importWithPreservedId("presets", "presets", preset)) {
+        imported.presets++;
+      }
+    }
+  }
+
+  if (data.authors?.length) {
+    for (const author of data.authors) {
+      if (await importWithPreservedId("authors", "authors", author)) {
+        imported.authors++;
+      }
+    }
+  }
+
+  // Skip annotations (requires schema migration)
+  if (data.annotations?.length) {
+    console.warn(
+      `[Import] Skipping ${data.annotations.length} annotations - requires migration 003_fix_annotation_id_type.sql`
     );
   }
 
+  if (data.cards?.length) {
+    for (const card of data.cards) {
+      if (await importWithPreservedId("cards", "cards", card)) {
+        imported.cards++;
+      }
+    }
+  }
+
+  if (data.reviewLogs?.length) {
+    for (const log of data.reviewLogs) {
+      if (await importWithPreservedId("reviewLogs", "review_logs", log)) {
+        imported.reviewLogs++;
+      }
+    }
+  }
+
+  console.log(
+    `[Import] Import complete: ${Object.values(imported).reduce((a, b) => a + b, 0)} records`
+  );
   return imported;
 }
 

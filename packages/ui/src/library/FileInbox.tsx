@@ -1,13 +1,16 @@
 /**
  * FileInbox Component (Platform-agnostic)
  * Displays new files (inbox) - orphaned blobs that have never been touched
+ *
+ * Uses MarkdownPreview component directly - fully hoisted!
  */
 
 import { useState } from "react";
 import { FileQuestion, Link, ChevronDown, ChevronUp } from "lucide-react";
 import type { BlobWithMetadata } from "@deeprecall/core";
+import { MarkdownPreview } from "../components/MarkdownPreview";
 
-interface FileInboxProps {
+export interface FileInboxProps {
   // Data
   newFiles: BlobWithMetadata[];
 
@@ -20,15 +23,6 @@ interface FileInboxProps {
 
   // Platform-specific fetch
   fetchBlobContent: (sha256: string) => Promise<string>;
-
-  // Platform-specific components
-  MarkdownPreview: React.ComponentType<{
-    initialContent: string;
-    title: string;
-    sha256: string;
-    onClose: () => void;
-    onSaved: (newHash: string) => void;
-  }>;
 }
 
 export function FileInbox({
@@ -39,7 +33,6 @@ export function FileInbox({
   onDeleteBlob,
   onRefreshBlobs,
   fetchBlobContent,
-  MarkdownPreview,
 }: FileInboxProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [contextMenu, setContextMenu] = useState<{

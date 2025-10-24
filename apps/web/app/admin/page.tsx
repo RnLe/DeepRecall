@@ -1,22 +1,25 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { AdminPanel, DuplicateResolutionModal } from "@deeprecall/ui";
+// ========================================
+// PURE UI IMPORTS (from @deeprecall/ui)
+// ========================================
+import {
+  AdminPanel,
+  DuplicateResolutionModal,
+  MarkdownPreview,
+  SimplePDFViewer,
+} from "@deeprecall/ui";
 import type { DuplicateGroup } from "@deeprecall/ui";
-import { MarkdownPreview } from "../reader/MarkdownPreview";
-import { SimplePDFViewer } from "../reader/SimplePDFViewer";
+
+// ========================================
+// PLATFORM HOOKS (from @/src/hooks)
+// ========================================
+import { useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useBlobs } from "@/src/hooks/useBlobs";
 import { useBlobsMeta, useDeviceBlobs } from "@deeprecall/data/hooks";
 import { getDeviceId } from "@deeprecall/data/utils/deviceId";
 import type { BlobWithMetadata } from "@deeprecall/blob-storage";
-
-interface ScanResult {
-  message: string;
-  scanned: number;
-  added: number;
-  duplicates?: DuplicateGroup[];
-}
 
 export default function AdminPage() {
   const queryClient = useQueryClient();

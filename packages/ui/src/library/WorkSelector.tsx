@@ -1,25 +1,23 @@
 /**
  * WorkSelector Component (Platform-agnostic)
  * Displays existing works in a grid for selection
+ * Uses Electric hooks directly for data fetching
  */
 
 import { BookOpen, Users } from "lucide-react";
-import type { WorkExtended, Author } from "@deeprecall/core";
+import type { Work, Asset } from "@deeprecall/core";
+import { useWorks, useAssets, useAuthorsByIds } from "@deeprecall/data/hooks";
+import { getPrimaryAuthors, getDisplayYear } from "../utils/library";
+import { useMemo } from "react";
 
-// Platform-agnostic operations interface
-export interface WorkSelectorOperations {
-  // Get authors by IDs for a work (returns Electric ShapeResult)
-  useAuthorsByIds: (ids: string[]) => { data?: Author[]; isLoading: boolean };
-
-  // Display utilities
-  getPrimaryAuthors: (authors: Author[], maxCount: number) => string;
-  getDisplayYear: (work: WorkExtended) => string | null;
+// Extended work with asset count
+interface WorkWithAssets extends Work {
+  assetCount: number;
 }
 interface WorkSelectorItemProps {
-  work: WorkExtended;
+  work: WorkWithAssets;
   isSelected: boolean;
   onChange: () => void;
-  operations: WorkSelectorOperations;
 }
 
 // Helper component to use hooks properly
@@ -27,13 +25,10 @@ function WorkSelectorItem({
   work,
   isSelected,
   onChange,
-  operations,
 }: WorkSelectorItemProps) {
-  const { data: authorEntities = [] } = operations.useAuthorsByIds(
-    work.authorIds || []
-  );
-  const authors = operations.getPrimaryAuthors(authorEntities, 2);
-  const year = operations.getDisplayYear(work);
+  const { data: authorEntities = [] } = useAuthorsByIds(work.authorIds || []);
+  const authors = getPrimaryAuthors(authorEntities, 2);
+  const year = getDisplayYear(work);
 
   return (
     <button
@@ -51,7 +46,7 @@ function WorkSelectorItem({
         {authors} {year && `• ${year}`}
       </div>
       <div className="text-xs text-neutral-500 mt-1">
-        {(work as any).assetCount || 0} file(s)
+        {work.assetCount || 0} file(s)
       </div>
     </button>
   );
@@ -62,13 +57,10 @@ function WorkSelectorItemDetailed({
   work,
   isSelected,
   onChange,
-  operations,
 }: WorkSelectorItemProps) {
-  const { data: authorEntities = [] } = operations.useAuthorsByIds(
-    work.authorIds || []
-  );
-  const authors = operations.getPrimaryAuthors(authorEntities, 2);
-  const year = operations.getDisplayYear(work);
+  const { data: authorEntities = [] } = useAuthorsByIds(work.authorIds || []);
+  const authors = getPrimaryAuthors(authorEntities, 2);
+  const year = getDisplayYear(work);
 
   return (
     <button
@@ -109,7 +101,7 @@ function WorkSelectorItemDetailed({
               {work.workType}
             </span>
             <span className="text-neutral-600">
-              {(work as any).assetCount || 0} file(s)
+              {work.assetCount || 0} file(s)
             </span>
           </div>
         </div>
@@ -121,17 +113,31 @@ function WorkSelectorItemDetailed({
 interface WorkSelectorProps {
   value: string | null;
   onChange: (workId: string | null) => void;
-  works: WorkExtended[];
-  operations: WorkSelectorOperations;
 }
 
-export function WorkSelector({
-  value,
-  onChange,
-  works,
-  operations,
-}: WorkSelectorProps) {
-  if (!works || works.length === 0) {
+export function WorkSelector({ value, onChange }: WorkSelectorProps) {
+  const { data: works = [] } = useWorks();
+  const { data: assets = [] } = useAssets();
+
+  // Compute asset counts for each work
+  const worksWithAssets: WorkWithAssets[] = useMemo(() => {
+    const assetCountByWork = assets.reduce(
+      (acc, asset) => {
+        if (asset.workId) {
+          acc[asset.workId] = (acc[asset.workId] || 0) + 1;
+        }
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    return works.map((work) => ({
+      ...work,
+      assetCount: assetCountByWork[work.id] || 0,
+    }));
+  }, [works, assets]);
+
+  if (!worksWithAssets || worksWithAssets.length === 0) {
     return (
       <div className="text-center py-8 text-neutral-500">
         <BookOpen className="w-8 h-8 mx-auto mb-2 text-neutral-600" />
@@ -145,13 +151,12 @@ export function WorkSelector({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
-      {works.map((work) => (
+      {worksWithAssets.map((work) => (
         <WorkSelectorItemDetailed
           key={work.id}
           work={work}
           isSelected={value === work.id}
           onChange={() => onChange(value === work.id ? null : work.id)}
-          operations={operations}
         />
       ))}
     </div>

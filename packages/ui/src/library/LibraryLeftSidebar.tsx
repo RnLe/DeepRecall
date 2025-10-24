@@ -1,109 +1,56 @@
 /**
  * LibraryLeftSidebar Component (Platform-agnostic)
  * Container for new files (inbox) and unlinked assets sections
+ * Uses Electric hooks and imports components directly
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import type { BlobWithMetadata } from "@deeprecall/core";
 import type { Asset } from "@deeprecall/core";
+import { assetsElectric } from "@deeprecall/data/repos";
+import { FileInbox } from "./FileInbox";
+import { UnlinkedAssetsList } from "./UnlinkedAssetsList";
+import { SimplePDFViewer } from "../components/SimplePDFViewer";
+import { MarkdownPreview } from "../components/MarkdownPreview";
 
-// Platform-agnostic blob operations interface
-export interface BlobOperations {
+// Platform-specific operations interface (minimal)
+export interface LibraryLeftSidebarOperations {
+  // Blob operations (require server CAS access)
   fetchOrphanedBlobs: () => Promise<BlobWithMetadata[]>;
+  orphanedBlobs: BlobWithMetadata[];
+  isLoadingBlobs: boolean;
   fetchBlobContent: (sha256: string) => Promise<string>;
   renameBlob: (hash: string, filename: string) => Promise<void>;
   deleteBlob: (hash: string) => Promise<void>;
   uploadFiles: (files: FileList) => Promise<void>;
-}
-
-// Platform-agnostic asset operations interface
-export interface AssetOperations {
-  createAsset: (asset: {
-    kind: "asset";
-    sha256: string;
-    filename: string;
-    bytes: number;
-    mime: string;
-    pageCount?: number | null;
-    role:
-      | "main"
-      | "notes"
-      | "slides"
-      | "data"
-      | "supplement"
-      | "solutions"
-      | "exercises"
-      | "thumbnail";
-    favorite: boolean;
-  }) => Promise<void>;
-  deleteAsset: (assetId: string) => Promise<void>;
+  getBlobUrl: (sha256: string) => string;
 }
 
 interface LibraryLeftSidebarProps {
-  // Data
-  orphanedBlobs: BlobWithMetadata[];
-  isLoadingBlobs: boolean;
-
-  // Operations
-  blobOps: BlobOperations;
-  assetOps: AssetOperations;
-
-  // Component dependencies - injected from platform
-  FileInbox: React.ComponentType<{
-    newFiles: BlobWithMetadata[];
-    onLinkBlob: (blob: BlobWithMetadata) => void;
-    onViewBlob: (blob: BlobWithMetadata) => void;
-    onRenameBlob: (hash: string, newFilename: string) => Promise<void>;
-    onDeleteBlob: (hash: string) => Promise<void>;
-    onRefreshBlobs: () => void;
-    fetchBlobContent: (sha256: string) => Promise<string>;
-    MarkdownPreview: React.ComponentType<{
-      initialContent: string;
-      title: string;
-      sha256: string;
-      onClose: () => void;
-      onSaved: (newHash: string) => void;
-    }>;
-  }>;
-
-  UnlinkedAssetsList: React.ComponentType<{
-    onLinkAsset: (asset: Asset) => void;
-    onViewAsset: (asset: Asset) => void;
-    onMoveToInbox: (assetId: string) => Promise<void>;
-  }>;
-
+  operations: LibraryLeftSidebarOperations;
+  // Component injection (LinkBlobDialog needs separate optimization)
   LinkBlobDialog: React.ComponentType<{
     blob: BlobWithMetadata;
     onSuccess: () => void;
     onCancel: () => void;
   }>;
-
-  SimplePDFViewer: React.ComponentType<{
-    sha256: string;
-    title: string;
-    onClose: () => void;
-  }>;
-
-  MarkdownPreview: React.ComponentType<{
-    initialContent: string;
-    title: string;
-    sha256: string;
-    onClose: () => void;
-    onSaved: (newHash: string) => void;
-  }>;
 }
 
 export function LibraryLeftSidebar({
-  orphanedBlobs,
-  isLoadingBlobs,
-  blobOps,
-  assetOps,
-  FileInbox,
-  UnlinkedAssetsList,
+  operations,
   LinkBlobDialog,
-  SimplePDFViewer,
-  MarkdownPreview,
 }: LibraryLeftSidebarProps) {
+  const {
+    orphanedBlobs,
+    isLoadingBlobs,
+    fetchOrphanedBlobs,
+    fetchBlobContent,
+    renameBlob,
+    deleteBlob,
+    uploadFiles,
+    getBlobUrl,
+  } = operations;
+
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
   const [viewingBlob, setViewingBlob] = useState<BlobWithMetadata | null>(null);
   const [viewingAsset, setViewingAsset] = useState<Asset | null>(null);
@@ -114,7 +61,7 @@ export function LibraryLeftSidebar({
   // Refetch function for when blobs are modified
   const refreshOrphanedBlobs = async () => {
     try {
-      await blobOps.fetchOrphanedBlobs();
+      await fetchOrphanedBlobs();
     } catch (error) {
       console.error("Failed to refresh orphaned blobs:", error);
     }
@@ -124,7 +71,7 @@ export function LibraryLeftSidebar({
   const handleConvertBlobToAsset = async (blob: BlobWithMetadata) => {
     try {
       // Create asset from blob using Electric
-      await assetOps.createAsset({
+      await assetsElectric.createAsset({
         kind: "asset",
         sha256: blob.sha256,
         filename: blob.filename || "Untitled",
@@ -150,7 +97,7 @@ export function LibraryLeftSidebar({
   // Handle move asset to inbox (remove from Electric, becomes orphaned blob)
   const handleMoveToInbox = async (assetId: string) => {
     try {
-      await assetOps.deleteAsset(assetId);
+      await assetsElectric.deleteAsset(assetId);
 
       // Refresh data - asset will now appear as orphaned blob
       await refreshOrphanedBlobs();
@@ -168,7 +115,7 @@ export function LibraryLeftSidebar({
   const handleFileUpload = async (files: FileList) => {
     setIsUploading(true);
     try {
-      await blobOps.uploadFiles(files);
+      await uploadFiles(files);
 
       // Refresh the orphaned blobs list
       await refreshOrphanedBlobs();
@@ -263,18 +210,21 @@ export function LibraryLeftSidebar({
           {/* New Files (Inbox) Section */}
           <FileInbox
             newFiles={orphanedBlobs}
-            onLinkBlob={(blob) => setLinkingBlob(blob)}
-            onViewBlob={(blob) => setViewingBlob(blob)}
-            onRenameBlob={blobOps.renameBlob}
-            onDeleteBlob={blobOps.deleteBlob}
+            onLinkBlob={(blob: BlobWithMetadata) => setLinkingBlob(blob)}
+            onViewBlob={(blob: BlobWithMetadata) => setViewingBlob(blob)}
+            onRenameBlob={renameBlob}
+            onDeleteBlob={deleteBlob}
             onRefreshBlobs={refreshOrphanedBlobs}
-            fetchBlobContent={blobOps.fetchBlobContent}
-            MarkdownPreview={MarkdownPreview}
+            fetchBlobContent={fetchBlobContent}
           />
 
           {/* Unlinked Assets Section */}
           <UnlinkedAssetsList
-            onLinkAsset={(asset) => {
+            operations={{
+              renameBlob,
+              fetchBlobContent,
+            }}
+            onLinkAsset={(asset: Asset) => {
               // Convert asset to blob format for LinkBlobDialog
               const blobData: BlobWithMetadata = {
                 sha256: asset.sha256,
@@ -288,7 +238,7 @@ export function LibraryLeftSidebar({
               };
               setLinkingBlob(blobData);
             }}
-            onViewAsset={(asset) => setViewingAsset(asset)}
+            onViewAsset={(asset: Asset) => setViewingAsset(asset)}
             onMoveToInbox={handleMoveToInbox}
           />
         </div>
@@ -312,6 +262,7 @@ export function LibraryLeftSidebar({
           sha256={viewingBlob.sha256}
           title={viewingBlob.filename || "Untitled"}
           onClose={() => setViewingBlob(null)}
+          getBlobUrl={getBlobUrl}
         />
       )}
 
@@ -321,6 +272,7 @@ export function LibraryLeftSidebar({
           sha256={viewingAsset.sha256}
           title={viewingAsset.filename || "Untitled"}
           onClose={() => setViewingAsset(null)}
+          getBlobUrl={getBlobUrl}
         />
       )}
     </>

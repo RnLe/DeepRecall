@@ -57,13 +57,13 @@ importers:
         specifier: ^0.16.25
         version: 0.16.25
       lucide-react:
-        specifier: ^0.545.0
-        version: 0.545.0(react@19.2.0)
+        specifier: ^0.546.0
+        version: 0.546.0(react@19.2.0)
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
       next:
-        specifier: ^15.5.5
+        specifier: ^15.0.0
         version: 15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       pdf-parse:
         specifier: ^2.3.11
@@ -114,9 +114,6 @@ importers:
       '@tailwindcss/forms':
         specifier: ^0.5.10
         version: 0.5.10(tailwindcss@4.1.16)
-      '@tailwindcss/line-clamp':
-        specifier: ^0.4.4
-        version: 0.4.4(tailwindcss@4.1.16)
       '@tailwindcss/postcss':
         specifier: ^4.0.0
         version: 4.1.16
@@ -974,11 +971,6 @@ packages:
     resolution: {integrity: sha512-utI1ONF6uf/pPNO68kmN1b8rEwNXv3czukalo8VtJH8ksIkZXr3Q3VYudZLkCsDd4Wku120uF02hYK25XGPorw==}
     peerDependencies:
       tailwindcss: '>=3.0.0 || >= 3.0.0-alpha.1 || >= 4.0.0-alpha.20 || >= 4.0.0-beta.1'
-
-  '@tailwindcss/line-clamp@0.4.4':
-    resolution: {integrity: sha512-5U6SY5z8N42VtrCrKlsTAA35gy2VSyYtHWCsg1H87NU1SXnEfekTVlrga9fzUDrrHcGi2Lb5KenUWb4lRQT5/g==}
-    peerDependencies:
-      tailwindcss: '>=2.0.0 || >=3.0.0 || >=3.0.0-alpha.1'
 
   '@tailwindcss/node@4.1.16':
     resolution: {integrity: sha512-BX5iaSsloNuvKNHRN3k2RcCuTEgASTo77mofW0vmeHkfrDWaoFAFvNHpEgtu0eqyypcyiBkDWzSMxJhp3AUVcw==}
@@ -2421,6 +2413,11 @@ packages:
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
+  lucide-react@0.546.0:
+    resolution: {integrity: sha512-Z94u6fKT43lKeYHiVyvyR8fT7pwCzDu7RyMPpTvh054+xahSgj4HFQ+NmflvzdXsoAjYGdCguGaFKYuvq0ThCQ==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   magic-string@0.30.19:
     resolution: {integrity: sha512-2N21sPY9Ws53PZvsEpVtNuSW+ScYbQdp4b9qUaL+9QkHUrGFKo56Lg9Emg5s9V/qrtNBmiR01sYhUOwu3H+VOw==}
 
@@ -3733,10 +3730,6 @@ snapshots:
   '@tailwindcss/forms@0.5.10(tailwindcss@4.1.16)':
     dependencies:
       mini-svg-data-uri: 1.4.4
-      tailwindcss: 4.1.16
-
-  '@tailwindcss/line-clamp@0.4.4(tailwindcss@4.1.16)':
-    dependencies:
       tailwindcss: 4.1.16
 
   '@tailwindcss/node@4.1.16':
@@ -5289,6 +5282,10 @@ snapshots:
       js-tokens: 4.0.0
 
   lucide-react@0.545.0(react@19.2.0):
+    dependencies:
+      react: 19.2.0
+
+  lucide-react@0.546.0(react@19.2.0):
     dependencies:
       react: 19.2.0
 

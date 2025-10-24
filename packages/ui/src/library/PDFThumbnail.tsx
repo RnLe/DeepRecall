@@ -1,24 +1,21 @@
 /**
  * PDFThumbnail - Lightweight first-page PDF thumbnail renderer
  * Optimized for work cards - minimal overhead, first page only
+ *
+ * Uses usePDF from @deeprecall/pdf directly - only needs getBlobUrl wrapper!
  */
 
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { BookOpen } from "lucide-react";
+import { usePDF } from "@deeprecall/pdf";
 
-interface PDFThumbnailProps {
+export interface PDFThumbnailProps {
   /** SHA-256 hash of the PDF to display */
   sha256: string;
   /** Function to get blob URL from SHA-256 */
   getBlobUrl: (sha256: string) => string;
-  /** Hook to load PDF document */
-  usePDF: (url: string) => {
-    pdf: any;
-    isLoading: boolean;
-    error: Error | null;
-  };
   /** CSS class for the container */
   className?: string;
   /** Width in pixels (height will be calculated from aspect ratio) */
@@ -34,7 +31,6 @@ interface PDFThumbnailProps {
 export function PDFThumbnail({
   sha256,
   getBlobUrl,
-  usePDF,
   className = "",
   width,
   height,

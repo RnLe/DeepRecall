@@ -7,22 +7,6 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@deeprecall/data/db";
-import { usePDF } from "@/src/hooks/usePDF";
-import { usePDFViewport } from "@/src/hooks/usePDFViewport";
-import { PDFPage } from "./PDFPage";
-import { AnnotationOverlay } from "./AnnotationOverlay";
-import { AnnotationToolbar } from "./AnnotationToolbar";
-import { AnnotationHandlers } from "./AnnotationHandlers";
-import { PDFScrollbar } from "./PDFScrollbar";
-import { CreateNoteDialog } from "./CreateNoteDialog";
-import type { Annotation } from "@deeprecall/core/schemas/annotation";
-import * as annotationRepo from "@deeprecall/data/repos/annotations";
-import {
-  useAnnotationUI,
-  hasActiveSelection,
-} from "@deeprecall/data/stores/annotation-ui";
-import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,6 +16,34 @@ import {
   ChevronsUpDown,
   RotateCcw,
 } from "lucide-react";
+
+// ========================================
+// PURE UI IMPORTS (from @deeprecall/ui)
+// ========================================
+import { AnnotationToolbar } from "@deeprecall/ui";
+import { AnnotationHandlers } from "@deeprecall/ui";
+import { PDFPage } from "@deeprecall/ui/reader/PDFPage";
+import { PDFScrollbar } from "@deeprecall/ui/reader/PDFScrollbar";
+import type { Annotation } from "@deeprecall/core/schemas/annotation";
+
+// ========================================
+// PLATFORM WRAPPERS (from ./_components)
+// ========================================
+import { AnnotationOverlay } from "./_components/AnnotationOverlay";
+import { CreateNoteDialog } from "./_components/CreateNoteDialog";
+
+// ========================================
+// PLATFORM HOOKS & UTILITIES
+// ========================================
+import { db } from "@deeprecall/data/db";
+import { usePDF } from "@/src/hooks/usePDF";
+import { usePDFViewport } from "@/src/hooks/usePDFViewport";
+import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import {
+  useAnnotationUI,
+  hasActiveSelection,
+} from "@deeprecall/data/stores/annotation-ui";
+import { useReaderUI } from "@deeprecall/data/stores/reader-ui";
 
 export interface PDFViewerProps {
   source: string | Uint8Array | ArrayBuffer;

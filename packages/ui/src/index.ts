@@ -4,7 +4,10 @@
  */
 
 // Library components
-export { ActivityBanner } from "./library/ActivityBanner";
+export {
+  ActivityBanner,
+  type ActivityBannerOperations,
+} from "./library/ActivityBanner";
 export * from "./library/AuthorAvatar";
 export * from "./library/AuthorCard";
 export * from "./library/AuthorCreateView";
@@ -12,9 +15,7 @@ export * from "./library/AuthorEditView";
 export * from "./library/AuthorFormFields";
 export * from "./library/AuthorImportView";
 export { AuthorInput } from "./library/AuthorInput";
-export type { AuthorOperations } from "./library/AuthorInput";
 export { AuthorLibrary } from "./library/AuthorLibrary";
-export type { AuthorLibraryOperations } from "./library/AuthorLibrary";
 export { AuthorListView } from "./library/AuthorListView";
 export * from "./library/BibtexExportModal";
 export * from "./library/BibtexImportModal";
@@ -58,5 +59,66 @@ export type {
   DuplicateResolutionModalProps,
 } from "./library/DuplicateResolutionModal";
 
+// Reader components
+export { AnnotationContextMenu } from "./reader/AnnotationContextMenu";
+export { AnnotationEditor } from "./reader/AnnotationEditor";
+export type {
+  AnnotationEditorProps,
+  AnnotationEditorOperations,
+} from "./reader/AnnotationEditor";
+export { AnnotationHandlers } from "./reader/AnnotationHandlers";
+export { AnnotationList } from "./reader/AnnotationList";
+export { AnnotationOverlay } from "./reader/AnnotationOverlay";
+export type {
+  AnnotationOverlayProps,
+  AnnotationOverlayOperations,
+} from "./reader/AnnotationOverlay";
+export { AnnotationToolbar } from "./reader/AnnotationToolbar";
+export { CompactNoteItem } from "./reader/CompactNoteItem";
+export type {
+  CompactNoteItemProps,
+  CompactNoteItemOperations,
+} from "./reader/CompactNoteItem";
+export { CreateGroupDialog } from "./reader/annotation/CreateGroupDialog";
+export type { CreateGroupDialogProps } from "./reader/annotation/CreateGroupDialog";
+export { NoteBranch } from "./reader/annotation/NoteBranch";
+export type {
+  NoteBranchProps,
+  NoteBranchOperations,
+} from "./reader/annotation/NoteBranch";
+export { NoteTreeView } from "./reader/annotation/NoteTreeView";
+export type {
+  NoteTreeViewProps,
+  NoteTreeViewOperations,
+} from "./reader/annotation/NoteTreeView";
+export { AnnotationPreview } from "./reader/annotation/AnnotationPreview";
+export type {
+  AnnotationPreviewProps,
+  AnnotationPreviewOperations,
+} from "./reader/annotation/AnnotationPreview";
+export { FileList } from "./reader/FileList";
+export { ReaderLayout } from "./reader/ReaderLayout";
+export type {
+  ReaderLayoutProps,
+  AnnotationEditorComponentProps,
+} from "./reader/ReaderLayout";
+export { TabContent } from "./reader/TabContent";
+export type {
+  TabContentProps,
+  TabContentOperations,
+  PDFViewerComponentProps,
+} from "./reader/TabContent";
+
+// Admin components
+export {
+  DexieGraphVisualization,
+  type DexieGraphVisualizationOperations,
+  type DexieGraphVisualizationProps,
+} from "./admin/DexieGraphVisualization";
+
+// Components
+export * from "./components";
+
 // Utils
 export * from "./utils/presets";
+export * from "./utils/date";

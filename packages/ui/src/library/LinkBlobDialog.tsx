@@ -3,7 +3,7 @@
  * Dialog for linking an orphaned blob to a new or existing Work
  * Supports two modes: link to existing work or create new work
  *
- * Platform-agnostic - uses Electric hooks for real-time sync
+ * Platform-agnostic - uses Electric hooks and imports components directly
  */
 
 import { useState, useMemo } from "react";
@@ -20,20 +20,20 @@ import { useAuthors, useFindOrCreateAuthor } from "@deeprecall/data/hooks";
 import { Plus, Link2, FileCode } from "lucide-react";
 
 // Component imports
-import { WorkSelector, type WorkSelectorOperations } from "./WorkSelector";
+import { WorkSelector } from "./WorkSelector";
 import { DynamicForm } from "./DynamicForm";
 import { PresetFormBuilder } from "./PresetFormBuilder";
-import { BibtexImportModal, BibtexImportOperations } from "./BibtexImportModal";
-import { AuthorInput, AuthorOperations } from "./AuthorInput";
+import { BibtexImportModal } from "./BibtexImportModal";
+import { AuthorInput } from "./AuthorInput";
+import { PDFPreview } from "../components/PDFPreview";
 
+// Utility imports
+import { parseAuthorList } from "../utils/nameParser";
+import { bibtexToWorkFormValues } from "../utils/bibtex";
+
+// Platform-specific operations interface (minimal)
 export interface LinkBlobDialogOperations {
-  bibtexToWorkFormValues: (entry: BibtexEntry) => Record<string, unknown>;
-  parseAuthorList: (input: string) => Array<{
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    orcid?: string;
-  }>;
+  getBlobUrl: (sha256: string) => string;
 }
 
 interface LinkBlobDialogProps {
@@ -45,23 +45,8 @@ interface LinkBlobDialogProps {
   onSuccess: () => void;
   /** Callback when dialog is cancelled */
   onCancel: () => void;
-  /** Platform-specific blob URL resolver */
-  getBlobUrl: (sha256: string) => string;
   /** Platform-specific operations */
   operations: LinkBlobDialogOperations;
-  /** Author operations */
-  authorOps: AuthorOperations;
-  /** BibTeX operations */
-  bibtexOps: BibtexImportOperations;
-  /** Work selector operations */
-  workSelectorOps: WorkSelectorOperations;
-  /** PDF Preview component */
-  PDFPreview: React.ComponentType<{
-    source: string;
-    sha256: string;
-    showToolbar?: boolean;
-    autoFitToHeight?: boolean;
-  }>;
 }
 
 type Mode = "link-to-existing" | "create-new";
@@ -72,13 +57,9 @@ export function LinkBlobDialog({
   preselectedWorkId,
   onSuccess,
   onCancel,
-  getBlobUrl,
   operations,
-  authorOps,
-  bibtexOps,
-  workSelectorOps,
-  PDFPreview,
 }: LinkBlobDialogProps) {
+  const { getBlobUrl } = operations;
   // Electric hooks - real-time synced data
   const { data: allPresets = [], isLoading: presetsLoading } = usePresets();
   const { data: allWorks = [], isLoading: worksLoading } = useWorks();
@@ -185,12 +166,12 @@ export function LinkBlobDialog({
     }
 
     // Convert BibTeX to form values
-    const formValues = operations.bibtexToWorkFormValues(entry);
+    const formValues = bibtexToWorkFormValues(entry);
 
     // Parse and create authors if present
     const newAuthorIds: string[] = [];
     if (formValues.authors && typeof formValues.authors === "string") {
-      const parsedAuthors = operations.parseAuthorList(formValues.authors);
+      const parsedAuthors = parseAuthorList(formValues.authors);
 
       for (const parsed of parsedAuthors) {
         try {
@@ -307,10 +288,7 @@ export function LinkBlobDialog({
       <BibtexImportModal
         isOpen={bibtexModalOpen}
         onClose={() => setBibtexModalOpen(false)}
-        operations={{
-          ...bibtexOps,
-          onImport: handleBibtexImport,
-        }}
+        onImport={handleBibtexImport}
       />
 
       {/* Dialog - 90% of viewport */}
@@ -394,8 +372,6 @@ export function LinkBlobDialog({
                   onChange={(workId: string | null) => {
                     setSelectedWorkId(workId);
                   }}
-                  works={worksExtended}
-                  operations={workSelectorOps}
                 />
 
                 {worksExtended && worksExtended.length === 0 && (
@@ -729,7 +705,6 @@ export function LinkBlobDialog({
                     value={authorIds}
                     authors={selectedAuthors}
                     onChange={setAuthorIds}
-                    authorOps={authorOps}
                     placeholder="Search or add authors (e.g., 'Smith, John and Doe, Jane')..."
                   />
                 </div>

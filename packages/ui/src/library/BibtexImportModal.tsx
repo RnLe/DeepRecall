@@ -3,45 +3,33 @@
  *
  * Modal for importing works from BibTeX code/files
  * Supports drag-and-drop, paste, and file selection
+ *
+ * Uses utilities directly - zero platform-specific code!
+ * Only requires onImport callback from parent.
  */
 
 import { useState, useRef, DragEvent } from "react";
 import { X, Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  parseBibtex,
+  validateBibtexString,
+  getPresetForBibtexEntry,
+} from "../utils/bibtex";
+import type { BibtexEntry, ParseResult } from "../utils/bibtex";
 
-export interface BibtexEntry {
-  type: string;
-  key: string;
-  fields: Record<string, string>;
-}
-
-interface ParseResult {
-  success: boolean;
-  entries: BibtexEntry[];
-  errors: string[];
-}
-
-export interface BibtexImportOperations {
-  // Parsing operations
-  parseBibtex: (text: string) => ParseResult;
-  validateBibtexString: (text: string) => { valid: boolean; message?: string };
-
-  // Preset mapping
-  getPresetForBibtexEntry: (entry: BibtexEntry) => string;
-
-  // Import callback
-  onImport: (entry: BibtexEntry, presetName: string) => void;
-}
+// Re-export types for convenience
+export type { BibtexEntry, ParseResult };
 
 interface BibtexImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  operations: BibtexImportOperations;
+  onImport: (entry: BibtexEntry, presetName: string) => void;
 }
 
 export function BibtexImportModal({
   isOpen,
   onClose,
-  operations,
+  onImport,
 }: BibtexImportModalProps) {
   const [bibtexText, setBibtexText] = useState("");
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
@@ -53,7 +41,7 @@ export function BibtexImportModal({
 
   const handleParse = () => {
     // Quick validation
-    const validation = operations.validateBibtexString(bibtexText);
+    const validation = validateBibtexString(bibtexText);
     if (!validation.valid) {
       setParseResult({
         success: false,
@@ -64,7 +52,7 @@ export function BibtexImportModal({
     }
 
     // Parse
-    const result = operations.parseBibtex(bibtexText);
+    const result = parseBibtex(bibtexText);
     setParseResult(result);
     setSelectedEntryIndex(0);
   };
@@ -73,9 +61,9 @@ export function BibtexImportModal({
     if (!parseResult?.entries.length) return;
 
     const entry = parseResult.entries[selectedEntryIndex];
-    const presetName = operations.getPresetForBibtexEntry(entry);
+    const presetName = getPresetForBibtexEntry(entry);
 
-    operations.onImport(entry, presetName);
+    onImport(entry, presetName);
     handleClose();
   };
 
@@ -275,8 +263,7 @@ Example:
                   {parseResult.entries.length > 1 && (
                     <div className="space-y-2">
                       {parseResult.entries.map((entry, idx) => {
-                        const presetName =
-                          operations.getPresetForBibtexEntry(entry);
+                        const presetName = getPresetForBibtexEntry(entry);
                         return (
                           <button
                             key={idx}
@@ -320,9 +307,7 @@ Example:
                         </p>
                         <span className="text-xs text-neutral-500">
                           @{parseResult.entries[0].type} →{" "}
-                          {operations.getPresetForBibtexEntry(
-                            parseResult.entries[0]
-                          )}{" "}
+                          {getPresetForBibtexEntry(parseResult.entries[0])}{" "}
                           template
                         </span>
                       </div>

@@ -1,25 +1,21 @@
 /**
  * PDFPreviewModal - Modal dialog for previewing PDFs from work cards
  * Displays PDF at 50% page width with PDFPreview component
+ *
+ * Uses PDFPreview directly from reader - only needs getBlobUrl wrapper!
  */
 
 "use client";
 
 import { X } from "lucide-react";
+import { PDFPreview } from "../components/PDFPreview";
 
-interface PDFPreviewModalProps {
+export interface PDFPreviewModalProps {
   sha256: string | null;
   title?: string;
   isOpen: boolean;
   onClose: () => void;
   getBlobUrl: (sha256: string) => string;
-  PDFPreview: React.ComponentType<{
-    source: string;
-    sha256: string;
-    showToolbar?: boolean;
-    autoFitToWidth?: boolean;
-    className?: string;
-  }>;
 }
 
 export function PDFPreviewModal({
@@ -28,7 +24,6 @@ export function PDFPreviewModal({
   isOpen,
   onClose,
   getBlobUrl,
-  PDFPreview,
 }: PDFPreviewModalProps) {
   if (!isOpen) return null;
 

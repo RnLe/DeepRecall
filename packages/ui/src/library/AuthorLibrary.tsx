@@ -9,16 +9,35 @@
  * - Import authors from BibTeX
  * - Delete authors (only if no connections)
  * - Two display modes: Full cards (with avatars) and List view (compact)
+ *
+ * Uses Electric hooks directly - only requires platform-specific operations for:
+ * - Avatar uploads (filesystem)
+ * - Blob URLs (platform-specific storage)
+ * - Navigation (platform routing)
  */
 
 import { useState } from "react";
 import { User, X, ExternalLink } from "lucide-react";
 import type { Author, CropRegion } from "@deeprecall/core";
+import { getAuthorFullName } from "@deeprecall/core";
+import {
+  useAuthors,
+  useWorks,
+  usePresets,
+  useCreateAuthor,
+  useUpdateAuthor,
+  useDeleteAuthor,
+  useFindOrCreateAuthor,
+  queryShape,
+} from "@deeprecall/data";
+import { formatWorkStats, parseAuthorList } from "../utils";
 import { AuthorListView } from "./AuthorListView";
 import { AuthorEditView } from "./AuthorEditView";
 import { AuthorCreateView } from "./AuthorCreateView";
 import { AuthorImportView } from "./AuthorImportView";
 import { AvatarEditView } from "./AvatarEditView";
+import { SimplePDFViewer } from "../components/SimplePDFViewer";
+import { ImageCropper } from "../components/ImageCropper";
 
 interface Work {
   id: string;
@@ -33,30 +52,9 @@ interface Preset {
   name: string;
 }
 
-interface ParsedAuthor {
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  orcid?: string;
-}
-
-export interface AuthorLibraryOperations {
-  // Author data fetching
-  listAuthors: (options: {
-    sortBy: "lastName" | "firstName" | "createdAt";
-  }) => Author[];
-  searchAuthors: (query: string, options: { limit: number }) => Author[];
-
-  // Author CRUD
-  createAuthor: (data: Partial<Author>) => Promise<Author>;
-  updateAuthor: (data: {
-    id: string;
-    updates: Partial<Author>;
-  }) => Promise<void>;
-  deleteAuthor: (id: string) => Promise<void>;
-  findOrCreateAuthor: (data: Partial<Author>) => Promise<Author>;
-
-  // Avatar management
+// Platform-specific operations (only 3!)
+export interface AuthorLibraryPlatformOps {
+  // Avatar management (filesystem)
   uploadAvatar: (data: {
     authorId: string;
     originalBlob: Blob;
@@ -68,40 +66,17 @@ export interface AuthorLibraryOperations {
   }>;
   deleteAvatar: (path: string) => Promise<void>;
 
-  // Works and presets
-  getWorks: () => Work[];
-  getPresets: () => Preset[];
+  // Blob URLs (platform storage)
+  getBlobUrl: (sha256: string) => string;
 
-  // Utilities
-  getAuthorFullName: (author: Author) => string;
-  parseAuthorList: (input: string) => ParsedAuthor[];
-  formatWorkStats: (stats: Record<string, number>) => string;
-
-  // Navigation
+  // Navigation (platform routing)
   openWorkInReader: (sha256: string, title: string) => void;
 }
 
 interface AuthorLibraryProps {
   isOpen: boolean;
   onClose: () => void;
-  operations: AuthorLibraryOperations;
-  // Components to be injected
-  SimplePDFViewer: React.ComponentType<{
-    sha256: string;
-    title: string;
-    onClose: () => void;
-  }>;
-  ImageCropper: React.ComponentType<{
-    initialImageUrl?: string;
-    initialCropRegion?: CropRegion;
-    initialFile?: File;
-    onSave: (data: {
-      originalBlob: Blob;
-      displayBlob: Blob;
-      cropRegion: CropRegion;
-    }) => void;
-    onCancel: () => void;
-  }>;
+  platformOps: AuthorLibraryPlatformOps;
 }
 
 type View = "list" | "edit" | "create" | "import" | "avatar";
@@ -110,10 +85,19 @@ type DisplayMode = "cards" | "list";
 export function AuthorLibrary({
   isOpen,
   onClose,
-  operations,
-  SimplePDFViewer,
-  ImageCropper,
+  platformOps,
 }: AuthorLibraryProps) {
+  // Use Electric hooks directly!
+  const allAuthorsQuery = useAuthors();
+  const worksQuery = useWorks();
+  const presetsQuery = usePresets();
+
+  // Use Electric mutation hooks
+  const createAuthorMutation = useCreateAuthor();
+  const updateAuthorMutation = useUpdateAuthor();
+  const deleteAuthorMutation = useDeleteAuthor();
+  const findOrCreateAuthorMutation = useFindOrCreateAuthor();
+
   const [view, setView] = useState<View>("list");
   const [displayMode, setDisplayMode] = useState<DisplayMode>("cards");
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,12 +118,56 @@ export function AuthorLibrary({
   } | null>(null);
   const [droppedAvatarFile, setDroppedAvatarFile] = useState<File | null>(null);
 
-  const allAuthors = operations.listAuthors({ sortBy });
+  // Sort authors client-side
+  const sortAuthors = (
+    authors: Author[],
+    sortBy: "lastName" | "firstName" | "createdAt"
+  ) => {
+    return [...authors].sort((a, b) => {
+      if (sortBy === "lastName") {
+        return a.lastName.localeCompare(b.lastName);
+      } else if (sortBy === "firstName") {
+        return a.firstName.localeCompare(b.firstName);
+      } else {
+        return (
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime()
+        );
+      }
+    });
+  };
+
+  // Client-side search
+  const searchAuthors = (query: string, authors: Author[], limit: number) => {
+    const lowerQuery = query.toLowerCase();
+    return authors
+      .filter((author) => {
+        const fullName = getAuthorFullName(author).toLowerCase();
+        const orcid = author.orcid?.toLowerCase() || "";
+        return fullName.includes(lowerQuery) || orcid.includes(lowerQuery);
+      })
+      .slice(0, limit);
+  };
+
+  // Find or create author (wrapper around the hook)
+  const findOrCreateAuthor = async (data: Partial<Author>): Promise<Author> => {
+    if (!data.firstName || !data.lastName) {
+      throw new Error("firstName and lastName are required");
+    }
+    return await findOrCreateAuthorMutation.mutateAsync({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      middleName: data.middleName,
+      orcid: data.orcid,
+    });
+  };
+
+  const allAuthors = sortAuthors(allAuthorsQuery.data || [], sortBy);
   const searchResults = searchQuery.trim()
-    ? operations.searchAuthors(searchQuery, { limit: 50 })
+    ? searchAuthors(searchQuery, allAuthorsQuery.data || [], 50)
     : [];
-  const works = operations.getWorks();
-  const presets = operations.getPresets();
+  const works = worksQuery.data || [];
+  const presets = presetsQuery.data || [];
 
   // Use search results if searching, otherwise show all
   const displayAuthors = searchQuery.trim() ? searchResults : allAuthors;
@@ -227,8 +255,8 @@ export function AuthorLibrary({
               onCreateNew={handleCreateNew}
               onImportBibtex={handleImportBibtex}
               works={works}
-              getAuthorFullName={operations.getAuthorFullName}
-              formatWorkStats={operations.formatWorkStats}
+              getAuthorFullName={getAuthorFullName}
+              formatWorkStats={formatWorkStats}
             />
           )}
 
@@ -236,8 +264,12 @@ export function AuthorLibrary({
             <AuthorEditView
               author={selectedAuthor}
               onBack={handleBackToList}
-              onUpdate={operations.updateAuthor}
-              onDelete={operations.deleteAuthor}
+              onUpdate={async ({ id, updates }) => {
+                await updateAuthorMutation.mutateAsync({ id, updates });
+              }}
+              onDelete={async (id) => {
+                await deleteAuthorMutation.mutateAsync(id);
+              }}
               onEditAvatar={handleEditAvatar}
               onDroppedFile={(file) => {
                 setDroppedAvatarFile(file);
@@ -254,14 +286,18 @@ export function AuthorLibrary({
                   title,
                 });
               }}
-              getAuthorFullName={operations.getAuthorFullName}
+              getAuthorFullName={getAuthorFullName}
             />
           )}
 
           {view === "create" && (
             <AuthorCreateView
               onBack={handleBackToList}
-              onCreate={operations.createAuthor}
+              onCreate={async (data) => {
+                return await createAuthorMutation.mutateAsync(
+                  data as Omit<Author, "id" | "createdAt" | "updatedAt">
+                );
+              }}
             />
           )}
 
@@ -270,9 +306,9 @@ export function AuthorLibrary({
               bibtexInput={bibtexInput}
               onBibtexChange={setBibtexInput}
               onBack={handleBackToList}
-              onImport={operations.findOrCreateAuthor}
-              parseAuthorList={operations.parseAuthorList}
-              getAuthorFullName={operations.getAuthorFullName}
+              onImport={findOrCreateAuthor}
+              parseAuthorList={parseAuthorList}
+              getAuthorFullName={getAuthorFullName}
             />
           )}
 
@@ -283,10 +319,12 @@ export function AuthorLibrary({
                 setDroppedAvatarFile(null);
                 setView("edit");
               }}
-              onUpdate={operations.updateAuthor}
+              onUpdate={async ({ id, updates }) => {
+                await updateAuthorMutation.mutateAsync({ id, updates });
+              }}
               droppedFile={droppedAvatarFile}
-              uploadAvatar={operations.uploadAvatar}
-              deleteAvatar={operations.deleteAvatar}
+              uploadAvatar={platformOps.uploadAvatar}
+              deleteAvatar={platformOps.deleteAvatar}
               ImageCropper={ImageCropper}
             />
           )}
@@ -299,6 +337,7 @@ export function AuthorLibrary({
           sha256={viewingWork.sha256}
           title={viewingWork.title}
           onClose={() => setViewingWork(null)}
+          getBlobUrl={platformOps.getBlobUrl}
         />
       )}
 
@@ -315,7 +354,7 @@ export function AuthorLibrary({
           >
             <button
               onClick={() => {
-                operations.openWorkInReader(
+                platformOps.openWorkInReader(
                   contextMenu.sha256,
                   contextMenu.title
                 );

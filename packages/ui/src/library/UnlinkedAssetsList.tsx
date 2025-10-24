@@ -1,57 +1,67 @@
 /**
  * UnlinkedAssetsList Component
  * Displays assets that were created but are not currently linked to any work or activity
- * Platform-agnostic - receives operations as callbacks
+ * Uses Electric hooks and imports components directly
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Package, Link, ChevronDown, ChevronUp } from "lucide-react";
 import type { Asset } from "@deeprecall/core";
+import { useAssets, useEdges } from "@deeprecall/data/hooks";
+import { assetsElectric } from "@deeprecall/data/repos";
+import { MarkdownPreview } from "../components/MarkdownPreview";
 
-// Platform-agnostic operations interface
-export interface UnlinkedAssetsOperations {
-  // Fetch unlinked assets (already Electric-powered)
-  unlinkedAssets: Asset[];
-  isLoading?: boolean;
-
-  // Asset mutations
-  updateAsset: (id: string, updates: { filename: string }) => Promise<void>;
-  deleteAsset: (id: string) => Promise<void>;
-
+// Platform-specific operations interface (minimal)
+export interface UnlinkedAssetsListOperations {
   // Blob operations (server-specific)
   renameBlob: (hash: string, filename: string) => Promise<void>;
   fetchBlobContent: (hash: string) => Promise<string>;
-
-  // Callback invalidations
-  onAssetsChanged?: () => void;
 }
 
-interface UnlinkedAssetsListProps extends UnlinkedAssetsOperations {
+interface UnlinkedAssetsListProps {
+  operations: UnlinkedAssetsListOperations;
   onLinkAsset: (asset: Asset) => void;
   onViewAsset: (asset: Asset) => void;
   onMoveToInbox: (assetId: string) => void;
-  MarkdownPreview?: React.ComponentType<{
-    initialContent: string;
-    title: string;
-    sha256: string;
-    onClose: () => void;
-    onSaved: (newHash: string) => void;
-  }>;
 }
 
 export function UnlinkedAssetsList({
-  unlinkedAssets,
-  isLoading,
-  updateAsset,
-  deleteAsset,
-  renameBlob,
-  fetchBlobContent,
-  onAssetsChanged,
+  operations,
   onLinkAsset,
   onViewAsset,
   onMoveToInbox,
-  MarkdownPreview,
 }: UnlinkedAssetsListProps) {
+  const { renameBlob, fetchBlobContent } = operations;
+
+  // Fetch data using Electric hooks
+  const { data: allAssets = [] } = useAssets();
+  const { data: allEdges = [] } = useEdges();
+
+  // Compute unlinked assets (inline useUnlinkedAssets logic)
+  const unlinkedAssets = useMemo(() => {
+    // Get all standalone assets (no workId)
+    const standaloneAssets = allAssets.filter((asset) => !asset.workId);
+
+    // Get asset IDs that are linked via "contains" relation
+    const assetIds = new Set(allAssets.map((a) => a.id));
+    const linkedAssetIds = new Set(
+      allEdges
+        .filter(
+          (edge) => edge.relation === "contains" && assetIds.has(edge.toId)
+        )
+        .map((edge) => edge.toId)
+    );
+
+    // Filter to only assets that are NOT in any edges
+    const unlinkedMap = new Map<string, Asset>();
+    for (const asset of standaloneAssets) {
+      if (!linkedAssetIds.has(asset.id)) {
+        unlinkedMap.set(asset.id, asset);
+      }
+    }
+
+    return Array.from(unlinkedMap.values());
+  }, [allAssets, allEdges]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [assetContextMenu, setAssetContextMenu] = useState<{
     x: number;
@@ -200,10 +210,11 @@ export function UnlinkedAssetsList({
       await renameBlob(hash, finalFilename);
 
       // Update asset metadata (Electric-synced)
-      await updateAsset(assetId, { filename: finalFilename });
+      await assetsElectric.updateAsset(assetId, {
+        filename: finalFilename,
+        updatedAt: new Date().toISOString(),
+      });
 
-      // Notify parent
-      onAssetsChanged?.();
       setRenamingAsset(null);
     } catch (error) {
       console.error("Rename failed:", error);
@@ -219,7 +230,7 @@ export function UnlinkedAssetsList({
   const handleAssetDelete = async (assetId: string, hash: string) => {
     try {
       // Delete asset (Electric-synced)
-      await deleteAsset(assetId);
+      await assetsElectric.deleteAsset(assetId);
 
       // Also delete blob from server (best effort)
       try {
@@ -233,8 +244,6 @@ export function UnlinkedAssetsList({
         );
       }
 
-      // Notify parent
-      onAssetsChanged?.();
       setPendingDelete(null);
     } catch (error) {
       console.error("Delete failed:", error);
@@ -295,17 +304,10 @@ export function UnlinkedAssetsList({
       </div>
 
       {/* Empty state */}
-      {!hasUnlinkedAssets && !isLoading && (
+      {!hasUnlinkedAssets && (
         <div className="bg-neutral-800/30 border border-neutral-700/50 rounded-lg p-3 flex flex-col items-center justify-center text-center">
           <Package className="w-8 h-8 text-neutral-600 mb-1.5" />
           <p className="text-xs text-neutral-500">No unlinked assets</p>
-        </div>
-      )}
-
-      {/* Loading state */}
-      {isLoading && (
-        <div className="bg-neutral-800/30 border border-neutral-700/50 rounded-lg p-3 flex flex-col items-center justify-center text-center">
-          <p className="text-xs text-neutral-500">Loading...</p>
         </div>
       )}
 
@@ -549,8 +551,6 @@ export function UnlinkedAssetsList({
                 ? { ...prev, asset: { ...prev.asset, sha256: newHash } }
                 : null
             );
-            // Notify parent to refresh
-            onAssetsChanged?.();
           }}
         />
       )}

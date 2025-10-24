@@ -2,10 +2,18 @@
  * BibtexExportModal Component (Platform-Agnostic)
  *
  * Modal for viewing and exporting work metadata as BibTeX
+ *
+ * Uses Electric hooks directly - zero platform-specific code!
  */
 
 import { useState, useEffect } from "react";
 import { Check, Copy, Download, FileCode, X } from "lucide-react";
+import { useAuthors, usePresets } from "@deeprecall/data";
+import {
+  workToBibtex,
+  downloadBibtex,
+  copyToClipboard,
+} from "../utils/bibtexExport";
 
 interface Work {
   id: string;
@@ -16,36 +24,20 @@ interface Work {
   [key: string]: any;
 }
 
-export interface BibtexExportOperations {
-  // Generate BibTeX from work data
-  workToBibtex: (
-    work: any,
-    presetName: string | undefined,
-    authors: any[]
-  ) => string;
-
-  // Export operations
-  copyToClipboard: (text: string) => Promise<boolean>;
-  downloadBibtex: (bibtex: string, filename: string) => void;
-
-  // Data fetching
-  getAuthors: (authorIds: string[]) => any[];
-  getPresetName: (presetId: string | undefined) => string | undefined;
-}
-
 interface BibtexExportModalProps {
   work: Work;
   isOpen: boolean;
   onClose: () => void;
-  operations: BibtexExportOperations;
 }
 
 export function BibtexExportModal({
   work,
   isOpen,
   onClose,
-  operations,
 }: BibtexExportModalProps) {
+  const { data: allAuthors = [] } = useAuthors();
+  const { data: allPresets = [] } = usePresets();
+
   const [bibtex, setBibtex] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -53,17 +45,22 @@ export function BibtexExportModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Get authors and preset name
-    const authors = operations.getAuthors(work.authorIds || []);
-    const presetName = operations.getPresetName(work.presetId);
+    // Get authors for this work
+    const authors = allAuthors.filter((author) =>
+      (work.authorIds || []).includes(author.id)
+    );
 
-    // Generate BibTeX
-    const generated = operations.workToBibtex(work, presetName, authors);
+    // Get preset name
+    const preset = allPresets.find((p) => p.id === work.presetId);
+    const presetName = preset?.name;
+
+    // Generate BibTeX using utility function
+    const generated = workToBibtex(work, presetName, authors);
     setBibtex(generated);
-  }, [isOpen, work, operations]);
+  }, [isOpen, work, allAuthors, allPresets]);
 
   const handleCopy = async () => {
-    const success = await operations.copyToClipboard(bibtex);
+    const success = await copyToClipboard(bibtex);
     if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -77,7 +74,7 @@ export function BibtexExportModal({
       .substring(0, 50);
     const year = work.year ? `_${work.year}` : "";
     const filename = `${sanitizedTitle}${year}.bib`;
-    operations.downloadBibtex(bibtex, filename);
+    downloadBibtex(bibtex, filename);
   };
 
   if (!isOpen) return null;

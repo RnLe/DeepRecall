@@ -1,10 +1,12 @@
 /**
  * Library header component
  * Shows title, stats, and action buttons
- * Platform-agnostic - receives stats and callbacks via props
+ * Uses Electric hooks directly for data fetching
  */
 
 import { BookOpen, FileText, Plus, User, Download, Upload } from "lucide-react";
+import { useWorks } from "@deeprecall/data/hooks";
+import { useMemo } from "react";
 
 export interface BlobStats {
   totalBlobs: number;
@@ -15,29 +17,37 @@ export interface BlobStats {
   pdfCount: number;
 }
 
-interface LibraryHeaderProps {
-  workCount: number;
+// Platform-specific operations interface
+export interface LibraryHeaderOperations {
   blobStats?: BlobStats;
+  onClearDatabase?: () => void;
+}
+
+interface LibraryHeaderProps {
   onCreateWork?: () => void;
   onCreateActivity?: () => void;
   onOpenTemplates?: () => void;
   onOpenAuthors?: () => void;
   onExportData?: () => void;
   onImportData?: () => void;
-  onClearDatabase?: () => void;
+  operations?: LibraryHeaderOperations;
 }
 
 export function LibraryHeader({
-  workCount,
-  blobStats,
   onCreateWork,
   onCreateActivity,
   onOpenTemplates,
   onOpenAuthors,
   onExportData,
   onImportData,
-  onClearDatabase,
+  operations,
 }: LibraryHeaderProps) {
+  // Electric hooks for data
+  const { data: works = [] } = useWorks();
+  const workCount = useMemo(() => works.length, [works]);
+  const blobStats = operations?.blobStats;
+  const onClearDatabase = operations?.onClearDatabase;
+
   return (
     <div>
       <div className="flex items-center justify-between">
