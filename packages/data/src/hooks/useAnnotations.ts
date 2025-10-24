@@ -78,9 +78,10 @@ export function usePDFAnnotations(sha256: string) {
   const electricResult = annotationsElectric.usePDFAnnotations(sha256);
 
   // Sync Electric data to Dexie annotations table (for merge layer)
-  // CRITICAL: Must sync even when empty to clear stale data
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
+  // If we sync too early (when Electric returns []), we'll clear the cache!
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error(
           "[usePDFAnnotations] Failed to sync Electric data to Dexie:",
@@ -88,7 +89,7 @@ export function usePDFAnnotations(sha256: string) {
         );
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   // Query merged data from Dexie
   const mergedQuery = useQuery({
@@ -100,19 +101,23 @@ export function usePDFAnnotations(sha256: string) {
   });
 
   // Auto-cleanup and refresh when Electric data changes (synced)
+  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       annotationsCleanup
         .cleanupSyncedAnnotations(electricResult.data)
         .then(() => {
           mergedQuery.refetch();
         });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
+  // Prioritize merged query loading state
+  // Show data immediately if available, even if Electric is still syncing
   return {
     ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
+    isLoading: mergedQuery.isLoading,
+    isSyncing: electricResult.isLoading,
   };
 }
 
@@ -171,8 +176,9 @@ export function useAnnotations() {
   const electricResult = annotationsElectric.useAnnotations();
 
   // Sync Electric data to Dexie
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error(
           "[useAnnotations] Failed to sync Electric data to Dexie:",
@@ -180,7 +186,7 @@ export function useAnnotations() {
         );
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   const mergedQuery = useQuery({
     queryKey: ["annotations", "merged"],

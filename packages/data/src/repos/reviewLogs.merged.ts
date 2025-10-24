@@ -62,18 +62,31 @@ export async function mergeReviewLogs(
 export async function getMergedReviewLogsByCard(
   cardId: string
 ): Promise<MergedReviewLog[]> {
-  const synced = await db.reviewLogs.where("card_id").equals(cardId).toArray();
-  const local = await db.reviewLogs_local.toArray();
-  const merged = await mergeReviewLogs(synced, local);
-  // Filter to this card only
-  return merged.filter((r) => r.card_id === cardId);
+  try {
+    const synced = await db.reviewLogs
+      .where("card_id")
+      .equals(cardId)
+      .toArray();
+    const local = await db.reviewLogs_local.toArray();
+    const merged = await mergeReviewLogs(synced, local);
+    // Filter to this card only
+    return merged.filter((r) => r.card_id === cardId);
+  } catch (error) {
+    console.error("[getMergedReviewLogsByCard] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
  * Get all merged review logs (use sparingly)
  */
 export async function getAllMergedReviewLogs(): Promise<MergedReviewLog[]> {
-  const synced = await db.reviewLogs.toArray();
-  const local = await db.reviewLogs_local.toArray();
-  return mergeReviewLogs(synced, local);
+  try {
+    const synced = await db.reviewLogs.toArray();
+    const local = await db.reviewLogs_local.toArray();
+    return mergeReviewLogs(synced, local);
+  } catch (error) {
+    console.error("[getAllMergedReviewLogs] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }

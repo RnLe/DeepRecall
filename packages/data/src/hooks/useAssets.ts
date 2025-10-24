@@ -76,9 +76,9 @@ export function useAssets() {
   const electricResult = assetsElectric.useAssets();
 
   // Sync Electric data to Dexie assets table (for merge layer)
-  // CRITICAL: Must sync even when empty to clear stale data
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         if (error.name === "DatabaseClosedError") return;
         console.error(
@@ -87,7 +87,7 @@ export function useAssets() {
         );
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   // Query merged data from Dexie
   const mergedQuery = useQuery({
@@ -96,17 +96,18 @@ export function useAssets() {
       return assetsMerged.getAllMergedAssets();
     },
     staleTime: 0, // Always check for local changes
-    initialData: [], // Start with empty array to prevent loading state
+    placeholderData: [], // Show empty array while loading (prevents loading state)
   });
 
   // Auto-cleanup and refresh when Electric data changes (synced)
+  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       assetsCleanup.cleanupSyncedAssets(electricResult.data).then(() => {
         mergedQuery.refetch();
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return {
     ...mergedQuery,
@@ -132,11 +133,12 @@ export function useAsset(id: string | undefined) {
     staleTime: 0,
   });
 
+  // CRITICAL: Check isLoading to prevent refetch during initial load
   useEffect(() => {
-    if (electricResult.data && id) {
+    if (!electricResult.isLoading && electricResult.data && id) {
       mergedQuery.refetch();
     }
-  }, [electricResult.data, id]);
+  }, [electricResult.isLoading, electricResult.data, id]);
 
   return mergedQuery;
 }
@@ -159,11 +161,12 @@ export function useAssetsByWork(workId: string | undefined) {
     staleTime: 0,
   });
 
+  // CRITICAL: Check isLoading to prevent refetch during initial load
   useEffect(() => {
-    if (electricResult.data && workId) {
+    if (!electricResult.isLoading && electricResult.data && workId) {
       mergedQuery.refetch();
     }
-  }, [electricResult.data, workId]);
+  }, [electricResult.isLoading, electricResult.data, workId]);
 
   return {
     ...mergedQuery,
@@ -194,11 +197,12 @@ export function useAssetByHash(sha256: string | undefined) {
     staleTime: 0,
   });
 
+  // CRITICAL: Check isLoading to prevent refetch during initial load
   useEffect(() => {
-    if (electricResult.data && sha256) {
+    if (!electricResult.isLoading && electricResult.data && sha256) {
       mergedQuery.refetch();
     }
-  }, [electricResult.data, sha256]);
+  }, [electricResult.isLoading, electricResult.data, sha256]);
 
   return mergedQuery;
 }

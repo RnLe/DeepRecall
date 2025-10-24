@@ -70,9 +70,9 @@ export function useEdges() {
   const electricResult = edgesElectric.useEdges();
 
   // Sync Electric data to Dexie edges table (for merge layer)
-  // CRITICAL: Must sync even when empty to clear stale data
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         if (error.name === "DatabaseClosedError") return;
         console.error(
@@ -90,17 +90,18 @@ export function useEdges() {
       return edgesMerged.getAllMergedEdges();
     },
     staleTime: 0, // Always check for local changes
-    initialData: [], // Start with empty array to prevent loading state
+    placeholderData: [], // Show empty array while loading (prevents loading state)
   });
 
   // Auto-cleanup and refresh when Electric data changes (synced)
+  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       edgesCleanup.cleanupSyncedEdges(electricResult.data).then(() => {
         mergedQuery.refetch();
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return {
     ...mergedQuery,

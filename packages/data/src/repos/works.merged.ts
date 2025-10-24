@@ -34,6 +34,9 @@ export interface MergedWork extends Work {
 /**
  * Merge synced works with local pending changes
  *
+ * CRITICAL: Collects ALL updates per ID and applies them sequentially
+ * (not just the latest) to handle rapid successive updates correctly.
+ *
  * @param synced - Works from Electric (source of truth after sync)
  * @param local - Pending local changes from Dexie
  * @returns Merged array with local changes applied
@@ -42,80 +45,113 @@ export function mergeWorks(
   synced: Work[],
   local: LocalWorkChange[]
 ): MergedWork[] {
-  // Index local changes by work ID for O(1) lookup
-  const localByWorkId = new Map<string, LocalWorkChange>();
+  // Phase 1: Collect ALL changes by type (not just latest!)
+  const pendingInserts = new Map<string, LocalWorkChange>();
+  const pendingUpdates = new Map<string, LocalWorkChange[]>(); // Array per ID!
+  const pendingDeletes = new Set<string>();
+
   for (const change of local) {
-    // Keep latest change per work (highest timestamp)
-    const existing = localByWorkId.get(change.id);
-    if (!existing || change._timestamp > existing._timestamp) {
-      localByWorkId.set(change.id, change);
+    if (change._op === "insert") {
+      // For inserts, keep latest by timestamp
+      const existing = pendingInserts.get(change.id);
+      if (!existing || change._timestamp > existing._timestamp) {
+        pendingInserts.set(change.id, change);
+      }
+    } else if (change._op === "update") {
+      // For updates, collect ALL in array (apply sequentially later)
+      if (!pendingUpdates.has(change.id)) {
+        pendingUpdates.set(change.id, []);
+      }
+      pendingUpdates.get(change.id)!.push(change);
+    } else if (change._op === "delete") {
+      // For deletes, just track the ID
+      pendingDeletes.add(change.id);
     }
+  }
+
+  // Sort each update array by timestamp to apply in order
+  for (const updates of pendingUpdates.values()) {
+    updates.sort((a, b) => a._timestamp - b._timestamp);
   }
 
   const merged: MergedWork[] = [];
   const processedIds = new Set<string>();
 
-  // 1. Apply local changes to synced works
-  for (const syncedWork of synced) {
-    const localChange = localByWorkId.get(syncedWork.id);
-    processedIds.add(syncedWork.id);
-
-    if (!localChange) {
-      // No local changes - use synced data as-is
-      merged.push(syncedWork);
+  // Phase 2: Process pending inserts (which may also have updates)
+  for (const [id, insert] of pendingInserts) {
+    if (pendingDeletes.has(id)) {
+      // Insert then delete - skip entirely
+      processedIds.add(id);
       continue;
     }
 
-    // Apply local change based on operation
-    switch (localChange._op) {
-      case "delete":
-        // Local delete - filter out from merged results (silent)
-        break;
+    let mergedWork: MergedWork = {
+      ...insert.data!,
+      _local: {
+        status: insert._status,
+        timestamp: insert._timestamp,
+        error: insert._error,
+      },
+    };
 
-      case "update":
-        // Local update - merge local changes into synced data
-        const updatedWork: MergedWork = {
-          ...syncedWork,
-          ...localChange.data, // Local changes override
+    // Apply any updates to this insert
+    const updates = pendingUpdates.get(id);
+    if (updates) {
+      for (const update of updates) {
+        mergedWork = {
+          ...mergedWork,
+          ...update.data,
           _local: {
-            status: localChange._status,
-            timestamp: localChange._timestamp,
-            error: localChange._error,
+            status: update._status,
+            timestamp: update._timestamp,
+            error: update._error,
           },
         };
-        merged.push(updatedWork);
-        break;
-
-      case "insert":
-        // Conflict: both local insert and synced data exist
-        // This means sync completed - prefer synced data but mark as synced
-        merged.push({
-          ...syncedWork,
-          _local: {
-            status: "synced" as const,
-            timestamp: localChange._timestamp,
-          },
-        });
-        break;
+      }
     }
+
+    merged.push(mergedWork);
+    processedIds.add(id);
   }
 
-  // 2. Add local inserts that haven't synced yet
-  for (const [workId, localChange] of localByWorkId) {
-    if (processedIds.has(workId)) continue; // Already processed above
+  // Phase 3: Process synced works (with potential updates or deletes)
+  for (const syncedWork of synced) {
+    if (processedIds.has(syncedWork.id)) {
+      // Already processed as pending insert
+      continue;
+    }
 
-    if (localChange._op === "insert" && localChange.data) {
-      // Local insert pending sync - show in UI immediately
-      const pendingWork: MergedWork = {
-        ...localChange.data,
+    if (pendingDeletes.has(syncedWork.id)) {
+      // Local delete - filter out
+      processedIds.add(syncedWork.id);
+      continue;
+    }
+
+    // Check for updates
+    const updates = pendingUpdates.get(syncedWork.id);
+    if (!updates || updates.length === 0) {
+      // No updates - use synced data as-is
+      merged.push(syncedWork);
+      processedIds.add(syncedWork.id);
+      continue;
+    }
+
+    // Apply ALL updates sequentially
+    let mergedWork: MergedWork = { ...syncedWork };
+    for (const update of updates) {
+      mergedWork = {
+        ...mergedWork,
+        ...update.data,
         _local: {
-          status: localChange._status,
-          timestamp: localChange._timestamp,
-          error: localChange._error,
+          status: update._status,
+          timestamp: update._timestamp,
+          error: update._error,
         },
       };
-      merged.push(pendingWork);
     }
+
+    merged.push(mergedWork);
+    processedIds.add(syncedWork.id);
   }
 
   return merged;
@@ -127,32 +163,42 @@ export function mergeWorks(
 export async function getMergedWork(
   id: string
 ): Promise<MergedWork | undefined> {
-  // Get synced work
-  const synced = await db.works.get(id);
+  try {
+    // Get synced work
+    const synced = await db.works.get(id);
 
-  // Get local changes for this work
-  const localChanges = await db.works_local.where("id").equals(id).toArray();
+    // Get local changes for this work
+    const localChanges = await db.works_local.where("id").equals(id).toArray();
 
-  if (!synced && localChanges.length === 0) {
-    return undefined;
+    if (!synced && localChanges.length === 0) {
+      return undefined;
+    }
+
+    // Merge single work
+    const merged = mergeWorks(synced ? [synced] : [], localChanges);
+
+    return merged[0];
+  } catch (error) {
+    console.error("[getMergedWork] Error:", error);
+    return undefined; // Always return valid type
   }
-
-  // Merge single work
-  const merged = mergeWorks(synced ? [synced] : [], localChanges);
-
-  return merged[0];
 }
 
 /**
  * Get all merged works
  */
 export async function getAllMergedWorks(): Promise<MergedWork[]> {
-  const [synced, local] = await Promise.all([
-    db.works.toArray(),
-    db.works_local.toArray(),
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.works.toArray(),
+      db.works_local.toArray(),
+    ]);
 
-  return mergeWorks(synced, local);
+    return mergeWorks(synced, local);
+  } catch (error) {
+    console.error("[getAllMergedWorks] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -161,27 +207,37 @@ export async function getAllMergedWorks(): Promise<MergedWork[]> {
 export async function getMergedWorksByType(
   workType: string
 ): Promise<MergedWork[]> {
-  const [synced, local] = await Promise.all([
-    db.works.where("workType").equals(workType).toArray(),
-    db.works_local.toArray(), // Get all local changes (filter during merge)
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.works.where("workType").equals(workType).toArray(),
+      db.works_local.toArray(), // Get all local changes (filter during merge)
+    ]);
 
-  // Merge all, then filter (in case local change modifies workType)
-  const merged = mergeWorks(synced, local);
-  return merged.filter((w) => w.workType === workType);
+    // Merge all, then filter (in case local change modifies workType)
+    const merged = mergeWorks(synced, local);
+    return merged.filter((w) => w.workType === workType);
+  } catch (error) {
+    console.error("[getMergedWorksByType] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
  * Get merged favorite works
  */
 export async function getMergedFavoriteWorks(): Promise<MergedWork[]> {
-  const [synced, local] = await Promise.all([
-    db.works.where("favorite").equals(1).toArray(), // Dexie uses 1/0 for booleans
-    db.works_local.toArray(),
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.works.where("favorite").equals(1).toArray(), // Dexie uses 1/0 for booleans
+      db.works_local.toArray(),
+    ]);
 
-  const merged = mergeWorks(synced, local);
-  return merged.filter((w) => w.favorite === true);
+    const merged = mergeWorks(synced, local);
+    return merged.filter((w) => w.favorite === true);
+  } catch (error) {
+    console.error("[getMergedFavoriteWorks] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -190,8 +246,13 @@ export async function getMergedFavoriteWorks(): Promise<MergedWork[]> {
 export async function searchMergedWorksByTitle(
   query: string
 ): Promise<MergedWork[]> {
-  const allWorks = await getAllMergedWorks();
-  const lowerQuery = query.toLowerCase();
+  try {
+    const allWorks = await getAllMergedWorks();
+    const lowerQuery = query.toLowerCase();
 
-  return allWorks.filter((w) => w.title.toLowerCase().includes(lowerQuery));
+    return allWorks.filter((w) => w.title.toLowerCase().includes(lowerQuery));
+  } catch (error) {
+    console.error("[searchMergedWorksByTitle] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }

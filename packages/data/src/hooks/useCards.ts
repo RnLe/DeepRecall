@@ -68,8 +68,9 @@ export function useCards() {
   const electricResult = cardsElectric.useCards();
 
   // Sync Electric data to Dexie
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error(
           "[useCards] Failed to sync Electric data to Dexie:",
@@ -77,7 +78,7 @@ export function useCards() {
         );
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   const mergedQuery = useQuery({
     queryKey: ["cards", "merged"],
@@ -85,15 +86,17 @@ export function useCards() {
       return cardsMerged.getAllMergedCards();
     },
     staleTime: 0,
+    placeholderData: [], // Show empty array while loading (prevents loading state)
   });
 
+  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       cardsCleanup.cleanupSyncedCards(electricResult.data).then(() => {
         mergedQuery.refetch();
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return {
     ...mergedQuery,

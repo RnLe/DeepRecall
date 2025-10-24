@@ -34,6 +34,9 @@ export interface MergedAsset extends Asset {
 /**
  * Merge synced assets with local pending changes
  *
+ * CRITICAL: Collects ALL updates per ID and applies them sequentially
+ * (not just the latest) to handle rapid successive updates correctly.
+ *
  * @param synced - Assets from Electric (source of truth after sync)
  * @param local - Pending local changes from Dexie
  * @returns Merged array with local changes applied
@@ -42,80 +45,113 @@ export function mergeAssets(
   synced: Asset[],
   local: LocalAssetChange[]
 ): MergedAsset[] {
-  // Index local changes by asset ID for O(1) lookup
-  const localByAssetId = new Map<string, LocalAssetChange>();
+  // Phase 1: Collect ALL changes by type (not just latest!)
+  const pendingInserts = new Map<string, LocalAssetChange>();
+  const pendingUpdates = new Map<string, LocalAssetChange[]>(); // Array per ID!
+  const pendingDeletes = new Set<string>();
+
   for (const change of local) {
-    // Keep latest change per asset (highest timestamp)
-    const existing = localByAssetId.get(change.id);
-    if (!existing || change._timestamp > existing._timestamp) {
-      localByAssetId.set(change.id, change);
+    if (change._op === "insert") {
+      // For inserts, keep latest by timestamp
+      const existing = pendingInserts.get(change.id);
+      if (!existing || change._timestamp > existing._timestamp) {
+        pendingInserts.set(change.id, change);
+      }
+    } else if (change._op === "update") {
+      // For updates, collect ALL in array (apply sequentially later)
+      if (!pendingUpdates.has(change.id)) {
+        pendingUpdates.set(change.id, []);
+      }
+      pendingUpdates.get(change.id)!.push(change);
+    } else if (change._op === "delete") {
+      // For deletes, just track the ID
+      pendingDeletes.add(change.id);
     }
+  }
+
+  // Sort each update array by timestamp to apply in order
+  for (const updates of pendingUpdates.values()) {
+    updates.sort((a, b) => a._timestamp - b._timestamp);
   }
 
   const merged: MergedAsset[] = [];
   const processedIds = new Set<string>();
 
-  // 1. Apply local changes to synced assets
-  for (const syncedAsset of synced) {
-    const localChange = localByAssetId.get(syncedAsset.id);
-    processedIds.add(syncedAsset.id);
-
-    if (!localChange) {
-      // No local changes - use synced data as-is
-      merged.push(syncedAsset);
+  // Phase 2: Process pending inserts (which may also have updates)
+  for (const [id, insert] of pendingInserts) {
+    if (pendingDeletes.has(id)) {
+      // Insert then delete - skip entirely
+      processedIds.add(id);
       continue;
     }
 
-    // Apply local change based on operation
-    switch (localChange._op) {
-      case "delete":
-        // Local delete - filter out from merged results (silent)
-        break;
+    let mergedAsset: MergedAsset = {
+      ...insert.data!,
+      _local: {
+        status: insert._status,
+        timestamp: insert._timestamp,
+        error: insert._error,
+      },
+    };
 
-      case "update":
-        // Local update - merge local changes into synced data
-        const updatedAsset: MergedAsset = {
-          ...syncedAsset,
-          ...localChange.data, // Local changes override
+    // Apply any updates to this insert
+    const updates = pendingUpdates.get(id);
+    if (updates) {
+      for (const update of updates) {
+        mergedAsset = {
+          ...mergedAsset,
+          ...update.data,
           _local: {
-            status: localChange._status,
-            timestamp: localChange._timestamp,
-            error: localChange._error,
+            status: update._status,
+            timestamp: update._timestamp,
+            error: update._error,
           },
         };
-        merged.push(updatedAsset);
-        break;
-
-      case "insert":
-        // Conflict: both local insert and synced data exist
-        // This means sync completed - prefer synced data but mark as synced
-        merged.push({
-          ...syncedAsset,
-          _local: {
-            status: "synced" as const,
-            timestamp: localChange._timestamp,
-          },
-        });
-        break;
+      }
     }
+
+    merged.push(mergedAsset);
+    processedIds.add(id);
   }
 
-  // 2. Add local inserts that haven't synced yet
-  for (const [assetId, localChange] of localByAssetId) {
-    if (processedIds.has(assetId)) continue; // Already processed above
+  // Phase 3: Process synced assets (with potential updates or deletes)
+  for (const syncedAsset of synced) {
+    if (processedIds.has(syncedAsset.id)) {
+      // Already processed as pending insert
+      continue;
+    }
 
-    if (localChange._op === "insert" && localChange.data) {
-      // Local insert pending sync - show in UI immediately
-      const pendingAsset: MergedAsset = {
-        ...localChange.data,
+    if (pendingDeletes.has(syncedAsset.id)) {
+      // Local delete - filter out
+      processedIds.add(syncedAsset.id);
+      continue;
+    }
+
+    // Check for updates
+    const updates = pendingUpdates.get(syncedAsset.id);
+    if (!updates || updates.length === 0) {
+      // No updates - use synced data as-is
+      merged.push(syncedAsset);
+      processedIds.add(syncedAsset.id);
+      continue;
+    }
+
+    // Apply ALL updates sequentially
+    let mergedAsset: MergedAsset = { ...syncedAsset };
+    for (const update of updates) {
+      mergedAsset = {
+        ...mergedAsset,
+        ...update.data,
         _local: {
-          status: localChange._status,
-          timestamp: localChange._timestamp,
-          error: localChange._error,
+          status: update._status,
+          timestamp: update._timestamp,
+          error: update._error,
         },
       };
-      merged.push(pendingAsset);
     }
+
+    merged.push(mergedAsset);
+    processedIds.add(syncedAsset.id);
   }
 
   return merged;
@@ -127,32 +163,42 @@ export function mergeAssets(
 export async function getMergedAsset(
   id: string
 ): Promise<MergedAsset | undefined> {
-  // Get synced asset
-  const synced = await db.assets.get(id);
+  try {
+    // Get synced asset
+    const synced = await db.assets.get(id);
 
-  // Get local changes for this asset
-  const localChanges = await db.assets_local.where("id").equals(id).toArray();
+    // Get local changes for this asset
+    const localChanges = await db.assets_local.where("id").equals(id).toArray();
 
-  if (!synced && localChanges.length === 0) {
-    return undefined;
+    if (!synced && localChanges.length === 0) {
+      return undefined;
+    }
+
+    // Merge single asset
+    const merged = mergeAssets(synced ? [synced] : [], localChanges);
+
+    return merged[0];
+  } catch (error) {
+    console.error("[getMergedAsset] Error:", error);
+    return undefined; // Always return valid type
   }
-
-  // Merge single asset
-  const merged = mergeAssets(synced ? [synced] : [], localChanges);
-
-  return merged[0];
 }
 
 /**
  * Get all merged assets
  */
 export async function getAllMergedAssets(): Promise<MergedAsset[]> {
-  const [synced, local] = await Promise.all([
-    db.assets.toArray(),
-    db.assets_local.toArray(),
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.assets.toArray(),
+      db.assets_local.toArray(),
+    ]);
 
-  return mergeAssets(synced, local);
+    return mergeAssets(synced, local);
+  } catch (error) {
+    console.error("[getAllMergedAssets] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -161,14 +207,19 @@ export async function getAllMergedAssets(): Promise<MergedAsset[]> {
 export async function getMergedAssetsByWork(
   workId: string
 ): Promise<MergedAsset[]> {
-  const [synced, local] = await Promise.all([
-    db.assets.where("workId").equals(workId).toArray(),
-    db.assets_local.toArray(), // Get all local changes (filter during merge)
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.assets.where("workId").equals(workId).toArray(),
+      db.assets_local.toArray(), // Get all local changes (filter during merge)
+    ]);
 
-  // Merge all, then filter (in case local change modifies workId)
-  const merged = mergeAssets(synced, local);
-  return merged.filter((a) => a.workId === workId);
+    // Merge all, then filter (in case local change modifies workId)
+    const merged = mergeAssets(synced, local);
+    return merged.filter((a) => a.workId === workId);
+  } catch (error) {
+    console.error("[getMergedAssetsByWork] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -177,13 +228,18 @@ export async function getMergedAssetsByWork(
 export async function getMergedAssetByHash(
   sha256: string
 ): Promise<MergedAsset | undefined> {
-  const [synced, local] = await Promise.all([
-    db.assets.where("sha256").equals(sha256).toArray(),
-    db.assets_local.toArray(),
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.assets.where("sha256").equals(sha256).toArray(),
+      db.assets_local.toArray(),
+    ]);
 
-  const merged = mergeAssets(synced, local);
-  return merged.find((a) => a.sha256 === sha256);
+    const merged = mergeAssets(synced, local);
+    return merged.find((a) => a.sha256 === sha256);
+  } catch (error) {
+    console.error("[getMergedAssetByHash] Error:", error);
+    return undefined; // Always return valid type
+  }
 }
 
 /**
@@ -192,11 +248,16 @@ export async function getMergedAssetByHash(
 export async function getMergedAssetsByAnnotation(
   annotationId: string
 ): Promise<MergedAsset[]> {
-  const [synced, local] = await Promise.all([
-    db.assets.where("annotationId").equals(annotationId).toArray(),
-    db.assets_local.toArray(),
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.assets.where("annotationId").equals(annotationId).toArray(),
+      db.assets_local.toArray(),
+    ]);
 
-  const merged = mergeAssets(synced, local);
-  return merged.filter((a) => a.annotationId === annotationId);
+    const merged = mergeAssets(synced, local);
+    return merged.filter((a) => a.annotationId === annotationId);
+  } catch (error) {
+    console.error("[getMergedAssetsByAnnotation] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }

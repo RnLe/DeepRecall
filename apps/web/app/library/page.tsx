@@ -52,7 +52,7 @@ import {
   edges as edgeRepo,
 } from "@deeprecall/data/repos";
 import { useTemplateLibraryUI } from "@deeprecall/data/stores";
-import "@/src/utils/admin"; // Exposes window.cleanupDuplicatePresets()
+import "@deeprecall/ui/utils/admin"; // Exposes window.cleanupDuplicatePresets()
 
 export default function LibraryPage() {
   // Electric hooks - real-time synced data

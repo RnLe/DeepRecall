@@ -544,16 +544,12 @@ export function AdminPanel({
             <span className="text-lg font-bold">SQLite</span>
             <span className="text-sm text-gray-400">Storage Backend</span>
           </div>
-          {blobsMeta && (
-            <>
-              <div className="w-px h-6 bg-gray-700" />
-              <div className="flex items-center gap-2">
-                <Network className="w-5 h-5 text-cyan-400" />
-                <span className="text-lg font-bold">{blobsMeta.length}</span>
-                <span className="text-sm text-gray-400">Electric Meta</span>
-              </div>
-            </>
-          )}
+          <div className="w-px h-6 bg-gray-700" />
+          <div className="flex items-center gap-2">
+            <Network className="w-5 h-5 text-cyan-400" />
+            <span className="text-lg font-bold">{blobsMeta?.length || 0}</span>
+            <span className="text-sm text-gray-400">Electric Meta</span>
+          </div>
         </div>
 
         {isLoading && (
@@ -660,11 +656,9 @@ export function AdminPanel({
                           ))}
                       </div>
                     </th>
-                    {deviceBlobs && (
-                      <th className="px-2 py-1.5 text-xs text-gray-400 font-medium">
-                        Devices
-                      </th>
-                    )}
+                    <th className="px-2 py-1.5 text-xs text-gray-400 font-medium">
+                      Devices
+                    </th>
                     <th
                       className="px-2 py-1.5 text-xs text-gray-400 font-medium cursor-pointer hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
                       onClick={() => handleSort("created_ms")}
@@ -793,26 +787,24 @@ export function AdminPanel({
                             searchQuery
                           )}
                         </td>
-                        {deviceBlobs && (
-                          <td className="px-2 py-1.5 text-xs">
-                            {deviceCount !== null && (
-                              <div className="flex items-center gap-1">
-                                <Network className="w-3 h-3 text-cyan-400" />
-                                <span className="text-cyan-400">
-                                  {deviceCount}
+                        <td className="px-2 py-1.5 text-xs">
+                          {deviceCount !== null && deviceCount > 0 && (
+                            <div className="flex items-center gap-1">
+                              <Network className="w-3 h-3 text-cyan-400" />
+                              <span className="text-cyan-400">
+                                {deviceCount}
+                              </span>
+                              {hasOnCurrentDevice && (
+                                <span
+                                  className="text-green-500"
+                                  title="Available on this device"
+                                >
+                                  ✓
                                 </span>
-                                {hasOnCurrentDevice && (
-                                  <span
-                                    className="text-green-500"
-                                    title="Available on this device"
-                                  >
-                                    ✓
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        )}
+                              )}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-2 py-1.5 text-xs text-green-600">
                           <span
                             title={new Date(blob.created_ms).toLocaleString()}

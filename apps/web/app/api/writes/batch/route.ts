@@ -133,42 +133,56 @@ function keysToSnakeCase(obj: Record<string, any>): Record<string, any> {
  * Transform annotation data from client schema to Postgres schema
  * Client: { data: { type, rects/ranges }, metadata: {...} }
  * Postgres: { type, geometry, style, content, metadata, attached_assets }
+ *
+ * Handles both full and partial updates
  */
 function transformAnnotationData(validated: any): Record<string, any> {
   const { data, metadata, ...rest } = validated;
 
-  // Extract type from data
-  const type = data.type;
+  const result: Record<string, any> = { ...rest };
 
-  // Build geometry JSONB (contains rects or ranges)
-  const geometry =
-    data.type === "rectangle" ? { rects: data.rects } : { ranges: data.ranges };
+  // Only transform data fields if data is present (might be missing in partial updates)
+  if (data) {
+    result.kind = "annotation"; // Postgres has a kind column that must be 'annotation'
+    result.type = data.type;
 
-  // Build style JSONB from metadata
-  const style = metadata?.color ? { color: metadata.color } : undefined;
+    // Build geometry JSONB (contains rects or ranges)
+    result.geometry =
+      data.type === "rectangle"
+        ? { rects: data.rects }
+        : { ranges: data.ranges };
+  }
 
-  // Extract content (notes)
-  const content = metadata?.notes || metadata?.title;
+  // Only transform metadata fields if metadata is present
+  if (metadata) {
+    // Build style JSONB from metadata
+    if (metadata.color) {
+      result.style = { color: metadata.color };
+    }
 
-  // Extract attached assets
-  const attachedAssets = metadata?.attachedAssets || [];
+    // Extract content (notes only, not title)
+    if (metadata.notes) {
+      result.content = metadata.notes;
+    }
 
-  // Build metadata JSONB (remaining metadata)
-  const pgMetadata: any = {};
-  if (metadata?.kind) pgMetadata.kind = metadata.kind;
-  if (metadata?.tags) pgMetadata.tags = metadata.tags;
-  if (metadata?.noteGroups) pgMetadata.noteGroups = metadata.noteGroups;
+    // Extract attached assets
+    if (metadata.attachedAssets) {
+      result.attachedAssets = metadata.attachedAssets;
+    }
 
-  return {
-    ...rest,
-    kind: "annotation", // Postgres has a kind column that must be 'annotation'
-    type,
-    geometry,
-    style,
-    content,
-    attachedAssets,
-    metadata: Object.keys(pgMetadata).length > 0 ? pgMetadata : undefined,
-  };
+    // Build metadata JSONB (remaining metadata including title)
+    const pgMetadata: any = {};
+    if (metadata.title) pgMetadata.title = metadata.title;
+    if (metadata.kind) pgMetadata.kind = metadata.kind;
+    if (metadata.tags) pgMetadata.tags = metadata.tags;
+    if (metadata.noteGroups) pgMetadata.noteGroups = metadata.noteGroups;
+
+    if (Object.keys(pgMetadata).length > 0) {
+      result.metadata = pgMetadata;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -207,8 +221,12 @@ async function applyInsert(pool: Pool, change: WriteChange): Promise<any> {
  * Apply update operation with LWW conflict resolution
  */
 async function applyUpdate(pool: Pool, change: WriteChange): Promise<any> {
+  // For updates, we only receive partial data (changed fields)
+  // So we need to use .partial() to allow optional fields
   const schema = getSchemaForTable(change.table);
-  const validated = schema.parse(change.payload);
+  const partialSchema =
+    schema instanceof z.ZodObject ? schema.partial() : schema;
+  const validated = partialSchema.parse(change.payload);
 
   // Special handling for annotations - transform schema
   const transformed =

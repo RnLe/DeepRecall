@@ -11,6 +11,7 @@ import {
 } from "@deeprecall/ui";
 import { useBlobStats } from "@deeprecall/data/hooks";
 import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface LibraryHeaderProps {
   onCreateWork?: () => void;
@@ -29,6 +30,7 @@ export function LibraryHeader({
   onExportData,
   onImportData,
 }: LibraryHeaderProps) {
+  const queryClient = useQueryClient();
   const cas = useWebBlobStorage();
   const { data: blobStats } = useBlobStats(cas);
 
@@ -44,7 +46,93 @@ export function LibraryHeader({
       )
     ) {
       try {
-        // Step 1: Clear Postgres database via API (this will cascade to Electric)
+        // Step 1: Clear local Dexie database FIRST (optimistic - instant UI update)
+        console.log("Clearing local Dexie database (optimistic)...");
+        const { db } = await import("@deeprecall/data/db");
+
+        await db.transaction(
+          "rw",
+          [
+            db.works,
+            db.assets,
+            db.activities,
+            db.collections,
+            db.edges,
+            db.presets,
+            db.authors,
+            db.annotations,
+            db.cards,
+            db.reviewLogs,
+            db.blobsMeta,
+            db.deviceBlobs,
+            // Clear local tables too
+            db.works_local,
+            db.assets_local,
+            db.activities_local,
+            db.collections_local,
+            db.edges_local,
+            db.presets_local,
+            db.authors_local,
+            db.annotations_local,
+            db.cards_local,
+            db.reviewLogs_local,
+          ],
+          async () => {
+            // Clear all synced tables
+            await Promise.all([
+              db.works.clear(),
+              db.assets.clear(),
+              db.activities.clear(),
+              db.collections.clear(),
+              db.edges.clear(),
+              db.presets.clear(),
+              db.authors.clear(),
+              db.annotations.clear(),
+              db.cards.clear(),
+              db.reviewLogs.clear(),
+              db.blobsMeta.clear(),
+              db.deviceBlobs.clear(),
+              // Clear all local tables
+              db.works_local.clear(),
+              db.assets_local.clear(),
+              db.activities_local.clear(),
+              db.collections_local.clear(),
+              db.edges_local.clear(),
+              db.presets_local.clear(),
+              db.authors_local.clear(),
+              db.annotations_local.clear(),
+              db.cards_local.clear(),
+              db.reviewLogs_local.clear(),
+            ]);
+          }
+        );
+
+        console.log("✅ Dexie database cleared (UI updated)");
+
+        // Step 2: Force clear React Query cache and reset all queries
+        console.log("Clearing React Query cache...");
+        queryClient.clear(); // Clear all cached data
+
+        // Force refetch all merged queries to show empty state
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ["assets", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["works", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["activities", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["collections", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["edges", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["presets", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["authors", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["annotations", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["cards", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["reviewLogs", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["blobs-meta", "merged"] }),
+          queryClient.refetchQueries({ queryKey: ["device-blobs", "merged"] }),
+        ]);
+        console.log(
+          "✅ React Query cleared and refetched (UI shows empty state)"
+        );
+
+        // Step 3: Clear Postgres database via API (background sync confirmation)
         console.log("Clearing Postgres database...");
         const pgResponse = await fetch("/api/admin/database", {
           method: "DELETE",
@@ -56,7 +144,7 @@ export function LibraryHeader({
 
         console.log("✅ Postgres database cleared");
 
-        // Step 2: Delete blob files from disk
+        // Step 4: Delete blob files from disk
         console.log("Deleting blob files...");
         try {
           const blobResponse = await fetch("/api/admin/database/blobs", {
@@ -72,25 +160,9 @@ export function LibraryHeader({
           console.warn("⚠️  Blob deletion error (non-critical):", error);
         }
 
-        // Step 3: Clear local Dexie database
-        // IMPORTANT: Do this last to avoid "DatabaseClosedError" from Electric hooks
-        console.log("Clearing local Dexie database...");
-        const { db } = await import("@deeprecall/data/db");
-
-        // Close all connections first to prevent errors
-        try {
-          db.close();
-        } catch (e) {
-          // Ignore close errors
-        }
-
-        // Delete the database
-        await db.delete();
-        console.log("✅ Dexie database cleared");
-
         alert("✅ All data cleared successfully!");
 
-        // No page refresh needed - optimistic updates will handle it! 🚀
+        // UI already shows empty state - no page reload needed! 🚀
       } catch (error) {
         console.error("Failed to clear database:", error);
         alert(

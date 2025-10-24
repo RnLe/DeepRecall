@@ -74,9 +74,9 @@ export function useWorks() {
   const electricResult = worksElectric.useWorks();
 
   // Sync Electric data to Dexie works table (for merge layer)
-  // CRITICAL: Must sync even when empty to clear stale data
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       // Replace entire Dexie works table with Electric data
       // This ensures deletions are properly reflected
       syncElectricToDexie(electricResult.data).catch((error) => {
@@ -90,7 +90,7 @@ export function useWorks() {
         );
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   // Query merged data from Dexie
   const mergedQuery = useQuery({
@@ -99,19 +99,20 @@ export function useWorks() {
       return worksMerged.getAllMergedWorks();
     },
     staleTime: 0, // Always check for local changes
-    initialData: [], // Start with empty array to prevent loading state
+    placeholderData: [], // Show empty array while loading (prevents loading state)
   });
 
   // Auto-cleanup and refresh when Electric data changes (synced)
+  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       // Cleanup confirmed syncs
       worksCleanup.cleanupSyncedWorks(electricResult.data).then(() => {
         // Refresh merged view after cleanup
         mergedQuery.refetch();
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return {
     ...mergedQuery,
@@ -137,11 +138,12 @@ export function useWork(id: string | undefined) {
     staleTime: 0,
   });
 
+  // CRITICAL: Check isLoading to prevent refetch during initial load
   useEffect(() => {
-    if (electricResult.data && id) {
+    if (!electricResult.isLoading && electricResult.data && id) {
       mergedQuery.refetch();
     }
-  }, [electricResult.data, id]);
+  }, [electricResult.isLoading, electricResult.data, id]);
 
   return mergedQuery;
 }
@@ -160,11 +162,12 @@ export function useWorksByType(workType: string) {
     staleTime: 0,
   });
 
+  // CRITICAL: Check isLoading to prevent refetch during initial load
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       mergedQuery.refetch();
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return mergedQuery;
 }
@@ -183,11 +186,12 @@ export function useFavoriteWorks() {
     staleTime: 0,
   });
 
+  // CRITICAL: Check isLoading to prevent refetch during initial load
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       mergedQuery.refetch();
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return mergedQuery;
 }

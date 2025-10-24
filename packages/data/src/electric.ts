@@ -21,7 +21,7 @@ interface ElectricConfig {
 const JSONB_COLUMNS_BY_TABLE: Record<string, string[]> = {
   presets: ["core_field_config", "custom_fields"],
   works: ["authors", "metadata"],
-  annotations: ["geometry", "style"],
+  annotations: ["geometry", "style", "metadata"],
   authors: ["avatar_crop_region"],
   // Add more tables as needed
 };
@@ -60,6 +60,48 @@ function parseJsonbColumns<T>(table: string, row: any): T {
   }
 
   return result as T;
+}
+
+/**
+ * Transform annotation from Postgres schema to client schema
+ * Postgres: { type, geometry, style, content, metadata, attached_assets, ... }
+ * Client: { data: { type, rects/ranges }, metadata: { color, notes/title, ... }, ... }
+ */
+function transformAnnotationFromPostgres(row: any): any {
+  const { type, geometry, style, content, metadata, attachedAssets, ...rest } =
+    row;
+
+  // Build data field (type + geometry)
+  const data: any = { type };
+  if (type === "rectangle") {
+    data.rects = geometry?.rects || [];
+  } else if (type === "highlight") {
+    data.ranges = geometry?.ranges || [];
+  }
+
+  // Build metadata field (style + content + metadata + attachedAssets)
+  const clientMetadata: any = {};
+  if (style?.color) clientMetadata.color = style.color;
+
+  // Content is notes (not title)
+  if (content && typeof content === "string") {
+    clientMetadata.notes = content;
+  }
+
+  // Merge Postgres metadata fields (includes title)
+  if (metadata) {
+    Object.assign(clientMetadata, metadata);
+  }
+
+  if (attachedAssets && attachedAssets.length > 0) {
+    clientMetadata.attachedAssets = attachedAssets;
+  }
+
+  return {
+    ...rest,
+    data,
+    metadata: clientMetadata,
+  };
 }
 
 let electricConfig: ElectricConfig | null = null;
@@ -182,9 +224,12 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       );
 
       // Parse JSONB columns
-      const parsedRows = rows.map((row) =>
-        parseJsonbColumns<T>(spec.table, row)
-      );
+      let parsedRows = rows.map((row) => parseJsonbColumns<T>(spec.table, row));
+
+      // Transform annotations from Postgres schema to client schema
+      if (spec.table === "annotations") {
+        parsedRows = parsedRows.map(transformAnnotationFromPostgres) as T[];
+      }
 
       setData(parsedRows);
       setIsLoading(false);
@@ -281,9 +326,12 @@ export async function queryShape<T = any>(spec: ShapeSpec<T>): Promise<T[]> {
       const rows = shapeData.rows || [];
 
       // Parse JSONB columns
-      const parsedRows = rows.map((row) =>
-        parseJsonbColumns<T>(spec.table, row)
-      );
+      let parsedRows = rows.map((row) => parseJsonbColumns<T>(spec.table, row));
+
+      // Transform annotations from Postgres schema to client schema
+      if (spec.table === "annotations") {
+        parsedRows = parsedRows.map(transformAnnotationFromPostgres) as T[];
+      }
 
       resolve(parsedRows);
       unsubscribe();

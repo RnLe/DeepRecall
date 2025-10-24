@@ -72,8 +72,9 @@ export function useReviewLogsByCard(cardId: string) {
   const electricResult = cardsElectric.useReviewLogsByCard(cardId);
 
   // Sync Electric data to Dexie
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error(
           "[useReviewLogsByCard] Failed to sync Electric data to Dexie:",
@@ -81,7 +82,7 @@ export function useReviewLogsByCard(cardId: string) {
         );
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   const mergedQuery = useQuery({
     queryKey: ["reviewLogs", "merged", "card", cardId],
@@ -89,17 +90,19 @@ export function useReviewLogsByCard(cardId: string) {
       return reviewLogsMerged.getMergedReviewLogsByCard(cardId);
     },
     staleTime: 0,
+    placeholderData: [], // Show empty array while loading (prevents loading state)
   });
 
+  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       reviewLogsCleanup
         .cleanupSyncedReviewLogs(electricResult.data)
         .then(() => {
           mergedQuery.refetch();
         });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return {
     ...mergedQuery,

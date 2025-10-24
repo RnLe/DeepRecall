@@ -17,55 +17,116 @@ export interface MergedCollection extends Collection {
 
 /**
  * Merge synced collections with local changes
+ *
+ * CRITICAL: Collects ALL updates per ID and applies sequentially (Pattern 2)
+ * Fixes bug where only last update was applied before sync
+ *
  * Rules:
  * - Local INSERT → Show immediately (pending)
- * - Local UPDATE → Override synced data
+ * - Local UPDATE → Apply ALL updates sequentially
  * - Local DELETE → Filter from results
  */
 export async function mergeCollections(
   synced: Collection[],
   local: any[]
 ): Promise<MergedCollection[]> {
-  const syncedMap = new Map(synced.map((c) => [c.id, c]));
-  const result: MergedCollection[] = [];
+  // Phase 1: Collect changes by type and ID
+  const pendingInserts = new Map<string, any>();
+  const pendingUpdates = new Map<string, any[]>(); // Array to collect ALL updates
+  const pendingDeletes = new Set<string>();
 
-  // Process local changes
-  for (const localChange of local) {
-    if (localChange._op === "insert") {
-      // New collection (not yet synced)
-      result.push({
-        ...localChange.data,
-        _local: {
-          op: "insert",
-          status: localChange._status,
-          timestamp: localChange._timestamp,
-        },
-      });
-      syncedMap.delete(localChange.id); // Don't duplicate
-    } else if (localChange._op === "update") {
-      // Updated collection (override synced)
-      const syncedCollection = syncedMap.get(localChange.id);
-      if (syncedCollection) {
-        result.push({
-          ...syncedCollection,
-          ...localChange.data,
-          _local: {
-            op: "update",
-            status: localChange._status,
-            timestamp: localChange._timestamp,
-          },
-        });
-        syncedMap.delete(localChange.id); // Don't duplicate
+  for (const change of local) {
+    if (change._op === "insert") {
+      const existing = pendingInserts.get(change.id);
+      if (!existing || change._timestamp > existing._timestamp) {
+        pendingInserts.set(change.id, change);
       }
-    } else if (localChange._op === "delete") {
-      // Deleted collection (filter out)
-      syncedMap.delete(localChange.id);
+    } else if (change._op === "update") {
+      // Collect ALL updates per ID (not just latest)
+      if (!pendingUpdates.has(change.id)) {
+        pendingUpdates.set(change.id, []);
+      }
+      pendingUpdates.get(change.id)!.push(change);
+    } else if (change._op === "delete") {
+      pendingDeletes.add(change.id);
     }
   }
 
-  // Add remaining synced collections (no local changes)
-  for (const syncedCollection of syncedMap.values()) {
-    result.push(syncedCollection);
+  // Sort updates by timestamp for each ID
+  for (const updates of pendingUpdates.values()) {
+    updates.sort((a, b) => a._timestamp - b._timestamp);
+  }
+
+  const result: MergedCollection[] = [];
+  const processedIds = new Set<string>();
+  const syncedMap = new Map(synced.map((c) => [c.id, c]));
+
+  // Phase 2: Process pending inserts (may have updates on top)
+  for (const [id, insert] of pendingInserts) {
+    if (pendingDeletes.has(id)) continue; // Deleted before sync
+
+    processedIds.add(id);
+    let mergedCollection: MergedCollection = {
+      ...(insert.data as Collection),
+      _local: {
+        op: "insert",
+        status: insert._status,
+        timestamp: insert._timestamp,
+      },
+    };
+
+    // Apply any updates that came after insert
+    const updates = pendingUpdates.get(id);
+    if (updates) {
+      for (const update of updates) {
+        mergedCollection = {
+          ...mergedCollection,
+          ...update.data,
+          _local: {
+            op: "update",
+            status: update._status,
+            timestamp: update._timestamp,
+          },
+        };
+      }
+    }
+
+    result.push(mergedCollection);
+  }
+
+  // Phase 3: Process synced items with updates
+  for (const [id, updates] of pendingUpdates) {
+    if (processedIds.has(id)) continue; // Already processed as insert
+    if (pendingDeletes.has(id)) continue; // Deleted
+
+    const syncedItem = syncedMap.get(id);
+    if (syncedItem) {
+      processedIds.add(id);
+      let mergedCollection: MergedCollection = { ...syncedItem };
+
+      // Apply ALL updates sequentially
+      for (const update of updates) {
+        mergedCollection = {
+          ...mergedCollection,
+          ...update.data,
+          _local: {
+            op: "update",
+            status: update._status,
+            timestamp: update._timestamp,
+          },
+        };
+      }
+
+      result.push(mergedCollection);
+    }
+  }
+
+  // Phase 4: Add synced items without local changes
+  for (const syncedItem of synced) {
+    if (processedIds.has(syncedItem.id)) continue; // Already processed
+    if (pendingDeletes.has(syncedItem.id)) continue; // Deleted locally
+
+    result.push(syncedItem);
   }
 
   return result;
@@ -75,9 +136,14 @@ export async function mergeCollections(
  * Get all merged collections (synced + local)
  */
 export async function getAllMergedCollections(): Promise<MergedCollection[]> {
-  const synced = await db.collections.toArray();
-  const local = await db.collections_local.toArray();
-  return mergeCollections(synced, local);
+  try {
+    const synced = await db.collections.toArray();
+    const local = await db.collections_local.toArray();
+    return mergeCollections(synced, local);
+  } catch (error) {
+    console.error("[getAllMergedCollections] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -86,17 +152,22 @@ export async function getAllMergedCollections(): Promise<MergedCollection[]> {
 export async function getMergedCollection(
   id: string
 ): Promise<MergedCollection | undefined> {
-  const synced = await db.collections.get(id);
-  const local = await db.collections_local.where("id").equals(id).toArray();
+  try {
+    const synced = await db.collections.get(id);
+    const local = await db.collections_local.where("id").equals(id).toArray();
 
-  if (local.length === 0) {
-    return synced; // No local changes
+    if (local.length === 0) {
+      return synced; // No local changes
+    }
+
+    // Apply local changes
+    const allCollections = synced ? [synced] : [];
+    const merged = await mergeCollections(allCollections, local);
+    return merged[0];
+  } catch (error) {
+    console.error("[getMergedCollection] Error:", error);
+    return undefined;
   }
-
-  // Apply local changes
-  const allCollections = synced ? [synced] : [];
-  const merged = await mergeCollections(allCollections, local);
-  return merged[0];
 }
 
 /**
@@ -105,6 +176,11 @@ export async function getMergedCollection(
 export async function getMergedPublicCollections(): Promise<
   MergedCollection[]
 > {
-  const allCollections = await getAllMergedCollections();
-  return allCollections.filter((c) => !c.isPrivate);
+  try {
+    const allCollections = await getAllMergedCollections();
+    return allCollections.filter((c) => !c.isPrivate);
+  } catch (error) {
+    console.error("[getMergedPublicCollections] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }

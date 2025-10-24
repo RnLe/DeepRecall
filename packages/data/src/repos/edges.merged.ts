@@ -17,55 +17,116 @@ export interface MergedEdge extends Edge {
 
 /**
  * Merge synced edges with local changes
+ *
+ * CRITICAL: Collects ALL updates per ID and applies sequentially (Pattern 2)
+ * Fixes bug where only last update was applied before sync
+ *
  * Rules:
  * - Local INSERT → Show immediately (pending)
- * - Local UPDATE → Override synced data
+ * - Local UPDATE → Apply ALL updates sequentially
  * - Local DELETE → Filter from results
  */
 export async function mergeEdges(
   synced: Edge[],
   local: any[]
 ): Promise<MergedEdge[]> {
-  const syncedMap = new Map(synced.map((e) => [e.id, e]));
-  const result: MergedEdge[] = [];
+  // Phase 1: Collect changes by type and ID
+  const pendingInserts = new Map<string, any>();
+  const pendingUpdates = new Map<string, any[]>(); // Array to collect ALL updates
+  const pendingDeletes = new Set<string>();
 
-  // Process local changes
-  for (const localChange of local) {
-    if (localChange._op === "insert") {
-      // New edge (not yet synced)
-      result.push({
-        ...localChange.data,
-        _local: {
-          op: "insert",
-          status: localChange._status,
-          timestamp: localChange._timestamp,
-        },
-      });
-      syncedMap.delete(localChange.id); // Don't duplicate
-    } else if (localChange._op === "update") {
-      // Updated edge (override synced)
-      const syncedEdge = syncedMap.get(localChange.id);
-      if (syncedEdge) {
-        result.push({
-          ...syncedEdge,
-          ...localChange.data,
-          _local: {
-            op: "update",
-            status: localChange._status,
-            timestamp: localChange._timestamp,
-          },
-        });
-        syncedMap.delete(localChange.id); // Don't duplicate
+  for (const change of local) {
+    if (change._op === "insert") {
+      const existing = pendingInserts.get(change.id);
+      if (!existing || change._timestamp > existing._timestamp) {
+        pendingInserts.set(change.id, change);
       }
-    } else if (localChange._op === "delete") {
-      // Deleted edge (filter out)
-      syncedMap.delete(localChange.id);
+    } else if (change._op === "update") {
+      // Collect ALL updates per ID (not just latest)
+      if (!pendingUpdates.has(change.id)) {
+        pendingUpdates.set(change.id, []);
+      }
+      pendingUpdates.get(change.id)!.push(change);
+    } else if (change._op === "delete") {
+      pendingDeletes.add(change.id);
     }
   }
 
-  // Add remaining synced edges (no local changes)
-  for (const syncedEdge of syncedMap.values()) {
-    result.push(syncedEdge);
+  // Sort updates by timestamp for each ID
+  for (const updates of pendingUpdates.values()) {
+    updates.sort((a, b) => a._timestamp - b._timestamp);
+  }
+
+  const result: MergedEdge[] = [];
+  const processedIds = new Set<string>();
+  const syncedMap = new Map(synced.map((e) => [e.id, e]));
+
+  // Phase 2: Process pending inserts (may have updates on top)
+  for (const [id, insert] of pendingInserts) {
+    if (pendingDeletes.has(id)) continue; // Deleted before sync
+
+    processedIds.add(id);
+    let mergedEdge: MergedEdge = {
+      ...(insert.data as Edge),
+      _local: {
+        op: "insert",
+        status: insert._status,
+        timestamp: insert._timestamp,
+      },
+    };
+
+    // Apply any updates that came after insert
+    const updates = pendingUpdates.get(id);
+    if (updates) {
+      for (const update of updates) {
+        mergedEdge = {
+          ...mergedEdge,
+          ...update.data,
+          _local: {
+            op: "update",
+            status: update._status,
+            timestamp: update._timestamp,
+          },
+        };
+      }
+    }
+
+    result.push(mergedEdge);
+  }
+
+  // Phase 3: Process synced items with updates
+  for (const [id, updates] of pendingUpdates) {
+    if (processedIds.has(id)) continue; // Already processed as insert
+    if (pendingDeletes.has(id)) continue; // Deleted
+
+    const syncedItem = syncedMap.get(id);
+    if (syncedItem) {
+      processedIds.add(id);
+      let mergedEdge: MergedEdge = { ...syncedItem };
+
+      // Apply ALL updates sequentially
+      for (const update of updates) {
+        mergedEdge = {
+          ...mergedEdge,
+          ...update.data,
+          _local: {
+            op: "update",
+            status: update._status,
+            timestamp: update._timestamp,
+          },
+        };
+      }
+
+      result.push(mergedEdge);
+    }
+  }
+
+  // Phase 4: Add synced items without local changes
+  for (const syncedItem of synced) {
+    if (processedIds.has(syncedItem.id)) continue; // Already processed
+    if (pendingDeletes.has(syncedItem.id)) continue; // Deleted locally
+
+    result.push(syncedItem);
   }
 
   return result;
@@ -75,9 +136,14 @@ export async function mergeEdges(
  * Get all merged edges (synced + local)
  */
 export async function getAllMergedEdges(): Promise<MergedEdge[]> {
-  const synced = await db.edges.toArray();
-  const local = await db.edges_local.toArray();
-  return mergeEdges(synced, local);
+  try {
+    const synced = await db.edges.toArray();
+    const local = await db.edges_local.toArray();
+    return mergeEdges(synced, local);
+  } catch (error) {
+    console.error("[getAllMergedEdges] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -86,17 +152,22 @@ export async function getAllMergedEdges(): Promise<MergedEdge[]> {
 export async function getMergedEdge(
   id: string
 ): Promise<MergedEdge | undefined> {
-  const synced = await db.edges.get(id);
-  const local = await db.edges_local.where("id").equals(id).toArray();
+  try {
+    const synced = await db.edges.get(id);
+    const local = await db.edges_local.where("id").equals(id).toArray();
 
-  if (local.length === 0) {
-    return synced; // No local changes
+    if (local.length === 0) {
+      return synced; // No local changes
+    }
+
+    // Apply local changes
+    const allEdges = synced ? [synced] : [];
+    const merged = await mergeEdges(allEdges, local);
+    return merged[0];
+  } catch (error) {
+    console.error("[getMergedEdge] Error:", error);
+    return undefined;
   }
-
-  // Apply local changes
-  const allEdges = synced ? [synced] : [];
-  const merged = await mergeEdges(allEdges, local);
-  return merged[0];
 }
 
 /**
@@ -105,22 +176,32 @@ export async function getMergedEdge(
 export async function getMergedEdgesFrom(
   fromId: string
 ): Promise<MergedEdge[]> {
-  const synced = await db.edges.where("fromId").equals(fromId).toArray();
-  const local = await db.edges_local.toArray();
-  const allMerged = await mergeEdges(synced, local);
-  // Filter for fromId (local changes might have different fromId)
-  return allMerged.filter((e) => e.fromId === fromId);
+  try {
+    const synced = await db.edges.where("fromId").equals(fromId).toArray();
+    const local = await db.edges_local.toArray();
+    const allMerged = await mergeEdges(synced, local);
+    // Filter for fromId (local changes might have different fromId)
+    return allMerged.filter((e) => e.fromId === fromId);
+  } catch (error) {
+    console.error("[getMergedEdgesFrom] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
  * Get merged edges to a specific entity
  */
 export async function getMergedEdgesTo(toId: string): Promise<MergedEdge[]> {
-  const synced = await db.edges.where("toId").equals(toId).toArray();
-  const local = await db.edges_local.toArray();
-  const allMerged = await mergeEdges(synced, local);
-  // Filter for toId (local changes might have different toId)
-  return allMerged.filter((e) => e.toId === toId);
+  try {
+    const synced = await db.edges.where("toId").equals(toId).toArray();
+    const local = await db.edges_local.toArray();
+    const allMerged = await mergeEdges(synced, local);
+    // Filter for toId (local changes might have different toId)
+    return allMerged.filter((e) => e.toId === toId);
+  } catch (error) {
+    console.error("[getMergedEdgesTo] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -130,6 +211,11 @@ export async function getMergedEdgesByRelation(
   fromId: string,
   relation: Relation
 ): Promise<MergedEdge[]> {
-  const allEdges = await getMergedEdgesFrom(fromId);
-  return allEdges.filter((e) => e.relation === relation);
+  try {
+    const allEdges = await getMergedEdgesFrom(fromId);
+    return allEdges.filter((e) => e.relation === relation);
+  } catch (error) {
+    console.error("[getMergedEdgesByRelation] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }

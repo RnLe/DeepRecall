@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import type { Annotation, Asset } from "@deeprecall/core";
 import { NoteDetailModal } from "../NoteDetailModal";
-import { SimplePDFViewer } from "../SimplePDFViewer";
+import { SimplePDFViewer } from "../../components/SimplePDFViewer";
 import { getRelativeTime } from "../../utils/date";
 import { useCreateAsset, useUpdateAsset } from "@deeprecall/data/hooks";
 

@@ -69,6 +69,8 @@ export async function createPresetLocal(
 
 /**
  * Update a preset locally (optimistic)
+ * CRITICAL: Uses .add() to allow multiple updates per ID
+ * Each update is stored separately and merged sequentially in merge layer
  */
 export async function updatePresetLocal(
   id: string,
@@ -79,8 +81,8 @@ export async function updatePresetLocal(
     updatedAt: new Date().toISOString(),
   };
 
-  // 1. Update/add to local Dexie
-  await db.presets_local.put({
+  // 1. Add to local Dexie (allows multiple updates for same ID)
+  await db.presets_local.add({
     id,
     _op: "update",
     _status: "pending",

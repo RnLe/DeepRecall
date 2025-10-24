@@ -45,23 +45,29 @@ async function syncElectricToDexie(electricData: BlobMeta[]): Promise<void> {
 export function useBlobsMeta() {
   const electricResult = useShape<BlobMeta>({ table: "blobs_meta" });
 
-  // Sync Electric → Dexie (critical: sync even when empty!)
+  // CRITICAL: Check isLoading to prevent cache clearing on page reload
+  // Sync Electric → Dexie only after initial load completes
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error("[Electric→Dexie] Failed to sync blobs_meta:", error);
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   // Return merged data from Dexie (persists across navigation)
   return useQuery({
     queryKey: ["blobs-meta", "merged"],
     queryFn: async () => {
-      const data = await db.blobsMeta.toArray();
-      return data;
+      try {
+        const data = await db.blobsMeta.toArray();
+        return data;
+      } catch (error) {
+        console.error("[useBlobsMeta] Error:", error);
+        return []; // Always return array, never undefined
+      }
     },
-    initialData: [],
+    placeholderData: [], // Prevent hydration mismatch
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: false,

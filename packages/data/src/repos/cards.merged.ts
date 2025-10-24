@@ -17,55 +17,116 @@ export interface MergedCard extends Card {
 
 /**
  * Merge synced cards with local changes
+ *
+ * CRITICAL: Collects ALL updates per ID and applies sequentially (Pattern 2)
+ * Fixes bug where only last update was applied before sync
+ *
  * Rules:
  * - Local INSERT → Show immediately (pending)
- * - Local UPDATE → Override synced data
+ * - Local UPDATE → Apply ALL updates sequentially
  * - Local DELETE → Filter from results
  */
 export async function mergeCards(
   synced: Card[],
   local: any[]
 ): Promise<MergedCard[]> {
-  const syncedMap = new Map(synced.map((c) => [c.id, c]));
-  const result: MergedCard[] = [];
+  // Phase 1: Collect changes by type and ID
+  const pendingInserts = new Map<string, any>();
+  const pendingUpdates = new Map<string, any[]>(); // Array to collect ALL updates
+  const pendingDeletes = new Set<string>();
 
-  // Process local changes
-  for (const localChange of local) {
-    if (localChange._op === "insert") {
-      // New card (not yet synced)
-      result.push({
-        ...localChange.data,
-        _local: {
-          op: "insert",
-          status: localChange._status,
-          timestamp: localChange._timestamp,
-        },
-      });
-      syncedMap.delete(localChange.id); // Don't duplicate
-    } else if (localChange._op === "update") {
-      // Updated card (override synced)
-      const syncedCard = syncedMap.get(localChange.id);
-      if (syncedCard) {
-        result.push({
-          ...syncedCard,
-          ...localChange.data,
-          _local: {
-            op: "update",
-            status: localChange._status,
-            timestamp: localChange._timestamp,
-          },
-        });
-        syncedMap.delete(localChange.id); // Don't duplicate
+  for (const change of local) {
+    if (change._op === "insert") {
+      const existing = pendingInserts.get(change.id);
+      if (!existing || change._timestamp > existing._timestamp) {
+        pendingInserts.set(change.id, change);
       }
-    } else if (localChange._op === "delete") {
-      // Deleted card (filter out)
-      syncedMap.delete(localChange.id);
+    } else if (change._op === "update") {
+      // Collect ALL updates per ID (not just latest)
+      if (!pendingUpdates.has(change.id)) {
+        pendingUpdates.set(change.id, []);
+      }
+      pendingUpdates.get(change.id)!.push(change);
+    } else if (change._op === "delete") {
+      pendingDeletes.add(change.id);
     }
   }
 
-  // Add remaining synced cards (no local changes)
-  for (const syncedCard of syncedMap.values()) {
-    result.push(syncedCard);
+  // Sort updates by timestamp for each ID
+  for (const updates of pendingUpdates.values()) {
+    updates.sort((a, b) => a._timestamp - b._timestamp);
+  }
+
+  const result: MergedCard[] = [];
+  const processedIds = new Set<string>();
+  const syncedMap = new Map(synced.map((c) => [c.id, c]));
+
+  // Phase 2: Process pending inserts (may have updates on top)
+  for (const [id, insert] of pendingInserts) {
+    if (pendingDeletes.has(id)) continue; // Deleted before sync
+
+    processedIds.add(id);
+    let mergedCard: MergedCard = {
+      ...(insert.data as Card),
+      _local: {
+        op: "insert",
+        status: insert._status,
+        timestamp: insert._timestamp,
+      },
+    };
+
+    // Apply any updates that came after insert
+    const updates = pendingUpdates.get(id);
+    if (updates) {
+      for (const update of updates) {
+        mergedCard = {
+          ...mergedCard,
+          ...update.data,
+          _local: {
+            op: "update",
+            status: update._status,
+            timestamp: update._timestamp,
+          },
+        };
+      }
+    }
+
+    result.push(mergedCard);
+  }
+
+  // Phase 3: Process synced items with updates
+  for (const [id, updates] of pendingUpdates) {
+    if (processedIds.has(id)) continue; // Already processed as insert
+    if (pendingDeletes.has(id)) continue; // Deleted
+
+    const syncedItem = syncedMap.get(id);
+    if (syncedItem) {
+      processedIds.add(id);
+      let mergedCard: MergedCard = { ...syncedItem };
+
+      // Apply ALL updates sequentially
+      for (const update of updates) {
+        mergedCard = {
+          ...mergedCard,
+          ...update.data,
+          _local: {
+            op: "update",
+            status: update._status,
+            timestamp: update._timestamp,
+          },
+        };
+      }
+
+      result.push(mergedCard);
+    }
+  }
+
+  // Phase 4: Add synced items without local changes
+  for (const syncedItem of synced) {
+    if (processedIds.has(syncedItem.id)) continue; // Already processed
+    if (pendingDeletes.has(syncedItem.id)) continue; // Deleted locally
+
+    result.push(syncedItem);
   }
 
   return result;
@@ -75,9 +136,14 @@ export async function mergeCards(
  * Get all merged cards (synced + local)
  */
 export async function getAllMergedCards(): Promise<MergedCard[]> {
-  const synced = await db.cards.toArray();
-  const local = await db.cards_local.toArray();
-  return mergeCards(synced, local);
+  try {
+    const synced = await db.cards.toArray();
+    const local = await db.cards_local.toArray();
+    return mergeCards(synced, local);
+  } catch (error) {
+    console.error("[getAllMergedCards] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -86,17 +152,22 @@ export async function getAllMergedCards(): Promise<MergedCard[]> {
 export async function getMergedCard(
   id: string
 ): Promise<MergedCard | undefined> {
-  const synced = await db.cards.get(id);
-  const local = await db.cards_local.where("id").equals(id).toArray();
+  try {
+    const synced = await db.cards.get(id);
+    const local = await db.cards_local.where("id").equals(id).toArray();
 
-  if (local.length === 0) {
-    return synced; // No local changes
+    if (local.length === 0) {
+      return synced; // No local changes
+    }
+
+    // Apply local changes
+    const allCards = synced ? [synced] : [];
+    const merged = await mergeCards(allCards, local);
+    return merged[0];
+  } catch (error) {
+    console.error("[getMergedCard] Error:", error);
+    return undefined;
   }
-
-  // Apply local changes
-  const allCards = synced ? [synced] : [];
-  const merged = await mergeCards(allCards, local);
-  return merged[0];
 }
 
 /**
@@ -105,11 +176,16 @@ export async function getMergedCard(
 export async function getMergedCardsByDoc(
   sha256: string
 ): Promise<MergedCard[]> {
-  const synced = await db.cards.where("sha256").equals(sha256).toArray();
-  const local = await db.cards_local.toArray();
-  const merged = await mergeCards(synced, local);
-  // Filter to this document only
-  return merged.filter((c) => c.sha256 === sha256);
+  try {
+    const synced = await db.cards.where("sha256").equals(sha256).toArray();
+    const local = await db.cards_local.toArray();
+    const merged = await mergeCards(synced, local);
+    // Filter to this document only
+    return merged.filter((c) => c.sha256 === sha256);
+  } catch (error) {
+    console.error("[getMergedCardsByDoc] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -118,23 +194,33 @@ export async function getMergedCardsByDoc(
 export async function getMergedCardsByAnnotation(
   annotationId: string
 ): Promise<MergedCard[]> {
-  const synced = await db.cards
-    .where("annotation_id")
-    .equals(annotationId)
-    .toArray();
-  const local = await db.cards_local.toArray();
-  const merged = await mergeCards(synced, local);
-  // Filter to this annotation only
-  return merged.filter((c) => c.annotation_id === annotationId);
+  try {
+    const synced = await db.cards
+      .where("annotation_id")
+      .equals(annotationId)
+      .toArray();
+    const local = await db.cards_local.toArray();
+    const merged = await mergeCards(synced, local);
+    // Filter to this annotation only
+    return merged.filter((c) => c.annotation_id === annotationId);
+  } catch (error) {
+    console.error("[getMergedCardsByAnnotation] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
  * Get merged cards that are due for review
  */
 export async function getMergedDueCards(nowMs: number): Promise<MergedCard[]> {
-  const synced = await db.cards.where("due").belowOrEqual(nowMs).toArray();
-  const local = await db.cards_local.toArray();
-  const merged = await mergeCards(synced, local);
-  // Filter to due cards only
-  return merged.filter((c) => c.due <= nowMs);
+  try {
+    const synced = await db.cards.where("due").belowOrEqual(nowMs).toArray();
+    const local = await db.cards_local.toArray();
+    const merged = await mergeCards(synced, local);
+    // Filter to due cards only
+    return merged.filter((c) => c.due <= nowMs);
+  } catch (error) {
+    console.error("[getMergedDueCards] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }

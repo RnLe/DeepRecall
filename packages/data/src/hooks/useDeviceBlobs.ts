@@ -47,23 +47,29 @@ async function syncElectricToDexie(electricData: DeviceBlob[]): Promise<void> {
 export function useDeviceBlobs() {
   const electricResult = useShape<DeviceBlob>({ table: "device_blobs" });
 
-  // Sync Electric → Dexie (critical: sync even when empty!)
+  // CRITICAL: Check isLoading to prevent cache clearing on page reload
+  // Sync Electric → Dexie only after initial load completes
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error("[Electric→Dexie] Failed to sync device_blobs:", error);
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   // Return merged data from Dexie (persists across navigation)
   return useQuery({
     queryKey: ["device-blobs", "merged"],
     queryFn: async () => {
-      const data = await db.deviceBlobs.toArray();
-      return data;
+      try {
+        const data = await db.deviceBlobs.toArray();
+        return data;
+      } catch (error) {
+        console.error("[useDeviceBlobs] Error:", error);
+        return []; // Always return array, never undefined
+      }
     },
-    initialData: [],
+    placeholderData: [], // Prevent hydration mismatch
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: false,

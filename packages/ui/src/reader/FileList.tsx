@@ -168,9 +168,9 @@ function FileListItem({
   const title = work?.title || asset.filename || "Untitled";
   const isLinked = !!work;
 
-  // Format file size
+  // Format file size (convert BigInt to Number for calculation)
   const fileSize = asset.bytes
-    ? `${(asset.bytes / 1024 / 1024).toFixed(1)} MB`
+    ? `${(Number(asset.bytes) / 1024 / 1024).toFixed(1)} MB`
     : undefined;
 
   return (

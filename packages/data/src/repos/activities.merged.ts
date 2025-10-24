@@ -34,6 +34,9 @@ export interface MergedActivity extends Activity {
 /**
  * Merge synced activities with local pending changes
  *
+ * CRITICAL: Collects ALL updates per ID and applies sequentially (Pattern 2)
+ * Fixes bug where only last update was applied before sync
+ *
  * @param synced - Activities from Electric (source of truth after sync)
  * @param local - Pending local changes from Dexie
  * @returns Merged array with local changes applied
@@ -42,80 +45,104 @@ export function mergeActivities(
   synced: Activity[],
   local: LocalActivityChange[]
 ): MergedActivity[] {
-  // Index local changes by activity ID for O(1) lookup
-  const localByActivityId = new Map<string, LocalActivityChange>();
+  // Phase 1: Collect changes by type and ID
+  const pendingInserts = new Map<string, LocalActivityChange>();
+  const pendingUpdates = new Map<string, LocalActivityChange[]>(); // Array to collect ALL updates
+  const pendingDeletes = new Set<string>();
+
   for (const change of local) {
-    // Keep latest change per activity (highest timestamp)
-    const existing = localByActivityId.get(change.id);
-    if (!existing || change._timestamp > existing._timestamp) {
-      localByActivityId.set(change.id, change);
+    if (change._op === "insert") {
+      // Keep latest insert per ID (shouldn't have multiple, but just in case)
+      const existing = pendingInserts.get(change.id);
+      if (!existing || change._timestamp > existing._timestamp) {
+        pendingInserts.set(change.id, change);
+      }
+    } else if (change._op === "update") {
+      // Collect ALL updates per ID (not just latest)
+      if (!pendingUpdates.has(change.id)) {
+        pendingUpdates.set(change.id, []);
+      }
+      pendingUpdates.get(change.id)!.push(change);
+    } else if (change._op === "delete") {
+      pendingDeletes.add(change.id);
     }
+  }
+
+  // Sort updates by timestamp for each ID
+  for (const updates of pendingUpdates.values()) {
+    updates.sort((a, b) => a._timestamp - b._timestamp);
   }
 
   const merged: MergedActivity[] = [];
   const processedIds = new Set<string>();
+  const syncedMap = new Map(synced.map((a) => [a.id, a]));
 
-  // 1. Apply local changes to synced activities
-  for (const syncedActivity of synced) {
-    const localChange = localByActivityId.get(syncedActivity.id);
-    processedIds.add(syncedActivity.id);
+  // Phase 2: Process pending inserts (may have updates on top)
+  for (const [id, insert] of pendingInserts) {
+    if (pendingDeletes.has(id)) continue; // Deleted before sync
 
-    if (!localChange) {
-      // No local changes - use synced data as-is
-      merged.push(syncedActivity);
-      continue;
-    }
+    processedIds.add(id);
+    let mergedActivity: MergedActivity = {
+      ...(insert.data as Activity), // Assert data exists for insert
+      _local: {
+        status: insert._status,
+        timestamp: insert._timestamp,
+        error: insert._error,
+      },
+    };
 
-    // Apply local change based on operation
-    switch (localChange._op) {
-      case "delete":
-        // Local delete - filter out from merged results (silent)
-        break;
-
-      case "update":
-        // Local update - merge local changes into synced data
-        const updatedActivity: MergedActivity = {
-          ...syncedActivity,
-          ...localChange.data, // Local changes override
+    // Apply any updates that came after insert
+    const updates = pendingUpdates.get(id);
+    if (updates) {
+      for (const update of updates) {
+        mergedActivity = {
+          ...mergedActivity,
+          ...update.data,
           _local: {
-            status: localChange._status,
-            timestamp: localChange._timestamp,
-            error: localChange._error,
+            status: update._status,
+            timestamp: update._timestamp,
+            error: update._error,
           },
         };
-        merged.push(updatedActivity);
-        break;
+      }
+    }
 
-      case "insert":
-        // Conflict: both local insert and synced data exist
-        // This means sync completed - prefer synced data but mark as synced
-        merged.push({
-          ...syncedActivity,
+    merged.push(mergedActivity);
+  }
+
+  // Phase 3: Process synced items with updates
+  for (const [id, updates] of pendingUpdates) {
+    if (processedIds.has(id)) continue; // Already processed as insert
+    if (pendingDeletes.has(id)) continue; // Deleted
+
+    const syncedItem = syncedMap.get(id);
+    if (syncedItem) {
+      processedIds.add(id);
+      let mergedActivity: MergedActivity = { ...syncedItem };
+
+      // Apply ALL updates sequentially
+      for (const update of updates) {
+        mergedActivity = {
+          ...mergedActivity,
+          ...update.data,
           _local: {
-            status: "synced" as const,
-            timestamp: localChange._timestamp,
+            status: update._status,
+            timestamp: update._timestamp,
+            error: update._error,
           },
-        });
-        break;
+        };
+      }
+
+      merged.push(mergedActivity);
     }
   }
 
-  // 2. Add local inserts that haven't synced yet
-  for (const [activityId, localChange] of localByActivityId) {
-    if (processedIds.has(activityId)) continue; // Already processed above
+  // Phase 4: Add synced items without local changes
+  for (const syncedItem of synced) {
+    if (processedIds.has(syncedItem.id)) continue; // Already processed
+    if (pendingDeletes.has(syncedItem.id)) continue; // Deleted locally
 
-    if (localChange._op === "insert" && localChange.data) {
-      // Local insert pending sync - show in UI immediately
-      const pendingActivity: MergedActivity = {
-        ...localChange.data,
-        _local: {
-          status: localChange._status,
-          timestamp: localChange._timestamp,
-          error: localChange._error,
-        },
-      };
-      merged.push(pendingActivity);
-    }
+    merged.push(syncedItem);
   }
 
   return merged;
@@ -127,35 +154,45 @@ export function mergeActivities(
 export async function getMergedActivity(
   id: string
 ): Promise<MergedActivity | undefined> {
-  // Get synced activity
-  const synced = await db.activities.get(id);
+  try {
+    // Get synced activity
+    const synced = await db.activities.get(id);
 
-  // Get local changes for this activity
-  const localChanges = await db.activities_local
-    .where("id")
-    .equals(id)
-    .toArray();
+    // Get local changes for this activity
+    const localChanges = await db.activities_local
+      .where("id")
+      .equals(id)
+      .toArray();
 
-  if (!synced && localChanges.length === 0) {
+    if (!synced && localChanges.length === 0) {
+      return undefined;
+    }
+
+    // Merge single activity
+    const merged = mergeActivities(synced ? [synced] : [], localChanges);
+
+    return merged[0];
+  } catch (error) {
+    console.error("[getMergedActivity] Error:", error);
     return undefined;
   }
-
-  // Merge single activity
-  const merged = mergeActivities(synced ? [synced] : [], localChanges);
-
-  return merged[0];
 }
 
 /**
  * Get all merged activities
  */
 export async function getAllMergedActivities(): Promise<MergedActivity[]> {
-  const [synced, local] = await Promise.all([
-    db.activities.toArray(),
-    db.activities_local.toArray(),
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.activities.toArray(),
+      db.activities_local.toArray(),
+    ]);
 
-  return mergeActivities(synced, local);
+    return mergeActivities(synced, local);
+  } catch (error) {
+    console.error("[getAllMergedActivities] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -164,14 +201,19 @@ export async function getAllMergedActivities(): Promise<MergedActivity[]> {
 export async function getMergedActivitiesByType(
   activityType: string
 ): Promise<MergedActivity[]> {
-  const [synced, local] = await Promise.all([
-    db.activities.where("activityType").equals(activityType).toArray(),
-    db.activities_local.toArray(), // Get all local changes (filter during merge)
-  ]);
+  try {
+    const [synced, local] = await Promise.all([
+      db.activities.where("activityType").equals(activityType).toArray(),
+      db.activities_local.toArray(), // Get all local changes (filter during merge)
+    ]);
 
-  // Merge all, then filter (in case local change modifies activityType)
-  const merged = mergeActivities(synced, local);
-  return merged.filter((a) => a.activityType === activityType);
+    // Merge all, then filter (in case local change modifies activityType)
+    const merged = mergeActivities(synced, local);
+    return merged.filter((a) => a.activityType === activityType);
+  } catch (error) {
+    console.error("[getMergedActivitiesByType] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -180,12 +222,17 @@ export async function getMergedActivitiesByType(
 export async function searchMergedActivitiesByTitle(
   query: string
 ): Promise<MergedActivity[]> {
-  const allActivities = await getAllMergedActivities();
-  const lowerQuery = query.toLowerCase();
+  try {
+    const allActivities = await getAllMergedActivities();
+    const lowerQuery = query.toLowerCase();
 
-  return allActivities.filter((a) =>
-    a.title.toLowerCase().includes(lowerQuery)
-  );
+    return allActivities.filter((a) =>
+      a.title.toLowerCase().includes(lowerQuery)
+    );
+  } catch (error) {
+    console.error("[searchMergedActivitiesByTitle] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }
 
 /**
@@ -195,15 +242,20 @@ export async function getMergedActivitiesInRange(
   startDate: string,
   endDate: string
 ): Promise<MergedActivity[]> {
-  const allActivities = await getAllMergedActivities();
+  try {
+    const allActivities = await getAllMergedActivities();
 
-  return allActivities.filter((a) => {
-    // Include if activity overlaps with date range
-    if (!a.startsAt && !a.endsAt) return false;
+    return allActivities.filter((a) => {
+      // Include if activity overlaps with date range
+      if (!a.startsAt && !a.endsAt) return false;
 
-    const activityStart = a.startsAt || startDate;
-    const activityEnd = a.endsAt || endDate;
+      const activityStart = a.startsAt || startDate;
+      const activityEnd = a.endsAt || endDate;
 
-    return activityStart <= endDate && activityEnd >= startDate;
-  });
+      return activityStart <= endDate && activityEnd >= startDate;
+    });
+  } catch (error) {
+    console.error("[getMergedActivitiesInRange] Error:", error);
+    return []; // Always return array, never undefined
+  }
 }

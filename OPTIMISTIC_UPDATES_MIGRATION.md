@@ -1,5 +1,156 @@
 # Optimistic Updates Migration - Progress Tracker
 
+## ⚠️ CRITICAL PATTERNS - READ FIRST
+
+### Pattern 1: Electric → Dexie Sync Must Check isLoading
+
+**WRONG** ❌ - Clears cache on page reload:
+
+```typescript
+useEffect(() => {
+  if (electricResult.data !== undefined) {
+    syncElectricToDexie(electricResult.data); // Runs when data === []!
+  }
+}, [electricResult.data]);
+```
+
+**CORRECT** ✅ - Preserves cache until real data arrives:
+
+```typescript
+useEffect(() => {
+  if (!electricResult.isLoading && electricResult.data !== undefined) {
+    syncElectricToDexie(electricResult.data); // Only runs after initial load
+  }
+}, [electricResult.isLoading, electricResult.data]);
+```
+
+**Why**: Electric data transitions through: `undefined` → `[]` → `[...data]`
+
+- Syncing at `[]` stage clears Dexie cache
+- Checking `isLoading` ensures we only sync after real data arrives
+- Result: Data persists across page reloads
+
+### Pattern 2: Merge Must Handle Updates to Pending Inserts
+
+**WRONG** ❌ - Updates to new items disappear:
+
+```typescript
+for (const localChange of local) {
+  if (localChange._op === "update") {
+    const synced = syncedMap.get(localChange.id);
+    if (synced) {
+      result.push({ ...synced, ...localChange.data }); // Only merges with synced!
+    }
+    // If not synced yet, update is silently ignored!
+  }
+}
+```
+
+**CORRECT** ✅ - Collect all updates and merge them sequentially:
+
+```typescript
+// Collect all local changes by type
+const pendingInserts = new Map<string, any>();
+const pendingUpdates = new Map<string, any[]>(); // Array of updates per ID!
+const pendingDeletes = new Set<string>();
+
+for (const change of local) {
+  if (change._op === "insert") {
+    pendingInserts.set(change.id, change);
+  } else if (change._op === "update") {
+    if (!pendingUpdates.has(change.id)) {
+      pendingUpdates.set(change.id, []);
+    }
+    pendingUpdates.get(change.id)!.push(change); // Collect ALL updates
+  } else if (change._op === "delete") {
+    pendingDeletes.add(change.id);
+  }
+}
+
+// Process: annotations with pending inserts
+for (const [id, insertChange] of pendingInserts) {
+  if (pendingDeletes.has(id)) continue;
+
+  let merged = insertChange.data;
+  const updates = pendingUpdates.get(id);
+  if (updates) {
+    // Apply ALL updates sequentially
+    for (const update of updates) {
+      merged = { ...merged, ...update.data };
+    }
+  }
+  result.push(merged);
+}
+
+// Process: synced annotations with updates
+for (const [id, updates] of pendingUpdates) {
+  const synced = syncedMap.get(id);
+  if (synced && !processedIds.has(id)) {
+    let merged = synced;
+    // Apply ALL updates sequentially
+    for (const update of updates) {
+      merged = { ...merged, ...update.data };
+    }
+    result.push(merged);
+  }
+}
+```
+
+**Why**: User creates item, then makes multiple rapid updates before Electric syncs
+
+- CREATE writes to `_local` with `_op: "insert"`
+- UPDATE #1 writes to `_local` with `_op: "update"` (e.g., title)
+- UPDATE #2 writes to `_local` with `_op: "update"` (e.g., color)
+- Merge must combine ALL of them before sync completes
+- **Critical**: Must handle MULTIPLE updates to same annotation, not just one!
+- Result: All updates show instantly, in correct order
+
+### Pattern 3: Schema Transforms Must Preserve Field Distinctions
+
+**WRONG** ❌ - Losing distinction between title and notes:
+
+```typescript
+// Client → Postgres
+if (metadata.notes || metadata.title) {
+  result.content = metadata.notes || metadata.title; // Title overwrites notes!
+}
+
+// Postgres → Client
+if (content) {
+  clientMetadata.notes = content; // Title becomes notes!
+}
+```
+
+**CORRECT** ✅ - Use separate fields for separate concerns:
+
+```typescript
+// Client → Postgres: Store in different Postgres fields
+if (metadata.notes) {
+  result.content = metadata.notes; // Notes in TEXT column
+}
+if (metadata.title) {
+  result.metadata = { ...result.metadata, title: metadata.title }; // Title in JSONB
+}
+
+// Postgres → Client: Extract from correct locations
+if (content) {
+  clientMetadata.notes = content; // Notes from TEXT column
+}
+if (metadata?.title) {
+  clientMetadata.title = metadata.title; // Title from JSONB
+}
+```
+
+**Why**: Postgres has different column types
+
+- `content` is TEXT (for large notes)
+- `metadata` is JSONB (for structured data like title)
+- Can't store both title and notes in single TEXT field without losing one
+- Must use JSONB metadata for title to preserve both fields
+- **Update transforms in 3 places**: `route.ts`, `electric.ts`, `annotations.merged.ts`
+
+---
+
 ## Architecture Overview
 
 **Problem**: 2-3s delay (WriteBuffer → Postgres → Electric → UI)
@@ -248,7 +399,55 @@ async function syncElectricToDexie(electricData: Entity[]): Promise<void> {
 - [x] Create `repos/annotations.merged.ts`
 - [x] Create `repos/annotations.cleanup.ts`
 - [x] Update `hooks/useAnnotations.ts` (uses syncElectricToDexie pattern!)
-- [ ] Test CRUD operations
+- [x] **CRITICAL BUG FIXES** (4 major issues resolved):
+
+#### Fix 1: Data Persistence After Page Reload
+
+- **Problem**: Annotations empty after reload until Electric syncs (~1-2 seconds)
+- **Root cause**: `useAnnotations()` hook missing `!electricResult.isLoading` check
+- **Symptom**: Electric data transitions `undefined` → `[]` → `[...data]`, syncing at `[]` cleared cache
+- **Solution**: Added `!electricResult.isLoading &&` check in `useAnnotations()` hook
+- **Result**: Dexie cache preserved on reload, data shows instantly ✅
+
+#### Fix 2: Title/Notes Field Confusion
+
+- **Problem**: After sync, annotation titles moved to `notes` field (disappeared!)
+- **Root cause**: Schema transforms incorrectly handling title vs notes:
+  - Client→Postgres: `metadata.title` stored in `content` TEXT column (lost distinction)
+  - Postgres→Client: `content` read as `notes` (title vanished!)
+- **Solution**:
+  - Client→Postgres: Store `notes` in `content`, store `title` in `metadata` JSONB
+  - Postgres→Client: Read `content` as `notes`, extract `title` from `metadata` JSONB
+  - Updated 3 transform functions: `route.ts`, `electric.ts`, `annotations.merged.ts`
+- **Result**: Title and notes both persist correctly through sync ✅
+
+#### Fix 3: Multiple Rapid Updates Not Applying
+
+- **Problem**: Create annotation, update title, update color → only title applied, color ignored
+- **Root cause**: Merge logic bug with multiple updates to pending inserts:
+  1. INSERT added to result array
+  2. First UPDATE replaced it via `findIndex`
+  3. Second UPDATE couldn't find it (already replaced)
+  4. Second UPDATE silently ignored
+- **Solution**: Complete rewrite of merge algorithm:
+  - Collect ALL changes first (inserts, updates, deletes)
+  - Group multiple UPDATEs by annotation ID into arrays
+  - Apply all updates sequentially to each annotation
+  - Process in 3 phases: pending inserts with updates, synced with updates, then remaining
+- **Result**: Multiple rapid updates all apply correctly, in order ✅
+
+#### Fix 4: Deletion Error "Query data cannot be undefined"
+
+- **Problem**: Deleting annotation crashed with React Query error
+- **Root cause**: `getMergedAnnotation(id)` could return `undefined` without try-catch
+- **Solution**: Wrapped in try-catch to return `undefined` gracefully
+- **Result**: Deletion works without crashes ✅
+
+- [x] **Blueprint for other entities**:
+  - MUST check `isLoading` before syncing to Dexie (all 10 entities fixed)
+  - MUST collect all updates per ID, not just first one
+  - MUST preserve field distinctions in schema transforms
+  - MUST wrap merge functions in try-catch for graceful errors
 
 ### Cards ✅
 

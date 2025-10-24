@@ -71,9 +71,9 @@ export function usePresets() {
   const electricResult = presetsElectric.usePresets();
 
   // Sync Electric data to Dexie presets table (for merge layer)
-  // CRITICAL: Must sync even when empty to clear stale data
+  // CRITICAL: Only sync after initial load to preserve cached data on page reload
   useEffect(() => {
-    if (electricResult.data !== undefined) {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
       // Replace entire Dexie presets table with Electric data
       // This ensures deletions are properly reflected
       syncElectricToDexie(electricResult.data).catch((error) => {
@@ -84,7 +84,7 @@ export function usePresets() {
         );
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   // Query merged data from Dexie
   const mergedQuery = useQuery({
@@ -96,15 +96,16 @@ export function usePresets() {
   });
 
   // Auto-cleanup and refresh when Electric data changes (synced)
+  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
   useEffect(() => {
-    if (electricResult.data) {
+    if (!electricResult.isLoading && electricResult.data) {
       // Cleanup confirmed syncs
       presetsCleanup.cleanupSyncedPresets(electricResult.data).then(() => {
         // Refresh merged view after cleanup
         mergedQuery.refetch();
       });
     }
-  }, [electricResult.data]);
+  }, [electricResult.isLoading, electricResult.data]);
 
   return {
     ...mergedQuery,
@@ -118,6 +119,16 @@ export function usePresets() {
 export function usePreset(id: string | undefined) {
   const electricResult = presetsElectric.usePreset(id);
 
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (!electricResult.isLoading && electricResult.data !== undefined && id) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error("[usePreset] Failed to sync Electric data:", error);
+      });
+    }
+  }, [electricResult.isLoading, electricResult.data, id]);
+
   const mergedQuery = useQuery({
     queryKey: ["presets", "merged", id],
     queryFn: async () => {
@@ -128,12 +139,6 @@ export function usePreset(id: string | undefined) {
     staleTime: 0,
   });
 
-  useEffect(() => {
-    if (electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, id]);
-
   return mergedQuery;
 }
 
@@ -143,6 +148,16 @@ export function usePreset(id: string | undefined) {
 export function usePresetsForTarget(targetEntity: PresetTarget) {
   const electricResult = presetsElectric.usePresetsForTarget(targetEntity);
 
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error("[usePresetsForTarget] Failed to sync:", error);
+      });
+    }
+  }, [electricResult.isLoading, electricResult.data]);
+
   const mergedQuery = useQuery({
     queryKey: ["presets", "merged", "target", targetEntity],
     queryFn: async () => {
@@ -150,12 +165,6 @@ export function usePresetsForTarget(targetEntity: PresetTarget) {
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
 
   return mergedQuery;
 }
@@ -166,6 +175,16 @@ export function usePresetsForTarget(targetEntity: PresetTarget) {
 export function useSystemPresets() {
   const electricResult = presetsElectric.useSystemPresets();
 
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error("[useSystemPresets] Failed to sync:", error);
+      });
+    }
+  }, [electricResult.isLoading, electricResult.data]);
+
   const mergedQuery = useQuery({
     queryKey: ["presets", "merged", "system"],
     queryFn: async () => {
@@ -173,12 +192,6 @@ export function useSystemPresets() {
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
 
   return mergedQuery;
 }

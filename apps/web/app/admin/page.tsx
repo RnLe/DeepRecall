@@ -85,8 +85,83 @@ export default function AdminPage() {
     },
 
     clearDatabase: async (): Promise<void> => {
+      // Step 1: Clear Dexie first (optimistic - instant UI update)
+      console.log("Clearing local Dexie database (optimistic)...");
+      const { db } = await import("@deeprecall/data/db");
+
+      await db.transaction(
+        "rw",
+        [
+          db.works,
+          db.assets,
+          db.activities,
+          db.collections,
+          db.edges,
+          db.presets,
+          db.authors,
+          db.annotations,
+          db.cards,
+          db.reviewLogs,
+          db.blobsMeta,
+          db.deviceBlobs,
+          // Clear local tables too
+          db.works_local,
+          db.assets_local,
+          db.activities_local,
+          db.collections_local,
+          db.edges_local,
+          db.presets_local,
+          db.authors_local,
+          db.annotations_local,
+          db.cards_local,
+          db.reviewLogs_local,
+        ],
+        async () => {
+          await Promise.all([
+            db.works.clear(),
+            db.assets.clear(),
+            db.activities.clear(),
+            db.collections.clear(),
+            db.edges.clear(),
+            db.presets.clear(),
+            db.authors.clear(),
+            db.annotations.clear(),
+            db.cards.clear(),
+            db.reviewLogs.clear(),
+            db.blobsMeta.clear(),
+            db.deviceBlobs.clear(),
+            // Clear all local tables
+            db.works_local.clear(),
+            db.assets_local.clear(),
+            db.activities_local.clear(),
+            db.collections_local.clear(),
+            db.edges_local.clear(),
+            db.presets_local.clear(),
+            db.authors_local.clear(),
+            db.annotations_local.clear(),
+            db.cards_local.clear(),
+            db.reviewLogs_local.clear(),
+          ]);
+        }
+      );
+
+      console.log("✅ Dexie cleared");
+
+      // Step 2: Invalidate React Query to show empty state
+      queryClient.clear();
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["blobs"] }),
+        queryClient.refetchQueries({ queryKey: ["blobs-meta"] }),
+        queryClient.refetchQueries({ queryKey: ["device-blobs"] }),
+      ]);
+
+      console.log("✅ React Query cleared");
+
+      // Step 3: Clear Postgres (background confirmation)
       const response = await fetch("/api/admin/database", { method: "DELETE" });
       if (!response.ok) throw new Error("Clear failed");
+
+      console.log("✅ Postgres cleared");
     },
 
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
@@ -99,7 +174,22 @@ export default function AdminPage() {
         if (!response.ok) throw new Error("Sync failed");
         const result = await response.json();
 
-        // Electric hooks will reactively update when new data arrives
+        // Invalidate Electric queries to trigger refetch
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["blobs-meta"] }),
+          queryClient.invalidateQueries({ queryKey: ["device-blobs"] }),
+        ]);
+
+        // Wait a bit for Electric to sync to Dexie
+        // Electric syncs in background, give it time to propagate
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Force refetch to show updated data
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ["blobs-meta"] }),
+          queryClient.refetchQueries({ queryKey: ["device-blobs"] }),
+        ]);
+
         return result;
       } finally {
         setIsSyncing(false);

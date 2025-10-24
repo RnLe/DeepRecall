@@ -6,7 +6,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,9 +34,8 @@ import { CreateNoteDialog } from "./_components/CreateNoteDialog";
 // ========================================
 // PLATFORM HOOKS & UTILITIES
 // ========================================
-import { db } from "@deeprecall/data/db";
 import { usePDF, usePDFViewport } from "@deeprecall/pdf/hooks";
-import * as annotationRepo from "@deeprecall/data/repos/annotations";
+import { usePDFAnnotations, useCreateAnnotation } from "@deeprecall/data/hooks";
 import {
   useAnnotationUI,
   hasActiveSelection,
@@ -70,9 +68,9 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
   // Annotation state
   const annotationUI = useAnnotationUI();
   const { rightSidebarOpen, toggleRightSidebar } = useReaderUI();
-  const [pageAnnotations, setPageAnnotations] = useState<
-    Map<number, Annotation[]>
-  >(new Map());
+
+  // Mutation hooks for creating annotations
+  const createAnnotation = useCreateAnnotation();
 
   // Track page dimensions (unscaled) for viewport calculations
   const [pageHeights, setPageHeights] = useState<number[]>([]);
@@ -102,30 +100,20 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
 
   const viewport = usePDFViewport(numPages, pageHeights, 2);
 
-  // Live annotations for visible pages - updates immediately on Dexie changes
-  const liveAnnotationsByPage = useLiveQuery(async () => {
+  // Use optimistic annotations hook (merged layer: synced + local)
+  const { data: allAnnotations = [], isLoading: annotationsLoading } =
+    usePDFAnnotations(sha256);
+
+  // Group annotations by page for rendering
+  const pageAnnotations = useMemo(() => {
     const map = new Map<number, Annotation[]>();
-    for (const pageNum of viewport.visiblePages) {
-      const arr = await db.annotations
-        .where("[sha256+page]")
-        .equals([sha256, pageNum])
-        .sortBy("createdAt");
-      if (arr.length > 0) map.set(pageNum, arr);
+    for (const ann of allAnnotations) {
+      const existing = map.get(ann.page) || [];
+      existing.push(ann);
+      map.set(ann.page, existing);
     }
     return map;
-  }, [sha256, viewport.visiblePages]);
-
-  // Live query for ALL annotations in document (for scrollbar)
-  const allAnnotations = useLiveQuery(async () => {
-    return await db.annotations.where("sha256").equals(sha256).sortBy("page");
-  }, [sha256]);
-
-  // Update local state when live annotations change
-  useEffect(() => {
-    if (liveAnnotationsByPage) {
-      setPageAnnotations(liveAnnotationsByPage);
-    }
-  }, [liveAnnotationsByPage]);
+  }, [allAnnotations]);
 
   // Keep input in sync with current page
   useEffect(() => {
@@ -258,7 +246,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
     try {
       if (selection.rectangles.length > 0) {
         // Rectangle annotation
-        await annotationRepo.createAnnotation({
+        await createAnnotation.mutateAsync({
           sha256,
           page: selection.page,
           data: {
@@ -275,7 +263,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
         });
       } else if (selection.textRanges.length > 0) {
         // Highlight annotation
-        await annotationRepo.createAnnotation({
+        await createAnnotation.mutateAsync({
           sha256,
           page: selection.page,
           data: {
@@ -291,16 +279,8 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
         });
       }
 
-      // Reload annotations for the page
-      const annotations = await annotationRepo.getPageAnnotations(
-        sha256,
-        selection.page
-      );
-      setPageAnnotations((prev) => {
-        const next = new Map(prev);
-        next.set(selection.page!, annotations);
-        return next;
-      });
+      // Annotations will auto-update via usePDFAnnotations hook
+      // No need to manually reload
 
       // Clear selection
       annotationUI.clearSelection();
@@ -310,7 +290,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
     } catch (error) {
       console.error("Failed to save annotation:", error);
     }
-  }, [sha256, annotationUI]);
+  }, [sha256, annotationUI, createAnnotation]);
 
   // Cancel annotation
   const handleCancelAnnotation = useCallback(() => {
@@ -713,7 +693,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
                         <AnnotationOverlay
                           sha256={sha256}
                           page={pageNumber}
-                          annotations={annotations}
+                          annotations={pageAnnotations.get(pageNumber) || []}
                           pageWidth={pageWidth}
                           pageHeight={pageHeight}
                           tool={annotationUI.tool}
