@@ -6,6 +6,32 @@
 // Import pdfjs-dist types only (not runtime code to avoid SSR DOMMatrix error)
 import type * as pdfjsLibType from "pdfjs-dist";
 
+// Configurable worker path (platform-specific)
+let workerPath = "/pdf.worker.min.mjs"; // Default for Web
+
+/**
+ * Configure PDF.js worker path for platform-specific asset loading
+ * @param path - Worker URL (e.g., '/pdf.worker.min.mjs', 'tauri://localhost/pdf.worker.min.mjs')
+ *
+ * @example
+ * // Web (Next.js)
+ * configurePdfWorker('/pdf.worker.min.mjs');
+ *
+ * // Desktop (Tauri)
+ * configurePdfWorker('tauri://localhost/pdf.worker.min.mjs');
+ *
+ * // Mobile (Capacitor)
+ * configurePdfWorker('capacitor://localhost/pdf.worker.min.mjs');
+ */
+export function configurePdfWorker(path: string): void {
+  workerPath = path;
+
+  // Update existing instance if already loaded
+  if (pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = path;
+  }
+}
+
 // Lazy-load pdfjs-dist on client side only
 let pdfjsLib: typeof pdfjsLibType | null = null;
 
@@ -13,7 +39,7 @@ if (typeof window !== "undefined") {
   import("pdfjs-dist").then((lib) => {
     pdfjsLib = lib;
     // Configure worker - critical for performance
-    lib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
+    lib.GlobalWorkerOptions.workerSrc = workerPath;
     // Expose library globally so pdfjs-dist/web helpers can access it
     (globalThis as any).pdfjsLib = lib;
   });

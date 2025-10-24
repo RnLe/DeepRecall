@@ -48,10 +48,12 @@ export function PDFTextLayer({
       setIsReady(false);
 
       try {
+        // Note: Worker path is configured via configurePdfWorker() in @deeprecall/pdf
+        // This ensures pdfjsLib is loaded and configured by packages/pdf
         if (!(globalThis as any).pdfjsLib) {
           const lib = (await import("pdfjs-dist")) as any;
           if (cancelled) return;
-          lib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
+          // Worker is already configured by @deeprecall/pdf initialization
           (globalThis as any).pdfjsLib = lib;
         }
 

@@ -86,7 +86,7 @@ Core operations: `has()`, `stat()`, `put()`, `delete()`, `list()`, `getUrl()`
   - [x] Add `replication_jobs` table (id PK, sha256, from_source, to_destination, status, progress)
   - [x] Created `migrations/002_blob_coordination.sql`
   - [x] Added foreign keys and indexes
-  - [ ] Run migration in Postgres (pending deployment)
+  - [x] Run migration in Postgres (pending deployment)
 
 - [x] **Create Zod schemas**
   - [x] Added `BlobMetaSchema` in `packages/core/src/schemas/blobs.ts`
@@ -177,18 +177,92 @@ Core operations: `has()`, `stat()`, `put()`, `delete()`, `list()`, `getUrl()`
   - [x] Delete and rename operations update both layers
   - [x] No UI regression - all features preserved
   - [x] Fixed client-side navigation issue - Electric data now persists via React Query cache
+  - [x] **Updated to use CAS adapter directly** via `useWebBlobStorage()` + React Query
 
-- [ ] **Library page**
+- [x] **Library page components**
+  - [x] `OrphanedBlobs.tsx` - Updated to use `useOrphanedBlobs(cas)` from `@deeprecall/data`
+  - [x] `LibraryLeftSidebar.tsx` - Updated to use `useOrphanedBlobs(cas)` from `@deeprecall/data`
+  - [x] `LibraryHeader.tsx` - Updated to use `useBlobStats(cas)` from `@deeprecall/data`
+  - [x] All components now pass platform-specific CAS adapter to platform-agnostic hooks
+
+- [x] **Hook cleanup and migration**
+  - [x] Deleted `apps/web/src/hooks/useBlobs.ts` (redundant, all functionality moved)
+  - [x] Created `packages/data/src/hooks/useLibrary.ts` (bridge layer hooks)
+  - [x] Extended `packages/data/src/hooks/useAssets.ts` with asset-specific queries:
+    - `useUnlinkedAssets()` - Assets without workId or edges
+    - `useDuplicateAssets()` - Multiple assets with same SHA-256
+  - [x] Only `useWebBlobStorage()` remains in web hooks (platform-specific singleton)
+  - [x] Bridge hooks now platform-agnostic by accepting `BlobCAS` parameter
+
+- [ ] **Future improvements**
   - [ ] Fix work card thumbnails (verify blob availability)
   - [ ] Update PDF preview to check CAS before loading
   - [ ] Add "Available on X devices" indicator
 
-- [ ] **FileInbox component**
-  - [x] Already hoisted and platform-agnostic
-  - [ ] Verify CAS adapter integration works
-  - [ ] Test upload creates both CAS blob and Electric entries
+### Phase 5: Architecture Complete ✅
 
-### Phase 5: Cloud Sync (Future)
+**Final Clean Structure:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                             │
+│  apps/web/app/library/page.tsx, apps/web/app/admin/page.tsx     │
+│                                                                   │
+│  const cas = useWebBlobStorage();  // Platform-specific          │
+│  const orphans = useOrphanedBlobs(cas);  // Platform-agnostic!   │
+└─────────────────────────────────────────────────────────────────┘
+                                 ▲
+                                 │
+┌─────────────────────────────────────────────────────────────────┐
+│               BRIDGE LAYER (packages/data/hooks)                 │
+│  useLibrary.ts: Platform-agnostic by accepting CAS               │
+│                                                                   │
+│  • useOrphanedBlobs(cas: BlobCAS)                                │
+│  • useOrphanedAssets(cas: BlobCAS)                               │
+│  • useBlobStats(cas: BlobCAS)                                    │
+│                                                                   │
+│  useAssets.ts: Asset-specific queries (Electric only)            │
+│  • useUnlinkedAssets() - Assets without connections              │
+│  • useDuplicateAssets() - Multiple assets with same SHA          │
+└─────────────────────────────────────────────────────────────────┘
+                    ▲                            ▲
+                    │                            │
+       ┌────────────┴───────────┐    ┌──────────┴──────────┐
+       │                        │    │                     │
+┌──────▼─────────┐    ┌─────────▼────▼──────────┐
+│ LAYER 1: CAS   │    │ LAYER 2: ELECTRIC       │
+│ (Local Files)  │    │ (Metadata Sync)         │
+│                │    │                         │
+│ Platform-      │    │ • useBlobsMeta()        │
+│ specific:      │    │ • useDeviceBlobs()      │
+│ • Web:         │    │ • useAssets()           │
+│   useWebBlob   │    │ • useWorks()            │
+│   Storage()    │    │                         │
+└────────────────┘    └─────────────────────────┘
+```
+
+**Benefits Achieved:**
+
+1. ✅ **Clear separation**: Layer 1 (CAS) ↔ Layer 2 (Electric) ↔ Bridge Layer
+2. ✅ **Platform portability**: Bridge hooks accept CAS parameter (works on Web/Desktop/Mobile)
+3. ✅ **Minimal Web code**: Only 1 blob hook in `apps/web/src/hooks/` (`useBlobStorage.ts`)
+4. ✅ **Type safety**: CAS interface enforces contract across platforms
+5. ✅ **Testability**: Bridge layer can be tested with mock CAS
+6. ✅ **No duplication**: All shared logic in `@deeprecall/data`
+
+**Mental Model:**
+
+- **Layer 1 (CAS)**: "Where are the physical files on THIS device?"
+  - Platform-specific implementations (Web API routes, Tauri Rust, Capacitor FS)
+  - Interface: `BlobCAS` from `@deeprecall/blob-storage`
+- **Layer 2 (Electric)**: "What files exist ACROSS ALL devices?"
+  - Platform-agnostic metadata (small tables synced via Electric)
+  - Tables: `blobs_meta`, `device_blobs`, `replication_jobs`
+- **Bridge Layer**: "Combine both for useful queries"
+  - Platform-agnostic hooks that accept CAS adapter
+  - Examples: orphaned blobs, blob stats, availability checks
+
+### Phase 6: Cloud Sync (Future)
 
 - [ ] **Add cloud storage provider**
   - [ ] Create S3/MinIO CAS adapter

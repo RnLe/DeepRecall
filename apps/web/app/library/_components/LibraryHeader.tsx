@@ -9,7 +9,8 @@ import {
   LibraryHeader as LibraryHeaderUI,
   type LibraryHeaderOperations,
 } from "@deeprecall/ui";
-import { useBlobStats } from "@/src/hooks/useBlobs";
+import { useBlobStats } from "@deeprecall/data/hooks";
+import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
 
 interface LibraryHeaderProps {
   onCreateWork?: () => void;
@@ -28,7 +29,8 @@ export function LibraryHeader({
   onExportData,
   onImportData,
 }: LibraryHeaderProps) {
-  const { data: blobStats } = useBlobStats();
+  const cas = useWebBlobStorage();
+  const { data: blobStats } = useBlobStats(cas);
 
   const handleClearDatabase = async () => {
     if (

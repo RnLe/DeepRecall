@@ -36,8 +36,7 @@ import { CreateNoteDialog } from "./_components/CreateNoteDialog";
 // PLATFORM HOOKS & UTILITIES
 // ========================================
 import { db } from "@deeprecall/data/db";
-import { usePDF } from "@/src/hooks/usePDF";
-import { usePDFViewport } from "@/src/hooks/usePDFViewport";
+import { usePDF, usePDFViewport } from "@deeprecall/pdf/hooks";
 import * as annotationRepo from "@deeprecall/data/repos/annotations";
 import {
   useAnnotationUI,

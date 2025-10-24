@@ -24,17 +24,25 @@
 
 ### Extract packages/ui
 
-- [x] **DEFERRED** - UI components kept in apps/web for now
-- [x] Reason: Too many Next.js dependencies, will extract incrementally later
-- [x] Strategy: Extract when building desktop/mobile apps (Domain C/E)
+- [x] Extract all UI components from apps/web to packages/ui
+- [x] Create platform-agnostic component library (library, reader, study, admin)
+- [x] Implement optimistic updates with React Query mutations
+- [x] Wire all components to Electric hooks from packages/data
 
 ### Extract packages/data
 
 - [x] Move Dexie database setup and repositories from `frontend/src/repo/`
 - [x] Move stores from `frontend/src/stores/` (refactor to be platform-agnostic)
 - [x] Create package.json and tsconfig for packages/data
-- [ ] Create unified data facade interface (useShape, write buffer) - **Domain B**
-- [ ] Add ElectricSQL integration hooks - **Domain B**
+- [x] Create unified data facade interface (useShape, write buffer)
+- [x] Add ElectricSQL integration hooks with optimistic updates
+
+### Extract packages/blob-storage
+
+- [x] Create platform-agnostic BlobCAS interface
+- [x] Implement two-layer CAS: local storage (Layer 1) + Electric metadata sync (Layer 2)
+- [x] Create bridge layer combining local CAS + Electric for cross-platform blob tracking
+- [x] Web implementation with SQLite + filesystem (Drizzle ORM)
 
 ### Extract packages/pdf
 
@@ -42,6 +50,7 @@
 - [x] Create facades for page tiling, viewport transforms
 - [x] Move PDF-related hooks (usePDF, usePDFPage, usePDFViewport)
 - [x] Create package.json and tsconfig for packages/pdf
+- [x] Implement configurable worker path for multi-platform support
 
 ### Extract packages/ink
 
@@ -54,6 +63,9 @@
 
 - [x] Update imports to use packages instead of local paths
 - [x] Keep server-only code (API routes, server actions) in apps/web
+- [x] Reduce to thin wrappers feeding platform-specific data to shared UI
+- [x] apps/web/src/hooks reduced from 8+ to 3 platform-specific files (62% reduction)
+- [x] apps/web/src/utils reduced to 1 Web-specific wrapper file
 - [x] Fix Docker configuration for monorepo structure
 - [x] Fix data folder paths for monorepo (now at workspace root)
 - [x] Ensure app runs correctly after refactoring
@@ -68,7 +80,8 @@
 - [x] Create Postgres migrations for core tables (works, assets, activities, collections, edges, presets, authors, annotations, cards, review_logs)
 - [x] Add `POST /api/writes/batch` endpoint in Next.js
 - [x] Configure Postgres with logical replication (wal_level=logical)
-- [ ] Configure Electric shapes for client replication
+- [x] Configure Electric shapes for client replication
+- [x] Auto-migration on startup with persistent postgres_data volume
 
 ### Client SDK
 
@@ -76,14 +89,14 @@
 - [x] Implement `useShape<T>(shapeSpec)` hook
 - [x] Create write buffer with persistent queue (Dexie)
 - [x] Implement flush worker with backoff and checkpoints
-- [ ] Create local view layer (`*_synced` + `*_local` overlay)
-- [ ] Wire up Works entity end-to-end (test case)
+- [x] Create local + merged view layers (Dexie local writes + Electric synced data)
+- [x] Wire up all 10 entities end-to-end with optimistic updates
 
 ### Reconciliation
 
-- [ ] Implement conflict detection and resolution
-- [ ] Add tombstone support for soft deletes
-- [ ] Create offline-only mode with export/import
+- [x] Implement LWW (Last-Write-Wins) conflict resolution by `updated_at`
+- [x] Add tombstone support for soft deletes (deleted_at field)
+- [x] Create offline-only mode with export/import (Web platform implementation)
 
 ---
 
@@ -131,9 +144,9 @@
 
 ## Milestones
 
-- **M1: Shared UI & SPA shells** — Packages extracted, apps/desktop renders read-only docs
-- **M2: Electric read-path** — Shapes working, data hydrating in clients
-- **M3: Write buffer + offline** — Optimistic UI, offline edits sync back
+- ✅ **M1: Shared UI & SPA shells** — All packages extracted (core, data, ui, pdf, blob-storage), platform-agnostic
+- ✅ **M2: Electric read-path** — Shapes working, all 10 entities hydrating via Electric
+- ✅ **M3: Write buffer + offline** — Optimistic UI with React Query, offline edits sync via WriteBuffer
 - **M4: Desktop packaging** — Signed installer, offline + sync working
 - **M5: iPad packaging** — iOS app with Apple Pencil, syncing
 - **M6: Polish** — Conflict UI, error handling, telemetry
@@ -142,113 +155,54 @@
 
 ## Current Status
 
-**Active Phase:** ✅ Domain B COMPLETE!
+**🎉 Milestones M1-M3 COMPLETE! 🎉**
 
-**Domain A (Monorepo Structure):**
+**Active Phase:** ✅ Domains A & B Complete — Ready for M4: Desktop App
 
-- ✅ Monorepo structure (apps/, packages/) with pnpm workspace
-- ✅ packages/core extracted (schemas, types, utils including presets)
-- ✅ packages/data extracted (Dexie DB, 10 repos, 5 stores, React Query hooks)
-- ✅ packages/pdf extracted (PDF.js utils, hooks, LRU cache)
-- ✅ packages/ui created (empty placeholder - deferred for Desktop/Mobile phases)
-- ✅ All imports updated to use @deeprecall/\* packages (148+ files)
-- ✅ Docker configuration updated for monorepo (build context, volumes, entrypoint)
-- ✅ Data folder paths fixed for monorepo structure (workspace root)
-- ✅ PDF worker path resolution fixed for pnpm workspace
-- ✅ Apps/web runs successfully in Docker with all features working
+---
 
-**Domain B (Electric + WriteBuffer):**
+### ✅ Domain A: Monorepo & Package Extraction (COMPLETE)
 
-- ✅ Postgres 16 + ElectricSQL service running (port 5133)
-- ✅ All 10 tables migrated and indexed
-- ✅ **Auto-migration on startup** - db-migrate service runs migrations automatically
-- ✅ **Persistent database** - postgres_data volume survives restarts
-- ✅ Electric client SDK (`initElectric()`, `useShape()`) - Fixed to handle Shape API correctly (rows array)
-- ✅ Write buffer with persistent queue + FlushWorker
-- ✅ Write API endpoint (`POST /api/writes/batch`)
-- ✅ **ALL 10 REPOS CONVERTED:** Works, Activities, Annotations, Assets, Authors, Cards, Collections, Edges, Presets, ReviewLogs
-- ✅ **ALL HOOKS CREATED:** useWorks, useActivities, useAnnotations, useAssets, useAuthors, usePresets (+ init/reset helpers), useEdges, useCards, useCollections, useReviewLogs
-- ✅ All hooks exported from `@deeprecall/data/hooks`
-- ✅ ElectricInitializer in providers.tsx
-- ✅ **library/page.tsx converted to Electric hooks** - Uses useWorks() + useAssets() with client-side join
-- ✅ **library/LinkBlobDialog.tsx converted to Electric hooks** - Uses useWorks, useAssets, usePresets, useAuthors with mutations
-- ✅ **library/TemplateLibrary.tsx converted to Electric hooks** - Uses usePresets with init helpers + Hoisted to packages/ui/src/library/
-- ✅ **Preset initialization** - useInitializePresets(), useMissingDefaultPresets(), useResetSinglePreset() hooks created
-- ✅ **Electric Shape API fixed** - Properly extracts rows array from Shape subscribe callback
+**Packages Created:**
 
-**Status: Domain B COMPLETE - Ready for testing!** 🎉
+- `@deeprecall/core` - Schemas (Zod), types, utilities (platform-agnostic)
+- `@deeprecall/data` - Dexie DB, Electric hooks, WriteBuffer, optimistic updates
+- `@deeprecall/ui` - Complete component library (library, reader, study, admin)
+- `@deeprecall/pdf` - PDF.js utilities with configurable worker paths
+- `@deeprecall/blob-storage` - Two-layer CAS interface (local + Electric bridge)
 
-**Current Status:** Electric shapes now loading correctly. Refresh browser to test!
+**apps/web Minimized:**
 
-**Last Updated:** 2025-01-22 (Electric Shape API fixed, auto-migration added)
+- Reduced to thin Next.js wrappers (routes, API, server-only code)
+- `src/hooks/`: 3 files (Web-specific: avatars, blob storage, file queries)
+- `src/utils/`: 1 file (Web API wrappers for export/import)
+- `src/server/`: CAS, Drizzle ORM, PDF extraction (Layer 1 infrastructure)
 
-- ✅ packages/pdf extracted (PDF.js utils, hooks, LRU cache)
-- ✅ packages/ui created (empty placeholder - deferred for Desktop/Mobile phases)
-- ✅ All imports updated to use @deeprecall/\* packages (148+ files)
-- ✅ Docker configuration updated for monorepo (build context, volumes, entrypoint)
-- ✅ Data folder paths fixed for monorepo structure (workspace root)
-- ✅ PDF worker path resolution fixed for pnpm workspace
-- ✅ Apps/web runs successfully in Docker with all features working
+---
 
-**Pragmatic Decisions Made:**
+### ✅ Domain B: Electric + Optimistic Updates (COMPLETE)
 
-- UI components kept in apps/web (too many Next.js dependencies)
-- Will extract UI incrementally when building desktop/mobile apps
-- Data layer separation is the critical achievement for multi-platform support
+**Infrastructure:**
 
-**apps/web structure:**
+- Postgres 16 with logical replication + auto-migration on startup
+- ElectricSQL sync service (port 5133) with persistent volume
+- Write API (`POST /api/writes/batch`) with LWW conflict resolution
 
-- `app/` - Next.js routes, pages, and UI components (kept here for now)
-- `src/server/` - Server-only code (CAS, DB, PDF extraction, metadata)
-- `src/hooks/` - App-specific React hooks
-- `src/utils/` - App-specific utilities
-- `src/srs/` - SRS/FSRS spaced repetition logic
+**Client Architecture:**
 
-**Shared packages:**
+- **Local Layer**: Dexie IndexedDB for immediate writes
+- **Sync Layer**: WriteBuffer queue → Postgres → Electric → Client
+- **Merged Layer**: React Query combines local + synced data for optimistic UI
+- All 10 entities converted (Works, Assets, Activities, Collections, Edges, Presets, Authors, Annotations, Cards, ReviewLogs)
 
-- `@deeprecall/core` - Schemas, types, utilities (platform-agnostic)
-- `@deeprecall/data` - Client data layer (Dexie, stores, hooks)
-- `@deeprecall/pdf` - PDF.js rendering utilities
-- `@deeprecall/ui` - Empty (future home for shared components)
+**Blob Architecture:**
 
-**Domain B Progress (In Progress):**
+- **Layer 1 (CAS)**: Platform-specific local storage (Web: SQLite + filesystem)
+- **Layer 2 (Electric)**: Cross-platform metadata sync
+- **Bridge Layer**: `useBlobBridge` combines both for unified API
 
-✅ **Infrastructure Complete:**
+---
 
-- Postgres 16 with logical replication
-- ElectricSQL sync service (port 5133)
-- Migration runner (auto-runs on startup)
-- All 10 tables created with indices
+**Next Phase:** Domain C - Desktop App (Tauri)
 
-✅ **Client SDK Complete:**
-
-- `@deeprecall/data/electric` with `initElectric()` and `useShape()`
-- `@deeprecall/data/writeBuffer` with persistent queue
-- FlushWorker with exponential backoff
-
-✅ **Write API Complete:**
-
-- `POST /api/writes/batch` with Zod validation
-- LWW conflict resolution by `updated_at`
-- Transaction support
-
-✅ **Works Entity Conversion Complete:**
-
-- Created `works.electric.ts` with Electric+WriteBuffer pattern
-- Read hooks: `useWorks()`, `useWork(id)`, `useWorksByType()`, `useFavoriteWorks()`, `useSearchWorks()`
-- Write hooks: `useCreateWork()`, `useUpdateWork()`, `useDeleteWork()`, `useToggleWorkFavorite()`, `useCreateWorkWithAsset()`
-- Exported from `@deeprecall/data/hooks`
-
-✅ **App Integration Complete:**
-
-- ElectricInitializer in `apps/web/app/providers.tsx`
-- Auto-starts FlushWorker on app mount
-- Environment variable `NEXT_PUBLIC_ELECTRIC_URL` configured
-
-**Next Steps:**
-
-1. ⏳ Test end-to-end: Create Work → WriteBuffer → Postgres → Electric → UI
-2. ⏳ Build optimistic state layer (show pending writes immediately)
-3. ⏳ Migrate remaining entities (Assets, Activities, etc.)
-
-**Last Updated:** 2025-01-22 (Works fully integrated with Electric+WriteBuffer!)
+**Last Updated:** 2025-10-24 (M1-M3 Complete!)

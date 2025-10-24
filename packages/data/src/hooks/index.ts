@@ -15,3 +15,6 @@ export * from "./useEdges";
 export * from "./useBlobsMeta";
 export * from "./useDeviceBlobs";
 export * from "./useReplicationJobs";
+
+// Library bridge hooks (combines CAS + Electric)
+export * from "./useBlobBridge";

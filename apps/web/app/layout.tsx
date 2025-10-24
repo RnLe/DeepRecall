@@ -53,12 +53,6 @@ export default function RootLayout({
                   >
                     Admin
                   </Link>
-                  <Link
-                    href="/admin/graph"
-                    className="text-gray-600 hover:text-gray-400 transition-colors"
-                  >
-                    Graph
-                  </Link>
                 </div>
               </div>
             </nav>

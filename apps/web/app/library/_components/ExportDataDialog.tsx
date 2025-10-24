@@ -13,7 +13,7 @@ import {
   exportData,
   estimateExportSize,
   formatBytes,
-} from "@/src/utils/data-sync";
+} from "@/src/utils/export-import-web";
 
 interface ExportDataDialogProps {
   isOpen: boolean;

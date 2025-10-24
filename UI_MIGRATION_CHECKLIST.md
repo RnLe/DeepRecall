@@ -177,11 +177,11 @@
 - [x] `NoteBranch.tsx` - Needs wrapper (NoteBranchOperations: uploadFile, getBlobUrl, fetchBlobContent - platform-specific)
 - [x] `NoteTreeView.tsx` - Needs wrapper (NoteTreeViewOperations extends NoteBranchOperations + group management)
 - [x] `AnnotationPreview.tsx` - Needs wrapper (AnnotationPreviewOperations: getBlobUrl, loadPDFDocument - platform-specific)
-- [ ] `page.tsx` - Next.js dynamic route (implements operations for all annotation components)
+- [x] `page.tsx` - Next.js dynamic route (implements operations for all annotation components)
 
 **study/**
 
-- [ ] **`page.tsx`** - Next.js page wrapper
+- [x] **`page.tsx`** - Next.js page wrapper
 
 **admin/**
 
@@ -214,11 +214,11 @@
 
 **Start Here:**
 
-1. [ ] `library/page.tsx` - Main library page
-2. [ ] `library/FileInbox.tsx` - File inbox component
-3. [ ] Other library components
-4. [ ] Reader components
-5. [ ] Study components
+1. [x] `library/page.tsx` - Main library page
+2. [x] `library/FileInbox.tsx` - File inbox component
+3. [x] Other library components
+4. [x] Reader components
+5. [x] Study components
 
 ### Phase 3: Extract to packages/ui (LATER)
 

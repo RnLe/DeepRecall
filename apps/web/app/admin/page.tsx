@@ -15,8 +15,8 @@ import type { DuplicateGroup } from "@deeprecall/ui";
 // PLATFORM HOOKS (from @/src/hooks)
 // ========================================
 import { useState, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useBlobs } from "@/src/hooks/useBlobs";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
 import { useBlobsMeta, useDeviceBlobs } from "@deeprecall/data/hooks";
 import { getDeviceId } from "@deeprecall/data/utils/deviceId";
 import type { BlobWithMetadata } from "@deeprecall/blob-storage";
@@ -26,7 +26,17 @@ export default function AdminPage() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // CAS layer (platform-local storage)
-  const { data: blobs, isLoading, error, refetch } = useBlobs();
+  const cas = useWebBlobStorage();
+  const {
+    data: blobs,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["blobs"],
+    queryFn: () => cas.list(),
+    staleTime: 1000 * 60 * 5,
+  });
 
   // Electric coordination layer (multi-device metadata)
   const electricBlobsMeta = useBlobsMeta();

@@ -11,6 +11,7 @@
     "./stores": "./src/stores/index.ts",
     "./hooks": "./src/hooks/index.ts",
     "./hooks/useWorks": "./src/hooks/useWorks.ts",
+    "./hooks/useLibraryLegacy": "./src/hooks/useLibraryLegacy.ts",
     "./electric": "./src/electric.ts",
     "./writeBuffer": "./src/writeBuffer.ts"
   },
@@ -19,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@deeprecall/blob-storage": "workspace:*",
     "@deeprecall/core": "workspace:*",
     "@electric-sql/client": "^1.0.0",
     "dexie": "^4.0.11",

@@ -2,8 +2,13 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useInitializePresets } from "@/src/hooks/usePresets";
 import { initElectric, initFlushWorker } from "@deeprecall/data";
+import { configurePdfWorker } from "@deeprecall/pdf";
+
+// Configure PDF.js worker for Web platform
+if (typeof window !== "undefined") {
+  configurePdfWorker("/pdf.worker.min.mjs");
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(

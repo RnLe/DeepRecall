@@ -10,10 +10,12 @@ import {
   type LibraryLeftSidebarOperations,
 } from "@deeprecall/ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
-import { useOrphanedBlobs } from "@/src/hooks/useBlobs";
+import { useOrphanedBlobs } from "@deeprecall/data/hooks";
+import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
 
 export function LibraryLeftSidebar() {
-  const orphanedBlobsQuery = useOrphanedBlobs();
+  const cas = useWebBlobStorage();
+  const orphanedBlobsQuery = useOrphanedBlobs(cas);
 
   // Platform-specific blob operations
   const operations: LibraryLeftSidebarOperations = {

@@ -10,7 +10,9 @@
       "@deeprecall/data": ["../../packages/data/src"],
       "@deeprecall/data/*": ["../../packages/data/src/*"],
       "@deeprecall/blob-storage": ["../../packages/blob-storage/src"],
-      "@deeprecall/blob-storage/*": ["../../packages/blob-storage/src/*"]
+      "@deeprecall/blob-storage/*": ["../../packages/blob-storage/src/*"],
+      "@deeprecall/pdf": ["../../packages/pdf/src"],
+      "@deeprecall/pdf/*": ["../../packages/pdf/src/*"]
     },
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -21,7 +23,7 @@
     "incremental": true,
     "module": "esnext",
     "esModuleInterop": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",

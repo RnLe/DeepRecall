@@ -34,7 +34,7 @@ import {
 } from "@deeprecall/data/repos/annotations";
 import { updateAnnotationLocal } from "@deeprecall/data/repos/annotations.local";
 import { updateAssetLocal } from "@deeprecall/data/repos/assets.local";
-import { loadPDFDocument } from "../../../../src/utils/pdf";
+import { loadPDFDocument } from "@deeprecall/pdf/utils";
 
 export default function AnnotationDetailPage() {
   const router = useRouter();

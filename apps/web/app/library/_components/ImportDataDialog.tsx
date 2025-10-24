@@ -13,7 +13,7 @@ import {
   previewImport,
   executeImport,
   formatBytes,
-} from "@/src/utils/data-sync";
+} from "@/src/utils/export-import-web";
 
 // Next.js implementation of import operations
 const importOps: ImportOperations = {

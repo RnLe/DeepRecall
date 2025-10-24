@@ -11,6 +11,9 @@ importers:
       '@deeprecall/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@deeprecall/pdf':
+        specifier: workspace:*
+        version: link:../../packages/pdf
       '@tanstack/react-query':
         specifier: ^5.90.3
         version: 5.90.5(react@19.2.0)
@@ -178,6 +181,9 @@ importers:
 
   packages/data:
     dependencies:
+      '@deeprecall/blob-storage':
+        specifier: workspace:*
+        version: link:../blob-storage
       '@deeprecall/core':
         specifier: workspace:*
         version: link:../core
@@ -259,8 +265,8 @@ importers:
         specifier: ^4.0.0
         version: 4.2.0(@types/react@19.2.2)(dexie@4.2.1)(react@19.2.0)
       lucide-react:
-        specifier: ^0.545.0
-        version: 0.545.0(react@19.2.0)
+        specifier: ^0.546.0
+        version: 0.546.0(react@19.2.0)
       react:
         specifier: ^19.2.0
         version: 19.2.0
@@ -2407,11 +2413,6 @@ packages:
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
-
-  lucide-react@0.545.0:
-    resolution: {integrity: sha512-7r1/yUuflQDSt4f1bpn5ZAocyIxcTyVyBBChSVtBKn5M+392cPmI5YJMWOJKk/HUWGm5wg83chlAZtCcGbEZtw==}
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   lucide-react@0.546.0:
     resolution: {integrity: sha512-Z94u6fKT43lKeYHiVyvyR8fT7pwCzDu7RyMPpTvh054+xahSgj4HFQ+NmflvzdXsoAjYGdCguGaFKYuvq0ThCQ==}
@@ -5280,10 +5281,6 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
-
-  lucide-react@0.545.0(react@19.2.0):
-    dependencies:
-      react: 19.2.0
 
   lucide-react@0.546.0(react@19.2.0):
     dependencies:

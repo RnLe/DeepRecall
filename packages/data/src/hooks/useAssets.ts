@@ -5,6 +5,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import type { Asset } from "@deeprecall/core";
 import * as assetsElectric from "../repos/assets.electric";
 import * as assetsLocal from "../repos/assets.local";
@@ -12,6 +13,7 @@ import * as assetsMerged from "../repos/assets.merged";
 import * as assetsCleanup from "../repos/assets.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { useEdges } from "./useEdges";
 
 // ============================================================================
 // Helper Functions
@@ -287,5 +289,85 @@ export function useDeleteAsset() {
     onError: (error: Error) => {
       console.error("❌ [useDeleteAsset] Failed to delete asset:", error);
     },
+  });
+}
+
+// ============================================================================
+// Additional Query Hooks (Asset-Specific)
+// ============================================================================
+
+/**
+ * Hook to get unlinked standalone assets - "Unlinked Assets"
+ *
+ * MENTAL MODEL: Assets that exist but are not connected to anything:
+ * - No workId (not part of any Work)
+ * - No edges with relation="contains" (not in any Activity/Collection)
+ *
+ * These Assets represent "data" that can be moved around and linked.
+ * They reference blobs (raw files) via sha256, but have their own lifecycle.
+ */
+export function useUnlinkedAssets() {
+  const { data: allAssets = [] } = useAssets();
+  const { data: allEdges = [] } = useEdges();
+
+  return useMemo(() => {
+    // Get all standalone assets (no workId)
+    const standaloneAssets = allAssets.filter((asset) => !asset.workId);
+
+    // Get asset IDs that are linked via "contains" relation
+    // (Activities and Collections use "contains" edges to link to Assets)
+    const assetIds = new Set(allAssets.map((a) => a.id));
+    const linkedAssetIds = new Set(
+      allEdges
+        .filter(
+          (edge) => edge.relation === "contains" && assetIds.has(edge.toId)
+        )
+        .map((edge) => edge.toId)
+    );
+
+    // Filter to only assets that are NOT in any edges
+    // Use a Map to deduplicate by asset.id to prevent duplicates
+    const unlinkedMap = new Map<string, Asset>();
+    for (const asset of standaloneAssets) {
+      if (!linkedAssetIds.has(asset.id)) {
+        unlinkedMap.set(asset.id, asset);
+      }
+    }
+
+    return Array.from(unlinkedMap.values());
+  }, [allAssets, allEdges]);
+}
+
+/**
+ * Hook to get duplicate assets (multiple assets with same hash)
+ * Returns a Map of sha256 -> Array<Asset> for all hashes with duplicates
+ */
+export function useDuplicateAssets() {
+  const { data: assets = [] } = useAssets();
+
+  return useQuery({
+    queryKey: ["duplicateAssets", assets.length],
+    queryFn: async (): Promise<Map<string, Asset[]>> => {
+      const hashToAssets = new Map<string, Asset[]>();
+
+      for (const asset of assets) {
+        if (!asset.sha256) continue;
+        const existing = hashToAssets.get(asset.sha256) || [];
+        existing.push(asset);
+        hashToAssets.set(asset.sha256, existing);
+      }
+
+      // Filter to only hashes with multiple assets
+      const duplicates = new Map<string, Asset[]>();
+      for (const [hash, assetList] of hashToAssets.entries()) {
+        if (assetList.length > 1) {
+          duplicates.set(hash, assetList);
+        }
+      }
+
+      return duplicates;
+    },
+    staleTime: 1000 * 60 * 5,
+    initialData: new Map(),
   });
 }
