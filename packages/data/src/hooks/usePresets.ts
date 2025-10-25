@@ -71,18 +71,22 @@ export function usePresets() {
   const electricResult = presetsElectric.usePresets();
 
   // Sync Electric data to Dexie presets table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
+  // CRITICAL: Only sync after initial load AND after a delay to ensure fresh data
+  // Skip immediate syncs from cached connections which may have stale data
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
-      // Replace entire Dexie presets table with Electric data
-      // This ensures deletions are properly reflected
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[usePresets] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      // Wait 500ms to ensure we have fresh data, not stale cached data
+      const syncTimer = setTimeout(() => {
+        syncElectricToDexie(electricResult.data!).catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[usePresets] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
+      }, 500);
+
+      return () => clearTimeout(syncTimer);
     }
   }, [electricResult.isLoading, electricResult.data]);
 

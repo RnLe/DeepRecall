@@ -34,6 +34,7 @@ import { bibtexToWorkFormValues } from "../utils/bibtex";
 // Platform-specific operations interface (minimal)
 export interface LinkBlobDialogOperations {
   getBlobUrl: (sha256: string) => string;
+  syncBlobToElectric: (sha256: string) => Promise<void>;
 }
 
 interface LinkBlobDialogProps {
@@ -59,7 +60,7 @@ export function LinkBlobDialog({
   onCancel,
   operations,
 }: LinkBlobDialogProps) {
-  const { getBlobUrl } = operations;
+  const { getBlobUrl, syncBlobToElectric } = operations;
   // Electric hooks - real-time synced data
   const { data: allPresets = [], isLoading: presetsLoading } = usePresets();
   const { data: allWorks = [], isLoading: worksLoading } = useWorks();
@@ -212,6 +213,11 @@ export function LinkBlobDialog({
     try {
       console.log("Creating work with:", { coreFields, metadata, blob });
 
+      // STEP 0: Sync blob to Electric first (auto-sync on link)
+      console.log("🔄 Auto-syncing blob to Electric...");
+      await syncBlobToElectric(blob.sha256);
+      console.log("✅ Blob synced to Electric");
+
       // Create Work first
       const work = await createWork.mutateAsync({
         title: (coreFields.title as string) || "Untitled",
@@ -258,6 +264,11 @@ export function LinkBlobDialog({
     if (!selectedWork || !selectedWorkId) return;
 
     try {
+      // STEP 0: Sync blob to Electric first (auto-sync on link)
+      console.log("🔄 Auto-syncing blob to Electric...");
+      await syncBlobToElectric(blob.sha256);
+      console.log("✅ Blob synced to Electric");
+
       // Create asset linked directly to the work
       await createAsset.mutateAsync({
         workId: selectedWorkId,

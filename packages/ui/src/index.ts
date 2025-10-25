@@ -51,8 +51,8 @@ export * from "./library/WorkCardDetailed";
 export * from "./library/WorkCardList";
 export * from "./library/WorkContextMenu";
 export * from "./library/WorkSelector";
-export { AdminPanel } from "./library/AdminPanel";
-export type { AdminPanelOperations } from "./library/AdminPanel";
+export { CASPanel } from "./library/CASPanel";
+export type { CASPanelOperations } from "./library/CASPanel";
 export { DuplicateResolutionModal } from "./library/DuplicateResolutionModal";
 export type {
   DuplicateGroup,

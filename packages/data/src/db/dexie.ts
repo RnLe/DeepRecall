@@ -997,3 +997,52 @@ db.on("versionchange", () => {
   db.close();
   window.location.reload();
 });
+
+/**
+ * Clear all Dexie data (both synced and local tables)
+ * Use this when Postgres is reset to prevent stale local data
+ *
+ * @example
+ * // In browser console:
+ * import { clearAllDexieData } from '@deeprecall/data/db';
+ * await clearAllDexieData();
+ */
+export async function clearAllDexieData(): Promise<void> {
+  console.log("[Dexie] Clearing all data...");
+
+  try {
+    // Clear all tables
+    await Promise.all([
+      // Synced tables
+      db.works.clear(),
+      db.assets.clear(),
+      db.activities.clear(),
+      db.collections.clear(),
+      db.edges.clear(),
+      db.presets.clear(),
+      db.authors.clear(),
+      db.annotations.clear(),
+      db.cards.clear(),
+      db.reviewLogs.clear(),
+      db.blobsMeta.clear(),
+      db.deviceBlobs.clear(),
+
+      // Local optimistic tables
+      db.works_local.clear(),
+      db.assets_local.clear(),
+      db.activities_local.clear(),
+      db.collections_local.clear(),
+      db.edges_local.clear(),
+      db.presets_local.clear(),
+      db.authors_local.clear(),
+      db.annotations_local.clear(),
+      db.cards_local.clear(),
+      db.reviewLogs_local.clear(),
+    ]);
+
+    console.log("[Dexie] ✅ All data cleared successfully");
+  } catch (error) {
+    console.error("[Dexie] Failed to clear data:", error);
+    throw error;
+  }
+}

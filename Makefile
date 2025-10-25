@@ -8,25 +8,22 @@ run:
 runb:
 	docker compose up --build
 
-# Stop and remove containers + volumes (fresh start)
+# Stop and remove containers + volumes (fresh start - WIPES ALL DATA)
 down:
 	docker compose down -v
 
-# Stop containers (keep volumes - faster restart)
+# Stop containers (keep volumes - preserves Postgres data)
 stop:
 	docker compose down
 
-# Clean Docker build cache
-clean-docker:
-	@echo "Cleaning Docker images and build cache..."
-	docker system prune -f
-	@echo "✅ Docker cleaned!"
+# Restart containers preserving data (stop + run)
+rerun: stop run
 
-# Restart containers (down + run)
-rerun: down run
+# Restart containers with build preserving data (stop + runb)
+rerunb: stop runb
 
-# Restart containers with build (down + runb)
-rerunb: down runb
+# FULL RESET: Wipe everything including Postgres (down + runb)
+reset: down runb
 
 # Set up required directories
 setup-dirs:

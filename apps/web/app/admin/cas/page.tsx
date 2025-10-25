@@ -4,7 +4,7 @@
 // PURE UI IMPORTS (from @deeprecall/ui)
 // ========================================
 import {
-  AdminPanel,
+  CASPanel,
   DuplicateResolutionModal,
   MarkdownPreview,
   SimplePDFViewer,
@@ -230,7 +230,7 @@ export default function AdminPage() {
   }, [refetch, queryClient]);
 
   return (
-    <AdminPanel
+    <CASPanel
       operations={operations}
       DuplicateResolutionModal={DuplicateResolutionModal}
       MarkdownPreview={MarkdownPreview}

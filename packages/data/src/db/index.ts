@@ -3,4 +3,4 @@
  * Export Dexie database instance
  */
 
-export { db } from "./dexie";
+export { db, clearAllDexieData } from "./dexie";

@@ -48,10 +48,28 @@ export default function RootLayout({
                     Study
                   </Link>
                   <Link
-                    href="/admin"
+                    href="/admin/cas"
                     className="text-gray-600 hover:text-gray-400 transition-colors"
                   >
-                    Admin
+                    CAS
+                  </Link>
+                  <Link
+                    href="/admin/dexie"
+                    className="text-gray-600 hover:text-gray-400 transition-colors"
+                  >
+                    Dexie
+                  </Link>
+                  <Link
+                    href="/admin/electric"
+                    className="text-gray-600 hover:text-gray-400 transition-colors"
+                  >
+                    Electric
+                  </Link>
+                  <Link
+                    href="/admin/postgres"
+                    className="text-gray-600 hover:text-gray-400 transition-colors"
+                  >
+                    Postgres
                   </Link>
                 </div>
               </div>

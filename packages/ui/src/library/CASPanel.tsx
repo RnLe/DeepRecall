@@ -1,5 +1,5 @@
 /**
- * Admin Panel Component (Platform-agnostic)
+ * CAS Panel Component (Platform-agnostic)
  *
  * Displays blob storage health with both:
  * - Platform-local CAS layer (better-sqlite3, actual files)
@@ -34,7 +34,7 @@ interface DuplicateGroup {
   }>;
 }
 
-export interface AdminPanelOperations {
+export interface CASPanelOperations {
   // CAS operations
   listBlobs: () => Promise<BlobWithMetadata[]>;
   deleteBlob: (hash: string) => Promise<void>;
@@ -56,8 +56,8 @@ export interface AdminPanelOperations {
   getBlobUrl: (sha256: string) => string;
 }
 
-export interface AdminPanelProps {
-  operations: AdminPanelOperations;
+export interface CASPanelProps {
+  operations: CASPanelOperations;
 
   // Platform-specific components
   DuplicateResolutionModal: React.ComponentType<{
@@ -108,7 +108,7 @@ export interface AdminPanelProps {
   currentDeviceId?: string;
 }
 
-export function AdminPanel({
+export function CASPanel({
   operations,
   DuplicateResolutionModal,
   MarkdownPreview,
@@ -121,7 +121,7 @@ export function AdminPanel({
   blobsMeta,
   deviceBlobs,
   currentDeviceId,
-}: AdminPanelProps) {
+}: CASPanelProps) {
   const [editingHash, setEditingHash] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [viewingMarkdown, setViewingMarkdown] = useState<{

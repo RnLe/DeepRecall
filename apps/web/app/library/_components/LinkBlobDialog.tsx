@@ -27,6 +27,18 @@ export function LinkBlobDialog({
 }: LinkBlobDialogProps) {
   const operations: LinkBlobDialogOperations = {
     getBlobUrl: (sha256: string) => `/api/blob/${sha256}`,
+    syncBlobToElectric: async (sha256: string) => {
+      const response = await fetch("/api/admin/sync-blob", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sha256 }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to sync blob");
+      }
+    },
   };
 
   return (

@@ -4,7 +4,7 @@ export {
   ActivityBanner,
   type ActivityBannerOperations,
 } from "./ActivityBanner";
-export { AdminPanel } from "./AdminPanel";
+export { CASPanel } from "./CASPanel";
 export { AuthorInput } from "./AuthorInput";
 export { BibtexExportModal } from "./BibtexExportModal";
 export {

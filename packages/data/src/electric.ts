@@ -12,7 +12,15 @@ import { useState, useEffect, useRef } from "react";
 interface ElectricConfig {
   url: string; // Electric sync service URL
   token?: string; // Optional auth token
+  mode?: "development" | "production"; // Sync mode
 }
+
+/**
+ * Sync mode configuration
+ * - development: 10s polling to catch sync delay issues
+ * - production: Real-time SSE for instant updates
+ */
+const SYNC_MODE: "development" | "production" = "production";
 
 /**
  * JSONB columns per table that need parsing
@@ -126,6 +134,15 @@ export function getElectricConfig(): ElectricConfig {
 }
 
 /**
+ * Clear all cached Electric connections
+ * Useful for development/debugging or when resetting the database
+ */
+export function clearElectricCache(): void {
+  console.log(`[Electric] Clearing ${shapeCache.size} cached connections`);
+  shapeCache.clear();
+}
+
+/**
  * Shape specification for Electric
  */
 export interface ShapeSpec<T = any> {
@@ -157,8 +174,33 @@ export interface ShapeResult<T> {
 }
 
 /**
+ * Shape cache to survive hot reloads
+ * Maps shape key to { stream, shape, subscribers, lastUpdate }
+ */
+const shapeCache = new Map<
+  string,
+  {
+    stream: ShapeStream;
+    shape: Shape;
+    subscribers: Set<(data: any[]) => void>;
+    lastUpdateTime: number; // Track when data was last updated
+  }
+>();
+
+/**
+ * Generate stable cache key for a shape
+ */
+function getShapeCacheKey(spec: ShapeSpec): string {
+  const parts = [spec.table];
+  if (spec.where) parts.push(spec.where);
+  if (spec.columns) parts.push(spec.columns.join(","));
+  return parts.join(":");
+}
+
+/**
  * React hook to subscribe to a shape
  * Automatically syncs changes from Postgres to local state
+ * Uses cached connections to survive hot reloads
  *
  * @example
  * const { data, isLoading, syncStatus } = useShape<Work>({
@@ -177,6 +219,47 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
   const shapeRef = useRef<Shape | null>(null);
 
   useEffect(() => {
+    const cacheKey = getShapeCacheKey(spec);
+    let cached = shapeCache.get(cacheKey);
+
+    // Reuse existing connection if available
+    if (cached) {
+      console.log(
+        `[Electric] Reusing cached shape: ${spec.table}${
+          spec.where ? ` (${spec.where})` : ""
+        }`
+      );
+      streamRef.current = cached.stream;
+      shapeRef.current = cached.shape;
+
+      // Subscribe to existing shape
+      const handleUpdate = (shapeData: any) => {
+        const rows = shapeData.rows || [];
+        let parsedRows = rows.map((row: any) =>
+          parseJsonbColumns<T>(spec.table, row)
+        );
+        if (spec.table === "annotations") {
+          parsedRows = parsedRows.map(transformAnnotationFromPostgres) as T[];
+        }
+        setData(parsedRows);
+        setIsLoading(false);
+        setSyncStatus("synced");
+      };
+
+      cached.subscribers.add(handleUpdate);
+
+      // Trigger immediate update with current data
+      const currentData = cached.shape.currentValue;
+      if (currentData) {
+        handleUpdate(currentData);
+      }
+
+      return () => {
+        cached!.subscribers.delete(handleUpdate);
+      };
+    }
+
+    // Create new connection
     const config = getElectricConfig();
 
     // Build shape URL
@@ -198,7 +281,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     console.log(
       `[Electric] Subscribing to shape: ${spec.table}${
         spec.where ? ` (${spec.where})` : ""
-      }`
+      } (mode: ${SYNC_MODE})`
     );
     setSyncStatus("connecting");
 
@@ -206,6 +289,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     const stream = new ShapeStream({
       url: shapeUrl,
       headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
+      liveSse: SYNC_MODE === "production", // Real-time SSE in production, polling in dev
     });
 
     streamRef.current = stream;
@@ -213,6 +297,9 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     // Create shape (manages data updates)
     const shape = new Shape(stream);
     shapeRef.current = shape;
+
+    // Create subscriber set
+    const subscribers = new Set<(data: any[]) => void>();
 
     // Subscribe to shape changes
     const unsubscribe = shape.subscribe((shapeData) => {
@@ -231,9 +318,18 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
         parsedRows = parsedRows.map(transformAnnotationFromPostgres) as T[];
       }
 
+      // Notify all subscribers
       setData(parsedRows);
       setIsLoading(false);
       setSyncStatus("synced");
+
+      // Update last update time in cache
+      const cached = shapeCache.get(cacheKey);
+      if (cached) {
+        cached.lastUpdateTime = Date.now();
+      }
+
+      subscribers.forEach((callback) => callback(parsedRows));
     });
 
     // Handle errors
@@ -264,17 +360,23 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       }
     );
 
-    // Cleanup on unmount
+    // Cache the connection
+    shapeCache.set(cacheKey, {
+      stream,
+      shape,
+      subscribers,
+      lastUpdateTime: Date.now(),
+    });
+    console.log(`[Electric] Cached shape connection: ${cacheKey}`);
+
+    // Cleanup on unmount - DON'T close connection, keep it alive for cache
     return () => {
-      console.log(`[Electric] Unsubscribing from shape: ${spec.table}`);
-      unsubscribe();
-      if (streamRef.current) {
-        // Note: ShapeStream doesn't have a close() method in v0.14
-        // It will be cleaned up by garbage collection
-      }
+      // Connection stays alive in cache for hot reloads
+      console.log(
+        `[Electric] Component unmounted, keeping connection alive: ${spec.table}`
+      );
     };
   }, [spec.table, spec.where, spec.columns?.join(",")]);
-
   return {
     data,
     isLoading,
@@ -316,6 +418,7 @@ export async function queryShape<T = any>(spec: ShapeSpec<T>): Promise<T[]> {
   const stream = new ShapeStream({
     url: shapeUrl,
     headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
+    liveSse: SYNC_MODE === "production", // Match subscription mode
   });
 
   const shape = new Shape(stream);
