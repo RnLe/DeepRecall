@@ -11,6 +11,7 @@ export * from "./annotation";
 
 // Data schemas
 export * from "./blobs";
+export * from "./boards";
 export * from "./cards";
 export * from "./data-sync";
 export * from "./files";
