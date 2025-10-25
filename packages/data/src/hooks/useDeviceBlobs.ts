@@ -41,23 +41,37 @@ async function syncElectricToDexie(electricData: DeviceBlob[]): Promise<void> {
 }
 
 /**
- * Get all device blob records
- * Uses syncElectricToDexie pattern for proper persistence
+ * Internal sync hook - subscribes to Electric and syncs to Dexie
+ * MUST be called exactly once by SyncManager to avoid race conditions
+ * DO NOT call from components - use useDeviceBlobs() instead
  */
-export function useDeviceBlobs() {
+export function useDeviceBlobsSync() {
   const electricResult = useShape<DeviceBlob>({ table: "device_blobs" });
 
-  // CRITICAL: Check isLoading to prevent cache clearing on page reload
-  // Sync Electric → Dexie only after initial load completes
+  // Sync Electric → Dexie only when fresh data is available
   useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
       syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error("[Electric→Dexie] Failed to sync device_blobs:", error);
+        console.error(
+          "[useDeviceBlobsSync] Failed to sync device_blobs:",
+          error
+        );
       });
     }
-  }, [electricResult.isLoading, electricResult.data]);
+  }, [electricResult.data, electricResult.isFreshData]);
 
-  // Return merged data from Dexie (persists across navigation)
+  return null;
+}
+
+/**
+ * Get all device blob records
+ * Read-only - queries Dexie without side effects
+ */
+export function useDeviceBlobs() {
   return useQuery({
     queryKey: ["device-blobs", "merged"],
     queryFn: async () => {
@@ -78,31 +92,72 @@ export function useDeviceBlobs() {
 
 /**
  * Get device blobs for a specific blob (all devices that have it)
+ * Read-only - queries Dexie without side effects
  */
 export function useDeviceBlobsByHash(sha256: string | undefined) {
-  return useShape<DeviceBlob>({
-    table: "device_blobs",
-    where: sha256 ? `sha256 = '${sha256}'` : undefined,
+  return useQuery({
+    queryKey: ["device-blobs", "merged", "hash", sha256],
+    queryFn: async () => {
+      if (!sha256) return [];
+      try {
+        const data = await db.deviceBlobs
+          .where("sha256")
+          .equals(sha256)
+          .toArray();
+        return data;
+      } catch (error) {
+        console.error("[useDeviceBlobsByHash] Error:", error);
+        return [];
+      }
+    },
+    enabled: !!sha256,
+    staleTime: 0,
   });
 }
 
 /**
  * Get device blobs for a specific device
+ * Read-only - queries Dexie without side effects
  */
 export function useDeviceBlobsByDevice(deviceId: string | undefined) {
-  return useShape<DeviceBlob>({
-    table: "device_blobs",
-    where: deviceId ? `device_id = '${deviceId}'` : undefined,
+  return useQuery({
+    queryKey: ["device-blobs", "merged", "device", deviceId],
+    queryFn: async () => {
+      if (!deviceId) return [];
+      try {
+        const data = await db.deviceBlobs
+          .where("device_id")
+          .equals(deviceId)
+          .toArray();
+        return data;
+      } catch (error) {
+        console.error("[useDeviceBlobsByDevice] Error:", error);
+        return [];
+      }
+    },
+    enabled: !!deviceId,
+    staleTime: 0,
   });
 }
 
 /**
  * Get a specific device blob record by ID
+ * Read-only - queries Dexie without side effects
  */
 export function useDeviceBlob(id: string | undefined) {
-  const result = useShape<DeviceBlob>({
-    table: "device_blobs",
-    where: id ? `id = '${id}'` : undefined,
+  return useQuery({
+    queryKey: ["device-blobs", "merged", id],
+    queryFn: async () => {
+      if (!id) return undefined;
+      try {
+        const data = await db.deviceBlobs.get(id);
+        return data;
+      } catch (error) {
+        console.error("[useDeviceBlob] Error:", error);
+        return undefined;
+      }
+    },
+    enabled: !!id,
+    staleTime: 0,
   });
-  return { ...result, data: result.data?.[0] };
 }

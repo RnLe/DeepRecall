@@ -14,7 +14,12 @@ import type {
   Edge,
   Author,
 } from "@deeprecall/core";
-import type { Preset, BlobMeta, DeviceBlob } from "@deeprecall/core";
+import type {
+  Preset,
+  BlobMeta,
+  DeviceBlob,
+  ReplicationJob,
+} from "@deeprecall/core";
 
 class DeepRecallDB extends Dexie {
   // Library entities (synced from Electric)
@@ -29,6 +34,7 @@ class DeepRecallDB extends Dexie {
   // Blob coordination (synced from Electric)
   blobsMeta!: EntityTable<BlobMeta, "sha256">;
   deviceBlobs!: EntityTable<DeviceBlob, "id">;
+  replicationJobs!: EntityTable<ReplicationJob, "id">;
 
   // Local optimistic changes (pending sync)
   presets_local!: EntityTable<
@@ -958,6 +964,8 @@ class DeepRecallDB extends Dexie {
         // Blob coordination (synced from Electric)
         blobsMeta: "sha256, mime, createdAt",
         deviceBlobs: "id, deviceId, sha256, present, health, createdAt",
+        replicationJobs:
+          "id, sha256, targetDeviceId, status, priority, createdAt",
 
         // Local optimistic tables (instant writes, pending sync)
         presets_local: "++_localId, id, _op, _status, _timestamp",

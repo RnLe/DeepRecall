@@ -66,91 +66,99 @@ async function syncElectricToDexie(electricData: Annotation[]): Promise<void> {
 }
 
 // ============================================================================
-// Query Hooks (Merged Layer: Synced + Local)
+// Sync Hooks (Internal - Called by SyncManager only)
+// ============================================================================
+
+/**
+ * Internal sync hook: Subscribes to Electric (all annotations) and syncs to Dexie
+ * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
+ *
+ * DO NOT call this from components! Use useAnnotations() or usePDFAnnotations() instead.
+ */
+export function useAnnotationsSync() {
+  const electricResult = annotationsElectric.useAnnotations();
+
+  // Sync Electric data to Dexie annotations table (for merge layer)
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[useAnnotationsSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Run cleanup when Electric confirms sync
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      annotationsCleanup
+        .cleanupSyncedAnnotations(electricResult.data)
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error("[useAnnotationsSync] Failed to cleanup:", error);
+        });
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
+// Query Hooks (Public - Called by components)
 // ============================================================================
 
 /**
  * Hook to get all annotations for a PDF (merged: synced + pending local changes)
  * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ *
+ * This is a READ-ONLY hook with no side effects.
+ * Sync is handled by useAnnotationsSync() in SyncManager.
  */
 export function usePDFAnnotations(sha256: string) {
-  const electricResult = annotationsElectric.usePDFAnnotations(sha256);
-
-  // Sync Electric data to Dexie annotations table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  // If we sync too early (when Electric returns []), we'll clear the cache!
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[usePDFAnnotations] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["annotations", "merged", "pdf", sha256],
     queryFn: async () => {
       return annotationsMerged.getMergedPDFAnnotations(sha256);
     },
     staleTime: 0, // Always check for local changes
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      annotationsCleanup
-        .cleanupSyncedAnnotations(electricResult.data)
-        .then(() => {
-          mergedQuery.refetch();
-        });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  // Prioritize merged query loading state
-  // Show data immediately if available, even if Electric is still syncing
-  return {
-    ...mergedQuery,
-    isLoading: mergedQuery.isLoading,
-    isSyncing: electricResult.isLoading,
-  };
 }
 
 /**
  * Hook to get annotations for a specific page (merged)
+ * READ-ONLY: No sync side effects (handled by useAnnotationsSync)
  */
 export function usePageAnnotations(sha256: string, page: number) {
-  const electricResult = annotationsElectric.usePageAnnotations(sha256, page);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["annotations", "merged", "page", sha256, page],
     queryFn: async () => {
       return annotationsMerged.getMergedPageAnnotations(sha256, page);
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get a single annotation by ID (merged)
+ * READ-ONLY: No sync side effects (handled by useAnnotationsSync)
  */
 export function useAnnotation(id: string | undefined) {
-  const electricResult = annotationsElectric.useAnnotation(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["annotations", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -159,72 +167,34 @@ export function useAnnotation(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get all annotations (merged) - use sparingly, prefer filtered queries
+ * READ-ONLY: No sync side effects (handled by useAnnotationsSync)
  */
 export function useAnnotations() {
-  const electricResult = annotationsElectric.useAnnotations();
-
-  // Sync Electric data to Dexie
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useAnnotations] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["annotations", "merged"],
     queryFn: async () => {
       return annotationsMerged.getAllMergedAnnotations();
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      annotationsCleanup
-        .cleanupSyncedAnnotations(electricResult.data)
-        .then(() => {
-          mergedQuery.refetch();
-        });
-    }
-  }, [electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get recent annotations (merged)
+ * READ-ONLY: No sync side effects (handled by useAnnotationsSync)
  */
 export function useRecentAnnotations(limit: number = 10) {
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["annotations", "merged", "recent", limit],
     queryFn: async () => {
       return annotationsMerged.getRecentMergedAnnotations(limit);
     },
     staleTime: 0,
   });
-
-  return mergedQuery;
 }
 
 // ============================================================================

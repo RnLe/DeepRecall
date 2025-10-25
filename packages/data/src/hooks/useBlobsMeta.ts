@@ -38,24 +38,50 @@ async function syncElectricToDexie(electricData: BlobMeta[]): Promise<void> {
   });
 }
 
+// ============================================================================
+// Sync Hooks (Internal - Called by SyncManager only)
+// ============================================================================
+
 /**
- * Get all blob metadata entries
- * Uses syncElectricToDexie pattern for proper persistence
+ * Internal sync hook: Subscribes to Electric and syncs to Dexie
+ * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
+ *
+ * DO NOT call this from components! Use useBlobsMeta() instead.
  */
-export function useBlobsMeta() {
+export function useBlobsMetaSync() {
   const electricResult = useShape<BlobMeta>({ table: "blobs_meta" });
 
-  // CRITICAL: Check isLoading to prevent cache clearing on page reload
-  // Sync Electric → Dexie only after initial load completes
+  // Sync Electric data to Dexie
   useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
       syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error("[Electric→Dexie] Failed to sync blobs_meta:", error);
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[useBlobsMetaSync] Failed to sync Electric data to Dexie:",
+          error
+        );
       });
     }
-  }, [electricResult.isLoading, electricResult.data]);
+  }, [electricResult.data, electricResult.isFreshData]);
 
-  // Return merged data from Dexie (persists across navigation)
+  return null;
+}
+
+// ============================================================================
+// Query Hooks (Public - Called by components)
+// ============================================================================
+
+/**
+ * Get all blob metadata entries
+ *
+ * This is a READ-ONLY hook with no side effects.
+ * Sync is handled by useBlobsMetaSync() in SyncManager.
+ */
+export function useBlobsMeta() {
   return useQuery({
     queryKey: ["blobs-meta", "merged"],
     queryFn: async () => {
@@ -76,21 +102,30 @@ export function useBlobsMeta() {
 
 /**
  * Get blob metadata by SHA-256 hash
+ * READ-ONLY: No sync side effects (handled by useBlobsMetaSync)
  */
 export function useBlobMeta(sha256: string | undefined) {
-  const result = useShape<BlobMeta>({
-    table: "blobs_meta",
-    where: sha256 ? `sha256 = '${sha256}'` : undefined,
+  return useQuery({
+    queryKey: ["blobs-meta", "merged", sha256],
+    queryFn: async () => {
+      if (!sha256) return undefined;
+      return db.blobsMeta.get(sha256);
+    },
+    enabled: !!sha256,
+    staleTime: 0,
   });
-  return { ...result, data: result.data?.[0] };
 }
 
 /**
  * Get blobs by MIME type
+ * READ-ONLY: No sync side effects (handled by useBlobsMetaSync)
  */
 export function useBlobsMetaByMime(mime: string) {
-  return useShape<BlobMeta>({
-    table: "blobs_meta",
-    where: `mime = '${mime}'`,
+  return useQuery({
+    queryKey: ["blobs-meta", "merged", "mime", mime],
+    queryFn: async () => {
+      return db.blobsMeta.where("mime").equals(mime).toArray();
+    },
+    staleTime: 0,
   });
 }

@@ -58,66 +58,77 @@ async function syncElectricToDexie(electricData: Edge[]): Promise<void> {
 }
 
 // ============================================================================
+// Sync Hook (Internal: Called ONLY by SyncManager)
+// ============================================================================
+
+/**
+ * Internal sync hook - subscribes to Electric and syncs to Dexie
+ * MUST be called exactly once by SyncManager to avoid race conditions
+ * DO NOT call from components - use useEdges() instead
+ */
+export function useEdgesSync() {
+  const electricResult = edgesElectric.useEdges();
+
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[useEdgesSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Cleanup synced edges
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      edgesCleanup.cleanupSyncedEdges(electricResult.data);
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
 // Query Hooks (Merged Layer: Synced + Local)
 // ============================================================================
 
 /**
  * Hook to get all edges (merged: synced + pending local changes)
- * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useEdges() {
-  const electricResult = edgesElectric.useEdges();
-
-  // Sync Electric data to Dexie edges table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useEdges] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["edges", "merged"],
     queryFn: async () => {
       return edgesMerged.getAllMergedEdges();
     },
-    staleTime: 0, // Always check for local changes
+    staleTime: 0,
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      edgesCleanup.cleanupSyncedEdges(electricResult.data).then(() => {
-        mergedQuery.refetch();
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    // Only show loading if merged query is loading (not Electric)
-    // This allows instant feedback from Dexie cache
-    isLoading: mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single edge by ID (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useEdge(id: string | undefined) {
-  const electricResult = edgesElectric.useEdge(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["edges", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -126,23 +137,14 @@ export function useEdge(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get edges from a specific entity (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useEdgesFrom(fromId: string | undefined) {
-  const electricResult = edgesElectric.useEdgesFrom(fromId || "");
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["edges", "merged", "from", fromId],
     queryFn: async () => {
       if (!fromId) return [];
@@ -150,32 +152,16 @@ export function useEdgesFrom(fromId: string | undefined) {
     },
     enabled: !!fromId,
     staleTime: 0,
+    placeholderData: [],
   });
-
-  useEffect(() => {
-    if (electricResult.data && fromId) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, fromId]);
-
-  if (!fromId) {
-    return {
-      data: [],
-      isLoading: false,
-      error: null,
-    };
-  }
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get edges to a specific entity (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useEdgesTo(toId: string | undefined) {
-  const electricResult = edgesElectric.useEdgesTo(toId || "");
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["edges", "merged", "to", toId],
     queryFn: async () => {
       if (!toId) return [];
@@ -183,46 +169,22 @@ export function useEdgesTo(toId: string | undefined) {
     },
     enabled: !!toId,
     staleTime: 0,
+    placeholderData: [],
   });
-
-  useEffect(() => {
-    if (electricResult.data && toId) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, toId]);
-
-  if (!toId) {
-    return {
-      data: [],
-      isLoading: false,
-      error: null,
-    };
-  }
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get edges by relation type (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useEdgesByRelation(fromId: string, relation: Relation) {
-  const electricResult = edgesElectric.useEdgesByRelation(fromId, relation);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["edges", "merged", "relation", fromId, relation],
     queryFn: async () => {
       return edgesMerged.getMergedEdgesByRelation(fromId, relation);
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 // ============================================================================

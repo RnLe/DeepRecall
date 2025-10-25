@@ -59,81 +59,93 @@ async function syncElectricToDexie(electricData: Preset[]): Promise<void> {
 }
 
 // ============================================================================
-// Query Hooks (Merged Layer: Synced + Local)
+// Sync Hooks (Internal - Called by SyncManager only)
+// ============================================================================
+
+/**
+ * Internal sync hook: Subscribes to Electric and syncs to Dexie
+ * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
+ *
+ * DO NOT call this from components! Use usePresets() instead.
+ */
+export function usePresetsSync() {
+  const electricResult = presetsElectric.usePresets();
+
+  // Sync Electric data to Dexie presets table (for merge layer)
+  // CRITICAL: Only sync after receiving fresh data from network
+  // Skip stale cached data that hasn't been updated yet
+  useEffect(() => {
+    if (!electricResult.isLoading && electricResult.data !== undefined) {
+      // Check if this is stale cached data (before first network update)
+      if (!electricResult.isFreshData) {
+        return; // Don't sync stale cached data
+      }
+
+      // This is fresh data from the network - safe to sync
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[usePresetsSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  // Run cleanup when Electric confirms sync
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      presetsCleanup
+        .cleanupSyncedPresets(electricResult.data)
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error("[usePresetsSync] Failed to cleanup:", error);
+        });
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
+// Query Hooks (Public - Called by components)
 // ============================================================================
 
 /**
  * Hook to get all presets (merged: synced + pending local changes)
  * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ *
+ * This is a READ-ONLY hook with no side effects.
+ * Sync is handled by usePresetsSync() in SyncManager.
  */
 export function usePresets() {
-  const electricResult = presetsElectric.usePresets();
-
-  // Sync Electric data to Dexie presets table (for merge layer)
-  // CRITICAL: Only sync after initial load AND after a delay to ensure fresh data
-  // Skip immediate syncs from cached connections which may have stale data
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      // Wait 500ms to ensure we have fresh data, not stale cached data
-      const syncTimer = setTimeout(() => {
-        syncElectricToDexie(electricResult.data!).catch((error) => {
-          if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[usePresets] Failed to sync Electric data to Dexie:",
-            error
-          );
-        });
-      }, 500);
-
-      return () => clearTimeout(syncTimer);
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["presets", "merged"],
     queryFn: async () => {
       return presetsMerged.getAllMergedPresets();
     },
     staleTime: 0, // Always check for local changes
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      // Cleanup confirmed syncs
-      presetsCleanup.cleanupSyncedPresets(electricResult.data).then(() => {
-        // Refresh merged view after cleanup
-        mergedQuery.refetch();
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single preset by ID (merged)
+ * READ-ONLY: No sync side effects (handled by usePresetsSync)
  */
 export function usePreset(id: string | undefined) {
-  const electricResult = presetsElectric.usePreset(id);
-
-  // Sync Electric data to Dexie
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined && id) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error("[usePreset] Failed to sync Electric data:", error);
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data, id]);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["presets", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -142,66 +154,39 @@ export function usePreset(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get presets for a specific target entity (merged)
+ * READ-ONLY: No sync side effects (handled by usePresetsSync)
  */
 export function usePresetsForTarget(targetEntity: PresetTarget) {
-  const electricResult = presetsElectric.usePresetsForTarget(targetEntity);
-
-  // Sync Electric data to Dexie
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error("[usePresetsForTarget] Failed to sync:", error);
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["presets", "merged", "target", targetEntity],
     queryFn: async () => {
       return presetsMerged.getMergedPresetsForTarget(targetEntity);
     },
     staleTime: 0,
   });
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get system presets only (merged)
+ * READ-ONLY: No sync side effects (handled by usePresetsSync)
  */
 export function useSystemPresets() {
-  const electricResult = presetsElectric.useSystemPresets();
-
-  // Sync Electric data to Dexie
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error("[useSystemPresets] Failed to sync:", error);
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["presets", "merged", "system"],
     queryFn: async () => {
       return presetsMerged.getMergedSystemPresets();
     },
     staleTime: 0,
   });
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get user presets only (merged)
+ * READ-ONLY: No sync side effects (handled by usePresetsSync)
  */
 export function useUserPresets() {
   const allPresets = usePresets();

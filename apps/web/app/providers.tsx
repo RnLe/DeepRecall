@@ -2,7 +2,23 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { initElectric, initFlushWorker } from "@deeprecall/data";
+import {
+  initElectric,
+  initFlushWorker,
+  usePresetsSync,
+  useActivitiesSync,
+  useAnnotationsSync,
+  useAssetsSync,
+  useAuthorsSync,
+  useBlobsMetaSync,
+  useCardsSync,
+  useCollectionsSync,
+  useDeviceBlobsSync,
+  useEdgesSync,
+  useReplicationJobsSync,
+  useReviewLogsSync,
+  useWorksSync,
+} from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 
 // Configure PDF.js worker for Web platform
@@ -26,7 +42,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ElectricInitializer />
-      <PresetInitializer />
+      <SyncManager />
       {children}
     </QueryClientProvider>
   );
@@ -84,10 +100,31 @@ function ElectricInitializer() {
 }
 
 /**
- * Preset system ready indicator
- * Note: Default presets are NOT auto-initialized
- * Users must manually click "Initialize Defaults" in PresetManager
+ * SyncManager: Centralized Electric → Dexie sync coordinator
+ *
+ * CRITICAL: This component runs ALL sync hooks exactly ONCE to prevent race conditions.
+ * - Subscribes to Electric shapes
+ * - Syncs data to Dexie synced tables
+ * - Runs cleanup on local tables
+ *
+ * Components should ONLY use read hooks (usePresets, useWorks, etc.)
+ * which query merged data from Dexie without side effects.
  */
-function PresetInitializer() {
+function SyncManager() {
+  // Sync hooks (alphabetical order)
+  useActivitiesSync();
+  useAnnotationsSync();
+  useAssetsSync();
+  useAuthorsSync();
+  useBlobsMetaSync();
+  useCardsSync();
+  useCollectionsSync();
+  useDeviceBlobsSync();
+  useEdgesSync();
+  usePresetsSync();
+  useReplicationJobsSync();
+  useReviewLogsSync();
+  useWorksSync();
+
   return null;
 }

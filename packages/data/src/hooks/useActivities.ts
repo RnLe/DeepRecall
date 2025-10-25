@@ -62,33 +62,71 @@ async function syncElectricToDexie(electricData: Activity[]): Promise<void> {
 }
 
 // ============================================================================
-// Query Hooks (Merged Layer: Synced + Local)
+// Sync Hooks (Internal - Called by SyncManager only)
+// ============================================================================
+
+/**
+ * Internal sync hook: Subscribes to Electric and syncs to Dexie
+ * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
+ *
+ * DO NOT call this from components! Use useActivities() instead.
+ */
+export function useActivitiesSync() {
+  const electricResult = activitiesElectric.useActivities();
+
+  // Sync Electric data to Dexie activities table (for merge layer)
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[useActivitiesSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Run cleanup when Electric confirms sync
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      activitiesCleanup
+        .cleanupSyncedActivities(electricResult.data)
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error("[useActivitiesSync] Failed to cleanup:", error);
+        });
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
+// Query Hooks (Public - Called by components)
 // ============================================================================
 
 /**
  * Hook to get all activities (merged: synced + pending local changes)
  * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ *
+ * This is a READ-ONLY hook with no side effects.
+ * Sync is handled by useActivitiesSync() in SyncManager.
  */
 export function useActivities() {
-  const electricResult = activitiesElectric.useActivities();
-
-  // Sync Electric data to Dexie activities table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useActivities] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["activities", "merged"],
     queryFn: async () => {
       return activitiesMerged.getAllMergedActivities();
@@ -96,34 +134,14 @@ export function useActivities() {
     staleTime: 0, // Always check for local changes
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      activitiesCleanup
-        .cleanupSyncedActivities(electricResult.data)
-        .then(() => {
-          mergedQuery.refetch();
-        });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    // Only show loading if merged query is loading (not Electric)
-    // This allows instant feedback from Dexie cache
-    isLoading: mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single activity by ID (merged)
+ * READ-ONLY: No sync side effects (handled by useActivitiesSync)
  */
 export function useActivity(id: string | undefined) {
-  const electricResult = activitiesElectric.useActivity(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["activities", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -132,67 +150,48 @@ export function useActivity(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get activities by type (merged)
+ * READ-ONLY: No sync side effects (handled by useActivitiesSync)
  */
 export function useActivitiesByType(activityType: string) {
-  const electricResult = activitiesElectric.useActivitiesByType(activityType);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["activities", "merged", "type", activityType],
     queryFn: async () => {
       return activitiesMerged.getMergedActivitiesByType(activityType);
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to search activities by title (client-side filtering on merged data)
+ * READ-ONLY: No sync side effects (handled by useActivitiesSync)
  */
 export function useSearchActivities(query: string) {
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["activities", "merged", "search", query],
     queryFn: async () => {
       return activitiesMerged.searchMergedActivitiesByTitle(query);
     },
     staleTime: 0,
   });
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get activities in date range (client-side filtering on merged data)
+ * READ-ONLY: No sync side effects (handled by useActivitiesSync)
  */
 export function useActivitiesInRange(startDate: string, endDate: string) {
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["activities", "merged", "range", startDate, endDate],
     queryFn: async () => {
       return activitiesMerged.getMergedActivitiesInRange(startDate, endDate);
     },
     staleTime: 0,
   });
-
-  return mergedQuery;
 }
 
 // ============================================================================

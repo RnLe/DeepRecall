@@ -58,8 +58,54 @@ async function syncElectricToDexie(electricData: Work[]): Promise<void> {
 }
 
 // ============================================================================
-// Query Hooks (Merged Layer: Synced + Local)
+// Sync Hook (Internal: Called ONLY by SyncManager)
 // ============================================================================
+
+/**
+ * Internal sync hook - subscribes to Electric and syncs to Dexie
+ * MUST be called exactly once by SyncManager to avoid race conditions
+ * DO NOT call from components - use useWorks() instead
+ */
+export function useWorksSync() {
+  const electricResult = worksElectric.useWorks();
+
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        // Ignore DatabaseClosedError (happens during db.delete())
+        if (error.name === "DatabaseClosedError") {
+          return;
+        }
+        console.error(
+          "[useWorksSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Cleanup synced works
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      worksCleanup.cleanupSyncedWorks(electricResult.data);
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
 
 // ============================================================================
 // Query Hooks (Merged Layer: Synced + Local)
@@ -67,68 +113,25 @@ async function syncElectricToDexie(electricData: Work[]): Promise<void> {
 
 /**
  * Hook to get all works (merged: synced + pending local changes)
- * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useWorks() {
-  const electricResult = worksElectric.useWorks();
-
-  // Sync Electric data to Dexie works table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      // Replace entire Dexie works table with Electric data
-      // This ensures deletions are properly reflected
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        // Ignore DatabaseClosedError (happens during db.delete())
-        if (error.name === "DatabaseClosedError") {
-          return;
-        }
-        console.error(
-          "[useWorks] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["works", "merged"],
     queryFn: async () => {
       return worksMerged.getAllMergedWorks();
     },
-    staleTime: 0, // Always check for local changes
+    staleTime: 0,
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      // Cleanup confirmed syncs
-      worksCleanup.cleanupSyncedWorks(electricResult.data).then(() => {
-        // Refresh merged view after cleanup
-        mergedQuery.refetch();
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    // Only show loading if merged query is loading (not Electric)
-    // This allows instant feedback from Dexie cache
-    isLoading: mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single work by ID (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useWork(id: string | undefined) {
-  const electricResult = worksElectric.useWork(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["works", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -137,63 +140,34 @@ export function useWork(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  // CRITICAL: Check isLoading to prevent refetch during initial load
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.isLoading, electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get works by type (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useWorksByType(workType: string) {
-  const electricResult = worksElectric.useWorksByType(workType);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["works", "merged", "type", workType],
     queryFn: async () => {
       return worksMerged.getMergedWorksByType(workType);
     },
     staleTime: 0,
   });
-
-  // CRITICAL: Check isLoading to prevent refetch during initial load
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get favorite works (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useFavoriteWorks() {
-  const electricResult = worksElectric.useFavoriteWorks();
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["works", "merged", "favorites"],
     queryFn: async () => {
       return worksMerged.getMergedFavoriteWorks();
     },
     staleTime: 0,
   });
-
-  // CRITICAL: Check isLoading to prevent refetch during initial load
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return mergedQuery;
 }
 
 /**

@@ -6,7 +6,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReviewLog } from "@deeprecall/core";
-import * as cardsElectric from "../repos/cards.electric";
+import { useShape } from "../electric";
 import * as reviewLogsLocal from "../repos/reviewLogs.local";
 import * as reviewLogsMerged from "../repos/reviewLogs.merged";
 import * as reviewLogsCleanup from "../repos/reviewLogs.cleanup";
@@ -62,29 +62,61 @@ async function syncElectricToDexie(electricData: ReviewLog[]): Promise<void> {
 }
 
 // ============================================================================
+// Sync Hook (Internal: Called ONLY by SyncManager)
+// ============================================================================
+
+/**
+ * Internal sync hook - subscribes to Electric and syncs to Dexie
+ * MUST be called exactly once by SyncManager to avoid race conditions
+ * DO NOT call from components - use useReviewLogsByCard() instead
+ */
+export function useReviewLogsSync() {
+  const electricResult = useShape<ReviewLog>({ table: "review_logs" });
+
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        console.error(
+          "[useReviewLogsSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Cleanup synced review logs
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      reviewLogsCleanup.cleanupSyncedReviewLogs(electricResult.data);
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
 // Query Hooks (Merged Layer: Synced + Local)
 // ============================================================================
 
 /**
  * Hook to get review logs for a card (merged: synced + pending local changes)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useReviewLogsByCard(cardId: string) {
-  const electricResult = cardsElectric.useReviewLogsByCard(cardId);
-
-  // Sync Electric data to Dexie
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useReviewLogsByCard] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["reviewLogs", "merged", "card", cardId],
     queryFn: async () => {
       return reviewLogsMerged.getMergedReviewLogsByCard(cardId);
@@ -92,22 +124,6 @@ export function useReviewLogsByCard(cardId: string) {
     staleTime: 0,
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      reviewLogsCleanup
-        .cleanupSyncedReviewLogs(electricResult.data)
-        .then(() => {
-          mergedQuery.refetch();
-        });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
-  };
 }
 
 // ============================================================================

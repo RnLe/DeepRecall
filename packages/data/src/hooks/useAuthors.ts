@@ -58,33 +58,71 @@ async function syncElectricToDexie(electricData: Author[]): Promise<void> {
 }
 
 // ============================================================================
-// Query Hooks (Merged Layer: Synced + Local)
+// Sync Hooks (Internal - Called by SyncManager only)
+// ============================================================================
+
+/**
+ * Internal sync hook: Subscribes to Electric and syncs to Dexie
+ * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
+ *
+ * DO NOT call this from components! Use useAuthors() instead.
+ */
+export function useAuthorsSync() {
+  const electricResult = authorsElectric.useAuthors();
+
+  // Sync Electric data to Dexie authors table (for merge layer)
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[useAuthorsSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Run cleanup when Electric confirms sync
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      authorsCleanup
+        .cleanupSyncedAuthors(electricResult.data)
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error("[useAuthorsSync] Failed to cleanup:", error);
+        });
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
+// Query Hooks (Public - Called by components)
 // ============================================================================
 
 /**
  * Hook to get all authors (merged: synced + pending local changes)
  * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ *
+ * This is a READ-ONLY hook with no side effects.
+ * Sync is handled by useAuthorsSync() in SyncManager.
  */
 export function useAuthors() {
-  const electricResult = authorsElectric.useAuthors();
-
-  // Sync Electric data to Dexie authors table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useAuthors] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["authors", "merged"],
     queryFn: async () => {
       return authorsMerged.getAllMergedAuthors();
@@ -92,30 +130,14 @@ export function useAuthors() {
     staleTime: 0, // Always check for local changes
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      authorsCleanup.cleanupSyncedAuthors(electricResult.data).then(() => {
-        mergedQuery.refetch();
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single author by ID (merged)
+ * READ-ONLY: No sync side effects (handled by useAuthorsSync)
  */
 export function useAuthor(id: string | undefined) {
-  const electricResult = authorsElectric.useAuthor(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["authors", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -124,37 +146,20 @@ export function useAuthor(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get multiple authors by IDs (merged)
+ * READ-ONLY: No sync side effects (handled by useAuthorsSync)
  */
 export function useAuthorsByIds(ids: string[]) {
-  const electricResult = authorsElectric.useAuthorsByIds(ids);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["authors", "merged", "ids", ids],
     queryFn: async () => {
       return authorsMerged.getMergedAuthorsByIds(ids);
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 // ============================================================================

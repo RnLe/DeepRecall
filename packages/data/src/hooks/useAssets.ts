@@ -60,37 +60,69 @@ async function syncElectricToDexie(electricData: Asset[]): Promise<void> {
 }
 
 // ============================================================================
-// Query Hooks (Merged Layer: Synced + Local)
+// Sync Hooks (Internal - Called by SyncManager only)
 // ============================================================================
 
+/**
+ * Internal sync hook: Subscribes to Electric and syncs to Dexie
+ * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
+ *
+ * DO NOT call this from components! Use useAssets() instead.
+ */
+export function useAssetsSync() {
+  const electricResult = assetsElectric.useAssets();
+
+  // Sync Electric data to Dexie assets table (for merge layer)
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error(
+          "[useAssetsSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Run cleanup when Electric confirms sync
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      assetsCleanup.cleanupSyncedAssets(electricResult.data).catch((error) => {
+        if (error.name === "DatabaseClosedError") return;
+        console.error("[useAssetsSync] Failed to cleanup:", error);
+      });
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
 // ============================================================================
-// Query Hooks (Merged Layer: Synced + Local)
+// Query Hooks (Public - Called by components)
 // ============================================================================
 
 /**
  * Hook to get all assets (merged: synced + pending local changes)
  * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ *
+ * This is a READ-ONLY hook with no side effects.
+ * Sync is handled by useAssetsSync() in SyncManager.
  */
 export function useAssets() {
-  const electricResult = assetsElectric.useAssets();
-
-  // Sync Electric data to Dexie assets table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useAssets] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["assets", "merged"],
     queryFn: async () => {
       return assetsMerged.getAllMergedAssets();
@@ -98,32 +130,14 @@ export function useAssets() {
     staleTime: 0, // Always check for local changes
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      assetsCleanup.cleanupSyncedAssets(electricResult.data).then(() => {
-        mergedQuery.refetch();
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    // Only show loading if merged query is loading (not Electric)
-    // This allows instant feedback from Dexie cache
-    isLoading: mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single asset by ID (merged)
+ * READ-ONLY: No sync side effects (handled by useAssetsSync)
  */
 export function useAsset(id: string | undefined) {
-  const electricResult = assetsElectric.useAsset(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["assets", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -132,26 +146,14 @@ export function useAsset(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  // CRITICAL: Check isLoading to prevent refetch during initial load
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.isLoading, electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get assets by work ID (merged)
+ * READ-ONLY: No sync side effects (handled by useAssetsSync)
  */
 export function useAssetsByWork(workId: string | undefined) {
-  const electricResult = workId
-    ? assetsElectric.useAssetsByWork(workId)
-    : { data: [], isLoading: false, error: null, syncStatus: "ready" as const };
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["assets", "merged", "work", workId],
     queryFn: async () => {
       if (!workId) return [];
@@ -160,34 +162,14 @@ export function useAssetsByWork(workId: string | undefined) {
     enabled: !!workId,
     staleTime: 0,
   });
-
-  // CRITICAL: Check isLoading to prevent refetch during initial load
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data && workId) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.isLoading, electricResult.data, workId]);
-
-  return {
-    ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get asset by hash (merged)
+ * READ-ONLY: No sync side effects (handled by useAssetsSync)
  */
 export function useAssetByHash(sha256: string | undefined) {
-  const electricResult = sha256
-    ? assetsElectric.useAssetByHash(sha256)
-    : {
-        data: undefined,
-        isLoading: false,
-        error: null,
-        syncStatus: "ready" as const,
-      };
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["assets", "merged", "hash", sha256],
     queryFn: async () => {
       if (!sha256) return undefined;
@@ -196,15 +178,6 @@ export function useAssetByHash(sha256: string | undefined) {
     enabled: !!sha256,
     staleTime: 0,
   });
-
-  // CRITICAL: Check isLoading to prevent refetch during initial load
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data && sha256) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.isLoading, electricResult.data, sha256]);
-
-  return mergedQuery;
 }
 
 // ============================================================================

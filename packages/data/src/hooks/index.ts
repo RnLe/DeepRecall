@@ -9,7 +9,10 @@ export * from "./useWorks";
 export * from "./useActivities";
 export * from "./useAnnotations";
 export * from "./useAssets";
+export * from "./useCards";
+export * from "./useCollections";
 export * from "./useEdges";
+export * from "./useReviewLogs";
 
 // Blob coordination hooks
 export * from "./useBlobsMeta";

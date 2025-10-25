@@ -58,29 +58,61 @@ async function syncElectricToDexie(electricData: Card[]): Promise<void> {
 }
 
 // ============================================================================
+// Sync Hook (Internal: Called ONLY by SyncManager)
+// ============================================================================
+
+/**
+ * Internal sync hook - subscribes to Electric and syncs to Dexie
+ * MUST be called exactly once by SyncManager to avoid race conditions
+ * DO NOT call from components - use useCards() instead
+ */
+export function useCardsSync() {
+  const electricResult = cardsElectric.useCards();
+
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        console.error(
+          "[useCardsSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Cleanup synced cards
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      cardsCleanup.cleanupSyncedCards(electricResult.data);
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
 // Query Hooks (Merged Layer: Synced + Local)
 // ============================================================================
 
 /**
  * Hook to get all cards (merged: synced + pending local changes)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useCards() {
-  const electricResult = cardsElectric.useCards();
-
-  // Sync Electric data to Dexie
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useCards] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["cards", "merged"],
     queryFn: async () => {
       return cardsMerged.getAllMergedCards();
@@ -88,29 +120,14 @@ export function useCards() {
     staleTime: 0,
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      cardsCleanup.cleanupSyncedCards(electricResult.data).then(() => {
-        mergedQuery.refetch();
-      });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single card by ID (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useCard(id: string | undefined) {
-  const electricResult = cardsElectric.useCard(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["cards", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -119,83 +136,48 @@ export function useCard(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get cards for a document (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useCardsByDoc(sha256: string) {
-  const electricResult = cardsElectric.useCardsByDoc(sha256);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["cards", "merged", "doc", sha256],
     queryFn: async () => {
       return cardsMerged.getMergedCardsByDoc(sha256);
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get cards for an annotation (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useCardsByAnnotation(annotationId: string) {
-  const electricResult = cardsElectric.useCardsByAnnotation(annotationId);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["cards", "merged", "annotation", annotationId],
     queryFn: async () => {
       return cardsMerged.getMergedCardsByAnnotation(annotationId);
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get due cards (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useDueCards(nowMs: number) {
-  const electricResult = cardsElectric.useDueCards(nowMs);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["cards", "merged", "due", nowMs],
     queryFn: async () => {
       return cardsMerged.getMergedDueCards(nowMs);
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 // ============================================================================

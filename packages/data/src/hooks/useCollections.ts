@@ -62,65 +62,76 @@ async function syncElectricToDexie(electricData: Collection[]): Promise<void> {
 }
 
 // ============================================================================
+// Sync Hook (Internal: Called ONLY by SyncManager)
+// ============================================================================
+
+/**
+ * Internal sync hook - subscribes to Electric and syncs to Dexie
+ * MUST be called exactly once by SyncManager to avoid race conditions
+ * DO NOT call from components - use useCollections() instead
+ */
+export function useCollectionsSync() {
+  const electricResult = collectionsElectric.useCollections();
+
+  // Sync Electric data to Dexie
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data !== undefined &&
+      electricResult.isFreshData
+    ) {
+      syncElectricToDexie(electricResult.data).catch((error) => {
+        console.error(
+          "[useCollectionsSync] Failed to sync Electric data to Dexie:",
+          error
+        );
+      });
+    }
+  }, [electricResult.data, electricResult.isFreshData]);
+
+  // Cleanup synced collections
+  useEffect(() => {
+    if (
+      !electricResult.isLoading &&
+      electricResult.data &&
+      electricResult.isFreshData
+    ) {
+      collectionsCleanup.cleanupSyncedCollections(electricResult.data);
+    }
+  }, [
+    electricResult.isLoading,
+    electricResult.data,
+    electricResult.isFreshData,
+  ]);
+
+  return null;
+}
+
+// ============================================================================
 // Query Hooks (Merged Layer: Synced + Local)
 // ============================================================================
 
 /**
  * Hook to get all collections (merged: synced + pending local changes)
- * Returns instant feedback with _local metadata for sync status
- * Auto-cleanup when Electric confirms sync
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useCollections() {
-  const electricResult = collectionsElectric.useCollections();
-
-  // Sync Electric data to Dexie collections table (for merge layer)
-  // CRITICAL: Only sync after initial load to preserve cached data on page reload
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useCollections] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
-    }
-  }, [electricResult.data]);
-
-  // Query merged data from Dexie
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["collections", "merged"],
     queryFn: async () => {
       return collectionsMerged.getAllMergedCollections();
     },
-    staleTime: 0, // Always check for local changes
+    staleTime: 0,
     placeholderData: [], // Show empty array while loading (prevents loading state)
   });
-
-  // Auto-cleanup and refresh when Electric data changes (synced)
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      collectionsCleanup
-        .cleanupSyncedCollections(electricResult.data)
-        .then(() => {
-          mergedQuery.refetch();
-        });
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    isLoading: electricResult.isLoading || mergedQuery.isLoading,
-  };
 }
 
 /**
  * Hook to get a single collection by ID (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function useCollection(id: string | undefined) {
-  const electricResult = collectionsElectric.useCollection(id);
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["collections", "merged", id],
     queryFn: async () => {
       if (!id) return undefined;
@@ -129,37 +140,20 @@ export function useCollection(id: string | undefined) {
     enabled: !!id,
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data && id) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data, id]);
-
-  return mergedQuery;
 }
 
 /**
  * Hook to get public collections (merged)
+ * Read-only - queries Dexie merged view without side effects
  */
 export function usePublicCollections() {
-  const electricResult = collectionsElectric.usePublicCollections();
-
-  const mergedQuery = useQuery({
+  return useQuery({
     queryKey: ["collections", "merged", "public"],
     queryFn: async () => {
       return collectionsMerged.getMergedPublicCollections();
     },
     staleTime: 0,
   });
-
-  useEffect(() => {
-    if (electricResult.data) {
-      mergedQuery.refetch();
-    }
-  }, [electricResult.data]);
-
-  return mergedQuery;
 }
 
 // ============================================================================

@@ -159,8 +159,8 @@ export interface ShapeSpec<T = any> {
 /**
  * Shape result with loading state
  */
-export interface ShapeResult<T> {
-  /** Loading state */
+export interface ShapeResult<T = any> {
+  /** Whether the shape is loading */
   isLoading: boolean;
 
   /** Current data (undefined while loading) */
@@ -171,6 +171,9 @@ export interface ShapeResult<T> {
 
   /** Sync status */
   syncStatus: "connecting" | "syncing" | "synced" | "error";
+
+  /** Whether data is fresh from network (not stale cache) */
+  isFreshData: boolean;
 }
 
 /**
@@ -184,6 +187,7 @@ const shapeCache = new Map<
     shape: Shape;
     subscribers: Set<(data: any[]) => void>;
     lastUpdateTime: number; // Track when data was last updated
+    hasReceivedFreshData: boolean; // Track if we've received network update since connection
   }
 >();
 
@@ -214,6 +218,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
   const [error, setError] = useState<Error | undefined>(undefined);
   const [syncStatus, setSyncStatus] =
     useState<ShapeResult<T>["syncStatus"]>("connecting");
+  const [isFreshData, setIsFreshData] = useState(false); // Track if data is fresh from network
 
   const streamRef = useRef<ShapeStream | null>(null);
   const shapeRef = useRef<Shape | null>(null);
@@ -227,7 +232,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       console.log(
         `[Electric] Reusing cached shape: ${spec.table}${
           spec.where ? ` (${spec.where})` : ""
-        }`
+        }${cached.hasReceivedFreshData ? " (fresh data)" : " (stale cache)"}`
       );
       streamRef.current = cached.stream;
       shapeRef.current = cached.shape;
@@ -244,6 +249,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
         setData(parsedRows);
         setIsLoading(false);
         setSyncStatus("synced");
+        setIsFreshData(true); // Any update from network is fresh
       };
 
       cached.subscribers.add(handleUpdate);
@@ -251,6 +257,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       // Trigger immediate update with current data
       const currentData = cached.shape.currentValue;
       if (currentData) {
+        setIsFreshData(cached.hasReceivedFreshData); // Use cache's freshness state
         handleUpdate(currentData);
       }
 
@@ -322,11 +329,13 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       setData(parsedRows);
       setIsLoading(false);
       setSyncStatus("synced");
+      setIsFreshData(true); // Mark as fresh data from network
 
       // Update last update time in cache
       const cached = shapeCache.get(cacheKey);
       if (cached) {
         cached.lastUpdateTime = Date.now();
+        cached.hasReceivedFreshData = true; // Mark as having received fresh data
       }
 
       subscribers.forEach((callback) => callback(parsedRows));
@@ -366,6 +375,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       shape,
       subscribers,
       lastUpdateTime: Date.now(),
+      hasReceivedFreshData: false, // Will be set true on first network update
     });
     console.log(`[Electric] Cached shape connection: ${cacheKey}`);
 
@@ -382,6 +392,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     isLoading,
     error,
     syncStatus,
+    isFreshData, // Expose freshness state to consumers
   };
 }
 
