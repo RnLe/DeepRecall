@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { StrokePoint, StrokeStyle } from "@deeprecall/core";
+import type { StrokePoint, StrokeStyle, ShapeMetadata } from "@deeprecall/core";
 import {
   useStrokes,
   useCreateStroke,
@@ -39,23 +39,30 @@ import {
 import type { PixiApp } from "@deeprecall/whiteboard/render";
 import {
   GestureFSM,
-  type Tool,
+  type ToolId,
   normalizePointerEvent,
   getCoalescedSamples,
-  shouldAddSample,
   type PointerSample,
-  type BrushType,
-  BRUSH_PRESETS,
+  getTool,
+  isInkingTool,
+  isEraserTool,
+  createInkingEngine,
+  type InkingEngine,
+  renderSmoothStroke,
+  AidDetector,
+  type AidState,
+  createDefaultAidState,
+  calculateVelocity,
+  calculateRecentVelocity,
 } from "@deeprecall/whiteboard/ink";
 import { DebugOverlay, type DebugStats } from "./DebugOverlay";
 
 export interface WhiteboardViewProps {
   boardId: string;
-  tool: Tool;
-  onToolChange?: (tool: Tool) => void;
+  toolId: ToolId;
+  onToolChange?: (toolId: ToolId) => void;
   brushColor?: string;
   brushWidth?: number;
-  brushType?: BrushType;
   className?: string;
   showDebug?: boolean;
   onDebugClose?: () => void;
@@ -63,11 +70,10 @@ export interface WhiteboardViewProps {
 
 export function WhiteboardView({
   boardId,
-  tool,
+  toolId,
   onToolChange,
   brushColor = "#000000",
   brushWidth = 2,
-  brushType = "pen",
   className = "",
   showDebug = false,
   onDebugClose,
@@ -82,6 +88,7 @@ export function WhiteboardView({
   const cameraRef = useRef<Camera | null>(null);
   const orchestratorRef = useRef<BoardOrchestrator | null>(null);
   const gestureFSMRef = useRef<GestureFSM | null>(null);
+  const inkingEngineRef = useRef<InkingEngine | null>(null);
   const minimapRef = useRef<MinimapRenderer | null>(null);
   const eraserHitsRef = useRef<Set<string>>(new Set());
   const renderCanvasRef = useRef<() => void>(() => {});
@@ -94,6 +101,10 @@ export function WhiteboardView({
   const rendererModeRef = useRef<"initializing" | "pixi" | "canvas">(
     "initializing"
   );
+  const aidDetectorRef = useRef<AidDetector | null>(null);
+  const aidStateRef = useRef<AidState | null>(null);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const velocityPollingRef = useRef<NodeJS.Timeout | null>(null); // For continuous velocity updates
 
   const [rendererMode, setRendererMode] = useState<
     "initializing" | "pixi" | "canvas"
@@ -102,9 +113,12 @@ export function WhiteboardView({
   // State
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 });
-  const [currentStroke, setCurrentStroke] = useState<PointerSample[]>([]);
-  const [strokeStartTime, setStrokeStartTime] = useState(0);
-  const [lastAddedTime, setLastAddedTime] = useState(0);
+  const [currentStrokePreview, setCurrentStrokePreview] = useState<
+    StrokePoint[]
+  >([]);
+  const [liveCursorPoint, setLiveCursorPoint] = useState<StrokePoint | null>(
+    null
+  ); // Live point that follows cursor during drawing
 
   // Debug state
   const [showStrokeVisualization, setShowStrokeVisualization] = useState(false);
@@ -120,12 +134,17 @@ export function WhiteboardView({
     cameraZoom: 1,
     viewportWidth: 0,
     viewportHeight: 0,
-    tool,
-    brushType,
+    toolId,
     brushColor,
     brushWidth,
     cursorScreen: { x: 0, y: 0 },
     cursorBoard: { x: 0, y: 0 },
+    aidStillness: false,
+    aidCurrentStrokePoints: 0,
+    aidStartEndDistance: 0,
+    aidDetectedShape: null,
+    aidCurrentVelocity: 0,
+    aidStrokeDuration: 0,
   });
 
   // Data hooks
@@ -142,10 +161,28 @@ export function WhiteboardView({
   });
   const visibleStrokeCountRef = useRef(0);
   const mousePosRef = useRef(mousePos);
-  const toolRef = useRef(tool);
-  const brushTypeRef = useRef(brushType);
+  const toolIdRef = useRef(toolId);
   const brushColorRef = useRef(brushColor);
   const brushWidthRef = useRef(brushWidth);
+  const aidStatsRef = useRef({
+    stillness: false,
+    currentStrokePoints: 0,
+    startEndDistance: 0,
+    detectedShape: null as string | null,
+    currentVelocity: 0,
+    strokeDuration: 0,
+  });
+
+  const resetAidStats = useCallback(() => {
+    aidStatsRef.current = {
+      stillness: false,
+      currentStrokePoints: 0,
+      startEndDistance: 0,
+      detectedShape: null,
+      currentVelocity: 0,
+      strokeDuration: 0,
+    };
+  }, []);
 
   useEffect(() => {
     showDebugRef.current = showDebug;
@@ -176,12 +213,8 @@ export function WhiteboardView({
   }, [mousePos]);
 
   useEffect(() => {
-    toolRef.current = tool;
-  }, [tool]);
-
-  useEffect(() => {
-    brushTypeRef.current = brushType;
-  }, [brushType]);
+    toolIdRef.current = toolId;
+  }, [toolId]);
 
   useEffect(() => {
     brushColorRef.current = brushColor;
@@ -213,15 +246,19 @@ export function WhiteboardView({
     }
 
     if (!gestureFSMRef.current) {
-      gestureFSMRef.current = new GestureFSM(tool);
+      gestureFSMRef.current = new GestureFSM(toolId);
     } else {
-      gestureFSMRef.current.setTool(tool);
+      gestureFSMRef.current.setTool(toolId);
     }
 
     if (!minimapRef.current && minimapCanvasRef.current) {
       minimapRef.current = new MinimapRenderer(minimapCanvasRef.current);
     }
-  }, [canvasSize, tool]);
+
+    if (!aidDetectorRef.current) {
+      aidDetectorRef.current = new AidDetector();
+    }
+  }, [canvasSize, toolId]);
 
   // Initialize PixiJS once canvas size is known
   useEffect(() => {
@@ -327,12 +364,17 @@ export function WhiteboardView({
               cameraZoom: cameraState.scale,
               viewportWidth: canvasSizeRef.current.width,
               viewportHeight: canvasSizeRef.current.height,
-              tool: toolRef.current,
-              brushType: brushTypeRef.current,
+              toolId: toolIdRef.current,
               brushColor: brushColorRef.current,
               brushWidth: brushWidthRef.current,
               cursorScreen,
               cursorBoard,
+              aidStillness: aidStatsRef.current.stillness,
+              aidCurrentStrokePoints: aidStatsRef.current.currentStrokePoints,
+              aidStartEndDistance: aidStatsRef.current.startEndDistance,
+              aidDetectedShape: aidStatsRef.current.detectedShape,
+              aidCurrentVelocity: aidStatsRef.current.currentVelocity,
+              aidStrokeDuration: aidStatsRef.current.strokeDuration,
             });
           }
         };
@@ -438,6 +480,12 @@ export function WhiteboardView({
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateSize);
+
+      // Clean up velocity polling on unmount
+      if (velocityPollingRef.current) {
+        clearInterval(velocityPollingRef.current);
+        velocityPollingRef.current = null;
+      }
     };
   }, []);
 
@@ -458,26 +506,16 @@ export function WhiteboardView({
 
     const boardOffset = camera.getBoardOffset();
 
-    const hasActiveStroke = currentStroke.length > 0 && tool === "pen";
-    const activeStrokePoints: StrokePoint[] = hasActiveStroke
-      ? currentStroke.map((sample) => {
-          const boardPoint = camera.screenToBoard(sample.x, sample.y);
-          return {
-            x: boardPoint.x,
-            y: boardPoint.y,
-            pressure: sample.pressure,
-            timestamp: sample.timestamp - strokeStartTime,
-            tiltX: sample.tiltX,
-            tiltY: sample.tiltY,
-          } as StrokePoint;
-        })
-      : [];
+    // Get current tool config
+    const currentTool = getTool(toolId);
+    const isDrawing =
+      isInkingTool(currentTool) && currentStrokePreview.length > 0;
 
     const activeStrokeStyle: StrokeStyle = {
       color: brushColor,
       width: brushWidth,
-      opacity: brushType === "highlighter" ? 0.4 : 1,
-      brushType: brushType === "eraser" ? "pen" : brushType,
+      opacity: toolId === "highlighter" ? 0.4 : 1,
+      toolId: toolId,
     };
 
     if (rendererModeRef.current === "pixi" && pixiRendererRef.current) {
@@ -487,8 +525,11 @@ export function WhiteboardView({
       pixiRenderer.renderBoard("#f8f7ea");
       pixiRenderer.renderStrokes(strokeObjects);
 
-      if (hasActiveStroke) {
-        pixiRenderer.setActiveStroke(activeStrokePoints, activeStrokeStyle);
+      if (isDrawing) {
+        const activePoints = liveCursorPoint
+          ? [...currentStrokePreview, liveCursorPoint]
+          : currentStrokePreview;
+        pixiRenderer.setActiveStroke(activePoints, activeStrokeStyle);
       } else {
         pixiRenderer.clearActiveStroke();
       }
@@ -520,29 +561,31 @@ export function WhiteboardView({
 
     objects.forEach((obj) => drawObject(renderCtx, obj));
 
-    if (hasActiveStroke) {
+    if (isDrawing) {
       const { ctx } = renderCtx;
-      ctx.strokeStyle = brushColor;
-      ctx.lineWidth = brushWidth;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      activeStrokePoints.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.stroke();
+      // Combine static placed points with live cursor point
+      const pointsToRender = liveCursorPoint
+        ? [...currentStrokePreview, liveCursorPoint]
+        : currentStrokePreview;
+
+      // Use smooth curve rendering
+      renderSmoothStroke(
+        ctx,
+        pointsToRender,
+        brushColor,
+        brushWidth,
+        activeStrokeStyle.opacity
+      );
     }
 
     restoreTransform(renderCtx);
   }, [
     canvasSize,
-    currentStroke,
-    tool,
+    currentStrokePreview,
+    liveCursorPoint,
+    toolId,
     brushColor,
     brushWidth,
-    brushType,
-    strokeStartTime,
     rendererMode,
     showDebug,
     showStrokeVisualization,
@@ -614,12 +657,20 @@ export function WhiteboardView({
     const gesture = gestureFSMRef.current?.getState();
     if (gesture?.type === "panning") return;
 
-    if (tool === "pen") {
+    const currentTool = getTool(toolId);
+
+    if (isInkingTool(currentTool)) {
+      // Cursor dot matches brush width
+      const camera = cameraRef.current;
+      if (!camera) return;
+      const cursorRadius = (brushWidth * camera.getState().scale) / 2;
       ctx.fillStyle = brushColor;
+      ctx.globalAlpha = 0.5;
       ctx.beginPath();
-      ctx.arc(mousePos.x, mousePos.y, 2, 0, Math.PI * 2);
+      ctx.arc(mousePos.x, mousePos.y, cursorRadius, 0, Math.PI * 2);
       ctx.fill();
-    } else if (tool === "eraser") {
+      ctx.globalAlpha = 1.0;
+    } else if (isEraserTool(currentTool)) {
       const camera = cameraRef.current;
       if (!camera) return;
       const eraserRadius = brushWidth * 3 * camera.getState().scale;
@@ -629,14 +680,15 @@ export function WhiteboardView({
       ctx.arc(mousePos.x, mousePos.y, eraserRadius, 0, Math.PI * 2);
       ctx.stroke();
     }
-  }, [mousePos, tool, brushColor, brushWidth, canvasSize]);
+  }, [mousePos, toolId, brushColor, brushWidth, canvasSize]);
 
   // Event handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     const camera = cameraRef.current;
     const gestureFSM = gestureFSMRef.current;
-    if (!canvas || !camera || !gestureFSM) return;
+    const aidDetector = aidDetectorRef.current;
+    if (!canvas || !camera || !gestureFSM || !aidDetector) return;
 
     canvas.setPointerCapture(e.pointerId);
     const canvasRect = canvas.getBoundingClientRect();
@@ -646,11 +698,79 @@ export function WhiteboardView({
 
     const state = gestureFSM.getState();
     if (state.type === "drawing") {
-      setStrokeStartTime(sample.timestamp);
-      setLastAddedTime(sample.timestamp);
-      setCurrentStroke([sample]);
+      // Create InkingEngine for this stroke
+      const currentTool = getTool(toolId);
+      if (isInkingTool(currentTool)) {
+        // Convert to board coordinates
+        const boardPos = camera.screenToBoard(sample.x, sample.y);
+        const boardSample = { ...sample, x: boardPos.x, y: boardPos.y };
+
+        const engine = createInkingEngine(currentTool.inking, brushWidth);
+        const initialPoint = engine.start(boardSample);
+        inkingEngineRef.current = engine;
+
+        setCurrentStrokePreview([initialPoint]);
+        setLiveCursorPoint(initialPoint);
+
+        // Initialize aid state for new stroke
+        aidStateRef.current = createDefaultAidState();
+
+        // Reset aid debug stats
+        resetAidStats();
+        aidStatsRef.current.currentStrokePoints = 1;
+
+        if (aidStateRef.current) {
+          // Initialize recent samples buffer with first point
+          aidStateRef.current.recentSamples = [
+            {
+              x: boardSample.x,
+              y: boardSample.y,
+              timestamp: boardSample.timestamp,
+            },
+          ];
+          aidStateRef.current.originalPoints = [initialPoint];
+
+          // Start velocity polling (checks every 16ms = ~60fps)
+          velocityPollingRef.current = setInterval(() => {
+            const aidState = aidStateRef.current;
+            if (
+              !aidState ||
+              !aidState.recentSamples ||
+              aidState.recentSamples.length === 0
+            ) {
+              return;
+            }
+
+            // Calculate velocity from recent samples (100ms window for quick response)
+            const velocity = calculateRecentVelocity(
+              aidState.recentSamples,
+              100
+            );
+            aidStatsRef.current.currentVelocity = velocity;
+
+            // Clean up old samples (keep last 200ms for history)
+            const now = performance.now();
+            const cutoff = now - 200;
+            aidState.recentSamples = aidState.recentSamples.filter(
+              (s) => s.timestamp >= cutoff
+            );
+
+            // If no recent samples (last sample is old), force velocity to 0
+            if (aidState.recentSamples.length > 0) {
+              const lastSample =
+                aidState.recentSamples[aidState.recentSamples.length - 1];
+              const timeSinceLastSample = now - lastSample.timestamp;
+              if (timeSinceLastSample > 100) {
+                // No movement for 100ms = velocity is 0
+                aidStatsRef.current.currentVelocity = 0;
+              }
+            }
+          }, 16); // ~60 FPS polling
+        }
+      }
     } else if (state.type === "erasing") {
-      setCurrentStroke([sample]);
+      // Start eraser gesture
+      checkEraserHit(sample);
     }
   };
 
@@ -658,7 +778,9 @@ export function WhiteboardView({
     const canvas = canvasRef.current;
     const camera = cameraRef.current;
     const gestureFSM = gestureFSMRef.current;
-    if (!canvas || !camera || !gestureFSM) return;
+    const aidDetector = aidDetectorRef.current;
+    const aidState = aidStateRef.current;
+    if (!canvas || !camera || !gestureFSM || !aidDetector) return;
 
     const canvasRect = canvas.getBoundingClientRect();
     const screenPos = {
@@ -676,22 +798,178 @@ export function WhiteboardView({
       const dy = lastSample.y - state.lastPoint.y;
       camera.pan(dx, dy);
       gestureFSM.onPointerMove(lastSample);
+      setLiveCursorPoint(null);
       renderCanvas();
       return;
     }
 
     if (state.type === "drawing" || state.type === "erasing") {
+      if (state.type === "erasing") {
+        setLiveCursorPoint(null);
+      }
+
+      // Track raw cursor position for velocity (BEFORE processing samples)
+      if (state.type === "drawing" && aidState && !aidState.isAdjusting) {
+        const lastSample = samples[samples.length - 1];
+        const boardPos = camera.screenToBoard(lastSample.x, lastSample.y);
+
+        const currentSample = {
+          x: boardPos.x,
+          y: boardPos.y,
+          timestamp: lastSample.timestamp,
+        };
+
+        // Add to recent samples buffer (keep last 200ms worth)
+        if (!aidState.recentSamples) {
+          aidState.recentSamples = [];
+        }
+        aidState.recentSamples.push(currentSample);
+
+        // Keep only samples from last 200ms
+        const cutoff = currentSample.timestamp - 200;
+        aidState.recentSamples = aidState.recentSamples.filter(
+          (s) => s.timestamp >= cutoff
+        );
+
+        // Calculate velocity from recent samples
+        const velocity = calculateRecentVelocity(aidState.recentSamples, 150);
+        aidStatsRef.current.currentVelocity = velocity;
+      }
+
       for (const sample of samples) {
-        const prevSample = currentStroke[currentStroke.length - 1] || null;
-        if (shouldAddSample(sample, prevSample, lastAddedTime)) {
-          setCurrentStroke((prev) => [...prev, sample]);
-          setLastAddedTime(sample.timestamp);
-          if (state.type === "erasing") {
-            checkEraserHit(sample);
+        if (state.type === "drawing" && inkingEngineRef.current && aidState) {
+          // Convert to board coordinates
+          const boardPos = camera.screenToBoard(sample.x, sample.y);
+          const boardSample = { ...sample, x: boardPos.x, y: boardPos.y };
+
+          // Check if we're in adjustment mode
+          if (aidState.isAdjusting && aidState.detectedShape) {
+            // Update shape based on cursor position
+            const adjustedShape = aidDetector.adjustShape(
+              aidState.detectedShape,
+              boardSample,
+              aidState.adjustmentMetadata
+            );
+            const shapePoints = aidDetector.generatePoints(adjustedShape);
+            setCurrentStrokePreview(shapePoints);
+            setLiveCursorPoint(null);
+
+            // Update detected shape in state
+            aidState.detectedShape = adjustedShape;
+
+            // Update debug stats
+            aidStatsRef.current.detectedShape = adjustedShape.type;
+          } else {
+            // Normal inking - process sample in inking engine
+            const update = inkingEngineRef.current.addSample(boardSample);
+
+            const enoughPointsForHold = aidState.originalPoints.length >= 10;
+
+            if (update.accepted) {
+              setCurrentStrokePreview(update.points);
+
+              // Store original points for shape detection (freeze once hold timer starts)
+              if (!aidState.holdTimer) {
+                aidState.originalPoints = update.points;
+              }
+
+              // Update debug stats for current stroke
+              const firstPoint = update.points[0];
+              const lastPoint = update.points[update.points.length - 1];
+              const dx = lastPoint.x - firstPoint.x;
+              const dy = lastPoint.y - firstPoint.y;
+              aidStatsRef.current.currentStrokePoints = update.points.length;
+              aidStatsRef.current.startEndDistance = Math.sqrt(
+                dx * dx + dy * dy
+              );
+              aidStatsRef.current.strokeDuration =
+                lastPoint.timestamp - firstPoint.timestamp;
+            }
+            setLiveCursorPoint(update.livePoint);
+
+            // Hold detection logic
+            if (aidState.enabled && !aidState.detectedShape) {
+              // Get current velocity from samples tracked above
+              const velocity = aidStatsRef.current.currentVelocity;
+              const stillnessMet =
+                velocity < aidDetector.config.holdVelocityThreshold &&
+                enoughPointsForHold;
+              aidStatsRef.current.stillness = stillnessMet;
+
+              if (stillnessMet) {
+                // Velocity low enough - start/continue hold timer
+                if (!aidState.holdTimer) {
+                  aidState.holdSnapshot = aidState.originalPoints.map(
+                    (point) => ({ ...point })
+                  );
+                  aidState.holdTimer = setTimeout(() => {
+                    // Hold completed - detect shape
+                    const sourcePoints =
+                      aidState.holdSnapshot && aidState.holdSnapshot.length > 0
+                        ? aidState.holdSnapshot
+                        : aidState.originalPoints;
+
+                    if (sourcePoints.length < 10) {
+                      aidState.holdTimer = null;
+                      aidState.holdSnapshot = null;
+                      aidStatsRef.current.detectedShape = null;
+                      return;
+                    }
+
+                    const shape = aidDetector.detectShape(
+                      sourcePoints,
+                      toolIdRef.current
+                    );
+                    aidState.holdSnapshot = null;
+
+                    if (shape) {
+                      // Shape detected! Enter adjustment mode
+                      aidState.detectedShape = shape;
+                      aidState.isAdjusting = true;
+
+                      // Update debug stats
+                      aidStatsRef.current.detectedShape = shape.type;
+                      aidStatsRef.current.stillness = false;
+
+                      // Determine which corner/edge to adjust
+                      if (update.livePoint) {
+                        aidState.adjustmentMetadata =
+                          aidDetector.determineAdjustmentPoint(
+                            shape,
+                            update.livePoint
+                          );
+                      }
+
+                      // Update preview to show shape
+                      const shapePoints = aidDetector.generatePoints(shape);
+                      setCurrentStrokePreview(shapePoints);
+                      setLiveCursorPoint(null);
+                    }
+
+                    aidState.holdTimer = null;
+                  }, aidDetector.config.holdDuration);
+                }
+              } else {
+                // Velocity too high - cancel hold timer
+                if (aidState.holdTimer) {
+                  clearTimeout(aidState.holdTimer);
+                  aidState.holdTimer = null;
+                  aidState.holdSnapshot = null;
+                  aidStatsRef.current.detectedShape = null;
+                }
+              }
+            }
           }
+        } else if (state.type === "erasing") {
+          // Check eraser hits
+          checkEraserHit(sample);
         }
         gestureFSM.onPointerMove(sample);
       }
+    } else {
+      setLiveCursorPoint(null);
+      // Reset aid stats when not drawing
+      resetAidStats();
     }
   };
 
@@ -699,22 +977,71 @@ export function WhiteboardView({
     const canvas = canvasRef.current;
     const camera = cameraRef.current;
     const gestureFSM = gestureFSMRef.current;
-    if (!canvas || !camera || !gestureFSM) return;
+    const aidDetector = aidDetectorRef.current;
+    const aidState = aidStateRef.current;
+    if (!canvas || !camera || !gestureFSM || !aidDetector) return;
 
     canvas.releasePointerCapture(e.pointerId);
     const canvasRect = canvas.getBoundingClientRect();
     const sample = normalizePointerEvent(e.nativeEvent, canvasRect);
     const completedGesture = gestureFSM.onPointerUp(sample);
 
-    if (completedGesture.type === "drawing" && currentStroke.length > 1) {
-      commitStroke();
+    if (completedGesture.type === "drawing" && inkingEngineRef.current) {
+      // Clean up velocity polling
+      if (velocityPollingRef.current) {
+        clearInterval(velocityPollingRef.current);
+        velocityPollingRef.current = null;
+      }
+
+      // Clean up hold timer if it exists
+      if (aidState?.holdTimer) {
+        clearTimeout(aidState.holdTimer);
+        aidState.holdTimer = null;
+      }
+
+      // Check if we're committing a detected shape
+      if (aidState?.isAdjusting && aidState.detectedShape) {
+        // Commit shape with metadata
+        const shapePoints = aidDetector.generatePoints(aidState.detectedShape);
+        const shapeMetadata = {
+          shapeType: aidState.detectedShape.type,
+          descriptor: aidState.detectedShape as Record<string, any>,
+          hasFill: aidDetector.shouldHaveFill(aidState.detectedShape),
+          fillOpacity: aidDetector.getDefaultFillOpacity(
+            aidState.detectedShape.type
+          ),
+        };
+
+        commitStroke(shapePoints, shapeMetadata);
+      } else {
+        // Normal stroke commit
+        const engine = inkingEngineRef.current;
+        const finalPoints = engine.finalize();
+
+        if (finalPoints.length > 0) {
+          commitStroke(finalPoints);
+        } else {
+          setCurrentStrokePreview([]);
+          setLiveCursorPoint(null);
+        }
+      }
+
+      // Reset aid state
+      aidStateRef.current = null;
+      inkingEngineRef.current = null;
     } else if (
       completedGesture.type === "erasing" &&
       eraserHitsRef.current.size > 0
     ) {
       commitErasure();
+      setLiveCursorPoint(null);
+      inkingEngineRef.current = null;
+    } else {
+      setLiveCursorPoint(null);
+      inkingEngineRef.current = null;
     }
-    setCurrentStroke([]);
+
+    resetAidStats();
   };
 
   const handleWheel = useCallback((event: WheelEvent) => {
@@ -793,34 +1120,41 @@ export function WhiteboardView({
     }
   };
 
-  const commitStroke = () => {
-    const camera = cameraRef.current;
-    if (!camera || currentStroke.length === 0) return;
+  const commitStroke = useCallback(
+    (points: StrokePoint[], shapeMetadata?: ShapeMetadata) => {
+      if (points.length === 0) return;
 
-    const points: StrokePoint[] = currentStroke.map((sample) => {
-      const boardPos = camera.screenToBoard(sample.x, sample.y);
-      return {
-        x: boardPos.x,
-        y: boardPos.y,
-        pressure: sample.pressure,
-        timestamp: sample.timestamp - strokeStartTime,
-        tiltX: sample.tiltX,
-        tiltY: sample.tiltY,
+      setCurrentStrokePreview(points);
+      setLiveCursorPoint(null);
+
+      const style: StrokeStyle = {
+        color: brushColor,
+        width: brushWidth,
+        opacity: toolId === "highlighter" ? 0.4 : 1,
+        toolId: toolId,
       };
-    });
 
-    const style: StrokeStyle = {
-      color: brushColor,
-      width: brushWidth,
-      opacity: brushType === "highlighter" ? 0.4 : 1,
-      brushType: brushType === "eraser" ? "pen" : brushType,
-    };
+      const boundingBox = calculateBoundingBox(points);
 
-    const boundingBox = calculateBoundingBox(points);
-
-    // Commit to local database - optimistic layer handles instant UI
-    createStroke.mutate({ boardId, points, style, boundingBox });
-  };
+      createStroke.mutate(
+        { boardId, points, style, boundingBox, shapeMetadata },
+        {
+          onSettled: () => {
+            setCurrentStrokePreview([]);
+          },
+        }
+      );
+    },
+    [
+      boardId,
+      brushColor,
+      brushWidth,
+      toolId,
+      createStroke,
+      setCurrentStrokePreview,
+      setLiveCursorPoint,
+    ]
+  );
 
   const commitErasure = () => {
     const idsToDelete = Array.from(eraserHitsRef.current);

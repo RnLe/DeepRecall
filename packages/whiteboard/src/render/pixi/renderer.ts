@@ -176,31 +176,52 @@ export class PixiRenderer {
     if (stroke.points.length === 0) return;
 
     const color = hexToPixiColor(stroke.style.color);
-    const width = stroke.style.width;
-    const alpha = stroke.style.opacity;
-
-    graphics.moveTo(stroke.points[0].x, stroke.points[0].y);
+    const baseWidth = stroke.style.width;
+    const alpha = stroke.style.opacity ?? 1;
 
     if (stroke.points.length === 1) {
       // Single point - draw as circle
-      graphics.circle(stroke.points[0].x, stroke.points[0].y, width / 2);
+      graphics.circle(stroke.points[0].x, stroke.points[0].y, baseWidth / 2);
       graphics.fill({ color, alpha });
-    } else {
-      // Multiple points - draw as line
-      graphics.moveTo(stroke.points[0].x, stroke.points[0].y);
+      return;
+    }
 
-      for (let i = 1; i < stroke.points.length; i++) {
-        graphics.lineTo(stroke.points[i].x, stroke.points[i].y);
+    this.drawSmoothStroke(graphics, stroke.points, baseWidth, color, alpha);
+  }
+
+  private drawSmoothStroke(
+    graphics: Graphics,
+    points: StrokePoint[],
+    baseWidth: number,
+    color: number,
+    alpha: number
+  ): void {
+    if (points.length === 0) return;
+
+    graphics.moveTo(points[0].x, points[0].y);
+
+    if (points.length === 2) {
+      graphics.lineTo(points[1].x, points[1].y);
+    } else {
+      for (let i = 1; i < points.length - 1; i++) {
+        const current = points[i];
+        const next = points[i + 1];
+        const midX = (current.x + next.x) / 2;
+        const midY = (current.y + next.y) / 2;
+        graphics.quadraticCurveTo(current.x, current.y, midX, midY);
       }
 
-      graphics.stroke({
-        width,
-        color,
-        alpha,
-        cap: "round",
-        join: "round",
-      });
+      const last = points[points.length - 1];
+      graphics.lineTo(last.x, last.y);
     }
+
+    graphics.stroke({
+      width: baseWidth,
+      color,
+      alpha,
+      cap: "round",
+      join: "round",
+    });
   }
 
   /**
@@ -260,29 +281,16 @@ export class PixiRenderer {
     if (points.length === 0) return;
 
     const color = hexToPixiColor(style.color);
-    const width = style.width;
+    const baseWidth = style.width;
     const alpha = style.opacity ?? 1;
 
-    graphics.moveTo(points[0].x, points[0].y);
-
     if (points.length === 1) {
-      graphics.circle(points[0].x, points[0].y, width / 2);
+      graphics.circle(points[0].x, points[0].y, baseWidth / 2);
       graphics.fill({ color, alpha });
       return;
     }
 
-    graphics.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      graphics.lineTo(points[i].x, points[i].y);
-    }
-
-    graphics.stroke({
-      width,
-      color,
-      alpha,
-      cap: "round",
-      join: "round",
-    });
+    this.drawSmoothStroke(graphics, points, baseWidth, color, alpha);
   }
 
   /**

@@ -1,51 +1,41 @@
 /**
- * Geometry Module - WASM Bindings (Placeholder)
+ * Geometry Module - Shape primitives and recognition
  *
- * Future: Rust + lyon tessellation for:
- * - Polyline → triangle mesh
- * - Round/mitre joins and caps
- * - Path boolean operations (split/clip for vector eraser)
- * - Precise bounds calculation
- *
- * For now, this is a placeholder. The current Canvas implementation
- * uses Canvas 2D path rendering which doesn't require tessellation.
+ * Provides:
+ * - Shape descriptors (line, circle, ellipse, rectangle, square)
+ * - Shape generation (descriptor → stroke points)
+ * - Shape fitting (stroke points → best-fit descriptor)
+ * - Shape recognition (detect shapes from freehand strokes)
  */
 
+export * from "./shapes";
+export * from "./fitting";
+export * from "./recognition";
+
+// Legacy tessellation placeholder (for future WASM integration)
 import type { Point } from "../core/math";
 
-/**
- * Tessellation result (vertices + indices)
- */
 export interface TessellatedStroke {
-  vertices: Float32Array; // [x, y, x, y, ...]
-  indices: Uint16Array; // Triangle indices
+  vertices: Float32Array;
+  indices: Uint16Array;
 }
 
-/**
- * Tessellate stroke polyline into triangle mesh (placeholder)
- */
 export function tessellateStroke(
   points: Point[],
   width: number,
   joinStyle: "round" | "miter" = "round",
   capStyle: "round" | "square" | "butt" = "round"
 ): TessellatedStroke {
-  // TODO: Implement WASM tessellation
-  // For now, return empty arrays
   return {
     vertices: new Float32Array(0),
     indices: new Uint16Array(0),
   };
 }
 
-/**
- * Boolean operation on paths (placeholder)
- */
 export function clipPath(
   pathA: Point[],
   pathB: Point[],
   operation: "union" | "intersection" | "difference"
 ): Point[][] {
-  // TODO: Implement WASM boolean ops
   return [];
 }

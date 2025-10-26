@@ -140,3 +140,29 @@ function perpendicularDistance(
 
   return Math.sqrt(distX * distX + distY * distY);
 }
+
+/**
+ * Exponential moving average smoothing
+ * Fast, single-pass smoothing suitable for real-time input
+ */
+export function exponentialSmoothing(
+  points: Point[],
+  alpha: number = 0.3
+): Point[] {
+  if (points.length < 2) return points;
+
+  const smoothed: Point[] = [points[0]]; // Keep first point as-is
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = smoothed[i - 1];
+    const curr = points[i];
+
+    // Exponential moving average: smoothed = alpha * current + (1-alpha) * previous
+    smoothed.push({
+      x: alpha * curr.x + (1 - alpha) * prev.x,
+      y: alpha * curr.y + (1 - alpha) * prev.y,
+    });
+  }
+
+  return smoothed;
+}

@@ -48,13 +48,26 @@ export const StrokePointSchema = z.object({
 export type StrokePoint = z.infer<typeof StrokePointSchema>;
 
 /**
+ * Shape metadata for geometric strokes
+ */
+export const ShapeMetadataSchema = z.object({
+  shapeType: z.enum(["line", "circle", "ellipse", "rectangle", "square"]),
+  descriptor: z.record(z.string(), z.any()), // Serialized shape descriptor
+  hasFill: z.boolean().default(true),
+  fillOpacity: z.number().min(0).max(1).default(0.15),
+});
+
+export type ShapeMetadata = z.infer<typeof ShapeMetadataSchema>;
+
+/**
  * Stroke style properties
  */
 export const StrokeStyleSchema = z.object({
   color: z.string().default("#000000"),
   width: z.number().min(0.5).max(100).default(2),
   opacity: z.number().min(0).max(1).default(1),
-  brushType: z.enum(["pen", "highlighter", "marker"]).default("pen"),
+  // Tool identifier (pen, highlighter, marker, pencil, etc.)
+  toolId: z.string().default("pen"),
 });
 
 export type StrokeStyle = z.infer<typeof StrokeStyleSchema>;
@@ -86,6 +99,9 @@ export const StrokeSchema = z.object({
   // Timestamps
   createdAt: ISODate,
   updatedAt: ISODate,
+
+  // Shape metadata (optional, for geometric strokes)
+  shapeMetadata: ShapeMetadataSchema.optional(),
 });
 
 export type Stroke = z.infer<typeof StrokeSchema>;

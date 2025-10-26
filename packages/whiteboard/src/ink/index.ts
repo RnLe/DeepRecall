@@ -1,8 +1,11 @@
 /**
- * Ink Module - Pointer Normalization, Brushes, Gestures
+ * Ink Module - Pointer Normalization, Tools, Inking Behavior, Gestures
  */
 
 export * from "./input";
-export * from "./brushes";
+export * from "./tools";
+export * from "./inking";
 export * from "./gestures";
 export * from "./smoothing";
+export * from "./rendering";
+export * from "./aids";

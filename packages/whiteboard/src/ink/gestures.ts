@@ -5,8 +5,7 @@
 
 import type { PointerSample } from "./input";
 import type { Point } from "../core/math";
-
-export type Tool = "pen" | "eraser" | "lasso" | "pan";
+import type { ToolId } from "./tools";
 
 export type GestureState =
   | { type: "idle" }
@@ -20,9 +19,9 @@ export type GestureState =
  */
 export class GestureFSM {
   private state: GestureState = { type: "idle" };
-  private currentTool: Tool;
+  private currentTool: ToolId;
 
-  constructor(initialTool: Tool = "pen") {
+  constructor(initialTool: ToolId = "pen") {
     this.currentTool = initialTool;
   }
 
@@ -36,7 +35,7 @@ export class GestureFSM {
   /**
    * Set active tool
    */
-  setTool(tool: Tool): void {
+  setTool(tool: ToolId): void {
     this.currentTool = tool;
     // Cancel any active gesture when tool changes
     this.state = { type: "idle" };
@@ -45,7 +44,7 @@ export class GestureFSM {
   /**
    * Get current tool
    */
-  getTool(): Tool {
+  getTool(): ToolId {
     return this.currentTool;
   }
 
@@ -64,37 +63,47 @@ export class GestureFSM {
     }
 
     // Tool-specific gesture start
-    switch (this.currentTool) {
-      case "pen":
-        this.state = {
-          type: "drawing",
-          startTime: sample.timestamp,
-          samples: [sample],
-        };
-        break;
-
-      case "eraser":
-        this.state = {
-          type: "erasing",
-          samples: [sample],
-        };
-        break;
-
-      case "lasso":
-        this.state = {
-          type: "selecting",
-          startPoint: { x: sample.x, y: sample.y },
-          currentPoint: { x: sample.x, y: sample.y },
-        };
-        break;
-
-      case "pan":
-        this.state = {
-          type: "panning",
-          startPoint: { x: sample.x, y: sample.y },
-          lastPoint: { x: sample.x, y: sample.y },
-        };
-        break;
+    // Inking tools
+    if (
+      this.currentTool === "pen" ||
+      this.currentTool === "highlighter" ||
+      this.currentTool === "marker" ||
+      this.currentTool === "pencil"
+    ) {
+      this.state = {
+        type: "drawing",
+        startTime: sample.timestamp,
+        samples: [sample],
+      };
+    }
+    // Eraser tools
+    else if (
+      this.currentTool === "vector-eraser" ||
+      this.currentTool === "bitmap-eraser"
+    ) {
+      this.state = {
+        type: "erasing",
+        samples: [sample],
+      };
+    }
+    // Selection tools
+    else if (
+      this.currentTool === "lasso" ||
+      this.currentTool === "box-select"
+    ) {
+      this.state = {
+        type: "selecting",
+        startPoint: { x: sample.x, y: sample.y },
+        currentPoint: { x: sample.x, y: sample.y },
+      };
+    }
+    // Navigation tools
+    else if (this.currentTool === "pan" || this.currentTool === "zoom") {
+      this.state = {
+        type: "panning",
+        startPoint: { x: sample.x, y: sample.y },
+        lastPoint: { x: sample.x, y: sample.y },
+      };
     }
   }
 

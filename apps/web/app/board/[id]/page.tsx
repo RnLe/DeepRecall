@@ -7,12 +7,7 @@
 
 import { use, useState } from "react";
 import { useBoard } from "@deeprecall/data";
-import {
-  WhiteboardView,
-  WhiteboardToolbar,
-  type Tool,
-  type BrushType,
-} from "@deeprecall/ui";
+import { WhiteboardView, WhiteboardToolbar, type ToolId } from "@deeprecall/ui";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -26,8 +21,7 @@ export default function BoardPage({
   const { data: board, isLoading, error } = useBoard(id);
 
   // Toolbar state
-  const [tool, setTool] = useState<Tool>("pen");
-  const [brushType, setBrushType] = useState<BrushType>("pen");
+  const [toolId, setToolId] = useState<ToolId>("pen");
   const [brushColor, setBrushColor] = useState("#000000");
   const [brushWidth, setBrushWidth] = useState(3);
   const [showDebug, setShowDebug] = useState(false);
@@ -72,10 +66,8 @@ export default function BoardPage({
         {/* Toolbar inline with header */}
         <div className="flex-1">
           <WhiteboardToolbar
-            tool={tool}
-            onToolChange={setTool}
-            brushType={brushType}
-            onBrushTypeChange={setBrushType}
+            toolId={toolId}
+            onToolChange={setToolId}
             brushColor={brushColor}
             onBrushColorChange={setBrushColor}
             brushWidth={brushWidth}
@@ -90,11 +82,10 @@ export default function BoardPage({
       <main className="flex-1 overflow-hidden">
         <WhiteboardView
           boardId={id}
-          tool={tool}
-          onToolChange={setTool}
+          toolId={toolId}
+          onToolChange={setToolId}
           brushColor={brushColor}
           brushWidth={brushWidth}
-          brushType={brushType}
           showDebug={showDebug}
           onDebugClose={() => setShowDebug(false)}
         />

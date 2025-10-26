@@ -6,7 +6,7 @@
 "use client";
 
 import { useState, useEffect, useRef, type MouseEvent } from "react";
-import type { Tool, BrushType } from "@deeprecall/whiteboard/ink";
+import type { ToolId } from "@deeprecall/whiteboard/ink";
 
 export interface DebugStats {
   fps: number;
@@ -20,12 +20,18 @@ export interface DebugStats {
   cameraZoom: number;
   viewportWidth: number;
   viewportHeight: number;
-  tool: Tool;
-  brushType: BrushType;
+  toolId: ToolId;
   brushColor: string;
   brushWidth: number;
   cursorScreen: { x: number; y: number };
   cursorBoard: { x: number; y: number };
+  // Inking aids stats
+  aidStillness: boolean;
+  aidCurrentStrokePoints: number;
+  aidStartEndDistance: number;
+  aidDetectedShape: string | null;
+  aidCurrentVelocity: number;
+  aidStrokeDuration: number;
 }
 
 export interface DebugOverlayProps {
@@ -229,15 +235,9 @@ export function DebugOverlay({
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <span className="text-gray-300">Tool</span>
+              <span className="text-gray-300">Tool ID</span>
               <span className="text-white font-mono text-xs uppercase">
-                {stats.tool}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-300">Brush</span>
-              <span className="text-white font-mono text-xs uppercase">
-                {stats.brushType}
+                {stats.toolId}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -270,6 +270,61 @@ export function DebugOverlay({
               <span className="text-white font-mono text-xs">
                 ({stats.cursorBoard.x.toFixed(1)},{" "}
                 {stats.cursorBoard.y.toFixed(1)})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Inking Aids */}
+        <div>
+          <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+            Inking Aids
+          </div>
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300">Stillness</span>
+              <span
+                className={`font-mono font-bold text-xs ${
+                  stats.aidStillness ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {stats.aidStillness ? "✓ DETECTED" : "✗ NOT DETECTED"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Current Velocity</span>
+              <span className="text-white font-mono text-xs">
+                {stats.aidCurrentVelocity.toFixed(4)} px/ms
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Stroke Points</span>
+              <span className="text-white font-mono">
+                {stats.aidCurrentStrokePoints}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Start↔End Distance</span>
+              <span className="text-white font-mono text-xs">
+                {stats.aidStartEndDistance.toFixed(1)}px
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Stroke Duration</span>
+              <span className="text-white font-mono text-xs">
+                {(stats.aidStrokeDuration / 1000).toFixed(2)}s
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-300">Detected Shape</span>
+              <span
+                className={`font-mono text-xs uppercase ${
+                  stats.aidDetectedShape
+                    ? "text-green-400 font-bold"
+                    : "text-gray-500"
+                }`}
+              >
+                {stats.aidDetectedShape || "none"}
               </span>
             </div>
           </div>

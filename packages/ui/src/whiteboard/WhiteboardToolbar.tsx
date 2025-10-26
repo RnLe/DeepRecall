@@ -5,14 +5,20 @@
 "use client";
 
 import { useState } from "react";
-import type { Tool, BrushType } from "@deeprecall/whiteboard/ink";
-import { Lasso, Pen, Highlighter, Bookmark, Eraser, Bug } from "lucide-react";
+import type { ToolId } from "@deeprecall/whiteboard/ink";
+import {
+  Lasso,
+  Pen,
+  Highlighter,
+  Bookmark,
+  Eraser,
+  Bug,
+  Pencil,
+} from "lucide-react";
 
 export interface WhiteboardToolbarProps {
-  tool: Tool;
-  onToolChange: (tool: Tool) => void;
-  brushType: BrushType;
-  onBrushTypeChange: (type: BrushType) => void;
+  toolId: ToolId;
+  onToolChange: (toolId: ToolId) => void;
   brushColor: string;
   onBrushColorChange: (color: string) => void;
   brushWidth: number;
@@ -24,10 +30,8 @@ export interface WhiteboardToolbarProps {
 }
 
 export function WhiteboardToolbar({
-  tool,
+  toolId,
   onToolChange,
-  brushType,
-  onBrushTypeChange,
   brushColor,
   onBrushColorChange,
   brushWidth,
@@ -47,11 +51,8 @@ export function WhiteboardToolbar({
   const selectedColorIndex = colorPresets.indexOf(brushColor);
   const selectedWidthIndex = getPresetIndex(brushWidth, widthPresets);
 
-  const handleToolClick = (newTool: Tool, newBrushType?: BrushType) => {
-    onToolChange(newTool);
-    if (newBrushType) {
-      onBrushTypeChange(newBrushType);
-    }
+  const handleToolClick = (newToolId: ToolId) => {
+    onToolChange(newToolId);
   };
 
   return (
@@ -62,7 +63,7 @@ export function WhiteboardToolbar({
         <button
           onClick={() => handleToolClick("lasso")}
           className={`p-2 rounded transition-colors ${
-            tool === "lasso"
+            toolId === "lasso"
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300 hover:bg-gray-600"
           }`}
@@ -73,9 +74,9 @@ export function WhiteboardToolbar({
 
         {/* Pen Tool */}
         <button
-          onClick={() => handleToolClick("pen", "pen")}
+          onClick={() => handleToolClick("pen")}
           className={`p-2 rounded transition-colors ${
-            tool === "pen" && brushType === "pen"
+            toolId === "pen"
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300 hover:bg-gray-600"
           }`}
@@ -84,11 +85,24 @@ export function WhiteboardToolbar({
           <Pen className="w-5 h-5" />
         </button>
 
+        {/* Pencil Tool */}
+        <button
+          onClick={() => handleToolClick("pencil")}
+          className={`p-2 rounded transition-colors ${
+            toolId === "pencil"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+          }`}
+          title="Pencil (C)"
+        >
+          <Pencil className="w-5 h-5" />
+        </button>
+
         {/* Highlighter Tool */}
         <button
-          onClick={() => handleToolClick("pen", "highlighter")}
+          onClick={() => handleToolClick("highlighter")}
           className={`p-2 rounded transition-colors ${
-            tool === "pen" && brushType === "highlighter"
+            toolId === "highlighter"
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300 hover:bg-gray-600"
           }`}
@@ -99,9 +113,9 @@ export function WhiteboardToolbar({
 
         {/* Marker Tool (90° rotated bookmark) */}
         <button
-          onClick={() => handleToolClick("pen", "marker")}
+          onClick={() => handleToolClick("marker")}
           className={`p-2 rounded transition-colors ${
-            tool === "pen" && brushType === "marker"
+            toolId === "marker"
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300 hover:bg-gray-600"
           }`}
@@ -112,9 +126,9 @@ export function WhiteboardToolbar({
 
         {/* Eraser Tool */}
         <button
-          onClick={() => handleToolClick("eraser")}
+          onClick={() => handleToolClick("vector-eraser")}
           className={`p-2 rounded transition-colors ${
-            tool === "eraser"
+            toolId === "vector-eraser" || toolId === "bitmap-eraser"
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300 hover:bg-gray-600"
           }`}
