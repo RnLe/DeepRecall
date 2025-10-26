@@ -56,10 +56,58 @@ packages/ui/src/whiteboard/   (React Components)
 
 ### Phase 0: Testing & Immediate Improvements
 
-- [ ] Refine toolbar UX (better visual feedback, tooltips)
-- [ ] Improve tool responsibility separation (ensure clean FSM transitions)
+- [x] Refine toolbar UX (better visual feedback, tooltips)
+- [x] Improve tool responsibility separation (ensure clean FSM transitions)
 
-### Phase 1: Selection & Editing
+### Phase 1: Advanced Rendering
+
+**Stage 1: Foundation Setup**
+
+- [x] Install PixiJS v8 dependency
+- [x] Create PixiJS renderer module structure (`render/pixi/`)
+- [x] Implement PixiJS application initialization (WebGPU + WebGL2 fallback)
+- [x] Create basic stroke renderer using PixiJS Graphics API
+
+**Stage 2: Integration**
+
+- [x] Replace Canvas 2D with PixiJS in WhiteboardView
+- [x] Maintain backward compatibility with existing API
+- [x] Verify all tools work with new renderer (pen, eraser, pan)
+- [x] Test performance baseline (FPS, memory usage)
+
+**Stage 2.5: Debug Overlay**
+
+- [x] Create draggable debug overlay component (transparent blur bg)
+- [x] Add toolbar "Debug" icon to toggle overlay
+- [x] Display performance stats: FPS, frame time, renderer type
+- [x] Display object stats: stroke count, point count, visible objects
+- [x] Add stroke visualization toggle (show points, control paths, bounding boxes)
+- [x] Add camera info: position, zoom level, viewport bounds
+
+**Stage 3: Tiled Rendering + LOD**
+
+- [ ] Implement quadtree tile system for infinite canvas
+- [ ] Create tile cache with LRU eviction
+- [ ] Add LOD system (3 levels: full detail, medium, low)
+- [ ] Implement visible tile culling based on camera viewport
+
+**Stage 4: GPU Acceleration**
+
+- [ ] Convert strokes to triangle meshes (using lyon/WASM in future)
+- [ ] Implement batched rendering for multiple strokes
+- [ ] Add texture atlas for stroke caching
+- [ ] Optimize draw calls (<100 per frame)
+
+**Stage 5: Debug Tool**
+
+- [ ] Create draggable debug overlay component (transparent blur bg)
+- [ ] Add performance stats: FPS, frame time, draw calls, object count
+- [ ] Add memory stats: texture memory, geometry memory, total
+- [ ] Add stroke visualization toggle (show points, paths, bounding boxes)
+- [ ] Add tile visualization (show tile boundaries, LOD levels)
+- [ ] Add debug toolbar icon to toggle overlay
+
+### Phase 2: Selection & Editing
 
 - [ ] Lasso selection tool (multi-stroke selection)
 - [ ] Proper undo/redo UI with history visualization
@@ -67,14 +115,6 @@ packages/ui/src/whiteboard/   (React Components)
 - [ ] Move/transform selected strokes
 - [ ] Delete selected strokes
 - [ ] Group/ungroup strokes
-
-### Phase 2: Advanced Rendering
-
-- [ ] Integrate PixiJS (WebGPU/WebGL2 renderer)
-- [ ] Implement tiled rendering for large canvases
-- [ ] Add LOD (Level of Detail) system
-- [ ] GPU-accelerated brush rendering
-- [ ] Smooth 60fps pan/zoom at scale
 
 ### Phase 3: Geometry Operations
 

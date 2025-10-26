@@ -1,0 +1,19 @@
+{
+  "name": "deeprecall-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeepRecall - Multi-platform reference management and study app",
+  "scripts": {
+    "dev": "pnpm --filter @deeprecall/web run dev",
+    "build": "pnpm --filter @deeprecall/web run build",
+    "start": "pnpm --filter @deeprecall/web run start",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "clean": "pnpm -r exec rm -rf node_modules .next dist .turbo"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.11.0"
+}

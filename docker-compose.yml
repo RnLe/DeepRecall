@@ -107,6 +107,14 @@ services:
         condition: service_completed_successfully
       electric:
         condition: service_started # Just wait for it to start, not be healthy
+    # GPU support for WebGL/hardware acceleration
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   # PostgreSQL data

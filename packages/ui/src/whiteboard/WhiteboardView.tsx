@@ -31,7 +31,12 @@ import {
   drawBoard,
   drawObject,
   MinimapRenderer,
+  PixiRenderer,
+  createPixiApp,
+  destroyPixiApp,
+  resizePixiApp,
 } from "@deeprecall/whiteboard/render";
+import type { PixiApp } from "@deeprecall/whiteboard/render";
 import {
   GestureFSM,
   type Tool,
@@ -42,6 +47,7 @@ import {
   type BrushType,
   BRUSH_PRESETS,
 } from "@deeprecall/whiteboard/ink";
+import { DebugOverlay, type DebugStats } from "./DebugOverlay";
 
 export interface WhiteboardViewProps {
   boardId: string;
@@ -51,6 +57,8 @@ export interface WhiteboardViewProps {
   brushWidth?: number;
   brushType?: BrushType;
   className?: string;
+  showDebug?: boolean;
+  onDebugClose?: () => void;
 }
 
 export function WhiteboardView({
@@ -61,6 +69,8 @@ export function WhiteboardView({
   brushWidth = 2,
   brushType = "pen",
   className = "",
+  showDebug = false,
+  onDebugClose,
 }: WhiteboardViewProps) {
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,6 +86,18 @@ export function WhiteboardView({
   const eraserHitsRef = useRef<Set<string>>(new Set());
   const renderCanvasRef = useRef<() => void>(() => {});
   const renderMinimapRef = useRef<() => void>(() => {});
+  const pixiAppRef = useRef<PixiApp | null>(null);
+  const pixiRendererRef = useRef<PixiRenderer | null>(null);
+  const pixiTickerCallbackRef = useRef<(() => void) | null>(null);
+  const initializationAttemptedRef = useRef<boolean>(false);
+  const initializingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rendererModeRef = useRef<"initializing" | "pixi" | "canvas">(
+    "initializing"
+  );
+
+  const [rendererMode, setRendererMode] = useState<
+    "initializing" | "pixi" | "canvas"
+  >("initializing");
 
   // State
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -84,10 +106,97 @@ export function WhiteboardView({
   const [strokeStartTime, setStrokeStartTime] = useState(0);
   const [lastAddedTime, setLastAddedTime] = useState(0);
 
+  // Debug state
+  const [showStrokeVisualization, setShowStrokeVisualization] = useState(false);
+  const [debugStats, setDebugStats] = useState<DebugStats>({
+    fps: 0,
+    frameTime: 0,
+    renderer: "canvas",
+    strokeCount: 0,
+    pointCount: 0,
+    visibleStrokes: 0,
+    cameraX: 0,
+    cameraY: 0,
+    cameraZoom: 1,
+    viewportWidth: 0,
+    viewportHeight: 0,
+    tool,
+    brushType,
+    brushColor,
+    brushWidth,
+    cursorScreen: { x: 0, y: 0 },
+    cursorBoard: { x: 0, y: 0 },
+  });
+
   // Data hooks
   const { data: strokes = [] } = useStrokes(boardId);
   const createStroke = useCreateStroke();
   const deleteStrokes = useDeleteStrokes();
+
+  // Debug refs to avoid stale closures
+  const showDebugRef = useRef(showDebug);
+  const canvasSizeRef = useRef(canvasSize);
+  const strokeMetricsRef = useRef({
+    strokeCount: strokes.length,
+    pointCount: strokes.reduce((sum, stroke) => sum + stroke.points.length, 0),
+  });
+  const visibleStrokeCountRef = useRef(0);
+  const mousePosRef = useRef(mousePos);
+  const toolRef = useRef(tool);
+  const brushTypeRef = useRef(brushType);
+  const brushColorRef = useRef(brushColor);
+  const brushWidthRef = useRef(brushWidth);
+
+  useEffect(() => {
+    showDebugRef.current = showDebug;
+  }, [showDebug]);
+
+  useEffect(() => {
+    if (!showDebug) {
+      setShowStrokeVisualization(false);
+    }
+  }, [showDebug]);
+
+  useEffect(() => {
+    canvasSizeRef.current = canvasSize;
+  }, [canvasSize]);
+
+  useEffect(() => {
+    strokeMetricsRef.current = {
+      strokeCount: strokes.length,
+      pointCount: strokes.reduce(
+        (sum, stroke) => sum + stroke.points.length,
+        0
+      ),
+    };
+  }, [strokes]);
+
+  useEffect(() => {
+    mousePosRef.current = mousePos;
+  }, [mousePos]);
+
+  useEffect(() => {
+    toolRef.current = tool;
+  }, [tool]);
+
+  useEffect(() => {
+    brushTypeRef.current = brushType;
+  }, [brushType]);
+
+  useEffect(() => {
+    brushColorRef.current = brushColor;
+  }, [brushColor]);
+
+  useEffect(() => {
+    brushWidthRef.current = brushWidth;
+  }, [brushWidth]);
+
+  const handleDebugClose = useCallback(() => {
+    setShowStrokeVisualization(false);
+    if (onDebugClose) {
+      onDebugClose();
+    }
+  }, [onDebugClose]);
 
   // Initialize engines
   useEffect(() => {
@@ -113,6 +222,199 @@ export function WhiteboardView({
       minimapRef.current = new MinimapRenderer(minimapCanvasRef.current);
     }
   }, [canvasSize, tool]);
+
+  // Initialize PixiJS once canvas size is known
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const size = canvasSizeRef.current;
+
+    console.log("[WhiteboardView] Init effect", {
+      rendererMode: rendererModeRef.current,
+      hasCanvas: !!canvas,
+      canvasWidth: size.width,
+      canvasHeight: size.height,
+      pixiAppExists: !!pixiAppRef.current,
+      initAttempted: initializationAttemptedRef.current,
+    });
+
+    if (!canvas) {
+      return;
+    }
+
+    if (rendererModeRef.current !== "initializing") {
+      return;
+    }
+
+    if (size.width === 0 || size.height === 0) {
+      console.log("[WhiteboardView] Canvas size unavailable, waiting");
+      return;
+    }
+
+    if (initializationAttemptedRef.current) {
+      console.log("[WhiteboardView] Initialization already in progress");
+      return;
+    }
+
+    initializationAttemptedRef.current = true;
+    initializingCanvasRef.current = canvas;
+
+    let cancelled = false;
+
+    const run = async () => {
+      console.log("[WhiteboardView] Starting PixiJS initialization...");
+      try {
+        const pixiApp = await createPixiApp(canvas, {
+          backgroundColor: 0x1f2937,
+        });
+
+        if (cancelled) {
+          console.log(
+            "[WhiteboardView] Initialization cancelled before completion"
+          );
+          if (pixiApp) {
+            destroyPixiApp(pixiApp);
+          }
+          initializationAttemptedRef.current = false;
+          initializingCanvasRef.current = null;
+          return;
+        }
+
+        if (!pixiApp) {
+          console.log(
+            "[WhiteboardView] PixiJS unavailable, falling back to Canvas 2D"
+          );
+          rendererModeRef.current = "canvas";
+          setRendererMode("canvas");
+          initializationAttemptedRef.current = false;
+          initializingCanvasRef.current = null;
+          return;
+        }
+
+        console.log("[WhiteboardView] PixiJS app created, setting up renderer");
+        pixiAppRef.current = pixiApp;
+        const pixiRenderer = new PixiRenderer(pixiApp);
+        pixiRenderer.updateResolution(size.width, size.height);
+        pixiRendererRef.current = pixiRenderer;
+
+        const tickerCallback = () => {
+          pixiRenderer.updateStats();
+
+          if (showDebugRef.current && cameraRef.current) {
+            const stats = pixiRenderer.getStats();
+            const cameraState = cameraRef.current.getState();
+            const cursorScreen = {
+              x: mousePosRef.current.x,
+              y: mousePosRef.current.y,
+            };
+            const cursorBoardPoint = cameraRef.current.screenToBoard(
+              cursorScreen.x,
+              cursorScreen.y
+            );
+            const cursorBoard = {
+              x: cursorBoardPoint.x,
+              y: cursorBoardPoint.y,
+            };
+
+            setDebugStats({
+              fps: stats.fps,
+              frameTime: stats.frameTime,
+              renderer: pixiApp.renderer,
+              strokeCount: strokeMetricsRef.current.strokeCount,
+              pointCount: strokeMetricsRef.current.pointCount,
+              visibleStrokes: visibleStrokeCountRef.current,
+              cameraX: cameraState.panOffset.x,
+              cameraY: cameraState.panOffset.y,
+              cameraZoom: cameraState.scale,
+              viewportWidth: canvasSizeRef.current.width,
+              viewportHeight: canvasSizeRef.current.height,
+              tool: toolRef.current,
+              brushType: brushTypeRef.current,
+              brushColor: brushColorRef.current,
+              brushWidth: brushWidthRef.current,
+              cursorScreen,
+              cursorBoard,
+            });
+          }
+        };
+        pixiTickerCallbackRef.current = tickerCallback;
+        pixiApp.app.ticker.add(tickerCallback);
+
+        await new Promise((resolve) => {
+          pixiApp.app.ticker.addOnce(() => resolve(undefined));
+        });
+
+        if (cancelled) {
+          console.log(
+            "[WhiteboardView] Initialization cancelled after readiness"
+          );
+          return;
+        }
+
+        console.log(
+          "[WhiteboardView] PixiJS fully ready, setting renderer mode to pixi"
+        );
+        rendererModeRef.current = "pixi";
+        setRendererMode("pixi");
+      } catch (error) {
+        if (!cancelled) {
+          console.error("[WhiteboardView] PixiJS init error:", error);
+          rendererModeRef.current = "canvas";
+          setRendererMode("canvas");
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+      if (!pixiAppRef.current) {
+        initializationAttemptedRef.current = false;
+        initializingCanvasRef.current = null;
+      }
+    };
+  }, [rendererMode, canvasSize.width, canvasSize.height]);
+
+  // Cleanup Pixi resources on unmount
+  useEffect(() => {
+    return () => {
+      if (pixiRendererRef.current) {
+        pixiRendererRef.current.destroy();
+        pixiRendererRef.current = null;
+      }
+
+      if (pixiAppRef.current) {
+        if (pixiTickerCallbackRef.current) {
+          pixiAppRef.current.app.ticker.remove(pixiTickerCallbackRef.current);
+        }
+        destroyPixiApp(pixiAppRef.current);
+        pixiAppRef.current = null;
+      }
+
+      pixiTickerCallbackRef.current = null;
+      rendererModeRef.current = "initializing";
+      initializationAttemptedRef.current = false;
+      initializingCanvasRef.current = null;
+    };
+  }, []);
+
+  // Resize PixiJS renderer when viewport changes
+  useEffect(() => {
+    if (
+      rendererMode !== "pixi" ||
+      !pixiAppRef.current ||
+      canvasSize.width === 0 ||
+      canvasSize.height === 0
+    ) {
+      return;
+    }
+
+    resizePixiApp(pixiAppRef.current, canvasSize.width, canvasSize.height);
+    pixiRendererRef.current?.updateResolution(
+      canvasSize.width,
+      canvasSize.height
+    );
+  }, [canvasSize, rendererMode]);
 
   // Update canvas size
   useEffect(() => {
@@ -145,7 +447,68 @@ export function WhiteboardView({
     const camera = cameraRef.current;
     const orchestrator = orchestratorRef.current;
 
-    if (!canvas || !camera || !orchestrator || canvasSize.width === 0) return;
+    if (!camera || !orchestrator || canvasSize.width === 0) return;
+
+    const objects = orchestrator.getVisibleObjects();
+    const strokeObjects = objects.filter(
+      (obj) => obj.kind === "stroke" && obj.visible
+    ) as StrokeObject[];
+
+    visibleStrokeCountRef.current = strokeObjects.length;
+
+    const boardOffset = camera.getBoardOffset();
+
+    const hasActiveStroke = currentStroke.length > 0 && tool === "pen";
+    const activeStrokePoints: StrokePoint[] = hasActiveStroke
+      ? currentStroke.map((sample) => {
+          const boardPoint = camera.screenToBoard(sample.x, sample.y);
+          return {
+            x: boardPoint.x,
+            y: boardPoint.y,
+            pressure: sample.pressure,
+            timestamp: sample.timestamp - strokeStartTime,
+            tiltX: sample.tiltX,
+            tiltY: sample.tiltY,
+          } as StrokePoint;
+        })
+      : [];
+
+    const activeStrokeStyle: StrokeStyle = {
+      color: brushColor,
+      width: brushWidth,
+      opacity: brushType === "highlighter" ? 0.4 : 1,
+      brushType: brushType === "eraser" ? "pen" : brushType,
+    };
+
+    if (rendererModeRef.current === "pixi" && pixiRendererRef.current) {
+      const pixiRenderer = pixiRendererRef.current;
+      const transform = camera.getTransform();
+      pixiRenderer.applyTransform(transform, boardOffset);
+      pixiRenderer.renderBoard("#f8f7ea");
+      pixiRenderer.renderStrokes(strokeObjects);
+
+      if (hasActiveStroke) {
+        pixiRenderer.setActiveStroke(activeStrokePoints, activeStrokeStyle);
+      } else {
+        pixiRenderer.clearActiveStroke();
+      }
+
+      // Apply stroke visualization (clears when disabled)
+      pixiRenderer.setStrokeVisualization(
+        showDebug && showStrokeVisualization,
+        strokeObjects
+      );
+
+      return;
+    }
+
+    // Don't create 2D context while PixiJS is initializing
+    // This prevents context conflicts
+    if (rendererModeRef.current === "initializing") {
+      return;
+    }
+
+    if (!canvas) return;
 
     const renderCtx = createRenderContext(canvas);
     if (!renderCtx) return;
@@ -153,21 +516,18 @@ export function WhiteboardView({
     clearCanvas(renderCtx, "#1f2937");
     const transform = camera.getTransform();
     applyTransform(renderCtx, transform);
-    const boardOffset = camera.getBoardOffset();
     drawBoard(renderCtx, boardOffset, "#f8f7ea");
 
-    const objects = orchestrator.getVisibleObjects();
     objects.forEach((obj) => drawObject(renderCtx, obj));
 
-    if (currentStroke.length > 0 && tool === "pen") {
-      const points = currentStroke.map((s) => camera.screenToBoard(s.x, s.y));
+    if (hasActiveStroke) {
       const { ctx } = renderCtx;
       ctx.strokeStyle = brushColor;
       ctx.lineWidth = brushWidth;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.beginPath();
-      points.forEach((p, i) => {
+      activeStrokePoints.forEach((p, i) => {
         if (i === 0) ctx.moveTo(p.x, p.y);
         else ctx.lineTo(p.x, p.y);
       });
@@ -175,7 +535,18 @@ export function WhiteboardView({
     }
 
     restoreTransform(renderCtx);
-  }, [canvasSize, currentStroke, tool, brushColor, brushWidth]);
+  }, [
+    canvasSize,
+    currentStroke,
+    tool,
+    brushColor,
+    brushWidth,
+    brushType,
+    strokeStartTime,
+    rendererMode,
+    showDebug,
+    showStrokeVisualization,
+  ]);
 
   useEffect(() => {
     renderCanvasRef.current = renderCanvas;
@@ -346,19 +717,36 @@ export function WhiteboardView({
     setCurrentStroke([]);
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
+  const handleWheel = useCallback((event: WheelEvent) => {
+    event.preventDefault();
+
     const camera = cameraRef.current;
     const canvas = canvasRef.current;
     if (!camera || !canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const mousePoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const mousePoint = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    const zoomFactor = event.deltaY < 0 ? 1.1 : 0.9;
+
     camera.zoomAt(mousePoint, zoomFactor);
-    renderCanvas();
-    renderMinimap();
-  };
+    renderCanvasRef.current();
+    renderMinimapRef.current();
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const wheelListener = (event: WheelEvent) => handleWheel(event);
+    canvas.addEventListener("wheel", wheelListener, { passive: false });
+
+    return () => {
+      canvas.removeEventListener("wheel", wheelListener);
+    };
+  }, [handleWheel]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -458,7 +846,6 @@ export function WhiteboardView({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        onWheel={handleWheel}
         onContextMenu={handleContextMenu}
         className="touch-none absolute inset-0"
         style={{
@@ -481,6 +868,18 @@ export function WhiteboardView({
       <div className="absolute bottom-4 right-4 border-2 border-gray-700 rounded shadow-lg overflow-hidden">
         <canvas ref={minimapCanvasRef} className="block" />
       </div>
+
+      {/* Debug Overlay */}
+      {showDebug && onDebugClose && (
+        <DebugOverlay
+          stats={debugStats}
+          showStrokeVisualization={showStrokeVisualization}
+          onToggleVisualization={() =>
+            setShowStrokeVisualization(!showStrokeVisualization)
+          }
+          onClose={handleDebugClose}
+        />
+      )}
     </div>
   );
 }

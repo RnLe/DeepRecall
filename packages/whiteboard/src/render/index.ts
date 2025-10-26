@@ -4,3 +4,4 @@
 
 export * from "./canvas";
 export * from "./minimap";
+export * from "./pixi";

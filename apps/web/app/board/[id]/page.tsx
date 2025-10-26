@@ -30,6 +30,7 @@ export default function BoardPage({
   const [brushType, setBrushType] = useState<BrushType>("pen");
   const [brushColor, setBrushColor] = useState("#000000");
   const [brushWidth, setBrushWidth] = useState(3);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Redirect if board not found
   useEffect(() => {
@@ -79,6 +80,8 @@ export default function BoardPage({
             onBrushColorChange={setBrushColor}
             brushWidth={brushWidth}
             onBrushWidthChange={setBrushWidth}
+            showDebug={showDebug}
+            onDebugToggle={() => setShowDebug(!showDebug)}
           />
         </div>
       </header>
@@ -92,6 +95,8 @@ export default function BoardPage({
           brushColor={brushColor}
           brushWidth={brushWidth}
           brushType={brushType}
+          showDebug={showDebug}
+          onDebugClose={() => setShowDebug(false)}
         />
       </main>
     </div>

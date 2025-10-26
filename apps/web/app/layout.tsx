@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
 import Link from "next/link";
+import { GPUIndicator } from "./components/GPUIndicator";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
@@ -71,6 +72,9 @@ export default function RootLayout({
                   >
                     Postgres
                   </Link>
+                </div>
+                <div className="ml-auto">
+                  <GPUIndicator />
                 </div>
               </div>
             </nav>

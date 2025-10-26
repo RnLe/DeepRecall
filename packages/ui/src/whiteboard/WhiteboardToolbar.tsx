@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import type { Tool, BrushType } from "@deeprecall/whiteboard/ink";
-import { Lasso, Pen, Highlighter, Bookmark, Eraser } from "lucide-react";
+import { Lasso, Pen, Highlighter, Bookmark, Eraser, Bug } from "lucide-react";
 
 export interface WhiteboardToolbarProps {
   tool: Tool;
@@ -19,6 +19,8 @@ export interface WhiteboardToolbarProps {
   onBrushWidthChange: (width: number) => void;
   colorPresets?: string[];
   widthPresets?: number[];
+  showDebug?: boolean;
+  onDebugToggle?: () => void;
 }
 
 export function WhiteboardToolbar({
@@ -32,6 +34,8 @@ export function WhiteboardToolbar({
   onBrushWidthChange,
   colorPresets = ["#000000", "#529dff", "#ff5252"],
   widthPresets = [1, 3, 6],
+  showDebug = false,
+  onDebugToggle,
 }: WhiteboardToolbarProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showWidthSlider, setShowWidthSlider] = useState(false);
@@ -222,6 +226,24 @@ export function WhiteboardToolbar({
           </div>
         )}
       </div>
+
+      {/* Debug Toggle */}
+      {onDebugToggle && (
+        <>
+          <div className="w-px h-8 bg-gray-600" />
+          <button
+            onClick={onDebugToggle}
+            className={`p-2 rounded transition-colors ${
+              showDebug
+                ? "bg-green-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+            title="Toggle Debug Overlay (D)"
+          >
+            <Bug className="w-5 h-5" />
+          </button>
+        </>
+      )}
     </div>
   );
 }
