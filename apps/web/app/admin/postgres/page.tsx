@@ -15,6 +15,8 @@ const POSTGRES_TABLES = [
   { key: "annotations", label: "Annotations" },
   { key: "cards", label: "Cards" },
   { key: "review_logs", label: "Review Logs" },
+  { key: "boards", label: "Boards" },
+  { key: "strokes", label: "Strokes" },
   { key: "blobs_meta", label: "Blobs Meta" },
   { key: "device_blobs", label: "Device Blobs" },
 ] as const;

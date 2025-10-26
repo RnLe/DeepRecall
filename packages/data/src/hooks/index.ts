@@ -19,5 +19,9 @@ export * from "./useBlobsMeta";
 export * from "./useDeviceBlobs";
 export * from "./useReplicationJobs";
 
+// Boards and strokes (note-taking canvas)
+export * from "./useBoards";
+export * from "./useStrokes";
+
 // Library bridge hooks (combines CAS + Electric)
 export * from "./useBlobBridge";

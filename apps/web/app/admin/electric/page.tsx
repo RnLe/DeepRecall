@@ -15,6 +15,8 @@ const ELECTRIC_TABLES = [
   { key: "annotations", label: "Annotations" },
   { key: "cards", label: "Cards" },
   { key: "reviewLogs", label: "Review Logs" },
+  { key: "boards", label: "Boards" },
+  { key: "strokes", label: "Strokes" },
   { key: "blobsMeta", label: "Blobs Meta" },
   { key: "deviceBlobs", label: "Device Blobs" },
 ] as const;

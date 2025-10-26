@@ -446,6 +446,49 @@ const mergedQuery = useQuery({
 
 **Why**: `placeholderData` is shown while loading but doesn't prevent the initial fetch. `initialData` is treated as real data and triggers staleness checks.
 
+### Bug: Continuous Actions (Drawing, Erasing) Feel Laggy
+
+**Symptom**: Interactive tools (brush, eraser) only show results after mouse release, not during gesture  
+**Cause**: Only updating database state on action completion; rendering waits for query refetch  
+**Fix**: Dual-layer state for continuous actions:
+
+```typescript
+// Layer 1: In-memory scene state (instant visual feedback)
+const orchestratorRef = useRef<SceneOrchestrator>(new SceneOrchestrator());
+
+// Layer 2: Database state (persistent, synced)
+const { data: items } = useMergedItems(id);
+
+// Sync database → scene when data changes
+useEffect(() => {
+  orchestrator.clear();
+  items.forEach((item) => orchestrator.add(item));
+  renderScene();
+}, [items]);
+
+// CRITICAL: Update scene immediately during gesture
+const handlePointerMove = (e) => {
+  if (tool === "eraser") {
+    const hits = orchestrator.query(pointerPos);
+    hits.forEach((item) => {
+      orchestrator.remove(item.id); // Instant visual removal
+      eraserHitsRef.current.add(item.id); // Track for DB deletion
+    });
+    renderScene(); // Re-render immediately
+  }
+};
+
+// Commit to database on gesture end
+const handlePointerUp = () => {
+  if (eraserHitsRef.current.size > 0) {
+    deleteItems.mutate({ ids: Array.from(eraserHitsRef.current) });
+    eraserHitsRef.current.clear();
+  }
+};
+```
+
+**Why**: Continuous actions need instant feedback. In-memory updates provide <16ms response; database mutations follow in background. The refetch from merged query will match the scene state (no flicker).
+
 ---
 
 ## 📊 Data Flow Diagram

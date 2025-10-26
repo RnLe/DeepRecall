@@ -25,6 +25,10 @@ const DEXIE_TABLES = [
   { key: "cards_local", label: "Cards (Local)" },
   { key: "reviewLogs", label: "Review Logs (Synced)" },
   { key: "reviewLogs_local", label: "Review Logs (Local)" },
+  { key: "boards", label: "Boards (Synced)" },
+  { key: "boards_local", label: "Boards (Local)" },
+  { key: "strokes", label: "Strokes (Synced)" },
+  { key: "strokes_local", label: "Strokes (Local)" },
   { key: "blobsMeta", label: "Blobs Meta" },
   { key: "deviceBlobs", label: "Device Blobs" },
 ] as const;

@@ -20,6 +20,8 @@ import {
   AnnotationSchema,
   CardSchema,
   ReviewLogSchema,
+  BoardSchema,
+  StrokeSchema,
 } from "@deeprecall/core";
 
 /**
@@ -38,6 +40,8 @@ const WriteChangeSchema = z.object({
     "annotations",
     "cards",
     "review_logs",
+    "boards",
+    "strokes",
   ]),
   op: z.enum(["insert", "update", "delete"]),
   payload: z.any(), // Will be validated by specific table schema
@@ -80,6 +84,10 @@ function getSchemaForTable(table: string): z.ZodTypeAny {
       return CardSchema;
     case "review_logs":
       return ReviewLogSchema;
+    case "boards":
+      return BoardSchema;
+    case "strokes":
+      return StrokeSchema;
     default:
       throw new Error(`Unknown table: ${table}`);
   }
@@ -104,6 +112,8 @@ const JSONB_COLUMNS = new Set([
   "geometry",
   "style",
   "avatar_crop_region",
+  "points", // strokes points array
+  "bounding_box", // strokes bounding box
 ]);
 
 /**

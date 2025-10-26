@@ -23,6 +23,7 @@ export interface OrphanedBlobsOperations {
   isLoading?: boolean;
   // Platform-specific getBlobUrl for LinkBlobDialog
   getBlobUrl: (sha256: string) => string;
+  syncBlobToElectric: (sha256: string) => Promise<void>;
 }
 
 interface OrphanedBlobsProps {
@@ -30,7 +31,8 @@ interface OrphanedBlobsProps {
 }
 
 export function OrphanedBlobs({ operations }: OrphanedBlobsProps) {
-  const { orphanedBlobs, isLoading, getBlobUrl } = operations;
+  const { orphanedBlobs, isLoading, getBlobUrl, syncBlobToElectric } =
+    operations;
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -153,7 +155,7 @@ export function OrphanedBlobs({ operations }: OrphanedBlobsProps) {
       {linkingBlob && (
         <LinkBlobDialog
           blob={linkingBlob}
-          operations={{ getBlobUrl }}
+          operations={{ getBlobUrl, syncBlobToElectric }}
           onSuccess={() => {
             setLinkingBlob(null);
             // Query will auto-refresh via React Query

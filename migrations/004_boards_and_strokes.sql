@@ -56,9 +56,5 @@ CREATE TABLE strokes (
 CREATE INDEX idx_strokes_board_id ON strokes(board_id);
 CREATE INDEX idx_strokes_created_at ON strokes(created_at);
 
--- Enable Electric replication for boards and strokes
-ALTER TABLE boards ENABLE ELECTRIC;
-ALTER TABLE strokes ENABLE ELECTRIC;
-
 COMMENT ON TABLE boards IS 'Canvas boards for note-taking with drawing support';
 COMMENT ON TABLE strokes IS 'Individual pen/brush strokes on canvas boards';

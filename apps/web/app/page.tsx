@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { BookOpen, Library, Brain } from "lucide-react";
+import { BookOpen, Library, Brain, PenTool } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -24,7 +24,7 @@ export default function HomePage() {
           </p>
         </header>
 
-        <nav className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <nav className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link
             href="/library"
             className="group p-8 bg-gray-900 border border-gray-800 rounded-lg hover:border-blue-500 transition-all duration-200"
@@ -48,6 +48,17 @@ export default function HomePage() {
               <p className="text-gray-400 text-center">
                 Annotate and study documents
               </p>
+            </div>
+          </Link>
+
+          <Link
+            href="/board"
+            className="group p-8 bg-gray-900 border border-gray-800 rounded-lg hover:border-orange-500 transition-all duration-200"
+          >
+            <div className="flex flex-col items-center space-y-4">
+              <PenTool className="w-12 h-12 text-orange-400 group-hover:scale-110 transition-transform" />
+              <h2 className="text-2xl font-semibold">Boards</h2>
+              <p className="text-gray-400 text-center">Draw and take notes</p>
             </div>
           </Link>
 

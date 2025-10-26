@@ -18,6 +18,8 @@ import {
   useReplicationJobsSync,
   useReviewLogsSync,
   useWorksSync,
+  useBoardsSync,
+  useStrokesSync,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 
@@ -117,6 +119,7 @@ function SyncManager() {
   useAssetsSync();
   useAuthorsSync();
   useBlobsMetaSync();
+  useBoardsSync();
   useCardsSync();
   useCollectionsSync();
   useDeviceBlobsSync();
@@ -124,6 +127,7 @@ function SyncManager() {
   usePresetsSync();
   useReplicationJobsSync();
   useReviewLogsSync();
+  useStrokesSync();
   useWorksSync();
 
   return null;

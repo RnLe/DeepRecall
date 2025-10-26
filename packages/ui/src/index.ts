@@ -116,6 +116,9 @@ export {
   type DexieGraphVisualizationProps,
 } from "./admin/DexieGraphVisualization";
 
+// Whiteboard components (new architecture)
+export * from "./whiteboard";
+
 // Components
 export * from "./components";
 

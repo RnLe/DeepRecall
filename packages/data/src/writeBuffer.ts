@@ -40,7 +40,9 @@ export type WriteTable =
   | "review_logs"
   | "blobs_meta"
   | "device_blobs"
-  | "replication_jobs";
+  | "replication_jobs"
+  | "boards"
+  | "strokes";
 
 /**
  * A single write change to be synced

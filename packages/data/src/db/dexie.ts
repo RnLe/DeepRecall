@@ -19,6 +19,8 @@ import type {
   BlobMeta,
   DeviceBlob,
   ReplicationJob,
+  Board,
+  Stroke,
 } from "@deeprecall/core";
 
 class DeepRecallDB extends Dexie {
@@ -35,6 +37,10 @@ class DeepRecallDB extends Dexie {
   blobsMeta!: EntityTable<BlobMeta, "sha256">;
   deviceBlobs!: EntityTable<DeviceBlob, "id">;
   replicationJobs!: EntityTable<ReplicationJob, "id">;
+
+  // Boards and strokes (synced from Electric)
+  boards!: EntityTable<Board, "id">;
+  strokes!: EntityTable<Stroke, "id">;
 
   // Local optimistic changes (pending sync)
   presets_local!: EntityTable<
@@ -163,6 +169,32 @@ class DeepRecallDB extends Dexie {
       _timestamp: number;
       _error?: string;
       data?: ReviewLog;
+    },
+    "_localId"
+  >;
+
+  boards_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Board;
+    },
+    "_localId"
+  >;
+
+  strokes_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: Stroke;
     },
     "_localId"
   >;
@@ -994,6 +1026,64 @@ class DeepRecallDB extends Dexie {
           "✅ Database upgraded to v18 - blob coordination tables enabled"
         );
       });
+
+    // Version 19: Add boards and strokes tables for note-taking canvas
+    this.version(19)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Blob coordination (unchanged)
+        blobsMeta: "sha256, mime, createdAt",
+        deviceBlobs: "id, deviceId, sha256, present, health, createdAt",
+        replicationJobs:
+          "id, sha256, targetDeviceId, status, priority, createdAt",
+
+        // Boards and strokes (new)
+        boards: "id, title, createdAt, updatedAt",
+        strokes: "id, boardId, createdAt",
+
+        // Local optimistic tables (add boards and strokes)
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+        edges_local: "++_localId, id, _op, _status, _timestamp",
+        annotations_local: "++_localId, id, _op, _status, _timestamp",
+        cards_local: "++_localId, id, _op, _status, _timestamp",
+        reviewLogs_local: "++_localId, id, _op, _status, _timestamp",
+        boards_local: "++_localId, id, _op, _status, _timestamp",
+        strokes_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async (tx) => {
+        console.log(
+          "Upgrading database to version 19 (adding boards and strokes tables)"
+        );
+        // No data migration needed - new tables start empty
+        console.log(
+          "✅ Database upgraded to v19 - boards and strokes tables enabled"
+        );
+      });
   }
 }
 
@@ -1034,6 +1124,8 @@ export async function clearAllDexieData(): Promise<void> {
       db.reviewLogs.clear(),
       db.blobsMeta.clear(),
       db.deviceBlobs.clear(),
+      db.boards.clear(),
+      db.strokes.clear(),
 
       // Local optimistic tables
       db.works_local.clear(),
@@ -1046,6 +1138,8 @@ export async function clearAllDexieData(): Promise<void> {
       db.annotations_local.clear(),
       db.cards_local.clear(),
       db.reviewLogs_local.clear(),
+      db.boards_local.clear(),
+      db.strokes_local.clear(),
     ]);
 
     console.log("[Dexie] ✅ All data cleared successfully");

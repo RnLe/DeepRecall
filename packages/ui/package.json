@@ -18,6 +18,7 @@
   "dependencies": {
     "@deeprecall/blob-storage": "workspace:*",
     "@deeprecall/core": "workspace:*",
+    "@deeprecall/whiteboard": "workspace:*",
     "@deeprecall/data": "workspace:*",
     "@deeprecall/pdf": "workspace:*",
     "@tanstack/react-query": "^5.90.3",
