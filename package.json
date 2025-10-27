@@ -5,7 +5,9 @@
   "description": "DeepRecall - Multi-platform reference management and study app",
   "scripts": {
     "dev": "pnpm --filter @deeprecall/web run dev",
+    "dev:desktop": "pnpm --filter @deeprecall/desktop run tauri:dev",
     "build": "pnpm --filter @deeprecall/web run build",
+    "build:desktop": "pnpm --filter @deeprecall/desktop run tauri:build",
     "start": "pnpm --filter @deeprecall/web run start",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
