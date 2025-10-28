@@ -90,15 +90,15 @@ jobs:
 
           # Import certificate - try alternative approach
           echo "Importing P12 certificate..."
-          
+
           # Extract certificate and private key separately
           openssl pkcs12 -in /tmp/certs/certs/distribution/distribution.p12 -passin pass:"$P12_PASSWORD" -clcerts -nokeys -out /tmp/cert.pem
           openssl pkcs12 -in /tmp/certs/certs/distribution/distribution.p12 -passin pass:"$P12_PASSWORD" -nocerts -nodes -out /tmp/key.pem
-          
+
           # Import certificate and key separately
           security import /tmp/cert.pem -k build.keychain -T /usr/bin/codesign -T /usr/bin/security
           security import /tmp/key.pem -k build.keychain -T /usr/bin/codesign -T /usr/bin/security
-          
+
           security set-key-partition-list -S apple-tool:,apple: -s -k "build123" build.keychain
 
           # Copy provisioning profile
