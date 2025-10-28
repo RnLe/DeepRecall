@@ -1,0 +1,20 @@
+# Nixpacks configuration for Railway deployment
+# Tells Railway how to build the monorepo
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm"]
+
+[phases.install]
+cmds = [
+  "cd ../..",
+  "pnpm install --frozen-lockfile"
+]
+
+[phases.build]
+cmds = [
+  "cd apps/web",
+  "pnpm run build"
+]
+
+[start]
+cmd = "cd apps/web && pnpm start"

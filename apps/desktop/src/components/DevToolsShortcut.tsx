@@ -1,0 +1,34 @@
+import { useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+
+/**
+ * DevTools keyboard shortcut component
+ * Enables F12 to open/close DevTools in Windows builds
+ */
+export function DevToolsShortcut() {
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // F12 to toggle DevTools
+      if (e.key === "F12") {
+        e.preventDefault();
+        try {
+          const isOpen = await invoke<boolean>("is_devtools_open");
+          if (isOpen) {
+            await invoke("close_devtools");
+            console.log("[DevTools] Closed via F12");
+          } else {
+            await invoke("open_devtools");
+            console.log("[DevTools] Opened via F12");
+          }
+        } catch (error) {
+          console.error("[DevTools] Failed to toggle:", error);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  return null; // No UI
+}

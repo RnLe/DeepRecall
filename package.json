@@ -6,8 +6,13 @@
   "scripts": {
     "dev": "pnpm --filter @deeprecall/web run dev",
     "dev:desktop": "pnpm --filter @deeprecall/desktop run tauri:dev",
+    "dev:mobile": "pnpm --filter @deeprecall/mobile run dev",
     "build": "pnpm --filter @deeprecall/web run build",
     "build:desktop": "pnpm --filter @deeprecall/desktop run tauri:build",
+    "build:mobile": "pnpm --filter @deeprecall/mobile run build",
+    "mobile:sync": "cd apps/mobile && pnpm cap:sync",
+    "mobile:run:ios": "cd apps/mobile && pnpm cap:run:ios",
+    "mobile:open:ios": "cd apps/mobile && pnpm cap:open:ios",
     "start": "pnpm --filter @deeprecall/web run start",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",

@@ -48,12 +48,14 @@ reset-db:
 # Clean all generated files and caches
 clean:
 	@echo "Cleaning apps/web..."
-	sudo rm -rf apps/web/node_modules
-	sudo rm -rf apps/web/.next
-	sudo rm -rf apps/web/.pnpm-store
-	sudo rm -f apps/web/pnpm-lock.yaml
+	sudo rm -rf apps/*/node_modules
+	sudo rm -rf apps/*/.next
+	sudo rm -rf apps/*/.pnpm-store
+	sudo rm -rf apps/*/dist
+	sudo rm -f apps/*/pnpm-lock.yaml
 	@echo "Cleaning packages..."
 	sudo rm -rf packages/*/node_modules
+	sudo rm -rf packages/*/dist
 	sudo rm -rf packages/*/.pnpm-store
 	@echo "Cleaning root..."
 	sudo rm -rf node_modules
@@ -63,3 +65,16 @@ clean:
 	sudo rm -rf python/__pycache__
 	sudo rm -rf python/**/__pycache__
 	@echo "✅ Clean complete!"
+
+# Build Windows desktop app from WSL2
+build-windows:
+	@echo "Building Windows desktop app..."
+	cd apps/desktop && pnpm tauri build --target x86_64-pc-windows-gnu --no-bundle
+	@echo "Copying to Windows Desktop..."
+	cp apps/desktop/src-tauri/target/x86_64-pc-windows-gnu/release/deeprecall.exe /mnt/c/Users/renem/Desktop/DeepRecall.exe
+	@echo "✅ DeepRecall.exe copied to Windows Desktop!"
+
+# Run migrations on Neon cloud database
+migrate-neon:
+	@echo "Running Neon database migrations..."
+	cd apps/desktop && ./migrate-neon.sh

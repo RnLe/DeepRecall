@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   initElectric,
   initFlushWorker,
@@ -20,6 +21,7 @@ import {
   useStrokesSync,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
+import { DevToolsShortcut } from "./components/DevToolsShortcut";
 
 // Configure PDF.js worker for Tauri platform
 // Tauri serves static assets from public/ directory
@@ -40,6 +42,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <DevToolsShortcut />
       <ElectricInitializer />
       <SyncManager />
       {children}
@@ -55,16 +58,59 @@ function ElectricInitializer() {
   const workerRef = useRef<ReturnType<typeof initFlushWorker> | null>(null);
 
   useEffect(() => {
-    // Initialize Electric connection (shared with web app)
+    // Initialize Electric connection
     const electricUrl =
       import.meta.env.VITE_ELECTRIC_URL || "http://localhost:5133";
-    initElectric({ url: electricUrl });
+    const electricSourceId = import.meta.env.VITE_ELECTRIC_SOURCE_ID;
+    const electricSecret = import.meta.env.VITE_ELECTRIC_SOURCE_SECRET;
+
+    initElectric({
+      url: electricUrl,
+      sourceId: electricSourceId, // Electric Cloud source ID
+      secret: electricSecret, // Electric Cloud source secret
+    });
     console.log(`[Electric] Desktop app connected to: ${electricUrl}`);
+    if (electricSourceId && electricSecret) {
+      console.log(`[Electric] Using Electric Cloud authentication`);
+    }
 
     // Initialize FlushWorker for desktop
-    // Desktop uses Tauri commands instead of HTTP API, but we'll use the same web API for now
+    // Desktop uses Tauri commands for direct Postgres writes
     const worker = initFlushWorker({
-      apiBase: "http://localhost:3000", // Point to web app's API endpoint
+      flushHandler: async (changes) => {
+        try {
+          const results = await invoke<
+            Array<{ id: string; success: boolean; error?: string }>
+          >("flush_writes", { changes });
+
+          // Transform Rust results to FlushWorker format
+          const applied: string[] = [];
+          const errors: Array<{ id: string; error: string }> = [];
+
+          for (const result of results) {
+            if (result.success) {
+              applied.push(result.id);
+            } else {
+              errors.push({
+                id: result.id,
+                error: result.error || "Unknown error",
+              });
+            }
+          }
+
+          return { applied, errors };
+        } catch (error) {
+          console.error("[FlushWorker] Tauri command failed:", error);
+          // Return all changes as failed
+          return {
+            applied: [],
+            errors: changes.map((c) => ({
+              id: c.id,
+              error: String(error),
+            })),
+          };
+        }
+      },
       batchSize: 10,
       retryDelay: 1000,
       maxRetryDelay: 30000,
@@ -73,7 +119,9 @@ function ElectricInitializer() {
     worker.start(1000); // Check every 1 second
     workerRef.current = worker;
     console.log("[FlushWorker] Started (interval: 1000ms)");
-    console.log("[FlushWorker] Using web API for writes (temporary)");
+    console.log(
+      "[FlushWorker] Using Tauri flush_writes command for direct Postgres writes"
+    );
 
     // Expose for debugging
     if (typeof window !== "undefined") {

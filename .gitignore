@@ -9,3 +9,4 @@
 # Database files
 /data/
 /blobs/
+**/dist/

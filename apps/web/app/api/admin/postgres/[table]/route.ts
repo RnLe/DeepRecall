@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
+import { createPostgresPool } from "@/app/api/lib/postgres";
 
 // Valid Postgres table names
 const VALID_TABLES = [
@@ -21,9 +21,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ table: string }> }
 ) {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
+  const pool = createPostgresPool();
 
   try {
     const { table: tableName } = await params;

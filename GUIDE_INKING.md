@@ -16,6 +16,24 @@ Optimistic canvas overlay → persisted stroke
 
 The inking layer is responsible for sampling pointer input, turning those samples into immutable stroke points, and feeding renderers that provide a zero-gap live preview while the persistence layer performs optimistic writes.
 
+## Apple Pencil Support (iOS/iPadOS) ✅
+
+**Fully supported out-of-the-box!** No mobile-specific implementation needed.
+
+- **Pressure**: Apple Pencil pressure (0.0-1.0) flows through PointerEvents API automatically
+- **Tilt**: `tiltX` and `tiltY` available for future texture/shader effects
+- **Palm Rejection**: Handled natively by iOS when Apple Pencil is detected
+- **Pointer Type**: Correctly identified as `"pen"` vs `"touch"` vs `"mouse"`
+- **Latency**: iOS optimizes Pencil input path for minimal lag
+
+The same `normalizePointerEvent()` function works identically on desktop and mobile:
+
+- Desktop: Wacom/Surface Pen via Chrome/Edge
+- Mobile: Apple Pencil via iOS Safari/Capacitor
+- Fallback: Mouse/touch with `pressure = 0.5`
+
+No platform-specific code required - the web standards handle everything!
+
 ## Core Contracts
 
 - **PointerSample** ( `input.ts` ) – normalized pointer data with `x`, `y`, `pressure`, `timestamp`, `pointerType`, and tilt values. Mouse input defaults to `pressure = 0.5` while buttons are pressed.

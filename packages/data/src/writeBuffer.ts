@@ -303,8 +303,16 @@ export function createWriteBuffer(): WriteBuffer {
  * Flush worker configuration
  */
 export interface FlushWorkerConfig {
-  /** Base URL for the API */
-  apiBase: string;
+  /** Base URL for the API (optional if using custom flushHandler) */
+  apiBase?: string;
+
+  /** Custom flush handler (e.g., for Tauri commands) */
+  flushHandler?: (
+    changes: WriteChange[]
+  ) => Promise<{
+    applied: string[];
+    errors: Array<{ id: string; error: string }>;
+  }>;
 
   /** Batch size for flushing */
   batchSize?: number;
@@ -327,19 +335,25 @@ export interface FlushWorkerConfig {
  * Uses exponential backoff for retries
  */
 export class FlushWorker {
-  private config: Required<FlushWorkerConfig>;
+  private config: FlushWorkerConfig & {
+    batchSize: number;
+    retryDelay: number;
+    maxRetryDelay: number;
+    maxRetries: number;
+    token: string;
+  };
   private buffer: WriteBuffer;
   private isRunning = false;
   private intervalId?: ReturnType<typeof setInterval>;
 
   constructor(config: FlushWorkerConfig) {
     this.config = {
-      batchSize: 10,
-      retryDelay: 1000,
-      maxRetryDelay: 30000,
-      maxRetries: 5,
-      token: "",
       ...config,
+      batchSize: config.batchSize ?? 10,
+      retryDelay: config.retryDelay ?? 1000,
+      maxRetryDelay: config.maxRetryDelay ?? 30000,
+      maxRetries: config.maxRetries ?? 5,
+      token: config.token ?? "",
     };
     this.buffer = createWriteBuffer();
   }
@@ -429,38 +443,56 @@ export class FlushWorker {
     }
 
     try {
-      // Send batch to server (with trailing slash for Next.js compatibility)
-      const url = `${this.config.apiBase}/api/writes/batch/`;
-      console.log(
-        `[FlushWorker] POSTing to ${url} with ${retryable.length} changes`
-      );
+      let result: {
+        applied: string[];
+        errors: Array<{ id: string; error: string }>;
+      };
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(this.config.token
-            ? { Authorization: `Bearer ${this.config.token}` }
-            : {}),
-        },
-        body: JSON.stringify({
-          changes: retryable,
-        }),
-      });
+      // Use custom flush handler if provided (e.g., Tauri command)
+      if (this.config.flushHandler) {
+        console.log(
+          `[FlushWorker] Using custom flush handler with ${retryable.length} changes`
+        );
+        result = await this.config.flushHandler(retryable);
+      } else {
+        // Use HTTP API (web app)
+        if (!this.config.apiBase) {
+          throw new Error("No apiBase or flushHandler configured");
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(
-          `[FlushWorker] Server error (${response.status}):`,
-          errorText
+        const url = `${this.config.apiBase}/api/writes/batch/`;
+        console.log(
+          `[FlushWorker] POSTing to ${url} with ${retryable.length} changes`
         );
-        throw new Error(
-          `Server returned ${response.status}: ${response.statusText}`
-        );
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(this.config.token
+              ? { Authorization: `Bearer ${this.config.token}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            changes: retryable,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(
+            `[FlushWorker] Server error (${response.status}):`,
+            errorText
+          );
+          throw new Error(
+            `Server returned ${response.status}: ${response.statusText}`
+          );
+        }
+
+        result = await response.json();
       }
 
-      const result = await response.json();
-      console.log("[FlushWorker] Server response:", result);
+      console.log("[FlushWorker] Flush response:", result);
 
       // Check if there were errors
       if (result.errors && result.errors.length > 0) {
@@ -479,7 +511,7 @@ export class FlushWorker {
       // Mark successful changes as applied
       const successIds = result.applied || [];
       if (successIds.length > 0) {
-        await this.buffer.markApplied(successIds, result.responses);
+        await this.buffer.markApplied(successIds);
         console.log(
           `[FlushWorker] Successfully applied ${successIds.length} changes`
         );

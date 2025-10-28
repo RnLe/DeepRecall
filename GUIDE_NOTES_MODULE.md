@@ -98,15 +98,32 @@ packages/ui/
 
 # Web Host (page as orchestrator)
 
-**Route:** `/whiteboard/[id]` in `apps/web`.
+**Routes:**
 
-- **`page.tsx`** (or `page.jsx`): the orchestrator.
+- Web: `/whiteboard/[id]` in `apps/web` (Next.js)
+- Desktop: `/board/[id]` in `apps/desktop` (Electron/Vite)
+- Mobile: `/board/:id` in `apps/mobile` (Capacitor/iOS)
+
+All use the same `<WhiteboardView/>` component from `packages/ui/src/whiteboard/`.
+
+## Web Implementation (`apps/web/app/board/[id]/page.tsx`)
+
+- **`page.tsx`** (Next.js route): the orchestrator.
   - Creates providers (Zustand/Board/Electric context).
   - Resolves board id, loads shape subscriptions (via `packages/data`).
   - Renders `<WhiteboardView/>`.
   - Surrounding UI: `<TopBar/>`, `<ToolPalette/>`, `<LayersPanel/>`, `<Minimap/>`, `<Inspector/>`.
 
-**Core visual composition:**
+## Mobile Implementation (`apps/mobile/src/pages/board/BoardPage.tsx`)
+
+- **`BoardPage.tsx`** (React Router route): mobile orchestrator.
+  - Uses `useParams()` from React Router (vs Next.js `params` prop).
+  - Same `<WhiteboardView/>` component - works identically.
+  - Mobile-optimized toolbar: collapsible on small screens, always visible on tablets.
+  - **Apple Pencil ready**: No special code needed - PointerEvents API handles everything.
+  - iOS-specific UI: "Apple Pencil Ready" indicator, safe area insets.
+
+**Core visual composition (same across all platforms):**
 
 ```tsx
 <WhiteboardView>
@@ -119,7 +136,14 @@ packages/ui/
 </WhiteboardView>
 ```
 
-Host-specific bits (file pickers, cache dirs) are injected via small `platform` shims later in Tauri/Capacitor.
+Platform-specific bits (file pickers, cache dirs) are injected via small `platform` shims in Capacitor/Electron.
+
+### Mobile Optimizations
+
+- **Touch/Pencil coexistence**: iOS automatically filters palm touches when Pencil is active
+- **Toolbar UX**: Collapsible on phones, persistent on tablets (checks `window.innerWidth`)
+- **Safe areas**: Uses Tailwind's `pt-safe` and `pb-safe` for notch/home indicator
+- **Active feedback**: Visual indicator confirms Apple Pencil pressure detection
 
 ---
 

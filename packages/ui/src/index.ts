@@ -79,6 +79,11 @@ export type {
   CompactNoteItemProps,
   CompactNoteItemOperations,
 } from "./reader/CompactNoteItem";
+export { CreateNoteDialog } from "./reader/CreateNoteDialog";
+export type {
+  CreateNoteDialogProps,
+  CreateNoteDialogOperations,
+} from "./reader/CreateNoteDialog";
 export { CreateGroupDialog } from "./reader/annotation/CreateGroupDialog";
 export type { CreateGroupDialogProps } from "./reader/annotation/CreateGroupDialog";
 export { NoteBranch } from "./reader/annotation/NoteBranch";
@@ -97,6 +102,24 @@ export type {
   AnnotationPreviewOperations,
 } from "./reader/annotation/AnnotationPreview";
 export { FileList } from "./reader/FileList";
+export { PDFPage } from "./reader/PDFPage";
+export type { PDFPageProps } from "./reader/PDFPage";
+export { PDFScrollbar } from "./reader/PDFScrollbar";
+export { NotePreview } from "./reader/NotePreview";
+export type {
+  NotePreviewProps,
+  NotePreviewOperations,
+} from "./reader/NotePreview";
+export { NoteDetailModal } from "./reader/NoteDetailModal";
+export type {
+  NoteDetailModalProps,
+  NoteDetailModalOperations,
+} from "./reader/NoteDetailModal";
+export { NoteSidebar } from "./reader/NoteSidebar";
+export type {
+  NoteSidebarProps,
+  NoteSidebarOperations,
+} from "./reader/NoteSidebar";
 export { ReaderLayout } from "./reader/ReaderLayout";
 export type {
   ReaderLayoutProps,

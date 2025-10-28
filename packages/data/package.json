@@ -9,9 +9,9 @@
     "./repos": "./src/repos/index.ts",
     "./repos/worksElectric": "./src/repos/works.electric.ts",
     "./stores": "./src/stores/index.ts",
+    "./stores/reader-ui": "./src/stores/reader-ui.ts",
     "./hooks": "./src/hooks/index.ts",
     "./hooks/useWorks": "./src/hooks/useWorks.ts",
-    "./hooks/useLibraryLegacy": "./src/hooks/useLibraryLegacy.ts",
     "./electric": "./src/electric.ts",
     "./writeBuffer": "./src/writeBuffer.ts"
   },

@@ -1,0 +1,59 @@
+/**
+ * LinkBlobDialog Wrapper (Capacitor Mobile)
+ * Provides platform-specific operations for blob linking
+ */
+
+"use client";
+
+import {
+  LinkBlobDialog as LinkBlobDialogUI,
+  type LinkBlobDialogOperations,
+} from "@deeprecall/ui";
+import type { BlobWithMetadata } from "@deeprecall/core";
+import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
+
+interface LinkBlobDialogProps {
+  blob: BlobWithMetadata;
+  preselectedWorkId?: string | null;
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+
+export function LinkBlobDialog({
+  blob,
+  preselectedWorkId,
+  onSuccess,
+  onCancel,
+}: LinkBlobDialogProps) {
+  const cas = useCapacitorBlobStorage();
+
+  const operations: LinkBlobDialogOperations = {
+    getBlobUrl: (sha256: string) => cas.getUrl(sha256),
+    syncBlobToElectric: async (sha256: string) => {
+      // For mobile, sync via HTTP API (same as web app)
+      const apiBaseUrl =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+      const response = await fetch(`${apiBaseUrl}/api/admin/sync-blob`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sha256 }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to sync blob");
+      }
+    },
+  };
+
+  return (
+    <LinkBlobDialogUI
+      blob={blob}
+      preselectedWorkId={preselectedWorkId}
+      onSuccess={onSuccess}
+      onCancel={onCancel}
+      operations={operations}
+    />
+  );
+}

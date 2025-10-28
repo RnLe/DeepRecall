@@ -12,7 +12,6 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-
 /// Get the blob storage directory path
 fn get_blobs_dir() -> Result<PathBuf> {
     let home_dir = dirs::home_dir().context("Failed to get home directory")?;
@@ -69,8 +68,18 @@ pub async fn store_blob(
     let subdir = blobs_dir.join(&hash[..2]);
     fs::create_dir_all(&subdir).map_err(|e| e.to_string())?;
 
-    // Store file with hash as name
-    let file_path = subdir.join(&hash);
+    // Store file with hash + extension as name (for MIME type detection)
+    // Extract extension from original filename
+    let extension = std::path::Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+    let filename_on_disk = if extension.is_empty() {
+        hash.clone()
+    } else {
+        format!("{}.{}", hash, extension)
+    };
+    let file_path = subdir.join(&filename_on_disk);
     fs::write(&file_path, &data).map_err(|e| e.to_string())?;
 
     // Get file metadata
@@ -111,22 +120,13 @@ pub async fn store_blob(
     })
 }
 
-/// Delete a blob
+/// Delete a blob (database entry only, keeps file on disk)
 #[tauri::command]
 pub async fn delete_blob(sha256: String) -> Result<(), String> {
     let conn = get_connection().map_err(|e| e.to_string())?;
 
-    // Get file path before deleting from database
-    if let Some(blob_info) = get_blob_by_hash(&conn, &sha256).map_err(|e| e.to_string())? {
-        if let Some(path) = blob_info.path {
-            // Delete file from filesystem
-            if let Err(e) = fs::remove_file(&path) {
-                eprintln!("Failed to delete file {}: {}", path, e);
-            }
-        }
-    }
-
-    // Delete from database
+    // Delete from database only - DO NOT delete the actual file
+    // Files are content-addressed and may be referenced elsewhere
     db_delete_blob(&conn, &sha256).map_err(|e| e.to_string())?;
 
     Ok(())
@@ -193,8 +193,9 @@ pub async fn scan_blobs() -> Result<ScanResult, String> {
 }
 
 fn process_file_for_scan(conn: &rusqlite::Connection, path: &Path, hash: &str) -> Result<bool> {
-    // Check if already in database
-    let exists = get_blob_by_hash(conn, hash)?.is_some();
+    // Check if already in database and get existing filename
+    let existing_blob = get_blob_by_hash(conn, hash)?;
+    let existing_filename = existing_blob.as_ref().and_then(|b| b.filename.clone());
 
     // Get file metadata
     let metadata = fs::metadata(path)?;
@@ -203,21 +204,28 @@ fn process_file_for_scan(conn: &rusqlite::Connection, path: &Path, hash: &str) -
         .duration_since(std::time::UNIX_EPOCH)?
         .as_millis() as i64;
 
-    let mime = get_mime_type(path);
+    // Try to detect MIME from filename first (if available), then fallback to path
+    let mime = if let Some(ref filename) = existing_filename {
+        mime_guess::from_path(filename)
+            .first_or_octet_stream()
+            .to_string()
+    } else {
+        get_mime_type(path)
+    };
 
-    // Insert or update
+    // Insert or update (preserve existing filename if available)
     insert_blob(
         conn,
         hash,
         metadata.len() as i64,
         &mime,
         mtime_ms,
-        None, // No original filename during scan
+        existing_filename.as_deref(), // Preserve filename if it exists
     )?;
 
     insert_path(conn, hash, path.to_str().unwrap())?;
 
-    Ok(!exists)
+    Ok(existing_blob.is_none())
 }
 
 /// Health check for blob storage
@@ -238,4 +246,98 @@ pub async fn get_blob_stats() -> Result<serde_json::Value, String> {
         "totalSize": stats.total_size,
         "byMimeType": {} // TODO: Implement MIME type breakdown
     }))
+}
+
+/// Read blob file content as string
+#[tauri::command]
+pub async fn read_blob(sha256: String) -> Result<String, String> {
+    let blobs_dir = get_blobs_dir().map_err(|e| e.to_string())?;
+    let prefix = &sha256[0..2];
+    let blob_path = blobs_dir.join(prefix).join(&sha256);
+
+    if !blob_path.exists() {
+        return Err(format!("Blob not found: {}", sha256));
+    }
+
+    fs::read_to_string(blob_path).map_err(|e| e.to_string())
+}
+
+/// Sync blob metadata to Electric (Postgres)
+#[tauri::command]
+pub async fn sync_blob_to_electric(sha256: String) -> Result<(), String> {
+    use tokio_postgres::NoTls;
+    
+    // Get blob info from SQLite catalog
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    let blob = get_blob_by_hash(&conn, &sha256)
+        .map_err(|e| format!("Failed to get blob: {}", e))?
+        .ok_or_else(|| format!("Blob not found: {}", sha256))?;
+
+    // Connect to Postgres
+    let pg_conn_str = "host=localhost port=5432 user=deeprecall password=deeprecall dbname=deeprecall";
+    let (client, connection) = tokio_postgres::connect(pg_conn_str, NoTls)
+        .await
+        .map_err(|e| format!("Failed to connect to Postgres: {}", e))?;
+    
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {}", e);
+        }
+    });
+
+    // Generate UUIDs for new records
+    let device_blob_id = uuid::Uuid::new_v4(); // Keep as UUID type
+    let device_id = "desktop"; // TODO: Get actual device ID from local storage
+    let now_ms = chrono::Utc::now().timestamp_millis();
+
+    // Insert into blobs_meta (if not exists)
+    // Note: blobs_meta uses sha256 as primary key, no separate id column
+    let meta_query = r#"
+        INSERT INTO blobs_meta (sha256, size, mime, filename, created_ms)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (sha256) DO NOTHING
+    "#;
+    
+    client.execute(
+        meta_query,
+        &[&sha256, &(blob.size as i64), &blob.mime, &blob.filename, &now_ms]
+    ).await.map_err(|e| format!("Failed to insert blobs_meta: {}", e))?;
+
+    // Insert into device_blobs (if not exists, update if exists)
+    let device_query = r#"
+        INSERT INTO device_blobs (id, device_id, sha256, present, health, created_ms)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (device_id, sha256) DO UPDATE SET
+            present = EXCLUDED.present,
+            health = EXCLUDED.health
+    "#;
+    
+    client.execute(
+        device_query,
+        &[&device_blob_id, &device_id, &sha256, &true, &"healthy", &now_ms]
+    ).await.map_err(|e| format!("Failed to insert device_blobs: {}", e))?;
+
+    println!("✅ Synced blob {} to Electric", sha256);
+    
+    Ok(())
+}
+
+/// Clear all blobs from disk
+#[tauri::command]
+pub async fn clear_all_blobs() -> Result<(), String> {
+    let blobs_dir = get_blobs_dir().map_err(|e| e.to_string())?;
+    
+    if blobs_dir.exists() {
+        fs::remove_dir_all(&blobs_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&blobs_dir).map_err(|e| e.to_string())?;
+    }
+
+    // Also clear the SQLite catalog
+    let conn = get_connection().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM blobs", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM paths", [])
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }

@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Pool } from "pg";
+import { createPostgresPool } from "@/app/api/lib/postgres";
 import { z } from "zod";
 import {
   WorkSchema,
@@ -23,6 +24,22 @@ import {
   BoardSchema,
   StrokeSchema,
 } from "@deeprecall/core";
+
+/**
+ * CORS headers for mobile dev mode
+ */
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+/**
+ * Handle OPTIONS request for CORS preflight
+ */
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
 
 /**
  * Write change schema
@@ -346,11 +363,8 @@ async function applyChange(
  */
 export async function POST(request: NextRequest) {
   console.log("[WritesBatch] API endpoint called!");
-  console.log("[WritesBatch] DATABASE_URL:", process.env.DATABASE_URL);
 
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
+  const pool = createPostgresPool();
 
   try {
     // Parse and validate request body
@@ -394,12 +408,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Return results
-    return NextResponse.json({
-      success: true,
-      applied: appliedIds,
-      responses: results,
-      errors: errors.length > 0 ? errors : undefined,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        applied: appliedIds,
+        responses: results,
+        errors: errors.length > 0 ? errors : undefined,
+      },
+      { headers: corsHeaders }
+    );
   } catch (error) {
     console.error("[WritesBatch] Batch processing failed:", error);
     return NextResponse.json(
@@ -407,7 +424,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   } finally {
     await pool.end();

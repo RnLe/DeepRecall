@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Providers } from "./providers";
 import Link from "next/link";
 import { GPUIndicator } from "./components/GPUIndicator";
+import { ElectricIndicator } from "./components/ElectricIndicator";
+import { PostgresIndicator } from "./components/PostgresIndicator";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
@@ -73,7 +75,9 @@ export default function RootLayout({
                     Postgres
                   </Link>
                 </div>
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
+                  <ElectricIndicator />
+                  <PostgresIndicator />
                   <GPUIndicator />
                 </div>
               </div>

@@ -5,15 +5,11 @@
 
 import { NextResponse } from "next/server";
 import { clearDatabase } from "@/src/server/cas";
-import { Pool } from "pg";
+import { createPostgresPool } from "@/app/api/lib/postgres";
 
 // Postgres connection for admin operations
 async function clearPostgres() {
-  const connectionString =
-    process.env.DATABASE_URL ||
-    "postgresql://postgres:password@localhost:5432/postgres";
-
-  const pool = new Pool({ connectionString });
+  const pool = createPostgresPool();
 
   try {
     // Clear all tables in reverse dependency order

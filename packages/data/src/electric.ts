@@ -10,8 +10,10 @@ import { useState, useEffect, useRef } from "react";
  * Electric configuration
  */
 interface ElectricConfig {
-  url: string; // Electric sync service URL
-  token?: string; // Optional auth token
+  url: string; // Electric sync service URL (e.g., https://api.electric-sql.cloud/v1/shape)
+  token?: string; // Optional auth token (for self-hosted)
+  sourceId?: string; // Electric Cloud source ID
+  secret?: string; // Electric Cloud source secret
   mode?: "development" | "production"; // Sync mode
 }
 
@@ -19,8 +21,12 @@ interface ElectricConfig {
  * Sync mode configuration
  * - development: 10s polling to catch sync delay issues
  * - production: Real-time SSE for instant updates
+ *
+ * CURRENT: Using development (polling) mode for Electric Cloud
+ * REASON: liveSse (SSE) had reliability issues detecting live changes
+ * RESULT: 10-second polling works perfectly with Electric Cloud
  */
-const SYNC_MODE: "development" | "production" = "production";
+const SYNC_MODE: "development" | "production" = "development";
 
 /**
  * JSONB columns per table that need parsing
@@ -269,11 +275,26 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     // Create new connection
     const config = getElectricConfig();
 
-    // Build shape URL
-    let shapeUrl = `${config.url}/v1/shape`;
+    // Build shape URL (Electric Cloud uses /v1/shape, self-hosted may vary)
+    // Electric Cloud expects the full path in config.url
+    let shapeUrl = config.url;
+
+    // If URL doesn't end with /v1/shape, append it (for backward compatibility)
+    if (!shapeUrl.includes("/v1/shape")) {
+      shapeUrl = `${shapeUrl}/v1/shape`;
+    }
+
     const params = new URLSearchParams({
       table: spec.table,
     });
+
+    // Add Electric Cloud credentials as query params (if provided)
+    if (config.sourceId) {
+      params.append("source_id", config.sourceId);
+    }
+    if (config.secret) {
+      params.append("secret", config.secret);
+    }
 
     if (spec.where) {
       params.append("where", spec.where);
@@ -290,6 +311,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
         spec.where ? ` (${spec.where})` : ""
       } (mode: ${SYNC_MODE})`
     );
+    console.log(`[Electric] Shape URL: ${shapeUrl}`);
     setSyncStatus("connecting");
 
     // Create shape stream

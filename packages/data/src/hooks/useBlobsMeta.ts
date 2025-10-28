@@ -55,8 +55,8 @@ export function useBlobsMetaSync() {
   useEffect(() => {
     if (
       !electricResult.isLoading &&
-      electricResult.data !== undefined &&
-      electricResult.isFreshData
+      electricResult.data !== undefined
+      // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         if (error.name === "DatabaseClosedError") return;

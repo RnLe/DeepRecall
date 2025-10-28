@@ -4,6 +4,7 @@
   "description": "Shared React UI components for DeepRecall",
   "type": "module",
   "exports": {
+    ".": "./src/index.ts",
     "./library": "./src/library/index.ts",
     "./reader": "./src/reader/index.ts",
     "./study": "./src/study/index.ts",

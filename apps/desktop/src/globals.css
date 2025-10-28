@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@plugin "@tailwindcss/typography";
+@plugin "@tailwindcss/forms";
+
+/* Make Tailwind scan UI package sources */
+@source "../../../packages/ui/src";
+
+@layer base {
+  * {
+    border-color: theme("colors.gray.800");
+  }
+
+  body {
+    background-color: theme("colors.gray.950");
+    color: theme("colors.gray.100");
+  }
+
+  /* Hide default scrollbar for PDF container */
+  .pdf-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* PDF.js Text Layer Styles */
+  .pdf-text-layer {
+    position: absolute;
+    text-align: initial;
+    inset: 0;
+    overflow: hidden;
+    opacity: 1;
+    line-height: 1;
+    -webkit-text-size-adjust: none;
+    -moz-text-size-adjust: none;
+    text-size-adjust: none;
+    forced-color-adjust: none;
+    transform-origin: 0 0;
+    caret-color: CanvasText;
+    pointer-events: auto;
+
+    /* CSS variables for font scaling - computed by PDFTextLayer */
+    --scale-factor: 1;
+    --user-unit: 1;
+    --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  }
+
+  .pdf-text-layer :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text !important;
+    transform-origin: 0% 0%;
+  }
+
+  /* Selection highlight */
+  .pdf-text-layer ::selection {
+    background: rgb(59 130 246 / 0.3);
+  }
+
+  .pdf-text-layer br::selection {
+    background: transparent;
+  }
+
+  /* Annotation highlight styles */
+  .pdf-text-layer .highlight {
+    margin: -1px;
+    padding: 1px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .pdf-text-layer .highlight.selected {
+    background-color: rgb(255 0 0 / 0.3);
+  }
+
+  /* PDF.js Annotation Layer Styles */
+  .pdf-annotation-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+
+  .pdf-annotation-layer section {
+    position: absolute;
+    text-align: initial;
+    pointer-events: auto;
+  }
+
+  /* ElectricSQL - Disable SSR transform warnings */
+  [data-electric-sql-disable-ssr-transform] {
+    display: contents;
+  }
+}
