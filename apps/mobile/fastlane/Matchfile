@@ -4,6 +4,4 @@ storage_mode("git")
 
 type("appstore") # Changed to appstore (was development)
 
-skip_certificate_verification(true)
-
 app_identifier("com.renlehpy.deeprecall")
