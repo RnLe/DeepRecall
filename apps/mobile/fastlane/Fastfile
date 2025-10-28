@@ -1,0 +1,46 @@
+# Fastfile for DeepRecall iOS builds
+default_platform(:ios)
+
+platform :ios do
+  desc "Build & upload to TestFlight"
+  lane :beta do
+    # 1) App Store Connect API key (from GitHub Secrets)
+    api_key = app_store_connect_api_key(
+      key_id:      ENV["ASC_KEY_ID"],
+      issuer_id:   ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],   # base64 string
+      is_key_content_base64: true
+    )
+
+    # 2) Code signing (Apple Distribution + App Store profile)
+    match(
+      type: "appstore",
+      api_key: api_key,
+      git_url: ENV["MATCH_GIT_URL"],
+      readonly: true,
+      app_identifier: "com.renlehpy.deeprecall",
+      keychain_name: ENV["MATCH_KEYCHAIN_NAME"] || "login.keychain",
+      keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"] || ""
+    )
+
+    # 3) Bump build number (monotonic)
+    increment_build_number(
+      xcodeproj: "ios/App/App.xcodeproj"
+    )
+
+    # 4) Archive (adjust scheme/workspace if your app differs)
+    build_ios_app(
+      workspace: "ios/App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store"
+    )
+
+    # 5) Upload to TestFlight
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+      distribute_external: false, # set true + groups when you're ready
+      apple_id: "6754611356"
+    )
+  end
+end

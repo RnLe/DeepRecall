@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# App Store Connect API Keys
+AuthKey_*.p8
+*.p8
+

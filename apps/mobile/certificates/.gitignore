@@ -1,0 +1,11 @@
+# Certificate files (generated locally, encrypted in Match repo)
+*.key
+*.csr
+*.cer
+*.pem
+*.p12
+*.mobileprovision
+
+# Keep the helper scripts
+!*.sh
+!*.md

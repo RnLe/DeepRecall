@@ -1,0 +1,20 @@
+# Fastlane specific
+*.ipa
+*.dSYM.zip
+*.mobileprovision
+
+# Fastlane automatic screenshots
+screenshots/
+fastlane/screenshots/
+
+# Fastlane reports
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+
+# Fastlane README
+fastlane/README.md
+
+# Bundler
+vendor/bundle
+.bundle

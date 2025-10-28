@@ -1,141 +1,70 @@
-# name: iOS TestFlight Deployment
+name: iOS → TestFlight
 
-# on:
-#   push:
-#     branches: [main, level2-transformation]
-#     paths:
-#       - "apps/mobile/**"
-#       - "packages/**"
-#       - ".github/workflows/ios-testflight.yml"
-#   workflow_dispatch:
+on:
+  push:
+    branches: [main] # change to your release branch if needed
+  workflow_dispatch: # manual trigger
 
-# jobs:
-#   build-and-deploy:
-#     runs-on: macos-latest
+jobs:
+  build-upload:
+    runs-on: macos-15 # pin macOS image for stability
+    defaults:
+      run:
+        working-directory: apps/mobile
 
-#     defaults:
-#       run:
-#         working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+      # Xcode pinning (avoid surprises when macos-latest changes)
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16.2" # pick a stable version available on macos-15
 
-#       - name: Setup pnpm
-#         uses: pnpm/action-setup@v2
-#         with:
-#           version: 8
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
 
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: "20"
-#           cache: "pnpm"
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
-#       - name: Install dependencies (root)
-#         run: pnpm install --frozen-lockfile
-#         working-directory: .
+      - name: Install JS deps (monorepo)
+        run: pnpm install --frozen-lockfile
+        working-directory: ../.. # run at repo root
 
-#       - name: Build packages
-#         run: pnpm --filter @deeprecall/ui build && pnpm --filter @deeprecall/data build && pnpm --filter @deeprecall/pdf build
-#         working-directory: .
+      # Build shared packages first (excluding mobile app itself)
+      - name: Build shared packages
+        run: pnpm -r --filter '!@deeprecall/mobile' build
+        working-directory: ../..
 
-#       - name: Create environment file
-#         run: |
-#           echo "VITE_ELECTRIC_URL=${{ secrets.VITE_ELECTRIC_URL }}" > .env.local
-#           echo "VITE_ELECTRIC_TOKEN=${{ secrets.VITE_ELECTRIC_TOKEN }}" >> .env.local
-#           echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env.local
+      - name: Build mobile web assets & sync iOS (Capacitor)
+        run: |
+          pnpm run build
+          npx cap sync ios
 
-#       - name: Build mobile web assets
-#         run: pnpm build
+      - name: Install CocoaPods
+        run: |
+          cd ios/App
+          pod install
 
-#       - name: Sync Capacitor
-#         run: pnpm cap sync ios
+      - name: Setup Ruby & bundle
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: apps/mobile
 
-#       - name: Setup Ruby
-#         uses: ruby/setup-ruby@v1
-#         with:
-#           ruby-version: "3.2"
-
-#       - name: Install Cocoapods
-#         run: |
-#           cd ios/App
-#           pod install
-
-#       - name: Import signing certificates
-#         env:
-#           CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
-#           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-#         run: |
-#           # Create temporary keychain
-#           security create-keychain -p "" build.keychain
-#           security default-keychain -s build.keychain
-#           security unlock-keychain -p "" build.keychain
-#           security set-keychain-settings -t 3600 -u build.keychain
-
-#           # Import certificate
-#           echo "$CERTIFICATE_P12" | base64 --decode > certificate.p12
-#           security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-#           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
-#           rm certificate.p12
-
-#       - name: Import provisioning profile
-#         env:
-#           PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
-#         run: |
-#           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-#           echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
-#       - name: Increment build number
-#         run: |
-#           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" ios/App/App/Info.plist
-
-#       - name: Build iOS archive
-#         run: |
-#           cd ios/App
-#           xcodebuild \
-#             -workspace App.xcworkspace \
-#             -scheme App \
-#             -configuration Release \
-#             -archivePath $PWD/build/App.xcarchive \
-#             clean archive \
-#             CODE_SIGN_STYLE=Manual
-
-#       - name: Export IPA
-#         run: |
-#           cd ios/App
-#           xcodebuild \
-#             -exportArchive \
-#             -archivePath $PWD/build/App.xcarchive \
-#             -exportOptionsPlist exportOptions.plist \
-#             -exportPath $PWD/build
-
-#       - name: Upload to TestFlight
-#         env:
-#           APPLE_ID: ${{ secrets.APPLE_ID }}
-#           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-#           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-#         run: |
-#           cd ios/App
-#           xcrun altool \
-#             --upload-app \
-#             --type ios \
-#             --file build/App.ipa \
-#             --username "$APPLE_ID" \
-#             --password "$APPLE_APP_PASSWORD" \
-#             --team-id "$APPLE_TEAM_ID"
-
-#       - name: Upload build artifacts
-#         uses: actions/upload-artifact@v4
-#         if: always()
-#         with:
-#           name: ios-build-${{ github.run_number }}
-#           path: |
-#             apps/mobile/ios/App/build/*.ipa
-#             apps/mobile/ios/App/build/*.xcarchive
-#           retention-days: 30
-
-#       - name: Cleanup keychain
-#         if: always()
-#         run: |
-#           security delete-keychain build.keychain || true
+      - name: Fastlane beta → TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_GIT_URL: https://github.com/RnLe/DeepRecall-certificates.git
+          MATCH_PASSWORD: "dummy" # Not using encryption
+        run: |
+          bundle exec fastlane ios beta
