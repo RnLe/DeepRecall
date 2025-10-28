@@ -65,13 +65,34 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.MATCH_GIT_SSH_PRIVATE_KEY }}
 
+      # Clone certificates repo and install them manually
+      - name: Install certificates manually
+        env:
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        run: |
+          # Clone certificates repo
+          git clone git@github.com:RnLe/DeepRecall-certificates.git /tmp/certs
+          
+          # Create temporary keychain
+          security create-keychain -p "" build.keychain
+          security list-keychains -d user -s build.keychain login.keychain
+          security default-keychain -d user -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          
+          # Import certificate
+          security import /tmp/certs/certs/distribution/distribution.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          
+          # Copy provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp /tmp/certs/profiles/appstore/AppStore_com.renlehpy.deeprecall.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
       - name: Fastlane beta → TestFlight
         working-directory: apps/mobile/fastlane
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
-          MATCH_GIT_URL: git@github.com:RnLe/DeepRecall-certificates.git
-          MATCH_PASSWORD: "dummy" # Not using encryption
         run: |
           bundle exec fastlane ios beta

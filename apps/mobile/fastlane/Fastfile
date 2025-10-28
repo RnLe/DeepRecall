@@ -12,16 +12,8 @@ platform :ios do
       is_key_content_base64: true
     )
 
-    # 2) Code signing (Apple Distribution + App Store profile)
-    match(
-      type: "appstore",
-      api_key: api_key,
-      git_url: ENV["MATCH_GIT_URL"],
-      readonly: true,
-      app_identifier: "com.renlehpy.deeprecall",
-      keychain_name: ENV["MATCH_KEYCHAIN_NAME"] || "login.keychain",
-      keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"] || ""
-    )
+    # 2) Code signing - certificates already installed manually
+    # Skip Match since we install certificates directly in the workflow
 
     # 3) Bump build number (monotonic)
     increment_build_number(
