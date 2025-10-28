@@ -133,6 +133,7 @@ export async function previewImport(file: File): Promise<{
  * Calculate conflicts between import data and local Dexie data
  */
 async function calculateConflicts(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
   importCounts: any
 ): Promise<ImportPreview["conflicts"]> {
   // This will be replaced with actual conflict detection

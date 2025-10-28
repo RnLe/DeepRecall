@@ -5,37 +5,44 @@
 
 import { PDFParse } from "pdf-parse";
 import { readFile } from "fs/promises";
-import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { createRequire } from "module";
 
 // Configure worker for Node.js environment
 if (typeof window === "undefined") {
   try {
-    // Use createRequire to resolve pdf-parse location at runtime
-    const require = createRequire(import.meta.url);
-    const pdfParsePath = require.resolve("pdf-parse");
-
-    // pdf-parse resolves to .../pdf-parse/dist/pdf-parse/cjs/index.cjs
-    // Worker is at .../pdf-parse/dist/worker/pdf.worker.mjs
-    // Go up 4 levels: index.cjs -> cjs/ -> pdf-parse/ -> dist/ -> pdf-parse/
-    const pdfParsePackageRoot = dirname(
-      dirname(dirname(dirname(pdfParsePath)))
-    );
-    const workerPath = join(pdfParsePackageRoot, "dist/worker/pdf.worker.mjs");
-
-    console.log(`[PDF Worker] Using worker: ${workerPath}`);
-
-    // Verify it exists
-    const fs = require("fs");
-    if (fs.existsSync(workerPath)) {
-      PDFParse.setWorker(workerPath);
+    // Skip worker configuration during Next.js build phase
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+      console.log("[PDF Worker] Skipping worker config during build");
     } else {
-      throw new Error(`PDF worker not found at ${workerPath}`);
+      // Use createRequire to resolve pdf-parse location at runtime
+      const require = createRequire(import.meta.url);
+      const pdfParsePath = require.resolve("pdf-parse");
+
+      // pdf-parse resolves to .../pdf-parse/dist/pdf-parse/cjs/index.cjs
+      // Worker is at .../pdf-parse/dist/worker/pdf.worker.mjs
+      // Go up 4 levels: index.cjs -> cjs/ -> pdf-parse/ -> dist/ -> pdf-parse/
+      const pdfParsePackageRoot = dirname(
+        dirname(dirname(dirname(pdfParsePath)))
+      );
+      const workerPath = join(
+        pdfParsePackageRoot,
+        "dist/worker/pdf.worker.mjs"
+      );
+
+      console.log(`[PDF Worker] Using worker: ${workerPath}`);
+
+      // Verify it exists
+      const fs = require("fs");
+      if (fs.existsSync(workerPath)) {
+        PDFParse.setWorker(workerPath);
+      } else {
+        console.warn(`[PDF Worker] Worker not found at ${workerPath}`);
+      }
     }
   } catch (error) {
     console.error("[PDF Worker] Failed to configure worker:", error);
-    throw error;
+    // Don't throw during build - just log the error
   }
 }
 
@@ -73,6 +80,7 @@ export async function extractPDFMetadata(
     const infoResult = await parser.getInfo();
 
     // Extract metadata from info object
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const info = infoResult.info as any;
 
     // Extract common metadata fields

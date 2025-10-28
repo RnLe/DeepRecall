@@ -20,6 +20,11 @@ export function OrphanedBlobs() {
     orphanedBlobs: orphans,
     isLoading,
     getBlobUrl: (sha256: string) => `/api/blob/${sha256}`,
+    syncBlobToElectric: async (sha256: string) => {
+      // For web app, blobs are already synced via server-side Electric
+      // This is a no-op since the server handles sync automatically
+      console.log(`Blob ${sha256} sync requested (handled server-side)`);
+    },
   };
 
   return <OrphanedBlobsUI operations={operations} />;
