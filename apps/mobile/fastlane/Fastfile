@@ -21,7 +21,9 @@ platform :ios do
       team_id: "R4B85344VH",
       bundle_identifier: "com.renlephy.deeprecall",
       path: "ios/App/App.xcodeproj",
-      profile_name: "DeepRecall App Store"
+      profile_name: "DeepRecall App Store",
+      code_sign_identity: "Apple Distribution",
+      build_configurations: ["Release"]
     )
 
     # 3) Bump build number (monotonic)

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-upload:
-    runs-on: macos-15 # pin macOS image for stability
+    runs-on: macos-14 # matches Xcode 15.x tooling
 
     steps:
       - name: Checkout
@@ -20,10 +20,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.1" # use a more stable version
-
-      - name: Ensure iOS platform runtime is installed
-        run: sudo /Applications/Xcode_16.1.app/Contents/Developer/usr/bin/xcodebuild -downloadPlatform iOS
+          xcode-version: "15.4"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
