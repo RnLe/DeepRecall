@@ -17,27 +17,45 @@ if (typeof window === "undefined") {
     } else {
       // Use createRequire to resolve pdf-parse location at runtime
       const require = createRequire(import.meta.url);
-      const pdfParsePath = require.resolve("pdf-parse");
+      let pdfParsePath: string;
 
-      // pdf-parse resolves to .../pdf-parse/dist/pdf-parse/cjs/index.cjs
-      // Worker is at .../pdf-parse/dist/worker/pdf.worker.mjs
-      // Go up 4 levels: index.cjs -> cjs/ -> pdf-parse/ -> dist/ -> pdf-parse/
-      const pdfParsePackageRoot = dirname(
-        dirname(dirname(dirname(pdfParsePath)))
-      );
-      const workerPath = join(
-        pdfParsePackageRoot,
-        "dist/worker/pdf.worker.mjs"
-      );
+      try {
+        pdfParsePath = require.resolve("pdf-parse");
+      } catch {
+        // In production, require.resolve might not work
+        // Try alternative resolution
+        console.log(
+          "[PDF Worker] Standard resolution failed, trying alternative"
+        );
+        pdfParsePath = "";
+      }
 
-      console.log(`[PDF Worker] Using worker: ${workerPath}`);
+      // Only proceed if we got a string path (not a webpack module ID)
+      if (typeof pdfParsePath === "string" && pdfParsePath.length > 0) {
+        // pdf-parse resolves to .../pdf-parse/dist/pdf-parse/cjs/index.cjs
+        // Worker is at .../pdf-parse/dist/worker/pdf.worker.mjs
+        // Go up 4 levels: index.cjs -> cjs/ -> pdf-parse/ -> dist/ -> pdf-parse/
+        const pdfParsePackageRoot = dirname(
+          dirname(dirname(dirname(pdfParsePath)))
+        );
+        const workerPath = join(
+          pdfParsePackageRoot,
+          "dist/worker/pdf.worker.mjs"
+        );
 
-      // Verify it exists
-      const fs = require("fs");
-      if (fs.existsSync(workerPath)) {
-        PDFParse.setWorker(workerPath);
+        console.log(`[PDF Worker] Using worker: ${workerPath}`);
+
+        // Verify it exists
+        const fs = require("fs");
+        if (fs.existsSync(workerPath)) {
+          PDFParse.setWorker(workerPath);
+        } else {
+          console.warn(`[PDF Worker] Worker not found at ${workerPath}`);
+        }
       } else {
-        console.warn(`[PDF Worker] Worker not found at ${workerPath}`);
+        console.log(
+          "[PDF Worker] Worker resolution skipped in bundled environment"
+        );
       }
     }
   } catch (error) {

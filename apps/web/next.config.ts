@@ -10,7 +10,13 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "200mb",
     },
   },
-  serverExternalPackages: ["pino", "better-sqlite3", "pg", "pg-native"],
+  serverExternalPackages: [
+    "pino",
+    "better-sqlite3",
+    "pg",
+    "pg-native",
+    "pdf-parse",
+  ],
   // Disable features that don't work with static export
   trailingSlash: true,
   // Configure asset prefix for mobile apps
