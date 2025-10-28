@@ -19,7 +19,7 @@ platform :ios do
     update_code_signing_settings(
       use_automatic_signing: false,
       team_id: "R4B85344VH",
-      bundle_identifier: "com.renlehpy.deeprecall",
+      bundle_identifier: "com.renlephy.deeprecall",
       path: "ios/App/App.xcodeproj",
       profile_name: "DeepRecall App Store"
     )
@@ -33,10 +33,11 @@ platform :ios do
     build_ios_app(
       workspace: "ios/App/App.xcworkspace",
       scheme: "App",
+      configuration: "Release",
       export_method: "app-store",
       export_options: {
         provisioningProfiles: {
-          "com.renlehpy.deeprecall" => "DeepRecall App Store"
+          "com.renlephy.deeprecall" => "DeepRecall App Store"
         }
       }
     )
