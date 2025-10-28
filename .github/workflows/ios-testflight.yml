@@ -20,7 +20,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.2" # pick a stable version available on macos-15
+          xcode-version: "16.1" # use a more stable version
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
