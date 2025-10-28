@@ -22,6 +22,9 @@ jobs:
         with:
           xcode-version: "16.1" # use a more stable version
 
+      - name: Ensure iOS platform runtime is installed
+        run: sudo /Applications/Xcode_16.1.app/Contents/Developer/usr/bin/xcodebuild -downloadPlatform iOS
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -103,7 +106,7 @@ jobs:
 
           # Copy provisioning profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp /tmp/certs/profiles/appstore/AppStore_com.renlehpy.deeprecall.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          cp /tmp/certs/profiles/appstore/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
 
           # List certificates to verify
           echo "Installed certificates:"
