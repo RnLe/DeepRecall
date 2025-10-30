@@ -73,6 +73,15 @@ function ElectricInitializer() {
     const electricSourceId = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_ID;
     const electricSecret = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET;
 
+    // Debug logging
+    console.log("[Electric] Environment check:");
+    console.log(
+      "  NEXT_PUBLIC_ELECTRIC_URL:",
+      process.env.NEXT_PUBLIC_ELECTRIC_URL
+    );
+    console.log("  NODE_ENV:", process.env.NODE_ENV);
+    console.log("  Using URL:", electricUrl);
+
     initElectric({
       url: electricUrl,
       sourceId: electricSourceId,
@@ -81,6 +90,8 @@ function ElectricInitializer() {
     console.log(`[Electric] Initialized with URL: ${electricUrl}`);
     if (electricSourceId && electricSecret) {
       console.log(`[Electric] Using Electric Cloud authentication`);
+    } else {
+      console.warn("[Electric] No authentication - using local instance");
     }
 
     // Initialize and start FlushWorker

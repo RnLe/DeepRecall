@@ -19,6 +19,14 @@ function WriteBufferProvider({ children }: { children: React.ReactNode }) {
 
     console.log("[WriteBufferProvider] Initializing FlushWorker");
     console.log("[WriteBufferProvider] API Base:", apiBase);
+    console.log(
+      "[WriteBufferProvider] VITE_API_BASE_URL env:",
+      import.meta.env.VITE_API_BASE_URL
+    );
+    console.log(
+      "[WriteBufferProvider] Full endpoint:",
+      `${apiBase}/api/writes/batch`
+    );
 
     const worker = initFlushWorker({
       apiBase,

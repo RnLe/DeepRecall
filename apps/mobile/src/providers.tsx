@@ -112,17 +112,30 @@ function ElectricInitializer() {
     // Initialize FlushWorker for mobile
     // Mobile uses HTTP API (same as web app)
     const apiBaseUrl = getApiBaseUrl();
+    console.log("[Mobile] API Base URL:", apiBaseUrl);
+    console.log(
+      "[Mobile] VITE_API_BASE_URL:",
+      import.meta.env.VITE_API_BASE_URL
+    );
+    console.log(
+      "[Mobile] Full API endpoint:",
+      `${apiBaseUrl}/api/writes/batch`
+    );
 
     const worker = initFlushWorker({
       flushHandler: async (changes) => {
+        const endpoint = `${apiBaseUrl}/api/writes/batch`;
+        console.log(`[FlushWorker] Attempting fetch to: ${endpoint}`);
         try {
-          const response = await fetch(`${apiBaseUrl}/api/writes/batch`, {
+          const response = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ changes }),
           });
 
           if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[FlushWorker] HTTP ${response.status}:`, errorText);
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
@@ -133,6 +146,7 @@ function ElectricInitializer() {
           };
         } catch (error) {
           console.error("[FlushWorker] HTTP API failed:", error);
+          console.error("[FlushWorker] Error details:", JSON.stringify(error));
           // Return all changes as failed
           return {
             applied: [],
