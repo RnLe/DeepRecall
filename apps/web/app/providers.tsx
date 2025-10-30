@@ -65,34 +65,66 @@ export function Providers({ children }: { children: React.ReactNode }) {
  */
 function ElectricInitializer() {
   const workerRef = useRef<ReturnType<typeof initFlushWorker> | null>(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   useEffect(() => {
-    // Initialize Electric connection with Cloud credentials
-    const electricUrl =
-      process.env.NEXT_PUBLIC_ELECTRIC_URL || "http://localhost:5133";
-    const electricSourceId = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_ID;
-    const electricSecret = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET;
+    // Fetch runtime config from API (Railway variables available at runtime)
+    async function initializeWithRuntimeConfig() {
+      try {
+        console.log("[Electric] Fetching runtime config from /api/config...");
+        const response = await fetch("/api/config");
+        const config = await response.json();
 
-    // Debug logging
-    console.log("[Electric] Environment check:");
-    console.log(
-      "  NEXT_PUBLIC_ELECTRIC_URL:",
-      process.env.NEXT_PUBLIC_ELECTRIC_URL
-    );
-    console.log("  NODE_ENV:", process.env.NODE_ENV);
-    console.log("  Using URL:", electricUrl);
+        console.log("[Electric] Runtime config received:");
+        console.log("  electricUrl:", config.electricUrl);
+        console.log("  hasSourceId:", !!config.electricSourceId);
+        console.log("  hasSecret:", !!config.electricSecret);
 
-    initElectric({
-      url: electricUrl,
-      sourceId: electricSourceId,
-      secret: electricSecret,
-    });
-    console.log(`[Electric] Initialized with URL: ${electricUrl}`);
-    if (electricSourceId && electricSecret) {
-      console.log(`[Electric] Using Electric Cloud authentication`);
-    } else {
-      console.warn("[Electric] No authentication - using local instance");
+        initElectric({
+          url: config.electricUrl,
+          sourceId: config.electricSourceId,
+          secret: config.electricSecret,
+        });
+        console.log(`[Electric] Initialized with URL: ${config.electricUrl}`);
+
+        if (config.electricSourceId && config.electricSecret) {
+          console.log(`[Electric] Using Electric Cloud authentication`);
+        } else {
+          console.warn("[Electric] No authentication - using local instance");
+        }
+
+        setConfigLoaded(true);
+      } catch (error) {
+        console.error("[Electric] Failed to load runtime config:", error);
+        // Fallback to build-time env vars
+        const electricUrl =
+          process.env.NEXT_PUBLIC_ELECTRIC_URL || "http://localhost:5133";
+        const electricSourceId = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_ID;
+        const electricSecret = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET;
+
+        console.log(
+          "[Electric] Using fallback build-time config:",
+          electricUrl
+        );
+
+        initElectric({
+          url: electricUrl,
+          sourceId: electricSourceId,
+          secret: electricSecret,
+        });
+        console.log(`[Electric] Initialized with URL: ${electricUrl}`);
+
+        if (electricSourceId && electricSecret) {
+          console.log(`[Electric] Using Electric Cloud authentication`);
+        } else {
+          console.warn("[Electric] No authentication - using local instance");
+        }
+        setConfigLoaded(true);
+      }
     }
+
+    // Initialize Electric
+    initializeWithRuntimeConfig();
 
     // Initialize and start FlushWorker
     const apiBase = process.env.NEXT_PUBLIC_API_BASE || "";
