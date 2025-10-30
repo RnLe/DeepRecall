@@ -145,8 +145,12 @@ function ElectricInitializer() {
             errors: result.errors || [],
           };
         } catch (error) {
-          console.error("[FlushWorker] HTTP API failed:", error);
-          console.error("[FlushWorker] Error details:", JSON.stringify(error));
+          const message =
+            error instanceof Error ? error.message : JSON.stringify(error);
+          console.error("[FlushWorker] HTTP API failed:", message);
+          if (error instanceof TypeError && "stack" in error) {
+            console.error("[FlushWorker] Stack:", error.stack);
+          }
           // Return all changes as failed
           return {
             applied: [],

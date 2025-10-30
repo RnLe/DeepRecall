@@ -7,6 +7,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "https",
     iosScheme: "https",
+    allowNavigation: ["deeprecall-production.up.railway.app"],
   },
   ios: {
     contentInset: "automatic",

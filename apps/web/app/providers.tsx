@@ -50,12 +50,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       })
   );
+  const [electricReady, setElectricReady] = useState(false);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ElectricInitializer />
-      <SyncManager />
-      {children}
+      <ElectricInitializer onReady={() => setElectricReady(true)} />
+      {electricReady ? (
+        <>
+          <SyncManager />
+          {children}
+        </>
+      ) : (
+        <div style={{ padding: "2rem", textAlign: "center" }}>
+          <p>Initializing Electric sync...</p>
+        </div>
+      )}
     </QueryClientProvider>
   );
 }
@@ -63,7 +72,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 /**
  * Initialize Electric sync and WriteBuffer flush worker
  */
-function ElectricInitializer() {
+function ElectricInitializer({ onReady }: { onReady: () => void }) {
   const workerRef = useRef<ReturnType<typeof initFlushWorker> | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
 
@@ -94,6 +103,7 @@ function ElectricInitializer() {
         }
 
         setConfigLoaded(true);
+        onReady();
       } catch (error) {
         console.error("[Electric] Failed to load runtime config:", error);
         // Fallback to build-time env vars
@@ -120,6 +130,7 @@ function ElectricInitializer() {
           console.warn("[Electric] No authentication - using local instance");
         }
         setConfigLoaded(true);
+        onReady();
       }
     }
 
