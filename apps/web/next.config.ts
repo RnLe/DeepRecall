@@ -18,9 +18,13 @@ const nextConfig: NextConfig = {
     "pdf-parse",
   ],
   // Disable features that don't work with static export
-  trailingSlash: true,
-  // Configure asset prefix for mobile apps
-  assetPrefix: process.env.NODE_ENV === "production" ? "." : "",
+  trailingSlash: false, // Prevent 308 redirects on API routes
+  async rewrites() {
+    return [
+      // Strip trailing slashes on API paths to avoid preflight redirect issues
+      { source: "/api/:path*/", destination: "/api/:path*" },
+    ];
+  },
   turbopack: {
     resolveAlias: {
       canvas: "./empty-module.ts",

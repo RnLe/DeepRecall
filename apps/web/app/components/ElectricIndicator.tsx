@@ -15,12 +15,22 @@ export function ElectricIndicator() {
 
   useEffect(() => {
     const checkConnection = async () => {
-      const electricUrl =
-        process.env.NEXT_PUBLIC_ELECTRIC_URL || "http://localhost:5133";
-      const sourceId = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_ID;
-      const secret = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET;
-
       try {
+        // Fetch runtime config from API route
+        const configResponse = await fetch("/api/config");
+        if (!configResponse.ok) {
+          setStatus({
+            connected: false,
+            error: "Failed to fetch config",
+          });
+          return;
+        }
+
+        const config = await configResponse.json();
+        const electricUrl = config.electricUrl || "http://localhost:5133";
+        const sourceId = config.electricSourceId;
+        const secret = config.electricSecret;
+
         // Test a simple shape query with Electric Cloud credentials
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -55,7 +65,6 @@ export function ElectricIndicator() {
       } catch (error) {
         setStatus({
           connected: false,
-          url: electricUrl,
           error: error instanceof Error ? error.message : "Connection failed",
         });
       }

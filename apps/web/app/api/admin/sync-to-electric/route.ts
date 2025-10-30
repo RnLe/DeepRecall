@@ -32,8 +32,10 @@ export async function POST(request: Request) {
     let failed = 0;
 
     // Use write buffer API instead of direct Postgres (works with Electric Cloud)
-    const apiBaseUrl =
-      process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
+    // Construct the base URL from the request to call our own API
+    const protocol = request.headers.get("x-forwarded-proto") || "http";
+    const host = request.headers.get("host") || "localhost:3000";
+    const apiBaseUrl = `${protocol}://${host}`;
 
     // Get paths for local_path info
     const allPaths = await db.select().from(paths).all();
