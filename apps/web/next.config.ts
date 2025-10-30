@@ -17,8 +17,14 @@ const nextConfig: NextConfig = {
     "pg-native",
     "pdf-parse",
   ],
-  // Keep trailing slashes for web pages
-  trailingSlash: true,
+  // Default to no trailing slash to avoid API redirect loops
+  trailingSlash: false,
+  async rewrites() {
+    return [
+      // Allow existing trailing-slash URLs (especially from static docs) to keep working
+      { source: "/api/:path*/", destination: "/api/:path*" },
+    ];
+  },
   turbopack: {
     resolveAlias: {
       canvas: "./empty-module.ts",
