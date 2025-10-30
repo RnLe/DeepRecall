@@ -22,9 +22,6 @@ jobs:
         with:
           xcode-version: "16.2"
 
-      - name: Ensure iOS 18 platform runtime is installed
-        run: sudo /Applications/Xcode_16.2.app/Contents/Developer/usr/bin/xcodebuild -downloadPlatform iOS
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
