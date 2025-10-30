@@ -274,6 +274,30 @@ railway variables
 2. Verify build used production environment: `pnpm run build:ios`
 3. Ensure `capacitor.config.ts` has correct server URL
 
+### Mobile: Upload Failed - "Bundle version already used"
+
+**Symptoms:**
+
+- Fastlane fails at `upload_to_testflight`
+- Error: `The bundle version must be higher than the previously uploaded version`
+
+**Fix:**
+
+This is now handled automatically! The Fastlane configuration queries App Store Connect for the latest build number and increments it. If you see this error, it means:
+
+1. The `latest_testflight_build_number` API call failed (check ASC credentials)
+2. Or you're re-running a failed build without changes
+
+To manually fix:
+
+```bash
+cd apps/mobile/ios/App
+# Check current build number
+agvtool what-version
+# Set new build number (must be higher than TestFlight)
+agvtool new-version -all 3
+```
+
 ---
 
 ## Post-Deployment Verification

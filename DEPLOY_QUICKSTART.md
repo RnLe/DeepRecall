@@ -97,6 +97,10 @@ const SYNC_MODE: "development" | "production" = "development"; // ✅ Keep this!
 
 **Fix:** Verify GitHub secrets are configured correctly
 
+### Mobile: "Bundle version already used" error
+
+**Fix:** Build numbers are now auto-incremented from TestFlight. Just re-run the workflow.
+
 ### Mobile: App crashes on launch
 
 **Fix:** Check `VITE_API_BASE_URL` points to deployed Railway URL (not localhost)
