@@ -7,6 +7,7 @@
 import React, { useState } from "react";
 import type { BlobWithMetadata } from "@deeprecall/core";
 import type { Asset } from "@deeprecall/core";
+import type { BlobCAS } from "@deeprecall/blob-storage";
 import { assetsElectric } from "@deeprecall/data/repos";
 import { FileInbox } from "./FileInbox";
 import { UnlinkedAssetsList } from "./UnlinkedAssetsList";
@@ -24,6 +25,7 @@ export interface LibraryLeftSidebarOperations {
   deleteBlob: (hash: string) => Promise<void>;
   uploadFiles: (files: FileList) => Promise<void>;
   getBlobUrl: (sha256: string) => string;
+  cas: BlobCAS;
 }
 
 interface LibraryLeftSidebarProps {
@@ -216,6 +218,7 @@ export function LibraryLeftSidebar({
             onDeleteBlob={deleteBlob}
             onRefreshBlobs={refreshOrphanedBlobs}
             fetchBlobContent={fetchBlobContent}
+            cas={operations.cas}
           />
 
           {/* Unlinked Assets Section */}

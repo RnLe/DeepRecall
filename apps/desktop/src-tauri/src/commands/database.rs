@@ -463,17 +463,36 @@ async fn apply_insert(client: &Client, change: &WriteChange) -> Result<Value, St
     let columns: Vec<String> = data.keys().cloned().collect();
     let placeholders: Vec<String> = (1..=columns.len()).map(|i| format!("${}", i)).collect();
     
-    // Build query
-    let query = format!(
-        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT (id) DO UPDATE SET {} RETURNING *",
-        change.table,
-        columns.join(", "),
-        placeholders.join(", "),
-        columns.iter().enumerate()
-            .map(|(i, col)| format!("{} = ${}", col, i + 1))
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    // Build query with appropriate conflict handling
+    let query = if change.table == "blobs_meta" {
+        // blobs_meta: unique on sha256, use DO NOTHING for idempotency
+        format!(
+            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT (sha256) DO NOTHING RETURNING *",
+            change.table,
+            columns.join(", "),
+            placeholders.join(", ")
+        )
+    } else if change.table == "device_blobs" {
+        // device_blobs: unique on (device_id, sha256), use DO NOTHING for idempotency
+        format!(
+            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT (device_id, sha256) DO NOTHING RETURNING *",
+            change.table,
+            columns.join(", "),
+            placeholders.join(", ")
+        )
+    } else {
+        // Other tables: update on conflict (LWW)
+        format!(
+            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT (id) DO UPDATE SET {} RETURNING *",
+            change.table,
+            columns.join(", "),
+            placeholders.join(", "),
+            columns.iter().enumerate()
+                .map(|(i, col)| format!("{} = ${}", col, i + 1))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
     
     // Convert JSON values to Postgres parameters
     let param_values: Vec<Box<dyn tokio_postgres::types::ToSql + Sync + Send>> = columns
@@ -490,12 +509,18 @@ async fn apply_insert(client: &Client, change: &WriteChange) -> Result<Value, St
         .map(|p| &**p as &(dyn tokio_postgres::types::ToSql + Sync))
         .collect();
     
-    let row = client.query_one(&query, &params[..])
+    // Use query() instead of query_one() to handle DO NOTHING case (returns 0 rows)
+    let rows = client.query(&query, &params[..])
         .await
         .map_err(|e| format!("Insert failed: {}", e))?;
     
-    // Convert row to JSON using type-aware helper
-    Ok(row_to_json(&row))
+    // If DO NOTHING was used and nothing was inserted, return null
+    // (This is not an error - just means the record already existed)
+    if let Some(row) = rows.first() {
+        Ok(row_to_json(row))
+    } else {
+        Ok(Value::Null)
+    }
 }
 
 /**
@@ -788,6 +813,41 @@ pub async fn query_postgres_table(table: String) -> Result<Vec<Value>, String> {
         .iter()
         .map(|row| row_to_json(row))
         .collect();
+    
+    Ok(results)
+}
+
+/// Query all Postgres tables at once (efficient for admin panel)
+#[tauri::command]
+pub async fn query_all_postgres_tables() -> Result<HashMap<String, Vec<Value>>, String> {
+    use std::collections::HashMap;
+    
+    let client = get_pg_client().await?;
+    
+    let valid_tables = [
+        "works", "assets", "activities", "collections", "edges", "presets",
+        "authors", "annotations", "cards", "review_logs", "boards", "strokes",
+        "blobs_meta", "device_blobs"
+    ];
+    
+    let mut results = HashMap::new();
+    
+    for table in valid_tables.iter() {
+        let query = format!("SELECT * FROM {} LIMIT 1000", table);
+        match client.query(&query, &[]).await {
+            Ok(rows) => {
+                let table_data: Vec<Value> = rows
+                    .iter()
+                    .map(|row| row_to_json(row))
+                    .collect();
+                results.insert(table.to_string(), table_data);
+            }
+            Err(e) => {
+                println!("Failed to query table {}: {}", table, e);
+                results.insert(table.to_string(), vec![]);
+            }
+        }
+    }
     
     Ok(results)
 }

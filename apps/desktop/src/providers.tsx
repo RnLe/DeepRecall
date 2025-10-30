@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   initElectric,
   initFlushWorker,
+  initializeDeviceId,
   usePresetsSync,
   useActivitiesSync,
   useAnnotationsSync,
@@ -26,6 +27,11 @@ import { DevToolsShortcut } from "./components/DevToolsShortcut";
 // Configure PDF.js worker for Tauri platform
 // Tauri serves static assets from public/ directory
 configurePdfWorker("/pdf.worker.min.mjs");
+
+// Initialize device ID on app startup (Tauri Store persistence)
+initializeDeviceId().catch((error) => {
+  console.error("[Desktop] Failed to initialize device ID:", error);
+});
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(

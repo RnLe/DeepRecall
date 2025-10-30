@@ -4,9 +4,25 @@
  */
 
 import { createWriteBuffer } from "../writeBuffer";
-import { randomUUID } from "crypto";
 
 const buffer = createWriteBuffer();
+
+/**
+ * Generate UUID v4 (cross-platform compatible)
+ * Uses Web Crypto API which works in browsers and modern Node.js
+ */
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    // Modern browsers and Node.js 19+
+    return crypto.randomUUID();
+  }
+  // Fallback for older environments
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export type BlobHealth = "healthy" | "missing" | "modified" | "relocated";
 
@@ -19,20 +35,20 @@ export async function markBlobAvailable(
   localPath: string | null,
   health: BlobHealth = "healthy"
 ): Promise<void> {
-  const now = Date.now();
+  const now = new Date().toISOString();
 
   await buffer.enqueue({
     table: "device_blobs",
     op: "insert",
     payload: {
-      id: randomUUID(),
-      device_id: deviceId,
+      id: generateUUID(),
+      deviceId,
       sha256,
       present: true,
-      local_path: localPath,
+      localPath,
       health,
-      mtime_ms: now,
-      created_ms: now,
+      createdAt: now,
+      updatedAt: now,
     },
   });
 
@@ -53,10 +69,10 @@ export async function markBlobUnavailable(
     op: "update",
     payload: {
       sha256,
-      device_id: deviceId,
+      deviceId,
       present: false,
       health: "missing" as BlobHealth,
-      mtime_ms: Date.now(),
+      updatedAt: new Date().toISOString(),
     },
   });
 
@@ -78,9 +94,9 @@ export async function updateBlobHealth(
     op: "update",
     payload: {
       sha256,
-      device_id: deviceId,
+      deviceId,
       health,
-      mtime_ms: Date.now(),
+      updatedAt: new Date().toISOString(),
     },
   });
 

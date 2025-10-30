@@ -71,23 +71,29 @@ async function syncElectricToDexie(electricData: Asset[]): Promise<void> {
  */
 export function useAssetsSync() {
   const electricResult = assetsElectric.useAssets();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie assets table (for merge layer)
   useEffect(() => {
     if (
       !electricResult.isLoading &&
-      electricResult.data !== undefined &&
-      electricResult.isFreshData
+      electricResult.data !== undefined
+      // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useAssetsSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all assets queries to trigger re-render
+          queryClient.invalidateQueries({ queryKey: ["assets"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[useAssetsSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   // Run cleanup when Electric confirms sync
   useEffect(() => {

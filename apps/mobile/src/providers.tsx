@@ -10,6 +10,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { getApiBaseUrl } from "./config/api";
 import {
   initElectric,
   initFlushWorker,
@@ -28,6 +29,7 @@ import {
   useWorksSync,
   useBoardsSync,
   useStrokesSync,
+  initializeDeviceId,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 
@@ -44,6 +46,12 @@ declare global {
 // Configure PDF.js worker for Capacitor platform
 // Capacitor serves static assets from public/ directory
 configurePdfWorker("/pdf.worker.min.mjs");
+
+// Initialize device ID from Capacitor Preferences storage
+// This ensures a stable device UUID across app restarts
+initializeDeviceId().catch((err) =>
+  console.error("[Mobile] Failed to initialize device ID:", err)
+);
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -103,8 +111,7 @@ function ElectricInitializer() {
 
     // Initialize FlushWorker for mobile
     // Mobile uses HTTP API (same as web app)
-    const apiBaseUrl =
-      import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    const apiBaseUrl = getApiBaseUrl();
 
     const worker = initFlushWorker({
       flushHandler: async (changes) => {

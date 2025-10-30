@@ -264,7 +264,7 @@ pub async fn read_blob(sha256: String) -> Result<String, String> {
 
 /// Sync blob metadata to Electric (Postgres)
 #[tauri::command]
-pub async fn sync_blob_to_electric(sha256: String) -> Result<(), String> {
+pub async fn sync_blob_to_electric(sha256: String, device_id: String) -> Result<(), String> {
     use tokio_postgres::NoTls;
     
     // Get blob info from SQLite catalog
@@ -287,7 +287,7 @@ pub async fn sync_blob_to_electric(sha256: String) -> Result<(), String> {
 
     // Generate UUIDs for new records
     let device_blob_id = uuid::Uuid::new_v4(); // Keep as UUID type
-    let device_id = "desktop"; // TODO: Get actual device ID from local storage
+    
     let now_ms = chrono::Utc::now().timestamp_millis();
 
     // Insert into blobs_meta (if not exists)

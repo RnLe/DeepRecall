@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   initElectric,
   initFlushWorker,
+  initializeDeviceId,
   usePresetsSync,
   useActivitiesSync,
   useAnnotationsSync,
@@ -26,6 +27,11 @@ import { configurePdfWorker } from "@deeprecall/pdf";
 // Configure PDF.js worker for Web platform
 if (typeof window !== "undefined") {
   configurePdfWorker("/pdf.worker.min.mjs");
+
+  // Initialize device ID on app startup (reliable persistence)
+  initializeDeviceId().catch((error) => {
+    console.error("[App] Failed to initialize device ID:", error);
+  });
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {

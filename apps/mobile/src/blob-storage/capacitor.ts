@@ -12,6 +12,23 @@ import type {
   HealthReport,
 } from "@deeprecall/blob-storage";
 
+const CUSTOM_BLOB_DIR = import.meta.env.VITE_MOBILE_BLOB_DIR;
+const DEV_BLOB_DIR = "apps/mobile/data";
+const PROD_BLOB_DIR = "blobs";
+
+/**
+ * Resolve blob directory based on environment
+ * - Custom env var takes priority
+ * - Dev mode uses apps/mobile/data (local filesystem)
+ * - Production uses blobs (iOS Documents directory)
+ */
+function resolveBlobDir(): string {
+  if (CUSTOM_BLOB_DIR && CUSTOM_BLOB_DIR.trim().length > 0) {
+    return CUSTOM_BLOB_DIR.trim();
+  }
+  return import.meta.env.DEV ? DEV_BLOB_DIR : PROD_BLOB_DIR;
+}
+
 /**
  * Calculate SHA-256 hash from ArrayBuffer
  */
@@ -63,7 +80,7 @@ function getMimeFromFilename(filename: string): string {
  * Stores files in iOS Documents directory using SHA-256 as filename
  */
 export class CapacitorBlobStorage implements BlobCAS {
-  private readonly BLOB_DIR = "blobs";
+  private readonly BLOB_DIR = resolveBlobDir();
   private readonly CATALOG_FILE = "blob_catalog.json";
 
   /**
@@ -77,22 +94,30 @@ export class CapacitorBlobStorage implements BlobCAS {
    */
   private async ensureBlobDir(): Promise<void> {
     try {
+      // In dev mode, use Data directory for local filesystem access
+      // In production, use Documents directory for iOS native storage
+      const directory = import.meta.env.DEV
+        ? Directory.Data
+        : Directory.Documents;
+
       await Filesystem.mkdir({
         path: this.BLOB_DIR,
-        directory: Directory.Documents,
+        directory,
         recursive: true,
       });
     } catch (error) {
-      // Directory already exists - this is OK
+      // Directory already exists - this is OK, silently continue
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      if (!errorMessage?.includes("exists")) {
+      if (!errorMessage?.includes("exist")) {
+        // Only throw if it's NOT a "directory exists" error
         console.error(
           "[CapacitorBlobStorage] Failed to create blob dir:",
           error
         );
         throw error;
       }
+      // Directory exists - this is fine, continue silently
     }
   }
 
@@ -103,9 +128,13 @@ export class CapacitorBlobStorage implements BlobCAS {
     if (this.catalogLoaded) return;
 
     try {
+      const directory = import.meta.env.DEV
+        ? Directory.Data
+        : Directory.Documents;
+
       const result = await Filesystem.readFile({
-        path: this.CATALOG_FILE,
-        directory: Directory.Documents,
+        path: `${this.BLOB_DIR}/${this.CATALOG_FILE}`,
+        directory,
         encoding: Encoding.UTF8,
       });
 
@@ -127,10 +156,14 @@ export class CapacitorBlobStorage implements BlobCAS {
    * Save catalog to disk
    */
   private async saveCatalog(): Promise<void> {
+    const directory = import.meta.env.DEV
+      ? Directory.Data
+      : Directory.Documents;
+
     const data = Object.fromEntries(this.catalog);
     await Filesystem.writeFile({
-      path: this.CATALOG_FILE,
-      directory: Directory.Documents,
+      path: `${this.BLOB_DIR}/${this.CATALOG_FILE}`,
+      directory,
       data: JSON.stringify(data, null, 2),
       encoding: Encoding.UTF8,
     });
@@ -195,10 +228,14 @@ export class CapacitorBlobStorage implements BlobCAS {
     // 3. Convert to base64 for Capacitor Filesystem
     const base64 = await fileToBase64(source);
 
-    // 4. Write to Documents/blobs/{sha256}
+    // 4. Write to appropriate directory based on environment
+    const directory = import.meta.env.DEV
+      ? Directory.Data
+      : Directory.Documents;
+
     await Filesystem.writeFile({
       path: `${this.BLOB_DIR}/${sha256}`,
-      directory: Directory.Documents,
+      directory,
       data: base64,
     });
 
@@ -227,8 +264,44 @@ export class CapacitorBlobStorage implements BlobCAS {
     this.catalog.set(sha256, blobInfo);
     await this.saveCatalog();
 
+    // 8. Coordinate with Electric (background - don't block upload)
+    this.coordinateWithElectric(sha256, blobInfo).catch((error) => {
+      console.error(
+        `[CapacitorBlobStorage] Failed to coordinate ${sha256.slice(0, 16)}... with Electric:`,
+        error
+      );
+    });
+
     console.log(`[CapacitorBlobStorage] Stored blob: ${sha256} (${filename})`);
     return blobInfo;
+  }
+
+  /**
+   * Coordinate blob upload with Electric (background)
+   */
+  private async coordinateWithElectric(
+    sha256: string,
+    blobInfo: BlobWithMetadata
+  ): Promise<void> {
+    const { coordinateBlobUpload, getDeviceId } = await import(
+      "@deeprecall/data"
+    );
+
+    await coordinateBlobUpload(
+      sha256,
+      {
+        sha256,
+        size: blobInfo.size,
+        mime: blobInfo.mime,
+        filename: blobInfo.filename,
+      },
+      getDeviceId(),
+      blobInfo.path
+    );
+
+    console.log(
+      `[CapacitorBlobStorage] Coordinated ${sha256.slice(0, 16)}... with Electric`
+    );
   }
 
   /**
@@ -244,9 +317,13 @@ export class CapacitorBlobStorage implements BlobCAS {
 
     // 2. Delete file
     try {
+      const directory = import.meta.env.DEV
+        ? Directory.Data
+        : Directory.Documents;
+
       await Filesystem.deleteFile({
         path: `${this.BLOB_DIR}/${sha256}`,
-        directory: Directory.Documents,
+        directory,
       });
     } catch (error) {
       console.error(
@@ -296,11 +373,25 @@ export class CapacitorBlobStorage implements BlobCAS {
       errors: [],
     };
 
+    // In browser dev mode, Capacitor filesystem doesn't access the real project folder
+    // User should manually upload files via the UI instead
+    if (import.meta.env.DEV && typeof window !== "undefined") {
+      console.log(
+        "[CapacitorBlobStorage] Dev mode: Scan only works for files uploaded via put(). " +
+          "Physical files in apps/mobile/data are not accessible in browser mode."
+      );
+      // Still scan the virtual filesystem (uploaded files)
+    }
+
     try {
+      const directory = import.meta.env.DEV
+        ? Directory.Data
+        : Directory.Documents;
+
       // Read all files in blob directory
       const dirResult = await Filesystem.readdir({
         path: this.BLOB_DIR,
-        directory: Directory.Documents,
+        directory,
       });
 
       const filesOnDisk = new Set(dirResult.files.map((f) => f.name));
@@ -316,11 +407,16 @@ export class CapacitorBlobStorage implements BlobCAS {
 
       // Find new blobs (on disk but not in catalog)
       for (const filename of filesOnDisk) {
+        // Skip the catalog file itself
+        if (filename === this.CATALOG_FILE) {
+          continue;
+        }
+
         if (!filesInCatalog.has(filename)) {
           try {
             const stat = await Filesystem.stat({
               path: `${this.BLOB_DIR}/${filename}`,
-              directory: Directory.Documents,
+              directory,
             });
 
             const blobInfo: BlobInfo = {
@@ -368,6 +464,10 @@ export class CapacitorBlobStorage implements BlobCAS {
       totalSize: 0,
     };
 
+    const directory = import.meta.env.DEV
+      ? Directory.Data
+      : Directory.Documents;
+
     for (const [sha256, blob] of this.catalog) {
       report.totalSize += blob.size;
 
@@ -375,7 +475,7 @@ export class CapacitorBlobStorage implements BlobCAS {
         // Check if file exists
         await Filesystem.stat({
           path: `${this.BLOB_DIR}/${sha256}`,
-          directory: Directory.Documents,
+          directory,
         });
         report.healthy++;
       } catch {
@@ -412,9 +512,11 @@ export async function fetchBlobContent(sha256: string): Promise<string> {
     casInstance = new CapacitorBlobStorage();
   }
 
+  const directory = import.meta.env.DEV ? Directory.Data : Directory.Documents;
+
   const result = await Filesystem.readFile({
     path: `${casInstance["BLOB_DIR"]}/${sha256}`,
-    directory: Directory.Documents,
+    directory,
     encoding: Encoding.UTF8,
   });
 

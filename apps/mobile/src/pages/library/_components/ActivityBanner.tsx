@@ -21,6 +21,7 @@ export function ActivityBanner({ activity }: ActivityBannerProps) {
   const cas = useCapacitorBlobStorage();
 
   const operations: ActivityBannerOperations = {
+    cas,
     onDropFiles: async (activityId: string, files: FileList) => {
       try {
         console.log(

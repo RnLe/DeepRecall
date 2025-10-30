@@ -48,7 +48,7 @@ export function PostgresIndicator() {
     };
 
     checkConnection();
-    const interval = setInterval(checkConnection, 30000); // Check every 30s
+    const interval = setInterval(checkConnection, 60000); // Check every 60s (1 minute)
 
     return () => clearInterval(interval);
   }, []);

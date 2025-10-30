@@ -12,9 +12,8 @@ let initialized = false;
  * Ensure required directories exist
  */
 async function ensureDirectories() {
-  // In monorepo: process.cwd() is /workspace/apps/web, but data is at /workspace/data
-  const dataPath =
-    process.env.DATA_PATH || path.join(process.cwd(), "../../data");
+  // Store data in apps/web/data (works for both local dev and Railway deployment)
+  const dataPath = process.env.DATA_PATH || path.join(process.cwd(), "data");
   const libraryPath =
     process.env.LIBRARY_PATH || path.join(dataPath, "library");
 

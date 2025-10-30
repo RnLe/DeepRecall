@@ -19,7 +19,7 @@ export async function PUT(
   try {
     const { hash: oldHash } = await params;
     const body = await request.json();
-    const { content, filename } = body;
+    const { content, filename, deviceId } = body;
 
     if (!content || !filename) {
       return NextResponse.json(
@@ -43,7 +43,8 @@ export async function PUT(
     const { hash: newHash, path: newPath } = await storeBlob(
       buffer,
       filename,
-      "notes"
+      "notes",
+      deviceId
     );
 
     // Always delete the old blob completely (database + disk) FIRST

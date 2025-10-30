@@ -52,12 +52,26 @@ function toCamelCase(str: string): string {
  */
 function parseJsonbColumns<T>(table: string, row: any): T {
   const jsonbColumns = JSONB_COLUMNS_BY_TABLE[table];
+
+  let normalizedRow = row;
+
+  if (normalizedRow && typeof normalizedRow.toJSON === "function") {
+    normalizedRow = normalizedRow.toJSON();
+  }
+
+  if (normalizedRow instanceof Map) {
+    normalizedRow = Object.fromEntries(normalizedRow.entries());
+  }
+
+  if (!normalizedRow || typeof normalizedRow !== "object") {
+    normalizedRow = {};
+  }
+
   const result: any = {};
 
-  for (const [key, value] of Object.entries(row)) {
+  for (const [key, value] of Object.entries(normalizedRow)) {
     const camelKey = toCamelCase(key);
 
-    // Parse JSONB columns
     if (jsonbColumns?.includes(key) && value && typeof value === "string") {
       try {
         result[camelKey] = JSON.parse(value);
@@ -74,6 +88,36 @@ function parseJsonbColumns<T>(table: string, row: any): T {
   }
 
   return result as T;
+}
+
+function buildRowsFromSource<T>(table: string, rawRows: any[]): T[] {
+  let parsedRows = rawRows.map((row) => parseJsonbColumns<T>(table, row));
+
+  if (table === "annotations") {
+    parsedRows = parsedRows.map(transformAnnotationFromPostgres) as T[];
+  }
+
+  return parsedRows as T[];
+}
+
+function normalizeShapeRows<T>(table: string, shapeData: any): T[] {
+  if (Array.isArray(shapeData)) {
+    return shapeData as T[];
+  }
+
+  if (shapeData instanceof Map) {
+    const rowsFromMap = Array.from(shapeData.values());
+    return buildRowsFromSource<T>(table, rowsFromMap);
+  }
+
+  if (shapeData && typeof shapeData === "object" && "rows" in shapeData) {
+    const rowsArray = Array.isArray((shapeData as any).rows)
+      ? (shapeData as any).rows
+      : [];
+    return buildRowsFromSource<T>(table, rowsArray);
+  }
+
+  return [];
 }
 
 /**
@@ -229,6 +273,13 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
   const streamRef = useRef<ShapeStream | null>(null);
   const shapeRef = useRef<Shape | null>(null);
 
+  const updateStateFromRows = (rowsData: T[], fresh: boolean) => {
+    setData(rowsData);
+    setIsLoading(false);
+    setSyncStatus("synced");
+    setIsFreshData(fresh);
+  };
+
   useEffect(() => {
     const cacheKey = getShapeCacheKey(spec);
     let cached = shapeCache.get(cacheKey);
@@ -244,31 +295,21 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       shapeRef.current = cached.shape;
 
       // Subscribe to existing shape
-      const handleUpdate = (shapeData: any) => {
-        const rows = shapeData.rows || [];
-        let parsedRows = rows.map((row: any) =>
-          parseJsonbColumns<T>(spec.table, row)
-        );
-        if (spec.table === "annotations") {
-          parsedRows = parsedRows.map(transformAnnotationFromPostgres) as T[];
-        }
-        setData(parsedRows);
-        setIsLoading(false);
-        setSyncStatus("synced");
-        setIsFreshData(true); // Any update from network is fresh
+      const handleParsedRows = (parsedRows: any[]) => {
+        updateStateFromRows(parsedRows as T[], true);
       };
 
-      cached.subscribers.add(handleUpdate);
+      cached.subscribers.add(handleParsedRows);
 
       // Trigger immediate update with current data
       const currentData = cached.shape.currentValue;
       if (currentData) {
-        setIsFreshData(cached.hasReceivedFreshData); // Use cache's freshness state
-        handleUpdate(currentData);
+        const parsedRows = normalizeShapeRows<T>(spec.table, currentData);
+        updateStateFromRows(parsedRows, cached.hasReceivedFreshData);
       }
 
       return () => {
-        cached!.subscribers.delete(handleUpdate);
+        cached!.subscribers.delete(handleParsedRows);
       };
     }
 
@@ -330,28 +371,18 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     // Create subscriber set
     const subscribers = new Set<(data: any[]) => void>();
 
+    const notifySubscribers = (parsedRows: T[]) => {
+      subscribers.forEach((callback) => callback(parsedRows));
+    };
+
     // Subscribe to shape changes
     const unsubscribe = shape.subscribe((shapeData) => {
-      // Shape.subscribe returns { value: Map, rows: Array }
-      // Use rows array directly
-      const rows = shapeData.rows || [];
+      const parsedRows = normalizeShapeRows<T>(spec.table, shapeData);
       console.log(
-        `[Electric] Shape updated: ${spec.table} (${rows.length} rows)`
+        `[Electric] Shape updated: ${spec.table} (${parsedRows.length} rows)`
       );
 
-      // Parse JSONB columns
-      let parsedRows = rows.map((row) => parseJsonbColumns<T>(spec.table, row));
-
-      // Transform annotations from Postgres schema to client schema
-      if (spec.table === "annotations") {
-        parsedRows = parsedRows.map(transformAnnotationFromPostgres) as T[];
-      }
-
-      // Notify all subscribers
-      setData(parsedRows);
-      setIsLoading(false);
-      setSyncStatus("synced");
-      setIsFreshData(true); // Mark as fresh data from network
+      updateStateFromRows(parsedRows, true);
 
       // Update last update time in cache
       const cached = shapeCache.get(cacheKey);
@@ -360,7 +391,7 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
         cached.hasReceivedFreshData = true; // Mark as having received fresh data
       }
 
-      subscribers.forEach((callback) => callback(parsedRows));
+      notifySubscribers(parsedRows);
     });
 
     // Handle errors

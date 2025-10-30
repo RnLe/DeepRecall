@@ -51,7 +51,14 @@ export const BlobWithMetadataSchema = z.object({
   pdfMetadata: PDFMetadataSchema.optional(),
   // Health status for file integrity tracking
   health: z
-    .enum(["healthy", "missing", "modified", "relocated", "duplicate"])
+    .enum([
+      "healthy",
+      "missing",
+      "modified",
+      "relocated",
+      "duplicate",
+      "remote",
+    ])
     .optional(),
   // Image metadata (optional)
   imageWidth: z.number().optional(),

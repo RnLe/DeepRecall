@@ -7,6 +7,7 @@
 
 import { BookOpen, Star, Users } from "lucide-react";
 import type { Work, Asset, BlobWithMetadata } from "@deeprecall/core";
+import type { BlobCAS } from "@deeprecall/blob-storage";
 import { useState, useMemo } from "react";
 import {
   useAuthorsByIds,
@@ -21,11 +22,13 @@ import { EditWorkDialog } from "./EditWorkDialog";
 import { BibtexExportModal } from "./BibtexExportModal";
 import { SimplePDFViewer } from "../components/SimplePDFViewer";
 import { PDFThumbnail } from "./PDFThumbnail";
+import { BlobStatusBadge } from "./BlobStatusBadge";
 
 // Platform-specific operations interface (minimal)
 export interface WorkCardCompactOperations {
   navigate: (path: string) => void;
   getBlobUrl: (sha256: string) => string;
+  cas: BlobCAS;
 }
 
 // Extended work with assets
@@ -253,6 +256,19 @@ export function WorkCardCompact({
                 </>
               )}
             </div>
+
+            {/* Line 3: Blob Status (if has PDF asset) */}
+            {work.assets &&
+              work.assets.length > 0 &&
+              work.assets[0].mime === "application/pdf" && (
+                <div className="mt-0.5">
+                  <BlobStatusBadge
+                    sha256={work.assets[0].sha256}
+                    cas={operations.cas}
+                    className="text-[10px]"
+                  />
+                </div>
+              )}
           </div>
         </div>
       </div>

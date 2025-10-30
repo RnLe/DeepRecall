@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
+import { Pool, PoolClient } from "pg";
 import { createPostgresPool } from "@/app/api/lib/postgres";
 import { z } from "zod";
 import {
@@ -23,6 +23,8 @@ import {
   ReviewLogSchema,
   BoardSchema,
   StrokeSchema,
+  BlobMetaSchema,
+  DeviceBlobSchema,
 } from "@deeprecall/core";
 
 /**
@@ -59,6 +61,8 @@ const WriteChangeSchema = z.object({
     "review_logs",
     "boards",
     "strokes",
+    "blobs_meta",
+    "device_blobs",
   ]),
   op: z.enum(["insert", "update", "delete"]),
   payload: z.any(), // Will be validated by specific table schema
@@ -105,6 +109,10 @@ function getSchemaForTable(table: string): z.ZodTypeAny {
       return BoardSchema;
     case "strokes":
       return StrokeSchema;
+    case "blobs_meta":
+      return BlobMetaSchema;
+    case "device_blobs":
+      return DeviceBlobSchema;
     default:
       throw new Error(`Unknown table: ${table}`);
   }
@@ -136,6 +144,34 @@ const JSONB_COLUMNS = new Set([
 /**
  * Convert object keys to snake_case and prepare values for Postgres
  */
+/**
+ * Convert ISO date fields to epoch milliseconds for blob tables
+ * TypeScript schemas use ISO dates, but Postgres blob tables use BIGINT epoch ms
+ */
+function transformBlobData(
+  table: string,
+  obj: Record<string, any>
+): Record<string, any> {
+  if (table !== "blobs_meta" && table !== "device_blobs") {
+    return obj;
+  }
+
+  const result = { ...obj };
+
+  // Convert createdAt (ISO) → created_ms (epoch)
+  if (result.createdAt) {
+    result.created_ms = new Date(result.createdAt).getTime();
+    delete result.createdAt;
+  }
+
+  // Remove updatedAt - device_blobs table doesn't have this column
+  if (table === "device_blobs" && result.updatedAt) {
+    delete result.updatedAt;
+  }
+
+  return result;
+}
+
 function keysToSnakeCase(obj: Record<string, any>): Record<string, any> {
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -215,7 +251,10 @@ function transformAnnotationData(validated: any): Record<string, any> {
 /**
  * Apply insert operation
  */
-async function applyInsert(pool: Pool, change: WriteChange): Promise<any> {
+async function applyInsert(
+  client: Pool | PoolClient,
+  change: WriteChange
+): Promise<any> {
   const schema = getSchemaForTable(change.table);
   const validated = schema.parse(change.payload);
 
@@ -225,29 +264,63 @@ async function applyInsert(pool: Pool, change: WriteChange): Promise<any> {
       ? transformAnnotationData(validated)
       : validated;
 
-  const data = keysToSnakeCase(transformed as Record<string, any>);
+  // Special handling for blob tables - convert ISO dates to epoch ms
+  const blobTransformed = transformBlobData(
+    change.table,
+    transformed as Record<string, any>
+  );
+
+  const data = keysToSnakeCase(blobTransformed as Record<string, any>);
 
   // Build INSERT query
   const columns = Object.keys(data);
   const values = Object.values(data);
   const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
 
-  const query = `
-    INSERT INTO ${change.table} (${columns.join(", ")})
-    VALUES (${placeholders})
-    ON CONFLICT (id) DO UPDATE SET
-      ${columns.map((col, i) => `${col} = $${i + 1}`).join(", ")}
-    RETURNING *
-  `;
+  // Determine conflict handling based on table
+  let query: string;
 
-  const result = await pool.query(query, values);
-  return result.rows[0];
+  if (change.table === "blobs_meta") {
+    // blobs_meta: unique on sha256
+    query = `
+      INSERT INTO ${change.table} (${columns.join(", ")})
+      VALUES (${placeholders})
+      ON CONFLICT (sha256) DO NOTHING
+      RETURNING *
+    `;
+  } else if (change.table === "device_blobs") {
+    // device_blobs: unique on (device_id, sha256)
+    query = `
+      INSERT INTO ${change.table} (${columns.join(", ")})
+      VALUES (${placeholders})
+      ON CONFLICT (device_id, sha256) DO NOTHING
+      RETURNING *
+    `;
+  } else {
+    // Other tables: update on conflict (LWW)
+    query = `
+      INSERT INTO ${change.table} (${columns.join(", ")})
+      VALUES (${placeholders})
+      ON CONFLICT (id) DO UPDATE SET
+        ${columns.map((col, i) => `${col} = $${i + 1}`).join(", ")}
+      RETURNING *
+    `;
+  }
+
+  const result = await client.query(query, values);
+
+  // If DO NOTHING was used and nothing was inserted, return null
+  // (This is not an error - just means the record already existed)
+  return result.rows[0] || null;
 }
 
 /**
  * Apply update operation with LWW conflict resolution
  */
-async function applyUpdate(pool: Pool, change: WriteChange): Promise<any> {
+async function applyUpdate(
+  client: Pool | PoolClient,
+  change: WriteChange
+): Promise<any> {
   // For updates, we only receive partial data (changed fields)
   // So we need to use .partial() to allow optional fields
   const schema = getSchemaForTable(change.table);
@@ -261,17 +334,23 @@ async function applyUpdate(pool: Pool, change: WriteChange): Promise<any> {
       ? transformAnnotationData(validated)
       : validated;
 
-  const data = keysToSnakeCase(transformed as Record<string, any>);
+  // Special handling for blob tables - convert ISO dates to epoch ms
+  const blobTransformed = transformBlobData(
+    change.table,
+    transformed as Record<string, any>
+  );
+
+  const data = keysToSnakeCase(blobTransformed as Record<string, any>);
 
   // Check if record exists and compare timestamps
-  const existing = await pool.query(
+  const existing = await client.query(
     `SELECT updated_at FROM ${change.table} WHERE id = $1`,
     [data.id]
   );
 
   if (existing.rows.length === 0) {
     // Record doesn't exist, treat as insert
-    return applyInsert(pool, change);
+    return applyInsert(client, change);
   }
 
   // Last-write-wins: only update if client's timestamp >= server's timestamp
@@ -283,7 +362,7 @@ async function applyUpdate(pool: Pool, change: WriteChange): Promise<any> {
       `[WritesBatch] Skipping update for ${change.table}/${data.id} - server is newer (server: ${serverUpdatedAt}, client: ${clientUpdatedAt})`
     );
     // Return existing record
-    const result = await pool.query(
+    const result = await client.query(
       `SELECT * FROM ${change.table} WHERE id = $1`,
       [data.id]
     );
@@ -302,14 +381,17 @@ async function applyUpdate(pool: Pool, change: WriteChange): Promise<any> {
     RETURNING *
   `;
 
-  const result = await pool.query(query, [data.id, ...values]);
+  const result = await client.query(query, [data.id, ...values]);
   return result.rows[0];
 }
 
 /**
  * Apply delete operation (with tombstone support)
  */
-async function applyDelete(pool: Pool, change: WriteChange): Promise<any> {
+async function applyDelete(
+  client: Pool | PoolClient,
+  change: WriteChange
+): Promise<any> {
   const { id } = change.payload;
 
   // For now, hard delete
@@ -320,15 +402,16 @@ async function applyDelete(pool: Pool, change: WriteChange): Promise<any> {
     RETURNING id
   `;
 
-  const result = await pool.query(query, [id]);
+  const result = await client.query(query, [id]);
   return result.rows[0] || { id, deleted: true };
 }
 
 /**
  * Apply a single write change
+ * @param client - Postgres client (must be within a transaction)
  */
 async function applyChange(
-  pool: Pool,
+  client: PoolClient,
   change: WriteChange
 ): Promise<{ success: boolean; response?: any; error?: string }> {
   try {
@@ -336,13 +419,13 @@ async function applyChange(
 
     switch (change.op) {
       case "insert":
-        response = await applyInsert(pool, change);
+        response = await applyInsert(client, change);
         break;
       case "update":
-        response = await applyUpdate(pool, change);
+        response = await applyUpdate(client, change);
         break;
       case "delete":
-        response = await applyDelete(pool, change);
+        response = await applyDelete(client, change);
         break;
       default:
         throw new Error(`Unknown operation: ${change.op}`);
@@ -364,7 +447,8 @@ async function applyChange(
 export async function POST(request: NextRequest) {
   console.log("[WritesBatch] API endpoint called!");
 
-  const pool = createPostgresPool();
+  const { getPostgresPool } = await import("@/app/api/lib/postgres");
+  const pool = getPostgresPool();
 
   try {
     // Parse and validate request body
@@ -372,6 +456,18 @@ export async function POST(request: NextRequest) {
     const { changes } = BatchRequestSchema.parse(body);
 
     console.log(`[WritesBatch] Processing ${changes.length} changes`);
+
+    // Sort changes to ensure foreign key dependencies are satisfied
+    // blobs_meta must be inserted before device_blobs (foreign key constraint)
+    const sortedChanges = [...changes].sort((a, b) => {
+      const tableOrder = ["blobs_meta", "device_blobs"];
+      const aIndex = tableOrder.indexOf(a.table);
+      const bIndex = tableOrder.indexOf(b.table);
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      return 0;
+    });
 
     // Apply changes in transaction
     const client = await pool.connect();
@@ -382,16 +478,42 @@ export async function POST(request: NextRequest) {
     try {
       await client.query("BEGIN");
 
-      for (const change of changes) {
-        const result = await applyChange(pool, change);
+      for (const change of sortedChanges) {
+        // Use savepoint for each change to isolate errors
+        const savepointName = `sp_${change.id.replace(/-/g, "_")}`;
 
-        if (result.success) {
-          results.push(result.response);
-          appliedIds.push(change.id);
-        } else {
+        try {
+          await client.query(`SAVEPOINT ${savepointName}`);
+          const result = await applyChange(client, change);
+
+          if (result.success) {
+            results.push(result.response);
+            appliedIds.push(change.id);
+            await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+          } else {
+            errors.push({
+              id: change.id,
+              error: result.error || "Unknown error",
+            });
+            await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          }
+        } catch (error) {
+          // Rollback this change but continue with others
+          console.error(
+            `[WritesBatch] Savepoint error for ${change.id}:`,
+            error
+          );
+          try {
+            await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          } catch (rollbackError) {
+            console.error(
+              `[WritesBatch] Failed to rollback savepoint:`,
+              rollbackError
+            );
+          }
           errors.push({
             id: change.id,
-            error: result.error || "Unknown error",
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
@@ -401,10 +523,24 @@ export async function POST(request: NextRequest) {
         `[WritesBatch] Successfully applied ${appliedIds.length}/${changes.length} changes`
       );
     } catch (error) {
-      await client.query("ROLLBACK");
+      // Ensure we rollback even if there's an error
+      try {
+        await client.query("ROLLBACK");
+        console.log("[WritesBatch] Transaction rolled back due to error");
+      } catch (rollbackError) {
+        console.error(
+          "[WritesBatch] Failed to rollback transaction:",
+          rollbackError
+        );
+      }
       throw error;
     } finally {
-      client.release();
+      // Always release the client, even if rollback failed
+      try {
+        client.release();
+      } catch (releaseError) {
+        console.error("[WritesBatch] Failed to release client:", releaseError);
+      }
     }
 
     // Return results
@@ -426,7 +562,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500, headers: corsHeaders }
     );
-  } finally {
-    await pool.end();
   }
+  // NOTE: Don't call pool.end() - we're using a singleton pool that stays alive
 }

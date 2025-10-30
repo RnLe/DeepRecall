@@ -28,16 +28,47 @@ export function LinkBlobDialog({
   const operations: LinkBlobDialogOperations = {
     getBlobUrl: (sha256: string) => `/api/blob/${sha256}`,
     syncBlobToElectric: async (sha256: string) => {
+      // Get device ID from client
+      const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
+      const deviceId = getDeviceId();
+
       const response = await fetch("/api/admin/sync-blob", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sha256 }),
+        body: JSON.stringify({ sha256, deviceId }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to sync blob");
+        // Try to parse error response
+        let errorMessage = "Failed to sync blob";
+        try {
+          const error = await response.json();
+          errorMessage = error.error || error.details || errorMessage;
+          console.error("[LinkBlobDialog] Sync failed:", {
+            status: response.status,
+            statusText: response.statusText,
+            error,
+            sha256,
+            deviceId,
+          });
+        } catch (parseError) {
+          // Response is not JSON, get text
+          const text = await response.text();
+          console.error("[LinkBlobDialog] Sync failed (non-JSON response):", {
+            status: response.status,
+            statusText: response.statusText,
+            responseText: text,
+            sha256,
+            deviceId,
+          });
+          errorMessage = `${response.status} ${response.statusText}: ${text}`;
+        }
+        throw new Error(errorMessage);
       }
+
+      console.log(
+        `[LinkBlobDialog] Successfully synced blob ${sha256.slice(0, 16)}...`
+      );
     },
   };
 

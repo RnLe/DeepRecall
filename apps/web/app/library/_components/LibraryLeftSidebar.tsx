@@ -10,12 +10,14 @@ import {
   type LibraryLeftSidebarOperations,
 } from "@deeprecall/ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
-import { useOrphanedBlobs } from "@deeprecall/data/hooks";
+import { useOrphanedBlobsFromElectric } from "@deeprecall/data/hooks";
 import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
+import { getDeviceId } from "@deeprecall/data";
 
 export function LibraryLeftSidebar() {
   const cas = useWebBlobStorage();
-  const orphanedBlobsQuery = useOrphanedBlobs(cas);
+  const currentDeviceId = getDeviceId();
+  const orphanedBlobsQuery = useOrphanedBlobsFromElectric(currentDeviceId);
 
   // Platform-specific blob operations
   const operations: LibraryLeftSidebarOperations = {
@@ -78,6 +80,7 @@ export function LibraryLeftSidebar() {
       await Promise.all(uploadPromises);
     },
     getBlobUrl: (sha256: string) => `/api/blob/${sha256}`,
+    cas,
   };
 
   return (

@@ -4,7 +4,7 @@
  */
 
 import type { DeviceBlob } from "@deeprecall/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
 import { db } from "../db";
@@ -47,6 +47,7 @@ async function syncElectricToDexie(electricData: DeviceBlob[]): Promise<void> {
  */
 export function useDeviceBlobsSync() {
   const electricResult = useShape<DeviceBlob>({ table: "device_blobs" });
+  const queryClient = useQueryClient();
 
   // Sync Electric → Dexie only when fresh data is available
   useEffect(() => {
@@ -55,14 +56,19 @@ export function useDeviceBlobsSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useDeviceBlobsSync] Failed to sync device_blobs:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all device blob queries so UI refetches with fresh data
+          queryClient.invalidateQueries({ queryKey: ["device-blobs"] });
+        })
+        .catch((error) => {
+          console.error(
+            "[useDeviceBlobsSync] Failed to sync device_blobs:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   return null;
 }
@@ -126,7 +132,7 @@ export function useDeviceBlobsByDevice(deviceId: string | undefined) {
       if (!deviceId) return [];
       try {
         const data = await db.deviceBlobs
-          .where("device_id")
+          .where("deviceId")
           .equals(deviceId)
           .toArray();
         return data;

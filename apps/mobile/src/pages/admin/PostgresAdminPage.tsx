@@ -6,10 +6,11 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { getApiBaseUrl } from "../../config/api";
 
 // Get API base URL from environment or default to localhost
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+const apiBaseUrl = getApiBaseUrl();
 
 // Postgres tables (matches migrations)
 const POSTGRES_TABLES = [
@@ -32,49 +33,40 @@ const POSTGRES_TABLES = [
 export default function PostgresAdminPage() {
   const [activeTab, setActiveTab] = useState<string>(POSTGRES_TABLES[0].key);
 
-  // Fetch counts for all tables
-  const countQueries = useQueries({
-    queries: POSTGRES_TABLES.map((table) => ({
-      queryKey: ["postgres-count", table.key],
-      queryFn: async () => {
-        const response = await fetch(
-          `${apiBaseUrl}/api/admin/postgres/${table.key}`
-        );
-        if (!response.ok) return 0;
-        const data = await response.json();
-        return Array.isArray(data) ? data.length : 0;
-      },
-      staleTime: 1000 * 60 * 5, // 5 minutes
-    })),
+  // Fetch ALL tables in a single HTTP request (efficient!)
+  const {
+    data: allTablesData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["postgres-all"],
+    queryFn: async () => {
+      const response = await fetch(`${apiBaseUrl}/api/admin/postgres/all`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch Postgres tables");
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return response.json() as Promise<Record<string, any[]>>;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Create a map of table counts
+  // Get data for active tab from the single fetch
+  const data = allTablesData?.[activeTab] || [];
+
+  // Create a map of table counts from the single fetch
   const tableCounts = POSTGRES_TABLES.reduce(
-    (acc, table, idx) => {
-      acc[table.key] = countQueries[idx].data ?? "...";
+    (acc, table) => {
+      const count = allTablesData?.[table.key]?.length;
+      acc[table.key] = count !== undefined ? count : "...";
       return acc;
     },
     {} as Record<string, number | string>
   );
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["postgres", activeTab],
-    queryFn: async () => {
-      const response = await fetch(
-        `${apiBaseUrl}/api/admin/postgres/${activeTab}`
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${activeTab}`);
-      }
-      return response.json();
-    },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
   const handleRefresh = () => {
     refetch();
-    // Refetch all count queries
-    countQueries.forEach((query) => query.refetch());
   };
 
   return (

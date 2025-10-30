@@ -15,6 +15,8 @@ import { usePresets } from "@deeprecall/data/hooks";
 import { useWorks, useCreateWork } from "@deeprecall/data/hooks";
 import { useAssets, useCreateAsset } from "@deeprecall/data/hooks";
 import { useAuthors, useFindOrCreateAuthor } from "@deeprecall/data/hooks";
+import { useDeviceBlobsByHash } from "@deeprecall/data/hooks";
+import { getDeviceId } from "@deeprecall/data";
 
 // Icons
 import { Plus, Link2, FileCode } from "lucide-react";
@@ -65,6 +67,13 @@ export function LinkBlobDialog({
   const { data: allPresets = [], isLoading: presetsLoading } = usePresets();
   const { data: allWorks = [], isLoading: worksLoading } = useWorks();
   const { data: allAssets = [] } = useAssets();
+
+  // Check if blob is available on this device
+  const currentDeviceId = getDeviceId();
+  const { data: deviceBlobs = [] } = useDeviceBlobsByHash(blob.sha256);
+  const isLocalBlob = deviceBlobs.some(
+    (db) => db.deviceId === currentDeviceId && db.present
+  );
 
   // Mutations
   const createWork = useCreateWork();
@@ -214,9 +223,14 @@ export function LinkBlobDialog({
       console.log("Creating work with:", { coreFields, metadata, blob });
 
       // STEP 0: Sync blob to Electric first (auto-sync on link)
-      console.log("🔄 Auto-syncing blob to Electric...");
-      await syncBlobToElectric(blob.sha256);
-      console.log("✅ Blob synced to Electric");
+      // Skip sync if blob is remote (already in Electric from another device)
+      if (isLocalBlob) {
+        console.log("🔄 Auto-syncing local blob to Electric...");
+        await syncBlobToElectric(blob.sha256);
+        console.log("✅ Blob synced to Electric");
+      } else {
+        console.log("⏭️ Skipping sync - blob is remote (already in Electric)");
+      }
 
       // Create Work first
       const work = await createWork.mutateAsync({
@@ -243,7 +257,7 @@ export function LinkBlobDialog({
         bytes: typeof blob.size === "bigint" ? Number(blob.size) : blob.size,
         mime: blob.mime,
         role: "main",
-        pageCount: blob.pageCount,
+        ...(blob.pageCount != null && { pageCount: blob.pageCount }),
         favorite: false,
       });
 
@@ -735,7 +749,40 @@ export function LinkBlobDialog({
 
           {/* Right: PDF Preview */}
           <div className="w-[45%] flex flex-col bg-neutral-950">
-            {blob.mime === "application/pdf" ? (
+            {!isLocalBlob ? (
+              // Remote blob - show download stub
+              <div className="flex-1 flex items-center justify-center text-neutral-500">
+                <div className="text-center max-w-sm px-6">
+                  <svg
+                    className="w-16 h-16 mx-auto mb-4 text-purple-500 opacity-50"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                    />
+                  </svg>
+                  <p className="text-sm font-medium text-neutral-300 mb-2">
+                    File Available on Other Device
+                  </p>
+                  <p className="text-xs text-neutral-500 mb-4">
+                    This file is not stored on this device. You can still link
+                    it to a work.
+                  </p>
+                  <button
+                    disabled
+                    className="px-4 py-2 bg-purple-600/20 text-purple-400 rounded-lg text-sm cursor-not-allowed opacity-50"
+                    title="Download functionality coming soon"
+                  >
+                    Download File (Coming Soon)
+                  </button>
+                </div>
+              </div>
+            ) : blob.mime === "application/pdf" ? (
               <PDFPreview
                 source={getBlobUrl(blob.sha256)}
                 sha256={blob.sha256}

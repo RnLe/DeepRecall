@@ -8,15 +8,26 @@
 
 import { Client } from "pg";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  "postgresql://deeprecall:deeprecall@localhost:5432/deeprecall";
-
 /**
  * Get a Postgres client connection
+ * Uses DATABASE_URL from environment (required)
  */
 async function getClient() {
-  const client = new Client({ connectionString: DATABASE_URL });
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL environment variable is required for server-side Postgres operations. " +
+        "Please set it in your .env file to connect to your Postgres/Neon database."
+    );
+  }
+
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl:
+      process.env.POSTGRES_SSL === "require"
+        ? { rejectUnauthorized: false }
+        : undefined,
+  });
+
   await client.connect();
   return client;
 }

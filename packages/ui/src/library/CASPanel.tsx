@@ -250,6 +250,12 @@ export function CASPanel({
       .length;
   };
 
+  // Get list of devices that have this blob
+  const getDevicesForBlob = (sha256: string) => {
+    if (!deviceBlobs) return [];
+    return deviceBlobs.filter((db) => db.sha256 === sha256 && db.present);
+  };
+
   // Check if current device has the blob
   const currentDeviceHasBlob = (sha256: string) => {
     if (!deviceBlobs || !currentDeviceId) return null;
@@ -259,11 +265,53 @@ export function CASPanel({
     );
   };
 
+  // Format device ID for display (show first 8 chars)
+  const formatDeviceId = (deviceId: string) => {
+    return deviceId.slice(0, 8);
+  };
+
+  // Create unified blob list: local blobs + remote-only blobs from Electric
+  const unifiedBlobs = useMemo(() => {
+    const localBlobs = blobs || [];
+    const localHashes = new Set(localBlobs.map((b) => b.sha256));
+
+    // Add remote-only blobs (exist in Electric but not locally)
+    const remoteOnlyBlobs: BlobWithMetadata[] = [];
+    if (blobsMeta && deviceBlobs && currentDeviceId) {
+      for (const meta of blobsMeta) {
+        // Skip if already in local blobs
+        if (localHashes.has(meta.sha256)) continue;
+
+        // Check if this device has it
+        const onThisDevice = deviceBlobs.some(
+          (db) =>
+            db.sha256 === meta.sha256 &&
+            db.deviceId === currentDeviceId &&
+            db.present
+        );
+
+        // Only add if NOT on this device (remote-only)
+        if (!onThisDevice) {
+          remoteOnlyBlobs.push({
+            sha256: meta.sha256,
+            filename: meta.filename || `remote-${meta.sha256.slice(0, 8)}`,
+            size: Number(meta.size),
+            mime: meta.mime,
+            health: "remote", // Special health status for remote-only blobs
+            created_ms: Date.now(), // Use current time as fallback
+            mtime_ms: Date.now(),
+            path: null, // Remote blobs have no local path
+          });
+        }
+      }
+    }
+
+    return [...localBlobs, ...remoteOnlyBlobs];
+  }, [blobs, blobsMeta, deviceBlobs, currentDeviceId]);
+
   // Filter and sort blobs
   const filteredAndSortedBlobs = useMemo(() => {
-    if (!blobs) return [];
-
-    return blobs
+    return unifiedBlobs
       .filter((blob) => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
@@ -297,7 +345,7 @@ export function CASPanel({
         if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
         return 0;
       });
-  }, [blobs, searchQuery, sortColumn, sortDirection]);
+  }, [unifiedBlobs, searchQuery, sortColumn, sortDirection]);
 
   // Handle rescan
   const handleRescan = async () => {
@@ -535,7 +583,12 @@ export function CASPanel({
             <span className="text-lg font-bold">
               {filteredAndSortedBlobs.length
                 ? (
-                    filteredAndSortedBlobs.reduce((acc, b) => acc + b.size, 0) /
+                    Number(
+                      filteredAndSortedBlobs.reduce(
+                        (acc, b) => acc + BigInt(b.size),
+                        BigInt(0)
+                      )
+                    ) /
                     1024 /
                     1024
                   ).toFixed(2)
@@ -701,11 +754,14 @@ export function CASPanel({
                 <tbody>
                   {filteredAndSortedBlobs.map((blob) => {
                     const health = blob.health || "healthy";
+                    const isRemote = health === "remote";
                     const healthColors = {
                       healthy: "text-green-500",
                       missing: "text-red-500",
                       modified: "text-yellow-500",
                       relocated: "text-blue-500",
+                      duplicate: "text-orange-500",
+                      remote: "text-purple-400",
                     };
                     const isEditing = editingHash === blob.sha256;
                     const deviceCount = getDeviceCount(blob.sha256);
@@ -716,8 +772,14 @@ export function CASPanel({
                     return (
                       <tr
                         key={`${blob.sha256}-${blob.path || "no-path"}`}
-                        onClick={() => !isEditing && handleViewBlob(blob)}
-                        className="group border-b border-gray-800 hover:bg-gray-900/50 cursor-pointer"
+                        onClick={() =>
+                          !isEditing && !isRemote && handleViewBlob(blob)
+                        }
+                        className={`group border-b border-gray-800 ${
+                          isRemote
+                            ? "bg-purple-950/20 hover:bg-purple-950/30 opacity-75"
+                            : "hover:bg-gray-900/50"
+                        } ${isRemote ? "cursor-default" : "cursor-pointer"}`}
                       >
                         <td className="px-2 py-1.5">
                           <span
@@ -770,20 +832,34 @@ export function CASPanel({
                               </button>
                             </div>
                           ) : (
-                            <span>
+                            <span
+                              className={
+                                isRemote ? "text-purple-300 italic" : ""
+                              }
+                            >
                               {highlightText(
                                 getDisplayName(blob.filename),
                                 searchQuery
                               )}
+                              {isRemote && (
+                                <span
+                                  className="ml-2 text-[10px] text-purple-400"
+                                  title="File exists on other devices but not locally"
+                                >
+                                  (remote)
+                                </span>
+                              )}
                             </span>
                           )}
                         </td>
-                        <td className="px-2 py-1.5 font-mono text-xs text-blue-400">
+                        <td
+                          className={`px-2 py-1.5 font-mono text-xs ${isRemote ? "text-purple-400" : "text-blue-400"}`}
+                        >
                           {getHashDisplay(blob.sha256, searchQuery)}
                         </td>
                         <td className="px-2 py-1.5 text-xs">
                           {highlightText(
-                            `${(blob.size / 1024 / 1024).toFixed(2)} MB`,
+                            `${(Number(blob.size) / 1024 / 1024).toFixed(2)} MB`,
                             searchQuery
                           )}
                         </td>
@@ -794,21 +870,55 @@ export function CASPanel({
                           )}
                         </td>
                         <td className="px-2 py-1.5 text-xs">
-                          {deviceCount !== null && deviceCount > 0 && (
-                            <div className="flex items-center gap-1">
-                              <Network className="w-3 h-3 text-cyan-400" />
-                              <span className="text-cyan-400">
-                                {deviceCount}
+                          {isRemote ? (
+                            <div
+                              className="flex items-center gap-1"
+                              title={`Available on: ${
+                                getDevicesForBlob(blob.sha256)
+                                  .map((d) => formatDeviceId(d.deviceId))
+                                  .join(", ") || "Unknown devices"
+                              }`}
+                            >
+                              <Network className="w-3 h-3 text-purple-400" />
+                              <span className="text-purple-400 text-[10px] italic">
+                                Remote only
                               </span>
-                              {hasOnCurrentDevice && (
-                                <span
-                                  className="text-green-500"
-                                  title="Available on this device"
-                                >
-                                  ✓
-                                </span>
-                              )}
                             </div>
+                          ) : deviceCount !== null && deviceCount > 0 ? (
+                            <div className="flex flex-col gap-0.5">
+                              {getDevicesForBlob(blob.sha256).map((device) => {
+                                const isCurrentDevice =
+                                  device.deviceId === currentDeviceId;
+                                return (
+                                  <div
+                                    key={device.deviceId}
+                                    className="flex items-center gap-1"
+                                    title={`Device ID: ${device.deviceId}${device.health ? ` • Health: ${device.health}` : ""}`}
+                                  >
+                                    <Network
+                                      className={`w-3 h-3 ${isCurrentDevice ? "text-green-500" : "text-cyan-400"}`}
+                                    />
+                                    <span
+                                      className={`font-mono ${isCurrentDevice ? "text-green-500 font-semibold" : "text-cyan-400"}`}
+                                    >
+                                      {formatDeviceId(device.deviceId)}
+                                    </span>
+                                    {isCurrentDevice && (
+                                      <span
+                                        className="text-green-500 text-[10px]"
+                                        title="This device"
+                                      >
+                                        (this)
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="text-gray-600 text-[10px]">
+                              No devices
+                            </span>
                           )}
                         </td>
                         <td className="px-2 py-1.5 text-xs text-green-600">
@@ -832,31 +942,37 @@ export function CASPanel({
                           </span>
                         </td>
                         <td className="px-2 py-1.5">
-                          <div
-                            className="flex items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {!isEditing && (
-                              <button
-                                onClick={() => {
-                                  setEditingHash(blob.sha256);
-                                  setEditValue(getDisplayName(blob.filename));
-                                }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-500/10 rounded text-blue-400"
-                                title="Rename"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteBlob(blob)}
-                              disabled={deletingHash === blob.sha256}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/10 rounded text-red-500 hover:text-red-400 disabled:opacity-50"
-                              title="Delete blob entry"
+                          {isRemote ? (
+                            <span className="text-purple-400/50 text-[10px] italic">
+                              N/A
+                            </span>
+                          ) : (
+                            <div
+                              className="flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                              {!isEditing && (
+                                <button
+                                  onClick={() => {
+                                    setEditingHash(blob.sha256);
+                                    setEditValue(getDisplayName(blob.filename));
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-500/10 rounded text-blue-400"
+                                  title="Rename"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteBlob(blob)}
+                                disabled={deletingHash === blob.sha256}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/10 rounded text-red-500 hover:text-red-400 disabled:opacity-50"
+                                title="Delete blob entry"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

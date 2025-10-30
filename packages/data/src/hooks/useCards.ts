@@ -73,8 +73,8 @@ export function useCardsSync() {
   useEffect(() => {
     if (
       !electricResult.isLoading &&
-      electricResult.data !== undefined &&
-      electricResult.isFreshData
+      electricResult.data !== undefined
+      // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error(
@@ -89,8 +89,8 @@ export function useCardsSync() {
   useEffect(() => {
     if (
       !electricResult.isLoading &&
-      electricResult.data &&
-      electricResult.isFreshData
+      electricResult.data
+      // Cleanup even with stale data - if Electric has these IDs, local changes should be removed
     ) {
       cardsCleanup.cleanupSyncedCards(electricResult.data);
     }

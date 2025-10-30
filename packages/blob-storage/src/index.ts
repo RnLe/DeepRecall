@@ -16,7 +16,13 @@ export interface BlobInfo {
   created_ms: number;
   mtime_ms: number;
   path: string | null;
-  health?: "healthy" | "missing" | "modified" | "relocated" | "duplicate";
+  health?:
+    | "healthy"
+    | "missing"
+    | "modified"
+    | "relocated"
+    | "duplicate"
+    | "remote";
 }
 
 /**

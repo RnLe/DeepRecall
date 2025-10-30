@@ -72,16 +72,10 @@ export function usePresetsSync() {
   const electricResult = presetsElectric.usePresets();
 
   // Sync Electric data to Dexie presets table (for merge layer)
-  // CRITICAL: Only sync after receiving fresh data from network
-  // Skip stale cached data that hasn't been updated yet
+  // Note: Sync even with stale cache data - having stale data is better than no data
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
-      // Check if this is stale cached data (before first network update)
-      if (!electricResult.isFreshData) {
-        return; // Don't sync stale cached data
-      }
-
-      // This is fresh data from the network - safe to sync
+      // Sync immediately, whether from cache or fresh from network
       syncElectricToDexie(electricResult.data).catch((error) => {
         if (error.name === "DatabaseClosedError") return;
         console.error(

@@ -112,6 +112,7 @@ pub fn run() {
             database::estimate_export_size,
             database::import_data,
             database::query_postgres_table,
+            database::query_all_postgres_tables,
             // Avatar commands
             avatars::upload_avatar,
             avatars::delete_avatar,

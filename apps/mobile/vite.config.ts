@@ -6,8 +6,10 @@ export default defineConfig({
   plugins: [react()],
 
   // Proxy configuration for browser dev mode
-  // Only proxy Next.js API - Electric runs locally via Docker
   server: {
+    // Run on port 5173 (Vite default) to match Electric CORS configuration
+    // Electric Cloud allows: localhost:3000, localhost:5173
+    port: 5173,
     proxy: {
       // Proxy Next.js API requests (for write buffer flush)
       "/api": {

@@ -9,8 +9,7 @@ import { readdir, unlink, stat } from "fs/promises";
 import path from "path";
 
 function getLibraryPath(): string {
-  const dataPath =
-    process.env.DATA_PATH || path.join(process.cwd(), "../../data");
+  const dataPath = process.env.DATA_PATH || path.join(process.cwd(), "data");
   return process.env.LIBRARY_PATH || path.join(dataPath, "library");
 }
 

@@ -25,6 +25,7 @@ export function OrphanedBlobs() {
       // This is a no-op since the server handles sync automatically
       console.log(`Blob ${sha256} sync requested (handled server-side)`);
     },
+    cas,
   };
 
   return <OrphanedBlobsUI operations={operations} />;

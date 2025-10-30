@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPostgresPool } from "@/app/api/lib/postgres";
+import { getPostgresPool } from "@/app/api/lib/postgres";
+import { getClientWithRetry } from "@/app/api/lib/postgres-client";
 
 // Valid Postgres table names
 const VALID_TABLES = [
@@ -15,13 +16,16 @@ const VALID_TABLES = [
   "review_logs",
   "blobs_meta",
   "device_blobs",
+  "boards",
+  "strokes",
 ] as const;
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ table: string }> }
 ) {
-  const pool = createPostgresPool();
+  const pool = getPostgresPool();
+  let client;
 
   try {
     const { table: tableName } = await params;
@@ -34,9 +38,26 @@ export async function GET(
       );
     }
 
+    // Get connection from pool with error handling
+    try {
+      client = await pool.connect();
+    } catch (poolError) {
+      console.error(
+        `[PostgresAdmin] Pool connection timeout for ${tableName}:`,
+        poolError
+      );
+      return NextResponse.json(
+        {
+          error: "Database connection pool exhausted",
+          details: "Too many concurrent requests. Please try again.",
+        },
+        { status: 503 }
+      );
+    }
+
     // Fetch all records using raw SQL (limit to reasonable amount for safety)
     // Using template string is safe here because we validated tableName against whitelist
-    const result = await pool.query(`SELECT * FROM ${tableName} LIMIT 1000`);
+    const result = await client.query(`SELECT * FROM ${tableName} LIMIT 1000`);
 
     return NextResponse.json(result.rows);
   } catch (error) {
@@ -49,6 +70,8 @@ export async function GET(
       { status: 500 }
     );
   } finally {
-    await pool.end();
+    if (client) {
+      client.release();
+    }
   }
 }

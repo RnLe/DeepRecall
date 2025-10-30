@@ -64,9 +64,7 @@ export function useBoardsSync() {
   // Sync Electric data to Dexie
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
-      if (!electricResult.isFreshData) {
-        return; // Don't sync stale cached data
-      }
+      // Note: Sync even with stale cache data - having stale data is better than no data
 
       syncElectricToDexie(electricResult.data).catch((error) => {
         if (error.name === "DatabaseClosedError") return;
@@ -85,7 +83,7 @@ export function useBoardsSync() {
   // Run cleanup when Electric confirms sync
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
-      if (!electricResult.isFreshData) return;
+      // Cleanup even with stale data - if Electric has these IDs, local changes should be removed
 
       const syncedIds = electricResult.data.map((b) => b.id);
       boardsCleanup.cleanupBoardsLocal(syncedIds).catch((error) => {

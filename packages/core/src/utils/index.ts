@@ -8,3 +8,4 @@ export * from "./coords";
 export * from "./annotation-id";
 export * from "./navigation";
 export * from "./presets";
+export * from "./mime";

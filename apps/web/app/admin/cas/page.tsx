@@ -15,28 +15,24 @@ import type { DuplicateGroup } from "@deeprecall/ui";
 // PLATFORM HOOKS (from @/src/hooks)
 // ========================================
 import { useState, useCallback } from "react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
-import { useBlobsMeta, useDeviceBlobs } from "@deeprecall/data/hooks";
+import {
+  useBlobsMeta,
+  useDeviceBlobs,
+  useUnifiedBlobList,
+} from "@deeprecall/data/hooks";
 import { getDeviceId } from "@deeprecall/data/utils/deviceId";
-import type { BlobWithMetadata } from "@deeprecall/blob-storage";
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // CAS layer (platform-local storage)
+  // Platform-specific CAS adapter
   const cas = useWebBlobStorage();
-  const {
-    data: blobs,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["blobs"],
-    queryFn: () => cas.list(),
-    staleTime: 1000 * 60 * 5,
-  });
+
+  // Bridge layer: Unified blob list (CAS + Electric metadata)
+  const { data: blobs, isLoading, error, refetch } = useUnifiedBlobList(cas);
 
   // Electric coordination layer (multi-device metadata)
   const electricBlobsMeta = useBlobsMeta();
@@ -45,10 +41,9 @@ export default function AdminPage() {
 
   // Operations implementation
   const operations = {
-    listBlobs: async (): Promise<BlobWithMetadata[]> => {
-      const response = await fetch("/api/library/blobs");
-      if (!response.ok) throw new Error("Failed to fetch blobs");
-      return response.json();
+    listBlobs: async () => {
+      // Use the unified list from bridge hook
+      return blobs || [];
     },
 
     deleteBlob: async (hash: string): Promise<void> => {
@@ -167,9 +162,15 @@ export default function AdminPage() {
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
       setIsSyncing(true);
       try {
+        // Get device ID from client
+        const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
+        const deviceId = getDeviceId();
+
         // Trigger the sync - Electric will propagate changes automatically
         const response = await fetch("/api/admin/sync-to-electric", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId }),
         });
         if (!response.ok) throw new Error("Sync failed");
         const result = await response.json();

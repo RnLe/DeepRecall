@@ -225,8 +225,14 @@ export async function executeImport(
     if (options.importDexie || options.importSQLite) {
       console.log("[Import] Triggering Electric sync...");
       try {
+        // Get device ID from client
+        const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
+        const deviceId = getDeviceId();
+
         const syncResponse = await fetch("/api/admin/sync-to-electric", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId }),
         });
         if (syncResponse.ok) {
           const syncResult = await syncResponse.json();

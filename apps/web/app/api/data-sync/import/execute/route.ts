@@ -120,9 +120,8 @@ async function copyFiles(
   }
 
   const filesDir = path.join(extractDir, ARCHIVE_STRUCTURE.FILES_DIR);
-  // In monorepo: process.cwd() is /workspace/apps/web, but data is at /workspace/data
-  const dataDir =
-    process.env.DATA_PATH || path.join(process.cwd(), "../../data");
+  // Store data in apps/web/data (works for both local dev and Railway deployment)
+  const dataDir = process.env.DATA_PATH || path.join(process.cwd(), "data");
 
   let copied = 0;
 

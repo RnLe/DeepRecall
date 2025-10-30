@@ -32,7 +32,9 @@ export function LinkBlobDialog({
       ),
     syncBlobToElectric: async (sha256: string) => {
       // Sync blob metadata to Postgres via Rust command
-      await invoke("sync_blob_to_electric", { sha256 });
+      const { getDeviceId } = await import("@deeprecall/data");
+      const deviceId = getDeviceId();
+      await invoke("sync_blob_to_electric", { sha256, deviceId });
     },
   };
 

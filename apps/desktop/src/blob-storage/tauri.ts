@@ -74,15 +74,56 @@ export class TauriBlobStorage implements BlobCAS {
       const uint8Array = new Uint8Array(arrayBuffer);
 
       // Invoke Rust command to store blob
-      return await invoke<BlobWithMetadata>("store_blob", {
+      const result = await invoke<BlobWithMetadata>("store_blob", {
         filename: file.name,
         data: Array.from(uint8Array),
         mime: file.type,
       });
+
+      // Coordinate with Electric (background - don't block upload)
+      this.coordinateWithElectric(result).catch((error) => {
+        console.error(
+          `[TauriBlobStorage] Failed to coordinate ${result.sha256.slice(0, 16)}... with Electric:`,
+          error
+        );
+      });
+
+      return result;
     } catch (error) {
       console.error("Error storing blob:", error);
       throw new Error(`Failed to store blob: ${error}`);
     }
+  }
+
+  /**
+   * Coordinate blob upload with Electric (background)
+   */
+  private async coordinateWithElectric(
+    blobInfo: BlobWithMetadata
+  ): Promise<void> {
+    const { coordinateBlobUpload, getDeviceId } = await import(
+      "@deeprecall/data"
+    );
+
+    await coordinateBlobUpload(
+      blobInfo.sha256,
+      {
+        sha256: blobInfo.sha256,
+        size: blobInfo.size,
+        mime: blobInfo.mime,
+        filename: blobInfo.filename ?? undefined,
+        pageCount: blobInfo.pageCount ?? undefined,
+        imageWidth: blobInfo.imageWidth ?? undefined,
+        imageHeight: blobInfo.imageHeight ?? undefined,
+        lineCount: blobInfo.lineCount ?? undefined,
+      },
+      getDeviceId(),
+      blobInfo.path ?? undefined
+    );
+
+    console.log(
+      `[TauriBlobStorage] Coordinated ${blobInfo.sha256.slice(0, 16)}... with Electric`
+    );
   }
 
   /**

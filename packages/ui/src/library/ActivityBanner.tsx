@@ -33,6 +33,7 @@ interface ActivityExtended extends Activity {
 // Platform-specific operations interface (minimal)
 export interface ActivityBannerOperations {
   onDropFiles: (activityId: string, files: FileList) => void;
+  cas: import("@deeprecall/blob-storage").BlobCAS;
 }
 
 interface ActivityBannerProps {
@@ -329,6 +330,7 @@ export function ActivityBanner({ activity, operations }: ActivityBannerProps) {
                       operations={{
                         navigate: () => {},
                         getBlobUrl: (sha256) => `/api/blob/${sha256}`,
+                        cas: operations.cas,
                       }}
                     />
                   ) : (

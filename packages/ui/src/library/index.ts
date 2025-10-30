@@ -12,6 +12,7 @@ export {
   type BibtexEntry,
   type ParseResult,
 } from "./BibtexImportModal";
+export { BlobStatusBadge, BlobAvailabilityIcon } from "./BlobStatusBadge";
 export { CompactDynamicForm } from "./CompactDynamicForm";
 export { CreateActivityDialog } from "./CreateActivityDialog";
 export { CreateWorkDialog } from "./CreateWorkDialog";

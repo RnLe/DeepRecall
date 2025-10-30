@@ -20,47 +20,36 @@ import type { DuplicateGroup } from "@deeprecall/ui";
 // PLATFORM HOOKS
 // ========================================
 import { useState, useCallback } from "react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCapacitorBlobStorage } from "../../hooks/useBlobStorage";
-import { useBlobsMeta, useDeviceBlobs } from "@deeprecall/data/hooks";
-import type { BlobWithMetadata } from "@deeprecall/blob-storage";
+import {
+  useBlobsMeta,
+  useDeviceBlobs,
+  useUnifiedBlobList,
+} from "@deeprecall/data/hooks";
+import { getDeviceId } from "@deeprecall/data";
+import { getApiBaseUrl } from "../../config/api";
 
 export default function CASAdminPage() {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // CAS layer (Capacitor filesystem)
+  // Platform-specific CAS adapter
   const cas = useCapacitorBlobStorage();
-  const {
-    data: blobs,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["blobs"],
-    queryFn: () => cas.list(),
-    staleTime: 1000 * 60 * 5,
-  });
+
+  // Bridge layer: Unified blob list (CAS + Electric metadata)
+  const { data: blobs, isLoading, error, refetch } = useUnifiedBlobList(cas);
 
   // Electric coordination layer (multi-device metadata)
   const electricBlobsMeta = useBlobsMeta();
   const electricDeviceBlobs = useDeviceBlobs();
-
-  // Get device ID from localStorage (same pattern as data package)
-  const getDeviceId = (): string => {
-    let deviceId = localStorage.getItem("deeprecall-device-id");
-    if (!deviceId) {
-      deviceId = crypto.randomUUID();
-      localStorage.setItem("deeprecall-device-id", deviceId);
-    }
-    return deviceId;
-  };
   const currentDeviceId = getDeviceId();
 
   // Operations implementation
   const operations = {
-    listBlobs: async (): Promise<BlobWithMetadata[]> => {
-      return cas.list();
+    listBlobs: async () => {
+      // Use the unified list from bridge hook
+      return blobs || [];
     },
 
     deleteBlob: async (hash: string): Promise<void> => {
@@ -72,15 +61,14 @@ export default function CASAdminPage() {
     },
 
     scanBlobs: async (): Promise<{ duplicates?: DuplicateGroup[] }> => {
-      // Mobile: Use HTTP API for complex scan operations
-      const apiBaseUrl =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+      // Mobile: Scan local Capacitor storage for new/removed blobs
+      const result = await cas.scan();
 
-      const response = await fetch(`${apiBaseUrl}/api/scan`, {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error("Rescan failed");
-      return response.json();
+      // Refresh local query caches so UI reflects updated catalog immediately
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["blobs"] });
+
+      return { duplicates: result.duplicates ?? [] };
     },
 
     clearDatabase: async (): Promise<void> => {
@@ -171,8 +159,7 @@ export default function CASAdminPage() {
       console.log("✅ React Query cleared");
 
       // Step 4: Clear Postgres via HTTP API (background confirmation)
-      const apiBaseUrl =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+      const apiBaseUrl = getApiBaseUrl();
 
       const response = await fetch(`${apiBaseUrl}/api/admin/database`, {
         method: "DELETE",
@@ -185,18 +172,36 @@ export default function CASAdminPage() {
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
       setIsSyncing(true);
       try {
-        const apiBaseUrl =
-          import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+        const deviceId = getDeviceId();
 
-        // Trigger the sync via HTTP API
-        const response = await fetch(
-          `${apiBaseUrl}/api/admin/sync-to-electric`,
-          {
-            method: "POST",
+        // Mobile: Coordinate all local blobs with Electric
+        // (Don't call web API - that would sync web server's blobs with mobile device ID!)
+        const localBlobs = await cas.list();
+
+        let synced = 0;
+        let failed = 0;
+
+        const { coordinateBlobUpload } = await import("@deeprecall/data");
+
+        for (const blob of localBlobs) {
+          try {
+            await coordinateBlobUpload(
+              blob.sha256,
+              {
+                sha256: blob.sha256,
+                size: blob.size,
+                mime: blob.mime,
+                filename: blob.filename || `${blob.sha256.slice(0, 16)}.bin`,
+              },
+              deviceId,
+              blob.path || null
+            );
+            synced++;
+          } catch (error) {
+            console.error(`Failed to coordinate ${blob.sha256}:`, error);
+            failed++;
           }
-        );
-        if (!response.ok) throw new Error("Sync failed");
-        const result = await response.json();
+        }
 
         // Invalidate Electric queries to trigger refetch
         await Promise.all([
@@ -213,7 +218,7 @@ export default function CASAdminPage() {
           queryClient.refetchQueries({ queryKey: ["device-blobs"] }),
         ]);
 
-        return result;
+        return { synced, failed };
       } finally {
         setIsSyncing(false);
       }
@@ -227,8 +232,7 @@ export default function CASAdminPage() {
         deletePaths?: string[];
       }>
     ): Promise<void> => {
-      const apiBaseUrl =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+      const apiBaseUrl = getApiBaseUrl();
 
       const response = await fetch(
         `${apiBaseUrl}/api/admin/resolve-duplicates`,

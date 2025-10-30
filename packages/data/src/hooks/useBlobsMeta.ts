@@ -4,7 +4,7 @@
  */
 
 import type { BlobMeta } from "@deeprecall/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
 import { db } from "../db";
@@ -50,6 +50,7 @@ async function syncElectricToDexie(electricData: BlobMeta[]): Promise<void> {
  */
 export function useBlobsMetaSync() {
   const electricResult = useShape<BlobMeta>({ table: "blobs_meta" });
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie
   useEffect(() => {
@@ -58,15 +59,20 @@ export function useBlobsMetaSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useBlobsMetaSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Refresh all blobs_meta queries to pick up the latest Dexie data
+          queryClient.invalidateQueries({ queryKey: ["blobs-meta"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[useBlobsMetaSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   return null;
 }
@@ -127,5 +133,144 @@ export function useBlobsMetaByMime(mime: string) {
       return db.blobsMeta.where("mime").equals(mime).toArray();
     },
     staleTime: 0,
+  });
+}
+
+// ============================================================================
+// Blob Resolution Hooks (Bridge Layer - Platform Agnostic)
+// ============================================================================
+
+/**
+ * Resolve blob for frontend display
+ * Combines Electric metadata + CAS availability
+ *
+ * @param sha256 - Blob SHA-256 hash
+ * @param cas - Platform-specific CAS adapter (injected)
+ * @returns Blob metadata with availability and URL
+ *
+ * @example
+ * const cas = useWebBlobStorage();
+ * const blob = useBlobResolution(sha256, cas);
+ * if (blob.data?.availableLocally) {
+ *   return <img src={blob.data.url} />;
+ * }
+ */
+export function useBlobResolution(
+  sha256: string | undefined,
+  cas: {
+    has: (sha256: string) => Promise<boolean>;
+    getUrl: (sha256: string) => string;
+  }
+) {
+  const { data: meta } = useBlobMeta(sha256);
+
+  return useQuery({
+    queryKey: ["blob", "resolution", sha256],
+    queryFn: async () => {
+      if (!meta || !sha256) return null;
+
+      const availableLocally = await cas.has(sha256);
+      const url = availableLocally ? cas.getUrl(sha256) : null;
+
+      return {
+        sha256,
+        filename: meta.filename,
+        mime: meta.mime,
+        size: meta.size,
+        createdAt: meta.createdAt,
+        availableLocally,
+        url,
+      };
+    },
+    enabled: !!meta && !!sha256,
+    staleTime: 5000, // Cache for 5 seconds (availability rarely changes)
+  });
+}
+
+/**
+ * Check blob availability status
+ * Lightweight query for status badges
+ *
+ * @param sha256 - Blob SHA-256 hash
+ * @param cas - Platform-specific CAS adapter
+ * @returns Boolean availability status
+ */
+export function useBlobAvailability(
+  sha256: string | undefined,
+  cas: { has: (sha256: string) => Promise<boolean> }
+) {
+  return useQuery({
+    queryKey: ["blob", "availability", sha256],
+    queryFn: async () => {
+      if (!sha256) return false;
+      return cas.has(sha256);
+    },
+    enabled: !!sha256,
+    staleTime: 5000,
+  });
+}
+
+/**
+ * Get unified blob list combining CAS + Electric metadata
+ * Used by Admin panel to show complete picture
+ *
+ * @param cas - Platform-specific CAS adapter
+ * @returns Combined list of blobs with metadata (CAS structure with Electric overrides)
+ *
+ * @example
+ * const cas = useWebBlobStorage();
+ * const { data: blobs } = useUnifiedBlobList(cas);
+ */
+export function useUnifiedBlobList(cas: {
+  list: () => Promise<
+    Array<{
+      sha256: string;
+      filename: string | null;
+      size: number;
+      mime: string;
+      created_ms: number;
+      mtime_ms: number;
+      path: string | null;
+      [key: string]: any;
+    }>
+  >;
+}) {
+  const { data: electricMeta = [] } = useBlobsMeta();
+
+  return useQuery({
+    queryKey: ["blobs", "unified"],
+    queryFn: async () => {
+      // Query local CAS (platform-specific storage)
+      const localBlobs = await cas.list();
+
+      // Create map of Electric metadata
+      const metaMap = new Map(electricMeta.map((m) => [m.sha256, m]));
+
+      // Merge: Keep CAS structure, overlay Electric metadata where available
+      const unified = localBlobs.map((blob) => {
+        const meta = metaMap.get(blob.sha256);
+
+        // If Electric metadata exists, prefer it for core fields
+        if (meta) {
+          return {
+            ...blob, // Keep CAS fields (created_ms, mtime_ms, path, etc.)
+            filename: meta.filename, // Electric filename (may differ from path)
+            mime: meta.mime, // Electric MIME (more reliable)
+            size: meta.size, // Electric size (authoritative)
+            // Add Electric metadata flag
+            hasElectricMetadata: true,
+          };
+        }
+
+        // No Electric metadata - use CAS data as-is
+        return {
+          ...blob,
+          hasElectricMetadata: false,
+        };
+      });
+
+      return unified;
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 }

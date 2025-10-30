@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mobile": "vite --mode development",
     "build": "tsc -b && vite build",
+    "build:ios": "tsc -b && vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
     "cap:sync": "cap sync",
@@ -17,6 +19,7 @@
     "@capacitor/core": "^7.4.4",
     "@capacitor/filesystem": "^7.1.4",
     "@capacitor/ios": "^7.4.4",
+    "@capacitor/preferences": "^7.0.0",
     "@capawesome/capacitor-file-picker": "^7.2.0",
     "@deeprecall/blob-storage": "workspace:*",
     "@deeprecall/core": "workspace:*",

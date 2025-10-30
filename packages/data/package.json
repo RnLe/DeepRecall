@@ -8,6 +8,8 @@
     "./db": "./src/db/index.ts",
     "./repos": "./src/repos/index.ts",
     "./repos/worksElectric": "./src/repos/works.electric.ts",
+    "./repos/blobs-meta.writes": "./src/repos/blobs-meta.writes.ts",
+    "./repos/device-blobs.writes": "./src/repos/device-blobs.writes.ts",
     "./stores": "./src/stores/index.ts",
     "./stores/reader-ui": "./src/stores/reader-ui.ts",
     "./hooks": "./src/hooks/index.ts",

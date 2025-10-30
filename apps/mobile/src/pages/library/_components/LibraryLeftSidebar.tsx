@@ -5,14 +5,15 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import {
   LibraryLeftSidebar as LibraryLeftSidebarUI,
   type LibraryLeftSidebarOperations,
 } from "@deeprecall/ui/library";
 import type { BlobWithMetadata } from "@deeprecall/core";
 import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
-import { useAssets } from "@deeprecall/data/hooks";
+import { useOrphanedBlobsFromElectric } from "@deeprecall/data/hooks";
+import { getDeviceId } from "@deeprecall/data";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 
 // Stub LinkBlobDialog component - will be replaced with real one
@@ -64,43 +65,19 @@ function LinkBlobDialogStub({
 
 export function LibraryLeftSidebar() {
   const cas = useCapacitorBlobStorage();
-  const { data: assets } = useAssets();
+  const currentDeviceId = getDeviceId();
+  const orphanedBlobsQuery = useOrphanedBlobsFromElectric(currentDeviceId);
 
-  const [orphanedBlobs, setOrphanedBlobs] = useState<BlobWithMetadata[]>([]);
-  const [isLoadingBlobs, setIsLoadingBlobs] = useState(false);
-
-  // Fetch orphaned blobs (blobs not linked to any asset)
   const fetchOrphanedBlobs = useCallback(async () => {
-    setIsLoadingBlobs(true);
-    try {
-      const allBlobs = await cas.list();
-
-      // Filter out blobs that are referenced by assets
-      const assetSha256s = new Set(assets?.map((a) => a.sha256) || []);
-      const orphaned = allBlobs.filter(
-        (blob) => !assetSha256s.has(blob.sha256)
-      );
-
-      setOrphanedBlobs(orphaned);
-      return orphaned;
-    } catch (error) {
-      console.error("Failed to fetch orphaned blobs:", error);
-      return [];
-    } finally {
-      setIsLoadingBlobs(false);
-    }
-  }, [cas, assets]);
-
-  // Auto-fetch on mount and when assets change
-  useEffect(() => {
-    fetchOrphanedBlobs();
-  }, [fetchOrphanedBlobs]);
+    await orphanedBlobsQuery.refetch();
+    return orphanedBlobsQuery.data || [];
+  }, [orphanedBlobsQuery]);
 
   // Real operations using CapacitorBlobStorage
   const operations: LibraryLeftSidebarOperations = {
     fetchOrphanedBlobs,
-    orphanedBlobs,
-    isLoadingBlobs,
+    orphanedBlobs: orphanedBlobsQuery.data || [],
+    isLoadingBlobs: orphanedBlobsQuery.isLoading,
 
     fetchBlobContent: async (sha256: string) => {
       try {
@@ -155,6 +132,7 @@ export function LibraryLeftSidebar() {
       // Capacitor uses file:// URLs
       return `capacitor://blob/${sha256}`;
     },
+    cas,
   };
 
   return (

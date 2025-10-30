@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getApiBaseUrl } from "../../config/api";
 
 interface PostgresStatus {
   connected: boolean;
@@ -14,9 +15,7 @@ export function PostgresIndicator() {
   useEffect(() => {
     const checkConnection = async () => {
       // Mobile uses HTTP API for database writes, not direct Postgres
-      const apiUrl =
-        import.meta.env.VITE_POSTGRES_API_URL ||
-        "http://localhost:3000/api/writes/batch";
+      const apiUrl = `${getApiBaseUrl()}/api/writes/batch`;
 
       try {
         // Test the write buffer API endpoint
@@ -29,7 +28,7 @@ export function PostgresIndicator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ writes: [] }),
+          body: JSON.stringify({ changes: [] }), // API expects 'changes' not 'writes'
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -56,7 +55,7 @@ export function PostgresIndicator() {
     };
 
     checkConnection();
-    const interval = setInterval(checkConnection, 30000); // Check every 30s
+    const interval = setInterval(checkConnection, 60000); // Check every 60s (1 minute)
 
     return () => clearInterval(interval);
   }, []);

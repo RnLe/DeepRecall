@@ -68,26 +68,32 @@ async function syncElectricToDexie(electricData: Work[]): Promise<void> {
  */
 export function useWorksSync() {
   const electricResult = worksElectric.useWorks();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie
   useEffect(() => {
     if (
       !electricResult.isLoading &&
-      electricResult.data !== undefined &&
-      electricResult.isFreshData
+      electricResult.data !== undefined
+      // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        // Ignore DatabaseClosedError (happens during db.delete())
-        if (error.name === "DatabaseClosedError") {
-          return;
-        }
-        console.error(
-          "[useWorksSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all works queries to trigger re-render
+          queryClient.invalidateQueries({ queryKey: ["works"] });
+        })
+        .catch((error) => {
+          // Ignore DatabaseClosedError (happens during db.delete())
+          if (error.name === "DatabaseClosedError") {
+            return;
+          }
+          console.error(
+            "[useWorksSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   // Cleanup synced works
   useEffect(() => {
@@ -116,6 +122,8 @@ export function useWorksSync() {
  * Read-only - queries Dexie merged view without side effects
  */
 export function useWorks() {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: ["works", "merged"],
     queryFn: async () => {

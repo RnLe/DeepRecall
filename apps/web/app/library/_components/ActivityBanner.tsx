@@ -10,6 +10,7 @@ import {
   type ActivityBannerOperations,
 } from "@deeprecall/ui";
 import type { Activity, Work, Asset } from "@deeprecall/core";
+import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
 
 interface ActivityExtended extends Activity {
   works?: Work[];
@@ -22,8 +23,11 @@ interface ActivityBannerProps {
 }
 
 export function ActivityBanner({ activity, onDropFiles }: ActivityBannerProps) {
+  const cas = useWebBlobStorage();
+
   const operations: ActivityBannerOperations = {
     onDropFiles,
+    cas,
   };
 
   return <ActivityBannerUI activity={activity} operations={operations} />;

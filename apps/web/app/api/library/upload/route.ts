@@ -15,6 +15,7 @@ const UploadMetadataSchema = z.object({
   annotationId: z.string().optional(),
   title: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  deviceId: z.string().optional(), // Client's unique device ID
 });
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -79,10 +80,10 @@ export async function POST(request: NextRequest) {
       hash,
       path: filePath,
       size,
-    } = await storeBlob(buffer, file.name, metadata.role);
+    } = await storeBlob(buffer, file.name, metadata.role, metadata.deviceId);
 
     console.log(
-      `Uploaded: ${file.name} → ${hash.slice(0, 16)}... (${metadata.role})`
+      `Uploaded: ${file.name} → ${hash.slice(0, 16)}... (${metadata.role}) by device ${metadata.deviceId?.slice(0, 8) || "server"}...`
     );
 
     // Return blob metadata (client will create Asset in Dexie)

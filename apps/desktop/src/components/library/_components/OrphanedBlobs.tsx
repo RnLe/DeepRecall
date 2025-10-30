@@ -24,8 +24,11 @@ export function OrphanedBlobs() {
       ),
     syncBlobToElectric: async (sha256: string) => {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("sync_blob_to_electric", { sha256 });
+      const { getDeviceId } = await import("@deeprecall/data");
+      const deviceId = getDeviceId();
+      await invoke("sync_blob_to_electric", { sha256, deviceId });
     },
+    cas,
   };
 
   return <OrphanedBlobsUI operations={operations} />;

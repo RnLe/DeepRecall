@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { BlobWithMetadata } from "@deeprecall/core";
 import { LinkBlobDialog } from "./LinkBlobDialog";
+import { BlobStatusBadge } from "./BlobStatusBadge";
 
 // Platform-specific operations interface (minimal)
 export interface OrphanedBlobsOperations {
@@ -24,6 +25,8 @@ export interface OrphanedBlobsOperations {
   // Platform-specific getBlobUrl for LinkBlobDialog
   getBlobUrl: (sha256: string) => string;
   syncBlobToElectric: (sha256: string) => Promise<void>;
+  // CAS for blob status badges
+  cas: import("@deeprecall/blob-storage").BlobCAS;
 }
 
 interface OrphanedBlobsProps {
@@ -31,7 +34,7 @@ interface OrphanedBlobsProps {
 }
 
 export function OrphanedBlobs({ operations }: OrphanedBlobsProps) {
-  const { orphanedBlobs, isLoading, getBlobUrl, syncBlobToElectric } =
+  const { orphanedBlobs, isLoading, getBlobUrl, syncBlobToElectric, cas } =
     operations;
   const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -127,6 +130,12 @@ export function OrphanedBlobs({ operations }: OrphanedBlobsProps) {
                         <span>{blob.pageCount} pages</span>
                       </>
                     )}
+                    <span>·</span>
+                    <BlobStatusBadge
+                      sha256={blob.sha256}
+                      cas={cas}
+                      className="text-[10px]"
+                    />
                   </div>
                 </div>
 

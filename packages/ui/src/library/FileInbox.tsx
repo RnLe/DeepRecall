@@ -8,7 +8,9 @@
 import { useState } from "react";
 import { FileQuestion, Link, ChevronDown, ChevronUp } from "lucide-react";
 import type { BlobWithMetadata } from "@deeprecall/core";
+import type { BlobCAS } from "@deeprecall/blob-storage";
 import { MarkdownPreview } from "../components/MarkdownPreview";
+import { BlobStatusBadge } from "./BlobStatusBadge";
 
 export interface FileInboxProps {
   // Data
@@ -23,6 +25,9 @@ export interface FileInboxProps {
 
   // Platform-specific fetch
   fetchBlobContent: (sha256: string) => Promise<string>;
+
+  // CAS for blob status
+  cas: BlobCAS;
 }
 
 export function FileInbox({
@@ -33,6 +38,7 @@ export function FileInbox({
   onDeleteBlob,
   onRefreshBlobs,
   fetchBlobContent,
+  cas,
 }: FileInboxProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -408,13 +414,21 @@ export function FileInbox({
                         >
                           {fileExt}
                         </span>
-                        <span>{(blob.size / 1024 / 1024).toFixed(2)} MB</span>
+                        <span>
+                          {(Number(blob.size) / 1024 / 1024).toFixed(2)} MB
+                        </span>
                         {metadata && (
                           <>
                             <span>·</span>
                             <span>{metadata}</span>
                           </>
                         )}
+                        <span>·</span>
+                        <BlobStatusBadge
+                          sha256={blob.sha256}
+                          cas={cas}
+                          className="text-[10px]"
+                        />
                       </div>
                     </div>
                   )}

@@ -7,15 +7,17 @@ import {
   LibraryLeftSidebar as LibraryLeftSidebarUI,
   type LibraryLeftSidebarOperations,
 } from "@deeprecall/ui";
-import { useOrphanedBlobs } from "@deeprecall/data/hooks";
+import { useOrphanedBlobsFromElectric } from "@deeprecall/data/hooks";
 import { useTauriBlobStorage } from "@/hooks/useBlobStorage";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { LinkBlobDialog } from "./LinkBlobDialog";
+import { getDeviceId } from "@deeprecall/data";
 
 export function LibraryLeftSidebar() {
   const cas = useTauriBlobStorage();
-  const orphanedBlobsQuery = useOrphanedBlobs(cas);
+  const currentDeviceId = getDeviceId();
+  const orphanedBlobsQuery = useOrphanedBlobsFromElectric(currentDeviceId);
 
   // Platform-specific blob operations
   const operations: LibraryLeftSidebarOperations = {
@@ -53,6 +55,7 @@ export function LibraryLeftSidebar() {
       convertFileSrc(
         `~/Documents/DeepRecall/blobs/${sha256.substring(0, 2)}/${sha256}`
       ),
+    cas,
   };
 
   return (

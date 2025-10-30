@@ -29,6 +29,10 @@ export * as blobsMetaElectric from "./blobs-meta.electric";
 export * as deviceBlobsElectric from "./device-blobs.electric";
 export * as replicationJobsElectric from "./replication-jobs.electric";
 
+// Export blob write operations (client-safe, no server dependencies)
+export * from "./blobs-meta.writes";
+export * from "./device-blobs.writes";
+
 // NOTE: blobs.server.ts is NOT exported here because it contains Node.js-only code (pg library)
 // Import it directly in server-side code: import { ... } from "@deeprecall/data/repos/blobs.server"
 

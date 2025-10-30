@@ -11,6 +11,7 @@ import {
 } from "@deeprecall/ui/library";
 import type { Work, Asset } from "@deeprecall/core";
 import { useNavigate } from "react-router-dom";
+import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
 
 interface WorkWithAssets extends Work {
   assets?: Asset[];
@@ -23,6 +24,7 @@ interface WorkCardCompactProps {
 
 export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
   const navigate = useNavigate();
+  const cas = useCapacitorBlobStorage();
 
   const operations: WorkCardCompactOperations = {
     navigate: (path: string) => {
@@ -31,6 +33,7 @@ export function WorkCardCompact({ work, onClick }: WorkCardCompactProps) {
     getBlobUrl: (sha256: string) => {
       return `capacitor://blob/${sha256}`;
     },
+    cas,
   };
 
   return (

@@ -5,11 +5,12 @@
 
 import { NextResponse } from "next/server";
 import { clearDatabase } from "@/src/server/cas";
-import { createPostgresPool } from "@/app/api/lib/postgres";
+import { getPostgresPool } from "@/app/api/lib/postgres";
 
 // Postgres connection for admin operations
 async function clearPostgres() {
-  const pool = createPostgresPool();
+  const pool = getPostgresPool();
+  const client = await pool.connect();
 
   try {
     // Clear all tables in reverse dependency order
@@ -31,7 +32,7 @@ async function clearPostgres() {
 
     for (const table of tables) {
       try {
-        await pool.query(`TRUNCATE TABLE ${table} CASCADE;`);
+        await client.query(`TRUNCATE TABLE ${table} CASCADE;`);
         console.log(`  ✅ Cleared ${table}`);
       } catch (error) {
         console.warn(`  ⚠️  Failed to clear ${table}:`, error);
@@ -41,7 +42,7 @@ async function clearPostgres() {
 
     return tables.length;
   } finally {
-    await pool.end();
+    client.release();
   }
 }
 

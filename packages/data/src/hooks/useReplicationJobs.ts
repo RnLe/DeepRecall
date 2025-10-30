@@ -51,12 +51,12 @@ export function useReplicationJobsSync() {
     table: "replication_jobs",
   });
 
-  // Sync Electric → Dexie only when fresh data is available
+  // Sync Electric → Dexie
   useEffect(() => {
     if (
       !electricResult.isLoading &&
-      electricResult.data !== undefined &&
-      electricResult.isFreshData
+      electricResult.data !== undefined
+      // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
       syncElectricToDexie(electricResult.data).catch((error) => {
         console.error(

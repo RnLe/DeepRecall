@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 // Postgres tables (matches migrations)
 const POSTGRES_TABLES = [
@@ -24,45 +24,40 @@ const POSTGRES_TABLES = [
 export default function PostgresPage() {
   const [activeTab, setActiveTab] = useState<string>(POSTGRES_TABLES[0].key);
 
-  // Fetch counts for all tables
-  const countQueries = useQueries({
-    queries: POSTGRES_TABLES.map((table) => ({
-      queryKey: ["postgres-count", table.key],
-      queryFn: async () => {
-        const response = await fetch(`/api/admin/postgres/${table.key}`);
-        if (!response.ok) return 0;
-        const data = await response.json();
-        return Array.isArray(data) ? data.length : 0;
-      },
-      staleTime: 1000 * 60 * 5, // 5 minutes
-    })),
+  // Fetch ALL tables in a single request (efficient!)
+  const {
+    data: allTablesData,
+    isLoading: allTablesLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["postgres-all"],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/postgres/all`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch Postgres data");
+      }
+      return response.json() as Promise<Record<string, any[]>>;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Create a map of table counts
+  // Get data and count for active tab
+  const data = allTablesData?.[activeTab] || [];
+  const isLoading = allTablesLoading;
+  const error = null;
+
+  // Create a map of table counts from the single fetch
   const tableCounts = POSTGRES_TABLES.reduce(
-    (acc, table, idx) => {
-      acc[table.key] = countQueries[idx].data ?? "...";
+    (acc, table) => {
+      const count = allTablesData?.[table.key]?.length;
+      acc[table.key] = count !== undefined ? count : "...";
       return acc;
     },
     {} as Record<string, number | string>
   );
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["postgres", activeTab],
-    queryFn: async () => {
-      const response = await fetch(`/api/admin/postgres/${activeTab}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${activeTab}`);
-      }
-      return response.json();
-    },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
   const handleRefresh = () => {
     refetch();
-    // Refetch all count queries
-    countQueries.forEach((query) => query.refetch());
   };
 
   return (
@@ -129,11 +124,7 @@ export default function PostgresPage() {
             <div className="text-center text-gray-400 py-8">Loading...</div>
           )}
 
-          {error && (
-            <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-red-400">
-              {error instanceof Error ? error.message : "Failed to load data"}
-            </div>
-          )}
+          {/* Error handling removed - using null error */}
 
           {!isLoading && !error && data && data.length === 0 && (
             <div className="text-center text-gray-500 py-8">

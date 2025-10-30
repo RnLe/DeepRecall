@@ -75,6 +75,18 @@ export class WebBlobStorage implements BlobCAS {
       formData.append("file", source, filename);
     }
 
+    // Include device ID in metadata
+    const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
+    const deviceId = getDeviceId();
+
+    formData.append(
+      "metadata",
+      JSON.stringify({
+        role: "notes",
+        deviceId,
+      })
+    );
+
     const response = await fetch("/api/library/upload", {
       method: "POST",
       body: formData,

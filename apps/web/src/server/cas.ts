@@ -15,9 +15,8 @@ import { extractFileMetadata, extractBufferMetadata } from "./metadata";
  * Get the library directory path from environment or default
  */
 export function getLibraryPath(): string {
-  // In monorepo: process.cwd() is /workspace/apps/web, but data is at /workspace/data
-  const dataPath =
-    process.env.DATA_PATH || path.join(process.cwd(), "../../data");
+  // Store data in apps/web/data (works for both local dev and Railway deployment)
+  const dataPath = process.env.DATA_PATH || path.join(process.cwd(), "data");
   return process.env.LIBRARY_PATH || path.join(dataPath, "library");
 }
 
@@ -623,12 +622,14 @@ export async function clearDatabase(): Promise<void> {
  * @param buffer - File content as Buffer
  * @param filename - Original filename (for extension)
  * @param role - Asset role for organization (default: "main")
+ * @param deviceId - Client's unique device ID (optional, defaults to "server" if not provided)
  * @returns Object with hash, path, and size
  */
 export async function storeBlob(
   buffer: Buffer,
   filename: string,
-  role: string = "main"
+  role: string = "main",
+  deviceId?: string
 ): Promise<{ hash: string; path: string; size: number }> {
   const hash = hashBuffer(buffer);
   const mime = getMimeType(filename);
@@ -658,7 +659,8 @@ export async function storeBlob(
         existingBlob.size,
         existingBlob.mime,
         existingBlob.filename || filename,
-        existingPath
+        existingPath,
+        deviceId
       ).catch((error) => {
         console.error(
           `[CAS] Failed to ensure Electric coordination for duplicate ${hash.slice(0, 16)}...`,
@@ -734,7 +736,8 @@ export async function storeBlob(
     mime,
     filename,
     targetPath,
-    metadata
+    metadata,
+    deviceId
   ).catch((error) => {
     console.error(
       `[CAS] Failed to create Electric coordination for ${hash.slice(0, 16)}...`,
@@ -761,9 +764,13 @@ async function createBlobCoordination(
     imageWidth?: number;
     imageHeight?: number;
     lineCount?: number;
-  }
+  },
+  deviceId?: string
 ): Promise<void> {
   try {
+    // Use provided device ID from client, or fallback to "server" for server-side operations
+    const finalDeviceId = deviceId || "server";
+
     // Call the blob coordination API route (avoids importing React hooks on server)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(`${baseUrl}/api/writes/blobs`, {
@@ -777,7 +784,7 @@ async function createBlobCoordination(
         mime,
         filename,
         localPath,
-        deviceId: "server",
+        deviceId: finalDeviceId,
         pageCount: metadata.pageCount,
         imageWidth: metadata.imageWidth,
         imageHeight: metadata.imageHeight,
@@ -791,7 +798,7 @@ async function createBlobCoordination(
     }
 
     console.log(
-      `[CAS] Created Electric coordination for ${sha256.slice(0, 16)}... on device server`
+      `[CAS] Created Electric coordination for ${sha256.slice(0, 16)}... on device ${finalDeviceId.slice(0, 8)}...`
     );
   } catch (error) {
     console.error(
@@ -811,9 +818,13 @@ async function ensureBlobCoordination(
   size: number,
   mime: string,
   filename: string,
-  localPath: string
+  localPath: string,
+  deviceId?: string
 ): Promise<void> {
   try {
+    // Use provided device ID from client, or fallback to "server" for server-side operations
+    const finalDeviceId = deviceId || "server";
+
     // Call the blob coordination API route
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(`${baseUrl}/api/writes/blobs`, {
@@ -827,7 +838,7 @@ async function ensureBlobCoordination(
         mime,
         filename,
         localPath,
-        deviceId: "server",
+        deviceId: finalDeviceId,
       }),
     });
 
@@ -840,7 +851,7 @@ async function ensureBlobCoordination(
     }
 
     console.log(
-      `[CAS] Ensured Electric coordination for ${sha256.slice(0, 16)}...`
+      `[CAS] Ensured Electric coordination for ${sha256.slice(0, 16)}... on device ${finalDeviceId.slice(0, 8)}...`
     );
   } catch (error) {
     // Silently fail - this is a best-effort operation

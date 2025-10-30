@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 // Postgres tables (matches migrations)
 const POSTGRES_TABLES = [
@@ -22,51 +22,34 @@ const POSTGRES_TABLES = [
 
 export default function PostgresPage() {
   const [activeTab, setActiveTab] = useState<string>(POSTGRES_TABLES[0].key);
-  const [tableCounts, setTableCounts] = useState<Record<string, number>>({});
 
-  // Fetch counts for all tables using parallel queries
-  const countQueries = useQueries({
-    queries: POSTGRES_TABLES.map((table) => ({
-      queryKey: ["postgres-count", table.key],
-      queryFn: async () => {
-        try {
-          const data = await invoke<any[]>("query_postgres_table", {
-            table: table.key,
-          });
-          return data.length;
-        } catch (err) {
-          console.error(`Postgres count error for ${table.key}:`, err);
-          return 0;
-        }
-      },
-      staleTime: 1000 * 60 * 5, // 5 minutes
-    })),
-  });
-
-  // Update counts when queries complete
-  useEffect(() => {
-    const counts: Record<string, number> = {};
-    POSTGRES_TABLES.forEach((table, idx) => {
-      counts[table.key] = countQueries[idx].data ?? 0;
-    });
-    setTableCounts(counts);
-  }, [countQueries.map((q) => q.data).join(",")]);
-
-  // Fetch data for active table via Tauri command
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["postgres", activeTab],
+  // Fetch ALL tables in a single Tauri call (efficient!)
+  const {
+    data: allTablesData,
+    isLoading: allTablesLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["postgres-all"],
     queryFn: async () => {
-      try {
-        return await invoke<any[]>("query_postgres_table", {
-          table: activeTab,
-        });
-      } catch (err) {
-        console.error("Postgres query error:", err);
-        return [];
-      }
+      return await invoke<Record<string, any[]>>("query_all_postgres_tables");
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  // Get data and count for active tab
+  const data = allTablesData?.[activeTab] || [];
+  const isLoading = allTablesLoading;
+  const error = null;
+
+  // Create a map of table counts from the single fetch
+  const tableCounts = POSTGRES_TABLES.reduce(
+    (acc, table) => {
+      const count = allTablesData?.[table.key]?.length;
+      acc[table.key] = count !== undefined ? count : "...";
+      return acc;
+    },
+    {} as Record<string, number | string>
+  );
 
   const handleRefresh = () => {
     refetch();
