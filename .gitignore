@@ -7,6 +7,6 @@
 **/.pnpm-store/
 
 # Database files
-**/data/
+apps/**/data/
 /blobs/
 **/dist/
