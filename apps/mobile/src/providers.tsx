@@ -119,12 +119,12 @@ function ElectricInitializer() {
     );
     console.log(
       "[Mobile] Full API endpoint:",
-      `${apiBaseUrl}/api/writes/batch`
+      `${apiBaseUrl}/api/writes/batch/`
     );
 
     const worker = initFlushWorker({
       flushHandler: async (changes) => {
-        const endpoint = `${apiBaseUrl}/api/writes/batch`;
+        const endpoint = `${apiBaseUrl}/api/writes/batch/`; // Add trailing slash to match Next.js trailingSlash: true
         console.log(`[FlushWorker] Attempting fetch to: ${endpoint}`);
         try {
           const response = await fetch(endpoint, {
@@ -170,7 +170,7 @@ function ElectricInitializer() {
     workerRef.current = worker;
     console.log("[FlushWorker] Started (interval: 5000ms)");
     console.log(
-      `[FlushWorker] Using HTTP API for writes: ${apiBaseUrl}/api/writes/batch`
+      `[FlushWorker] Using HTTP API for writes: ${apiBaseUrl}/api/writes/batch/`
     );
 
     // Expose for debugging
