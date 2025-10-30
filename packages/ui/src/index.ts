@@ -138,6 +138,7 @@ export {
   type DexieGraphVisualizationOperations,
   type DexieGraphVisualizationProps,
 } from "./admin/DexieGraphVisualization";
+export { LogViewerButton, LogViewerDialog } from "./admin/LogViewer";
 
 // Whiteboard components (new architecture)
 export * from "./whiteboard";

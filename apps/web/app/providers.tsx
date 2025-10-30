@@ -6,6 +6,7 @@ import {
   initElectric,
   initFlushWorker,
   initializeDeviceId,
+  initConsoleLogger,
   usePresetsSync,
   useActivitiesSync,
   useAnnotationsSync,
@@ -27,6 +28,9 @@ import { configurePdfWorker } from "@deeprecall/pdf";
 // Configure PDF.js worker for Web platform
 if (typeof window !== "undefined") {
   configurePdfWorker("/pdf.worker.min.mjs");
+  // Initialize console logger for debugging (temporary)
+  initConsoleLogger();
+  console.log("[Web] Console logger initialized");
 
   // Initialize device ID on app startup (reliable persistence)
   initializeDeviceId().catch((error) => {

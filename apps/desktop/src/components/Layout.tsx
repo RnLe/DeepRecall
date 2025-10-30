@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { GPUIndicator } from "./indicators/GPUIndicator";
 import { PostgresIndicator } from "./indicators/PostgresIndicator";
 import { ElectricIndicator } from "./indicators/ElectricIndicator";
+import { LogViewerButton } from "@deeprecall/ui";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -111,6 +112,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
         {/* Status Indicators */}
         <div className="flex items-center gap-1 px-4 border-l border-gray-800 [app-region:no-drag]">
+          <LogViewerButton />
           <ElectricIndicator />
           <PostgresIndicator />
           <GPUIndicator />

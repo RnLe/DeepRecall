@@ -7,6 +7,7 @@ import { Link, Outlet } from "react-router-dom";
 import { GPUIndicator } from "./indicators/GPUIndicator";
 import { ElectricIndicator } from "./indicators/ElectricIndicator";
 import { PostgresIndicator } from "./indicators/PostgresIndicator";
+import { LogViewerButton } from "@deeprecall/ui";
 
 export function Layout() {
   return (
@@ -69,6 +70,7 @@ export function Layout() {
             </Link>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <LogViewerButton />
             <GPUIndicator />
             <ElectricIndicator />
             <PostgresIndicator />

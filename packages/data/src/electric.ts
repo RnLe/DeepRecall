@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * ElectricSQL client integration
  * Handles real-time sync of data from Postgres to local Dexie
