@@ -72,6 +72,7 @@ async function syncElectricToDexie(electricData: Collection[]): Promise<void> {
  */
 export function useCollectionsSync() {
   const electricResult = collectionsElectric.useCollections();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie
   useEffect(() => {
@@ -80,14 +81,19 @@ export function useCollectionsSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useCollectionsSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all collections queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["collections"] });
+        })
+        .catch((error) => {
+          console.error(
+            "[useCollectionsSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   // Cleanup synced collections
   useEffect(() => {

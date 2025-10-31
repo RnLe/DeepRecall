@@ -3,9 +3,21 @@
  * Emergency database wipe - clears ALL data from Postgres and SQLite CAS
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { clearDatabase } from "@/src/server/cas";
 import { getPostgresPool } from "@/app/api/lib/postgres";
+import {
+  handleCorsOptions,
+  checkCorsOrigin,
+  addCorsHeaders,
+} from "@/app/api/lib/cors";
+
+/**
+ * Handle OPTIONS request for CORS preflight
+ */
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsOptions(req);
+}
 
 // Postgres connection for admin operations
 async function clearPostgres() {
@@ -46,7 +58,11 @@ async function clearPostgres() {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  // Check CORS origin
+  const corsError = checkCorsOrigin(request);
+  if (corsError) return corsError;
+
   try {
     console.log("🚨 EMERGENCY DATABASE WIPE INITIATED");
 
@@ -60,7 +76,7 @@ export async function DELETE() {
     const tablesCleared = await clearPostgres();
     console.log("✅ Postgres database cleared");
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: "All databases cleared successfully",
       cleared: {
@@ -69,14 +85,16 @@ export async function DELETE() {
         tables: tablesCleared,
       },
     });
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("❌ Error clearing database:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         error: "Failed to clear database",
         details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
+    return addCorsHeaders(response, request);
   }
 }

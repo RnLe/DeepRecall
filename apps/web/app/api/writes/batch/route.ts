@@ -9,6 +9,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Pool, PoolClient } from "pg";
 import { createPostgresPool } from "@/app/api/lib/postgres";
+import {
+  handleCorsOptions,
+  checkCorsOrigin,
+  addCorsHeaders,
+} from "@/app/api/lib/cors";
 import { z } from "zod";
 import {
   WorkSchema,
@@ -28,39 +33,10 @@ import {
 } from "@deeprecall/core";
 
 /**
- * Allowed origins for CORS (mobile + web)
- */
-const ALLOW_ORIGINS = new Set([
-  "capacitor://localhost",
-  "ionic://localhost",
-  "http://localhost",
-  "http://localhost:3000",
-  "https://deeprecall-production.up.railway.app",
-  // Add your custom domain when you have one
-]);
-
-/**
- * Generate CORS headers for the given origin
- */
-function corsHeaders(origin: string) {
-  return {
-    "Access-Control-Allow-Origin": origin,
-    Vary: "Origin",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, authorization",
-    "Access-Control-Max-Age": "86400",
-  };
-}
-
-/**
  * Handle OPTIONS request for CORS preflight
  */
 export async function OPTIONS(req: NextRequest) {
-  const origin = req.headers.get("origin") ?? "";
-  if (!ALLOW_ORIGINS.has(origin)) {
-    return new NextResponse("Origin not allowed", { status: 403 });
-  }
-  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+  return handleCorsOptions(req);
 }
 
 /**
@@ -468,10 +444,8 @@ export async function POST(request: NextRequest) {
   console.log("[WritesBatch] API endpoint called!");
 
   // Check CORS origin
-  const origin = request.headers.get("origin") ?? "";
-  if (origin && !ALLOW_ORIGINS.has(origin)) {
-    return new NextResponse("Origin not allowed", { status: 403 });
-  }
+  const corsError = checkCorsOrigin(request);
+  if (corsError) return corsError;
 
   const { getPostgresPool } = await import("@/app/api/lib/postgres");
   const pool = getPostgresPool();
@@ -570,24 +544,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Return results
-    return NextResponse.json(
-      {
-        success: true,
-        applied: appliedIds,
-        responses: results,
-        errors: errors.length > 0 ? errors : undefined,
-      },
-      origin ? { headers: corsHeaders(origin) } : {}
-    );
+    const response = NextResponse.json({
+      success: true,
+      applied: appliedIds,
+      responses: results,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("[WritesBatch] Batch processing failed:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      origin ? { status: 500, headers: corsHeaders(origin) } : { status: 500 }
+      { status: 500 }
     );
+    return addCorsHeaders(response, request);
   }
   // NOTE: Don't call pool.end() - we're using a singleton pool that stays alive
 }

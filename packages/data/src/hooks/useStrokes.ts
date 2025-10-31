@@ -62,24 +62,31 @@ async function syncElectricToDexie(electricData: Stroke[]): Promise<void> {
  */
 export function useStrokesSync() {
   const electricResult = strokesElectric.useStrokes(undefined);
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
       // Note: Sync even with stale cache data - having stale data is better than no data
 
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useStrokesSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all strokes queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["strokes"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[useStrokesSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
   }, [
     electricResult.isLoading,
     electricResult.data,
     electricResult.isFreshData,
+    queryClient,
   ]);
 
   // Run cleanup when Electric confirms sync

@@ -77,6 +77,7 @@ async function syncElectricToDexie(electricData: Annotation[]): Promise<void> {
  */
 export function useAnnotationsSync() {
   const electricResult = annotationsElectric.useAnnotations();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie annotations table (for merge layer)
   useEffect(() => {
@@ -85,15 +86,20 @@ export function useAnnotationsSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useAnnotationsSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all annotations queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["annotations"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[useAnnotationsSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   // Run cleanup when Electric confirms sync
   useEffect(() => {

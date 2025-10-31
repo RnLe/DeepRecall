@@ -3,6 +3,8 @@
 > **Blueprint for implementing instant UI updates with background sync**
 >
 > Based on Annotations entity - applies to all entities (Works, Assets, Cards, etc.)
+>
+> **See also**: `GUIDE_CROSS_DEVICE_REACTIVITY.md` for enabling real-time updates across devices
 
 ## 🎯 Core Concept
 

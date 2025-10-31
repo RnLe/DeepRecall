@@ -72,6 +72,7 @@ async function syncElectricToDexie(electricData: ReviewLog[]): Promise<void> {
  */
 export function useReviewLogsSync() {
   const electricResult = useShape<ReviewLog>({ table: "review_logs" });
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie
   useEffect(() => {
@@ -80,14 +81,19 @@ export function useReviewLogsSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useReviewLogsSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all review logs queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["reviewLogs"] });
+        })
+        .catch((error) => {
+          console.error(
+            "[useReviewLogsSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   // Cleanup synced review logs
   useEffect(() => {

@@ -4,7 +4,7 @@
  */
 
 import type { ReplicationJob, ReplicationStatus } from "@deeprecall/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
 import { db } from "../db";
@@ -50,6 +50,7 @@ export function useReplicationJobsSync() {
   const electricResult = useShape<ReplicationJob>({
     table: "replication_jobs",
   });
+  const queryClient = useQueryClient();
 
   // Sync Electric → Dexie
   useEffect(() => {
@@ -58,14 +59,19 @@ export function useReplicationJobsSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        console.error(
-          "[useReplicationJobsSync] Failed to sync replication_jobs:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all replication jobs queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["replication-jobs"] });
+        })
+        .catch((error) => {
+          console.error(
+            "[useReplicationJobsSync] Failed to sync replication_jobs:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   return null;
 }

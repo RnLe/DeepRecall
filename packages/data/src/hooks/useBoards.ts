@@ -60,24 +60,31 @@ async function syncElectricToDexie(electricData: Board[]): Promise<void> {
  */
 export function useBoardsSync() {
   const electricResult = boardsElectric.useBoards();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
       // Note: Sync even with stale cache data - having stale data is better than no data
 
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useBoardsSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all boards queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["boards"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[useBoardsSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
   }, [
     electricResult.isLoading,
     electricResult.data,
     electricResult.isFreshData,
+    queryClient,
   ]);
 
   // Run cleanup when Electric confirms sync

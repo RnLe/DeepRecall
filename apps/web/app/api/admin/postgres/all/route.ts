@@ -3,8 +3,13 @@
  * Fetch all tables in a single request (efficient!)
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getPostgresPool } from "@/app/api/lib/postgres";
+import {
+  handleCorsOptions,
+  checkCorsOrigin,
+  addCorsHeaders,
+} from "@/app/api/lib/cors";
 
 // Valid Postgres table names
 const VALID_TABLES = [
@@ -24,7 +29,17 @@ const VALID_TABLES = [
   "strokes",
 ] as const;
 
-export async function GET() {
+/**
+ * Handle OPTIONS request for CORS preflight
+ */
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsOptions(req);
+}
+
+export async function GET(request: NextRequest) {
+  // Check CORS origin
+  const corsError = checkCorsOrigin(request);
+  if (corsError) return corsError;
   const pool = getPostgresPool();
   let client;
 
@@ -46,16 +61,18 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json(results);
+    const response = NextResponse.json(results);
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("Error fetching all Postgres data:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         error: "Failed to fetch data",
         details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
+    return addCorsHeaders(response, request);
   } finally {
     if (client) {
       client.release();

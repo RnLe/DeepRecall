@@ -8,8 +8,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { eq } from "drizzle-orm";
+import {
+  handleCorsOptions,
+  checkCorsOrigin,
+  addCorsHeaders,
+} from "@/app/api/lib/cors";
+
+/**
+ * Handle OPTIONS request for CORS preflight
+ */
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsOptions(req);
+}
 
 export async function POST(request: NextRequest) {
+  // Check CORS origin
+  const corsError = checkCorsOrigin(request);
+  if (corsError) return corsError;
   try {
     const { sha256, deviceId } = await request.json();
 
@@ -84,15 +99,16 @@ export async function POST(request: NextRequest) {
       `[SyncBlob] ✅ Synced blob ${sha256.slice(0, 16)} for device ${deviceId.slice(0, 8)}...`
     );
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       sha256: sha256,
     });
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("[SyncBlob] Error syncing blob:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         error: "Failed to sync blob",
         message: errorMessage,
@@ -100,5 +116,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+    return addCorsHeaders(response, request);
   }
 }

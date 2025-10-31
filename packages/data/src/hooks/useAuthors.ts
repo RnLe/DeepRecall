@@ -69,6 +69,7 @@ async function syncElectricToDexie(electricData: Author[]): Promise<void> {
  */
 export function useAuthorsSync() {
   const electricResult = authorsElectric.useAuthors();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie authors table (for merge layer)
   useEffect(() => {
@@ -77,15 +78,20 @@ export function useAuthorsSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useAuthorsSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all authors queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["authors"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[useAuthorsSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   // Run cleanup when Electric confirms sync
   useEffect(() => {

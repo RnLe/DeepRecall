@@ -11,6 +11,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import {
+  handleCorsOptions,
+  checkCorsOrigin,
+  addCorsHeaders,
+} from "@/app/api/lib/cors";
 
 // Avatar storage directory (relative to project root)
 const AVATAR_DIR = path.join(process.cwd(), "data", "avatars");
@@ -23,10 +28,20 @@ async function ensureAvatarDir() {
 }
 
 /**
+ * Handle OPTIONS request for CORS preflight
+ */
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsOptions(req);
+}
+
+/**
  * POST /api/avatars
  * Upload a new avatar
  */
 export async function POST(request: NextRequest) {
+  // Check CORS origin
+  const corsError = checkCorsOrigin(request);
+  if (corsError) return corsError;
   try {
     await ensureAvatarDir();
 
@@ -58,7 +73,7 @@ export async function POST(request: NextRequest) {
     await writeFile(originalPath, originalBuffer);
     await writeFile(displayPath, displayBuffer);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       paths: {
         original: `/api/avatars/${originalFilename}`,
@@ -66,12 +81,14 @@ export async function POST(request: NextRequest) {
       },
       cropRegion: JSON.parse(cropRegion),
     });
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("Failed to upload avatar:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "Failed to upload avatar" },
       { status: 500 }
     );
+    return addCorsHeaders(response, request);
   }
 }
 
@@ -80,6 +97,9 @@ export async function POST(request: NextRequest) {
  * Delete an avatar file
  */
 export async function DELETE(request: NextRequest) {
+  // Check CORS origin
+  const corsError = checkCorsOrigin(request);
+  if (corsError) return corsError;
   try {
     const url = new URL(request.url);
     const filepath = url.searchParams.get("path");
@@ -104,12 +124,14 @@ export async function DELETE(request: NextRequest) {
       await unlink(fullPath);
     }
 
-    return NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true });
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("Failed to delete avatar:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "Failed to delete avatar" },
       { status: 500 }
     );
+    return addCorsHeaders(response, request);
   }
 }

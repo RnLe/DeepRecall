@@ -12,6 +12,11 @@ import { eq } from "drizzle-orm";
 import { hashFile } from "@/src/server/hash";
 import { getMimeType } from "@/src/server/cas";
 import { stat } from "fs/promises";
+import {
+  handleCorsOptions,
+  checkCorsOrigin,
+  addCorsHeaders,
+} from "@/app/api/lib/cors";
 
 interface ResolutionRequest {
   mode: "user-selection" | "auto-resolve";
@@ -22,7 +27,17 @@ interface ResolutionRequest {
   }>;
 }
 
+/**
+ * Handle OPTIONS request for CORS preflight
+ */
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsOptions(req);
+}
+
 export async function POST(request: NextRequest) {
+  // Check CORS origin
+  const corsError = checkCorsOrigin(request);
+  if (corsError) return corsError;
   try {
     const body: ResolutionRequest = await request.json();
     const { mode, resolutions } = body;
@@ -143,13 +158,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       ...results,
     });
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("Duplicate resolution failed:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         error:
           error instanceof Error
@@ -158,5 +174,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+    return addCorsHeaders(response, request);
   }
 }

@@ -68,6 +68,7 @@ async function syncElectricToDexie(electricData: Edge[]): Promise<void> {
  */
 export function useEdgesSync() {
   const electricResult = edgesElectric.useEdges();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie
   useEffect(() => {
@@ -76,15 +77,20 @@ export function useEdgesSync() {
       electricResult.data !== undefined
       // Note: Sync even with stale cache data - having stale data is better than no data
     ) {
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[useEdgesSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all edges queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["edges"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[useEdgesSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
-  }, [electricResult.data, electricResult.isFreshData]);
+  }, [electricResult.data, electricResult.isFreshData, queryClient]);
 
   // Cleanup synced edges
   useEffect(() => {

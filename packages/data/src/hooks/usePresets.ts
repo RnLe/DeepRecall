@@ -70,24 +70,31 @@ async function syncElectricToDexie(electricData: Preset[]): Promise<void> {
  */
 export function usePresetsSync() {
   const electricResult = presetsElectric.usePresets();
+  const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie presets table (for merge layer)
   // Note: Sync even with stale cache data - having stale data is better than no data
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
       // Sync immediately, whether from cache or fresh from network
-      syncElectricToDexie(electricResult.data).catch((error) => {
-        if (error.name === "DatabaseClosedError") return;
-        console.error(
-          "[usePresetsSync] Failed to sync Electric data to Dexie:",
-          error
-        );
-      });
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate all presets queries to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["presets"] });
+        })
+        .catch((error) => {
+          if (error.name === "DatabaseClosedError") return;
+          console.error(
+            "[usePresetsSync] Failed to sync Electric data to Dexie:",
+            error
+          );
+        });
     }
   }, [
     electricResult.isLoading,
     electricResult.data,
     electricResult.isFreshData,
+    queryClient,
   ]);
 
   // Run cleanup when Electric confirms sync

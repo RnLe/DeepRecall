@@ -1,5 +1,7 @@
 # Blob Storage Unification Plan
 
+> Note: For production runtime, routing, CORS, and CI patterns, see also `GUIDE_RUNTIME_CONFIG_ROUTING_CORS.md` (concise deployment-focused companion).
+
 > **Goal**: Unify blob storage across Web, Desktop, and Mobile with metadata-driven architecture
 
 ## 🎉 Current Status: Phase 3 Complete! 🎉
