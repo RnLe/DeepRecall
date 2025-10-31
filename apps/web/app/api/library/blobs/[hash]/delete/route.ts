@@ -8,6 +8,7 @@ import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { eq } from "drizzle-orm";
 import { unlink } from "fs/promises";
+import { logger } from "@deeprecall/telemetry";
 
 export async function DELETE(
   request: NextRequest,
@@ -49,8 +50,16 @@ export async function DELETE(
     if (deleteFile && filePath) {
       try {
         await unlink(filePath);
+        logger.info("cas", "Blob deleted from filesystem", {
+          hash: hash.slice(0, 16),
+          path: filePath,
+        });
       } catch (error) {
-        console.error("Failed to delete file from disk:", error);
+        logger.error("cas", "Failed to delete blob file from disk", {
+          hash: hash.slice(0, 16),
+          path: filePath,
+          error: (error as Error).message,
+        });
         // Don't fail the whole operation if file delete fails
       }
     }
@@ -61,7 +70,10 @@ export async function DELETE(
       fileDeleted: deleteFile && filePath !== null,
     });
   } catch (error) {
-    console.error("Delete failed:", error);
+    logger.error("server.api", "Failed to delete blob", {
+      hash: (await params).hash.slice(0, 16),
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to delete blob" },
       { status: 500 }

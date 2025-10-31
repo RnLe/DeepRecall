@@ -24,6 +24,7 @@ import { NoteDetailModal } from "../NoteDetailModal";
 import { SimplePDFViewer } from "../../components/SimplePDFViewer";
 import { getRelativeTime } from "../../utils/date";
 import { useCreateAsset, useUpdateAsset } from "@deeprecall/data/hooks";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Operations Interface
@@ -168,7 +169,11 @@ export function NoteBranch({
       try {
         await onGroupUpdate(groupId, { viewMode: mode });
       } catch (error) {
-        console.error("Failed to save view mode:", error);
+        logger.error("ui", "Failed to save note group view mode", {
+          error,
+          groupId,
+          mode,
+        });
         // Revert on error
         setLocalViewMode(viewMode);
       }
@@ -184,7 +189,11 @@ export function NoteBranch({
       try {
         await onGroupUpdate(groupId, { columns: cols });
       } catch (error) {
-        console.error("Failed to save column count:", error);
+        logger.error("ui", "Failed to save note group column count", {
+          error,
+          groupId,
+          columns: cols,
+        });
         // Revert on error
         setLocalColumns(columns);
       }
@@ -214,7 +223,11 @@ export function NoteBranch({
         try {
           await onGroupUpdate(groupId, { width: localWidth });
         } catch (error) {
-          console.error("Failed to save width:", error);
+          logger.error("ui", "Failed to save note group width", {
+            error,
+            groupId,
+            width: localWidth,
+          });
         }
       }
     };
@@ -327,7 +340,11 @@ export function NoteBranch({
       // Reload notes
       onNotesChange();
     } catch (error) {
-      console.error("File upload failed:", error);
+      logger.error("ui", "Note file upload failed", {
+        error,
+        annotationId: annotation.id,
+        groupId,
+      });
       alert(
         `Upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
       );
@@ -605,7 +622,13 @@ function NoteCard({
       fetch(getBlobUrl(note.sha256))
         .then((res) => res.text())
         .then((text) => setMarkdownContent(text))
-        .catch((err) => console.error("Failed to load markdown:", err));
+        .catch((err) =>
+          logger.error("ui", "Failed to load markdown content for note", {
+            error: err,
+            noteId: note.id,
+            sha256: note.sha256,
+          })
+        );
     }
   }, [viewMode, isMarkdown, note.sha256, getBlobUrl]);
 

@@ -7,6 +7,7 @@ import type { Edge, Relation } from "@deeprecall/core";
 import { EdgeSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -48,7 +49,10 @@ export async function createEdgeLocal(
     payload: validated,
   });
 
-  console.log(`[EdgesLocal] Created edge ${edge.id} (pending sync)`);
+  logger.info("db.local", "Created edge (pending sync)", {
+    edgeId: edge.id,
+    relation,
+  });
   return validated;
 }
 
@@ -77,7 +81,7 @@ export async function updateEdgeLocal(
     payload: updated,
   });
 
-  console.log(`[EdgesLocal] Updated edge ${id} (pending sync)`);
+  logger.info("db.local", "Updated edge (pending sync)", { edgeId: id });
 }
 
 /**
@@ -100,5 +104,5 @@ export async function deleteEdgeLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[EdgesLocal] Deleted edge ${id} (pending sync)`);
+  logger.info("db.local", "Deleted edge (pending sync)", { edgeId: id });
 }

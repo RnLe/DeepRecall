@@ -8,6 +8,7 @@ import type { ReplicationJob, ReplicationStatus } from "@deeprecall/core";
 import { ReplicationJobSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get all replication jobs
@@ -83,9 +84,11 @@ export async function createReplicationJob(
     op: "insert",
     payload: validated,
   });
-  console.log(
-    `[ReplicationJobsRepo] Created replication job ${replicationJob.id} for ${replicationJob.sha256} (enqueued)`
-  );
+  logger.info("sync.coordination", "Created replication job (enqueued)", {
+    jobId: replicationJob.id,
+    sha256: replicationJob.sha256.slice(0, 16),
+    toDestination: replicationJob.toDestination,
+  });
   return validated;
 }
 
@@ -102,7 +105,10 @@ export async function updateReplicationJob(
     op: "update",
     payload: updated,
   });
-  console.log(`[ReplicationJobsRepo] Updated replication job ${id} (enqueued)`);
+  logger.info("sync.coordination", "Updated replication job (enqueued)", {
+    jobId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -114,7 +120,9 @@ export async function deleteReplicationJob(id: string): Promise<void> {
     op: "delete",
     payload: { id },
   });
-  console.log(`[ReplicationJobsRepo] Deleted replication job ${id} (enqueued)`);
+  logger.info("sync.coordination", "Deleted replication job (enqueued)", {
+    jobId: id,
+  });
 }
 
 /**

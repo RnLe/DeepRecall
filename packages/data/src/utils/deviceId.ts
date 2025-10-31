@@ -12,6 +12,8 @@
  * This ensures device IDs survive cache clears and app reinstalls.
  */
 
+import { logger } from "@deeprecall/telemetry";
+
 const DEVICE_ID_KEY = "deeprecall:deviceId";
 const DEVICE_NAME_KEY = "deeprecall:deviceName";
 const DEVICE_TYPE_KEY = "deeprecall:deviceType";
@@ -56,7 +58,7 @@ async function getDeviceIdFromIndexedDB(): Promise<string | null> {
       };
     });
   } catch (error) {
-    console.error("[DeviceID] Failed to read from IndexedDB:", error);
+    logger.error("ui", "[DeviceID] Failed to read from IndexedDB", { error });
     return null;
   }
 }
@@ -92,7 +94,7 @@ async function saveDeviceIdToIndexedDB(deviceId: string): Promise<void> {
       };
     });
   } catch (error) {
-    console.error("[DeviceID] Failed to save to IndexedDB:", error);
+    logger.error("ui", "[DeviceID] Failed to save to IndexedDB", { error });
   }
 }
 
@@ -118,7 +120,7 @@ async function getDeviceIdFromPlatformStorage(): Promise<string | null> {
       const deviceId = await store.get(DEVICE_ID_KEY);
       return (deviceId as string) || null;
     } catch (error) {
-      console.error("[DeviceID] Tauri store not available:", error);
+      logger.error("ui", "[DeviceID] Tauri store not available", { error });
       return null;
     }
   }
@@ -135,7 +137,9 @@ async function getDeviceIdFromPlatformStorage(): Promise<string | null> {
       const { value } = await Preferences.get({ key: DEVICE_ID_KEY });
       return value;
     } catch (error) {
-      console.error("[DeviceID] Capacitor Preferences not available:", error);
+      logger.error("ui", "[DeviceID] Capacitor Preferences not available", {
+        error,
+      });
       return null;
     }
   }
@@ -150,7 +154,7 @@ async function getDeviceIdFromPlatformStorage(): Promise<string | null> {
   if (indexedDBId) {
     // Restore to localStorage for faster access
     localStorage.setItem(DEVICE_ID_KEY, indexedDBId);
-    console.log("[DeviceID] Restored from IndexedDB to localStorage");
+    logger.info("ui", "[DeviceID] Restored from IndexedDB to localStorage");
   }
 
   return indexedDBId;
@@ -180,10 +184,10 @@ async function saveDeviceIdToPlatformStorage(
       await store.set(DEVICE_ID_KEY, deviceId);
       await store.set(DEVICE_NAME_KEY, deviceName);
       await store.save();
-      console.log("[DeviceID] Saved to Tauri store");
+      logger.info("ui", "[DeviceID] Saved to Tauri store");
       return;
     } catch (error) {
-      console.error("[DeviceID] Failed to save to Tauri store:", error);
+      logger.error("ui", "[DeviceID] Failed to save to Tauri store", { error });
     }
   }
 
@@ -198,13 +202,12 @@ async function saveDeviceIdToPlatformStorage(
       );
       await Preferences.set({ key: DEVICE_ID_KEY, value: deviceId });
       await Preferences.set({ key: DEVICE_NAME_KEY, value: deviceName });
-      console.log("[DeviceID] Saved to Capacitor Preferences");
+      logger.info("ui", "[DeviceID] Saved to Capacitor Preferences");
       return;
     } catch (error) {
-      console.error(
-        "[DeviceID] Failed to save to Capacitor Preferences:",
-        error
-      );
+      logger.error("ui", "[DeviceID] Failed to save to Capacitor Preferences", {
+        error,
+      });
     }
   }
 
@@ -212,7 +215,7 @@ async function saveDeviceIdToPlatformStorage(
   localStorage.setItem(DEVICE_ID_KEY, deviceId);
   localStorage.setItem(DEVICE_NAME_KEY, deviceName);
   await saveDeviceIdToIndexedDB(deviceId);
-  console.log("[DeviceID] Saved to localStorage + IndexedDB");
+  logger.info("ui", "[DeviceID] Saved to localStorage + IndexedDB");
 }
 
 /**
@@ -241,7 +244,7 @@ export async function getDeviceIdAsync(): Promise<string> {
     // Save to platform storage
     await saveDeviceIdToPlatformStorage(deviceId, defaultName);
 
-    console.log(`[DeviceID] Generated new device ID: ${deviceId}`);
+    logger.info("ui", `[DeviceID] Generated new device ID: ${deviceId}`);
   }
 
   // Cache for subsequent calls
@@ -276,7 +279,8 @@ export function getDeviceId(): string {
   localStorage.setItem(DEVICE_ID_KEY, newDeviceId);
   cachedDeviceId = newDeviceId;
 
-  console.warn(
+  logger.warn(
+    "ui",
     "[DeviceID] Generated device ID synchronously - may not persist. Use getDeviceIdAsync() for reliable persistence."
   );
 
@@ -329,9 +333,10 @@ export async function getDeviceNameAsync(): Promise<string> {
         return name as string;
       }
     } catch (error) {
-      console.error(
-        "[DeviceID] Failed to read device name from Tauri store:",
-        error
+      logger.error(
+        "ui",
+        "[DeviceID] Failed to read device name from Tauri store",
+        { error }
       );
     }
   }
@@ -351,9 +356,10 @@ export async function getDeviceNameAsync(): Promise<string> {
         return value;
       }
     } catch (error) {
-      console.error(
-        "[DeviceID] Failed to read device name from Capacitor:",
-        error
+      logger.error(
+        "ui",
+        "[DeviceID] Failed to read device name from Capacitor",
+        { error }
       );
     }
   }
@@ -369,7 +375,7 @@ export async function getDeviceNameAsync(): Promise<string> {
  */
 export async function setDeviceName(name: string): Promise<void> {
   if (typeof window === "undefined") {
-    console.warn("[DeviceID] Cannot set device name on server");
+    logger.warn("ui", "[DeviceID] Cannot set device name on server");
     return;
   }
 
@@ -388,12 +394,16 @@ export async function setDeviceName(name: string): Promise<void> {
       const store = new Store(".device.dat");
       await store.set(DEVICE_NAME_KEY, name);
       await store.save();
-      console.log(`[DeviceID] Updated device name to: ${name} (Tauri store)`);
+      logger.info(
+        "ui",
+        `[DeviceID] Updated device name to: ${name} (Tauri store)`
+      );
       return;
     } catch (error) {
-      console.error(
-        "[DeviceID] Failed to save device name to Tauri store:",
-        error
+      logger.error(
+        "ui",
+        "[DeviceID] Failed to save device name to Tauri store",
+        { error }
       );
     }
   }
@@ -408,19 +418,24 @@ export async function setDeviceName(name: string): Promise<void> {
         /* webpackIgnore: true */ modulePath as any
       );
       await Preferences.set({ key: DEVICE_NAME_KEY, value: name });
-      console.log(`[DeviceID] Updated device name to: ${name} (Capacitor)`);
+      logger.info(
+        "ui",
+        `[DeviceID] Updated device name to: ${name} (Capacitor)`
+      );
       return;
     } catch (error) {
-      console.error(
-        "[DeviceID] Failed to save device name to Capacitor:",
-        error
-      );
+      logger.error("ui", "[DeviceID] Failed to save device name to Capacitor", {
+        error,
+      });
     }
   }
 
   // Web: Save to localStorage
   localStorage.setItem(DEVICE_NAME_KEY, name);
-  console.log(`[DeviceID] Updated device name to: ${name} (localStorage)`);
+  logger.info(
+    "ui",
+    `[DeviceID] Updated device name to: ${name} (localStorage)`
+  );
 }
 
 /**
@@ -491,12 +506,13 @@ export async function getDeviceInfoAsync(): Promise<DeviceInfo> {
  * import { initializeDeviceId } from "@deeprecall/data";
  *
  * initializeDeviceId().then(() => {
- *   console.log("Device ID initialized");
+ *   logger.info("ui", "Device ID initialized");
  * });
  */
 export async function initializeDeviceId(): Promise<DeviceInfo> {
   const info = await getDeviceInfoAsync();
-  console.log(
+  logger.info(
+    "ui",
     `[DeviceID] Initialized - ID: ${info.id}, Name: ${info.name}, Type: ${info.type}`
   );
   return info;
@@ -508,13 +524,14 @@ export async function initializeDeviceId(): Promise<DeviceInfo> {
  */
 export function resetDeviceId(): void {
   if (typeof window === "undefined") {
-    console.warn("[DeviceID] Cannot reset device ID on server");
+    logger.warn("ui", "[DeviceID] Cannot reset device ID on server");
     return;
   }
 
   localStorage.removeItem(DEVICE_ID_KEY);
   localStorage.removeItem(DEVICE_NAME_KEY);
-  console.log(
+  logger.info(
+    "ui",
     "[DeviceID] Device ID reset - will generate new ID on next access"
   );
 }

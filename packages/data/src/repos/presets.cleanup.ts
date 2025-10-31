@@ -12,6 +12,7 @@
 
 import { db } from "../db";
 import type { Preset } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 
 // Debounce cleanup to prevent redundant runs
 let cleanupTimer: NodeJS.Timeout | null = null;
@@ -72,7 +73,9 @@ async function _cleanupSyncedPresetsInternal(
         if (isSynced) {
           await db.presets_local.where("id").equals(local.id).delete();
           cleanedCount++;
-          console.log(`[Cleanup] Confirmed insert for preset ${local.id}`);
+          logger.debug("db.local", "Cleanup: Confirmed insert", {
+            presetId: local.id,
+          });
         }
         break;
 
@@ -89,7 +92,9 @@ async function _cleanupSyncedPresetsInternal(
             if (syncedTime >= localTime) {
               await db.presets_local.where("id").equals(local.id).delete();
               cleanedCount++;
-              console.log(`[Cleanup] Confirmed update for preset ${local.id}`);
+              logger.debug("db.local", "Cleanup: Confirmed update", {
+                presetId: local.id,
+              });
             }
           }
         }
@@ -100,14 +105,18 @@ async function _cleanupSyncedPresetsInternal(
         if (!isSynced) {
           await db.presets_local.where("id").equals(local.id).delete();
           cleanedCount++;
-          console.log(`[Cleanup] Confirmed delete for preset ${local.id}`);
+          logger.debug("db.local", "Cleanup: Confirmed delete", {
+            presetId: local.id,
+          });
         }
         break;
     }
   }
 
   if (cleanedCount > 0) {
-    console.log(`✅ [Cleanup] Removed ${cleanedCount} confirmed local changes`);
+    logger.info("db.local", "Cleanup: Removed confirmed changes", {
+      count: cleanedCount,
+    });
   }
 }
 
@@ -131,9 +140,9 @@ export async function cleanupOldErrors(): Promise<void> {
       .and((change) => change._timestamp < sevenDaysAgo)
       .delete();
 
-    console.log(
-      `🗑️ [Cleanup] Removed ${oldErrors.length} old error records (>7 days)`
-    );
+    logger.info("db.local", "Cleanup: Removed old errors", {
+      count: oldErrors.length,
+    });
   }
 }
 
@@ -145,6 +154,6 @@ export async function forceCleanupAll(): Promise<void> {
     .where("_status")
     .equals("synced")
     .delete();
-  console.log(`[Cleanup] Force removed ${count} synced records`);
+  logger.info("db.local", "Cleanup: Force removed synced", { count });
   return;
 }

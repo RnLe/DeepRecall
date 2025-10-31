@@ -23,6 +23,7 @@ import {
   Network,
 } from "lucide-react";
 import type { BlobWithMetadata } from "@deeprecall/blob-storage";
+import { logger } from "@deeprecall/telemetry";
 
 interface DuplicateGroup {
   hash: string;
@@ -358,7 +359,7 @@ export function CASPanel({
         onRefresh();
       }
     } catch (error) {
-      console.error("Rescan failed:", error);
+      logger.error("ui", "Rescan failed", { error });
       alert(
         "Rescan failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -376,7 +377,7 @@ export function CASPanel({
       await operations.syncToElectric();
       // No need to show success message or refresh - optimistic updates handle it!
     } catch (error) {
-      console.error("Sync failed:", error);
+      logger.error("ui", "Sync failed", { error });
       alert(
         "Sync failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -399,7 +400,7 @@ export function CASPanel({
       await operations.clearDatabase();
       onRefresh();
     } catch (error) {
-      console.error("Clear failed:", error);
+      logger.error("ui", "Clear failed", { error });
       alert(
         "Clear failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -426,7 +427,7 @@ export function CASPanel({
       await operations.deleteBlob(blob.sha256);
       onRefresh();
     } catch (error) {
-      console.error("Delete failed:", error);
+      logger.error("ui", "Delete failed", { error, hash: blob.sha256 });
       alert(
         "Delete failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -467,7 +468,7 @@ export function CASPanel({
       onRefresh();
       setEditingHash(null);
     } catch (error) {
-      console.error("Rename failed:", error);
+      logger.error("ui", "Rename failed", { error, hash: blob.sha256 });
       alert(
         "Rename failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -490,7 +491,7 @@ export function CASPanel({
       setDuplicates([]);
       onRefresh();
     } catch (error) {
-      console.error("Duplicate resolution failed:", error);
+      logger.error("ui", "Duplicate resolution failed", { error, mode });
       alert(
         "Duplicate resolution failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -512,7 +513,11 @@ export function CASPanel({
         const content = await operations.fetchBlobContent(blob.sha256);
         setViewingMarkdown({ blob, content });
       } catch (error) {
-        console.error("Failed to load markdown:", error);
+        logger.error("ui", "Failed to load markdown", {
+          error,
+          hash: blob.sha256,
+          filename: blob.filename,
+        });
         alert("Failed to load markdown file");
       }
     }

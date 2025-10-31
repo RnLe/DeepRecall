@@ -5,6 +5,7 @@
 
 import type { Annotation } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 let cleanupTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -45,9 +46,9 @@ export async function cleanupSyncedAnnotations(
     }
 
     if (deletedCount > 0) {
-      console.log(
-        `[AnnotationsCleanup] Cleaned up ${deletedCount} synced change(s)`
-      );
+      logger.info("db.local", "Cleanup: Removed confirmed changes", {
+        count: deletedCount,
+      });
     }
   }, 100);
 }
@@ -65,8 +66,8 @@ export async function cleanupOldErrors(): Promise<void> {
 
   if (errorChanges.length > 0) {
     await db.annotations_local.bulkDelete(errorChanges.map((c) => c._localId!));
-    console.log(
-      `[AnnotationsCleanup] Cleaned up ${errorChanges.length} old error(s)`
-    );
+    logger.info("db.local", "Cleanup: Removed old errors", {
+      count: errorChanges.length,
+    });
   }
 }

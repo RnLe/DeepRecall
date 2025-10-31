@@ -5,6 +5,7 @@
  */
 
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Clean up local changes that have been synced
@@ -25,9 +26,9 @@ export async function cleanupStrokesLocal(syncedIds: string[]): Promise<void> {
 
   if (toDelete.length > 0) {
     await db.strokes_local.bulkDelete(toDelete);
-    console.log(
-      `[Strokes Cleanup] Removed ${toDelete.length} synced change(s)`
-    );
+    logger.info("ink", "Cleanup: Removed synced changes", {
+      count: toDelete.length,
+    });
   }
 }
 
@@ -43,8 +44,8 @@ export async function cleanupAllSyncedStrokes(): Promise<void> {
   if (synced.length > 0) {
     const ids = synced.map((c) => c._localId!).filter((id) => id !== undefined);
     await db.strokes_local.bulkDelete(ids);
-    console.log(
-      `[Strokes Cleanup] Removed ${ids.length} synced local change(s)`
-    );
+    logger.info("ink", "Cleanup: Removed synced local changes", {
+      count: ids.length,
+    });
   }
 }

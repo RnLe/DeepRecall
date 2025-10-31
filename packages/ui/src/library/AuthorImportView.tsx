@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import type { Author } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 
 interface ParsedAuthor {
   firstName: string;
@@ -80,7 +81,9 @@ export function AuthorImportView({
         }, 1000);
       }
     } catch (error) {
-      console.error("Failed to import:", error);
+      logger.error("ui", "Failed to import authors from BibTeX", {
+        error,
+      });
       alert("Failed to import authors. Please check the BibTeX format.");
     } finally {
       setIsImporting(false);

@@ -12,6 +12,7 @@ import * as reviewLogsMerged from "../repos/reviewLogs.merged";
 import * as reviewLogsCleanup from "../repos/reviewLogs.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -41,22 +42,27 @@ async function syncElectricToDexie(electricData: ReviewLog[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.reviewLogs.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale review log(s)`
-      );
+      logger.info("sync.electric", "Deleted stale review logs from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.reviewLogs.bulkPut(electricData);
-      console.log(
-        `[Electric→Dexie] Synced ${electricData.length} review log(s)`
+      logger.info(
+        "sync.electric",
+        "Synced review logs from Electric to Dexie",
+        {
+          count: electricData.length,
+        }
       );
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] ReviewLogs table cleared (0 rows)`);
+      logger.info("sync.electric", "ReviewLogs table cleared", { count: 0 });
     }
   });
 }
@@ -87,10 +93,9 @@ export function useReviewLogsSync() {
           queryClient.invalidateQueries({ queryKey: ["reviewLogs"] });
         })
         .catch((error) => {
-          console.error(
-            "[useReviewLogsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync review logs to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -147,16 +152,16 @@ export function useCreateReviewLog() {
       return reviewLogsLocal.createReviewLogLocal(log);
     },
     onSuccess: (newLog: ReviewLog) => {
-      console.log(
-        `✅ [useCreateReviewLog] Created review log ${newLog.id} (pending sync)`
-      );
+      logger.info("srs", "Created review log locally (pending sync)", {
+        logId: newLog.id,
+        cardId: newLog.card_id,
+      });
       queryClient.invalidateQueries({ queryKey: ["reviewLogs", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useCreateReviewLog] Failed to create review log:",
-        error
-      );
+      logger.error("srs", "Failed to create review log", {
+        error: error.message,
+      });
     },
   });
 }
@@ -174,16 +179,15 @@ export function useDeleteReviewLog() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(
-        `✅ [useDeleteReviewLog] Deleted review log ${id} (pending sync)`
-      );
+      logger.info("srs", "Deleted review log locally (pending sync)", {
+        logId: id,
+      });
       queryClient.invalidateQueries({ queryKey: ["reviewLogs", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useDeleteReviewLog] Failed to delete review log:",
-        error
-      );
+      logger.error("srs", "Failed to delete review log", {
+        error: error.message,
+      });
     },
   });
 }

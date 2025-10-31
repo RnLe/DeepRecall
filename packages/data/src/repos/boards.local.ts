@@ -9,6 +9,7 @@ import { db } from "../db";
 import { BoardSchema, type Board } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "@deeprecall/telemetry";
 
 export interface LocalBoardChange {
   _localId?: number;
@@ -46,7 +47,7 @@ export async function createBoardLocal(
   };
 
   await db.boards_local.add(change);
-  console.log(`[Board Local] Created board locally: ${board.id}`);
+  logger.info("whiteboard", "Created board locally", { boardId: board.id });
 
   // 2. Enqueue for background sync
   await buffer.enqueue({
@@ -95,7 +96,10 @@ export async function updateBoardLocal(
   };
 
   await db.boards_local.add(change);
-  console.log(`[Board Local] Updated board locally: ${id}`);
+  logger.info("whiteboard", "Updated board locally", {
+    boardId: id,
+    fields: Object.keys(updates),
+  });
 
   // 2. Enqueue for background sync
   await buffer.enqueue({
@@ -118,7 +122,7 @@ export async function deleteBoardLocal(id: string): Promise<void> {
   };
 
   await db.boards_local.add(change);
-  console.log(`[Board Local] Deleted board locally: ${id}`);
+  logger.info("whiteboard", "Deleted board locally", { boardId: id });
 
   // 2. Enqueue for background sync
   await buffer.enqueue({

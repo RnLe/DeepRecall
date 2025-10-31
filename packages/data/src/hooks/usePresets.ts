@@ -13,6 +13,7 @@ import * as presetsCleanup from "../repos/presets.cleanup";
 import { DEFAULT_PRESET_NAMES } from "../repos/presets.default";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -40,20 +41,23 @@ async function syncElectricToDexie(electricData: Preset[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.presets.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale preset(s)`
-      );
+      logger.info("sync.electric", "Deleted stale presets from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.presets.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} preset(s)`);
+      logger.info("sync.electric", "Synced presets from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Presets table cleared (0 rows)`);
+      logger.info("sync.electric", "Presets table cleared", { count: 0 });
     }
   });
 }
@@ -84,10 +88,9 @@ export function usePresetsSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[usePresetsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync presets to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [
@@ -108,7 +111,9 @@ export function usePresetsSync() {
         .cleanupSyncedPresets(electricResult.data)
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error("[usePresetsSync] Failed to cleanup:", error);
+          logger.error("db.local", "Failed to cleanup presets", {
+            error: error.message,
+          });
         });
     }
   }, [
@@ -280,8 +285,10 @@ export function useInitializePresets() {
     onSuccess: () => {
       // Invalidate merged queries to show new presets immediately
       queryClient.invalidateQueries({ queryKey: ["presets", "merged"] });
-      console.log(
-        "[useInitializePresets] Preset initialization complete (syncing in background)"
+      logger.info(
+        "db.local",
+        "Preset initialization complete (syncing in background)",
+        {}
       );
     },
   });

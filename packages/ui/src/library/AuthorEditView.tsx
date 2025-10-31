@@ -9,6 +9,7 @@ import { Save, Trash2, Camera, BookOpen } from "lucide-react";
 import type { Author } from "@deeprecall/core";
 import { AuthorFormFields, type AuthorFormData } from "./AuthorFormFields";
 import { AuthorAvatar } from "./AuthorAvatar";
+import { logger } from "@deeprecall/telemetry";
 
 interface Work {
   id: string;
@@ -125,7 +126,10 @@ export function AuthorEditView({
       alert("Author updated successfully!");
       onBack();
     } catch (error) {
-      console.error("Failed to update author:", error);
+      logger.error("ui", "Failed to update author", {
+        error,
+        authorId: author.id,
+      });
       alert("Failed to update author. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -152,7 +156,10 @@ export function AuthorEditView({
         alert("Author deleted successfully!");
         onBack();
       } catch (error) {
-        console.error("Failed to delete author:", error);
+        logger.error("ui", "Failed to delete author", {
+          error,
+          authorId: author.id,
+        });
         alert("Failed to delete author. Please try again.");
       }
     }
@@ -172,7 +179,10 @@ export function AuthorEditView({
         },
       });
     } catch (error) {
-      console.error("Failed to remove avatar:", error);
+      logger.error("ui", "Failed to remove avatar", {
+        error,
+        authorId: author.id,
+      });
       alert("Failed to remove avatar. Please try again.");
     }
   };

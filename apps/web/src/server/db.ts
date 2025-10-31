@@ -11,6 +11,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import path from "path";
 import fs from "fs";
 import * as schema from "./schema";
+import { logger } from "@deeprecall/telemetry";
 
 // Lazy initialization to prevent native module loading during Edge instrumentation
 let _db: BetterSQLite3Database<typeof schema> | null = null;
@@ -24,7 +25,7 @@ let _sqlite: Database.Database | null = null;
 export function getDB(): BetterSQLite3Database<typeof schema> {
   if (_db) return _db;
 
-  console.log("Initializing SQLite database...");
+  logger.info("server.api", "Initializing SQLite database");
 
   // Lazy import of native module
   const Database = require("better-sqlite3");
@@ -55,9 +56,14 @@ export function getDB(): BetterSQLite3Database<typeof schema> {
     migrate(drizzleDb, {
       migrationsFolder: path.join(process.cwd(), "drizzle"),
     });
-    console.log("Database initialized and migrated");
+    logger.info("server.api", "Database initialized and migrated", {
+      dbPath: DB_PATH,
+    });
   } catch (error) {
-    console.error("Database migration failed:", error);
+    logger.error("server.api", "Database migration failed", {
+      error: error instanceof Error ? error.message : String(error),
+      dbPath: DB_PATH,
+    });
     // Don't throw - let the app start, migrations might already be applied
   }
 
@@ -87,9 +93,11 @@ export function initDB() {
     migrate(dbInstance, {
       migrationsFolder: path.join(process.cwd(), "drizzle"),
     });
-    console.log("Database initialized");
+    logger.info("server.api", "Database initialized");
   } catch (error) {
-    console.error("Database initialization failed:", error);
+    logger.error("server.api", "Database initialization failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }

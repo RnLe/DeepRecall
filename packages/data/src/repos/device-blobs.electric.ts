@@ -8,6 +8,7 @@ import type { DeviceBlob } from "@deeprecall/core";
 import { DeviceBlobSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get all device blob records
@@ -68,9 +69,11 @@ export async function createDeviceBlob(
     op: "insert",
     payload: validated,
   });
-  console.log(
-    `[DeviceBlobsRepo] Created device blob ${deviceBlob.id} for ${deviceBlob.sha256} on ${deviceBlob.deviceId} (enqueued)`
-  );
+  logger.info("sync.coordination", "Created device blob (enqueued)", {
+    deviceBlobId: deviceBlob.id,
+    sha256: deviceBlob.sha256.slice(0, 16),
+    deviceId: deviceBlob.deviceId,
+  });
   return validated;
 }
 
@@ -87,7 +90,10 @@ export async function updateDeviceBlob(
     op: "update",
     payload: updated,
   });
-  console.log(`[DeviceBlobsRepo] Updated device blob ${id} (enqueued)`);
+  logger.info("sync.coordination", "Updated device blob (enqueued)", {
+    deviceBlobId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -99,7 +105,9 @@ export async function deleteDeviceBlob(id: string): Promise<void> {
     op: "delete",
     payload: { id },
   });
-  console.log(`[DeviceBlobsRepo] Deleted device blob ${id} (enqueued)`);
+  logger.info("sync.coordination", "Deleted device blob (enqueued)", {
+    deviceBlobId: id,
+  });
 }
 
 /**
@@ -130,7 +138,12 @@ export async function markBlobUnavailable(
 ): Promise<void> {
   // We can't query from here, so we'd need to pass the ID
   // This is a convenience that should be called from a component with the ID
-  console.warn(
-    `[DeviceBlobsRepo] markBlobUnavailable requires looking up the device blob ID first`
+  logger.warn(
+    "sync.coordination",
+    "markBlobUnavailable requires device blob ID lookup",
+    {
+      sha256: sha256.slice(0, 16),
+      deviceId,
+    }
   );
 }

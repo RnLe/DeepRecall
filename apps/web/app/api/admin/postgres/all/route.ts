@@ -10,6 +10,7 @@ import {
   checkCorsOrigin,
   addCorsHeaders,
 } from "@/app/api/lib/cors";
+import { logger } from "@deeprecall/telemetry";
 
 // Valid Postgres table names
 const VALID_TABLES = [
@@ -56,7 +57,10 @@ export async function GET(request: NextRequest) {
         );
         results[tableName] = result.rows;
       } catch (error) {
-        console.error(`Error fetching ${tableName}:`, error);
+        logger.error("db.postgres", "Failed to fetch table in batch query", {
+          table: tableName,
+          error: (error as Error).message,
+        });
         results[tableName] = [];
       }
     }
@@ -64,7 +68,9 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.json(results);
     return addCorsHeaders(response, request);
   } catch (error) {
-    console.error("Error fetching all Postgres data:", error);
+    logger.error("server.api", "Failed to fetch all Postgres tables", {
+      error: (error as Error).message,
+    });
     const response = NextResponse.json(
       {
         error: "Failed to fetch data",

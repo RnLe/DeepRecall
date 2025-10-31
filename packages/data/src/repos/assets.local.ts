@@ -14,6 +14,7 @@ import { db } from "../db";
 import { AssetSchema, type Asset } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Local change record with sync metadata
@@ -63,7 +64,10 @@ export async function createAssetLocal(
     payload: asset,
   });
 
-  console.log(`[Local] Created asset ${asset.id} (pending sync)`);
+  logger.info("db.local", "Created asset (pending sync)", {
+    assetId: asset.id,
+    workId: asset.workId,
+  });
   return asset;
 }
 
@@ -95,7 +99,10 @@ export async function updateAssetLocal(
     payload: { id, ...updatedData },
   });
 
-  console.log(`[Local] Updated asset ${id} (pending sync)`);
+  logger.info("db.local", "Updated asset (pending sync)", {
+    assetId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -117,7 +124,7 @@ export async function deleteAssetLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[Local] Deleted asset ${id} (pending sync)`);
+  logger.info("db.local", "Deleted asset (pending sync)", { assetId: id });
 }
 
 /**
@@ -132,7 +139,7 @@ export async function getLocalAssetChanges(): Promise<LocalAssetChange[]> {
  */
 export async function markAssetSynced(id: string): Promise<void> {
   await db.assets_local.where("id").equals(id).delete();
-  console.log(`[Local] Cleaned up synced asset ${id}`);
+  logger.debug("db.local", "Cleaned up synced asset", { assetId: id });
 }
 
 /**
@@ -146,5 +153,5 @@ export async function markAssetSyncFailed(
     _status: "error",
     _error: error,
   });
-  console.warn(`[Local] Asset ${id} sync failed: ${error}`);
+  logger.warn("db.local", "Asset sync failed", { assetId: id, error });
 }

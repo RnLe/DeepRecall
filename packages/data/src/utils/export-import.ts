@@ -11,6 +11,7 @@ import type {
   ImportResult,
   ExportOptions,
 } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Export all Dexie data to JSON (platform-agnostic)
@@ -82,7 +83,7 @@ export async function importDexieData(
 
   if (strategy === "replace") {
     // For replace strategy: clear synced tables first
-    console.log("[Import] Replace strategy: clearing existing data...");
+    logger.info("ui", "[Import] Replace strategy: clearing existing data...");
     await db.transaction(
       "rw",
       [
@@ -116,7 +117,8 @@ export async function importDexieData(
   // 1. Works (no dependencies)
   // 2. Assets (depends on Works)
   // 3. Other entities
-  console.log(
+  logger.info(
+    "ui",
     "[Import] Importing data with preserved IDs in dependency order..."
   );
 
@@ -130,7 +132,7 @@ export async function importDexieData(
       // Write directly to synced Dexie table (instant UI)
       const table = (db as any)[dexieTable];
       if (!table) {
-        console.warn(`[Import] Unknown Dexie table: ${dexieTable}`);
+        logger.warn("ui", `[Import] Unknown Dexie table: ${dexieTable}`);
         return false;
       }
 
@@ -150,9 +152,10 @@ export async function importDexieData(
 
       return true;
     } catch (error) {
-      console.warn(
-        `[Import] Failed to import ${dexieTable} ${entity.id}:`,
-        error
+      logger.warn(
+        "ui",
+        `[Import] Failed to import ${dexieTable} ${entity.id}`,
+        { error }
       );
       return false;
     }
@@ -221,7 +224,8 @@ export async function importDexieData(
 
   // Skip annotations (requires schema migration)
   if (data.annotations?.length) {
-    console.warn(
+    logger.warn(
+      "ui",
       `[Import] Skipping ${data.annotations.length} annotations - requires migration 003_fix_annotation_id_type.sql`
     );
   }
@@ -242,7 +246,8 @@ export async function importDexieData(
     }
   }
 
-  console.log(
+  logger.info(
+    "ui",
     `[Import] Import complete: ${Object.values(imported).reduce((a, b) => a + b, 0)} records`
   );
   return imported;

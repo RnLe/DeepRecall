@@ -12,6 +12,7 @@ import * as collectionsMerged from "../repos/collections.merged";
 import * as collectionsCleanup from "../repos/collections.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -41,22 +42,27 @@ async function syncElectricToDexie(electricData: Collection[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.collections.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale collection(s)`
-      );
+      logger.info("sync.electric", "Deleted stale collections from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.collections.bulkPut(electricData);
-      console.log(
-        `[Electric→Dexie] Synced ${electricData.length} collection(s)`
+      logger.info(
+        "sync.electric",
+        "Synced collections from Electric to Dexie",
+        {
+          count: electricData.length,
+        }
       );
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Collections table cleared (0 rows)`);
+      logger.info("sync.electric", "Collections table cleared", { count: 0 });
     }
   });
 }
@@ -87,10 +93,9 @@ export function useCollectionsSync() {
           queryClient.invalidateQueries({ queryKey: ["collections"] });
         })
         .catch((error) => {
-          console.error(
-            "[useCollectionsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync collections to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -180,17 +185,16 @@ export function useCreateCollection() {
       return collectionsLocal.createCollectionLocal(data);
     },
     onSuccess: (newCollection: Collection) => {
-      console.log(
-        `✅ [useCreateCollection] Created collection ${newCollection.id} (pending sync)`
-      );
+      logger.info("db.local", "Created collection locally (pending sync)", {
+        collectionId: newCollection.id,
+      });
       // Invalidate merged queries to show new collection immediately
       queryClient.invalidateQueries({ queryKey: ["collections", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useCreateCollection] Failed to create collection:",
-        error
-      );
+      logger.error("db.local", "Failed to create collection", {
+        error: error.message,
+      });
     },
   });
 }
@@ -213,17 +217,16 @@ export function useUpdateCollection() {
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Collection> }) => {
-      console.log(
-        `✅ [useUpdateCollection] Updated collection ${id} (pending sync)`
-      );
+      logger.info("db.local", "Updated collection locally (pending sync)", {
+        collectionId: id,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["collections", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useUpdateCollection] Failed to update collection:",
-        error
-      );
+      logger.error("db.local", "Failed to update collection", {
+        error: error.message,
+      });
     },
   });
 }
@@ -240,17 +243,16 @@ export function useDeleteCollection() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(
-        `✅ [useDeleteCollection] Deleted collection ${id} (pending sync)`
-      );
+      logger.info("db.local", "Deleted collection locally (pending sync)", {
+        collectionId: id,
+      });
       // Invalidate merged queries to remove immediately
       queryClient.invalidateQueries({ queryKey: ["collections", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useDeleteCollection] Failed to delete collection:",
-        error
-      );
+      logger.error("db.local", "Failed to delete collection", {
+        error: error.message,
+      });
     },
   });
 }

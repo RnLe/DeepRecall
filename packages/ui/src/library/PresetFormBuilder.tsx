@@ -12,6 +12,7 @@ import type {
   CustomFieldDefinition,
 } from "@deeprecall/core";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 interface PresetFormBuilderProps {
   targetEntity: PresetTarget;
@@ -179,7 +180,11 @@ export function PresetFormBuilder({
 
       onSuccess(preset.id);
     } catch (error) {
-      console.error("Failed to create preset:", error);
+      logger.error("ui", "Failed to create preset", {
+        error,
+        name,
+        targetEntity,
+      });
       alert("Failed to create template. Please try again.");
     }
   };

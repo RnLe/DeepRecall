@@ -4,6 +4,7 @@
  */
 
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -43,9 +44,11 @@ export async function createBlobMeta(
     },
   });
 
-  console.log(
-    `[BlobsMetaWrites] Created blob meta ${input.sha256.slice(0, 16)}... (enqueued)`
-  );
+  logger.info("cas", "Created blob meta (enqueued)", {
+    sha256: input.sha256.slice(0, 16),
+    size: input.size,
+    mime: input.mime,
+  });
 }
 
 /**
@@ -82,9 +85,10 @@ export async function updateBlobMeta(
     },
   });
 
-  console.log(
-    `[BlobsMetaWrites] Updated blob meta ${sha256.slice(0, 16)}... (enqueued)`
-  );
+  logger.info("cas", "Updated blob meta (enqueued)", {
+    sha256: sha256.slice(0, 16),
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -97,9 +101,9 @@ export async function deleteBlobMeta(sha256: string): Promise<void> {
     payload: { sha256 },
   });
 
-  console.log(
-    `[BlobsMetaWrites] Deleted blob meta ${sha256.slice(0, 16)}... (enqueued)`
-  );
+  logger.info("cas", "Deleted blob meta (enqueued)", {
+    sha256: sha256.slice(0, 16),
+  });
 }
 
 /**
@@ -132,9 +136,11 @@ export async function coordinateBlobUpload(
   const { markBlobAvailable } = await import("./device-blobs.writes");
   await markBlobAvailable(sha256, deviceId, localPath ?? null, "healthy");
 
-  console.log(
-    `[BlobCoordination] Coordinated upload for ${sha256.slice(0, 16)}... on device ${deviceId}`
-  );
+  logger.info("sync.coordination", "Coordinated blob upload", {
+    sha256: sha256.slice(0, 16),
+    deviceId,
+    hasLocalPath: !!localPath,
+  });
 }
 
 /**

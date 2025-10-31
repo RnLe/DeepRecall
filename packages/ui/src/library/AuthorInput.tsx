@@ -17,6 +17,7 @@ import type { Author } from "@deeprecall/core";
 import { getAuthorFullName } from "@deeprecall/core";
 import { queryShape, useCreateAuthor } from "@deeprecall/data";
 import { parseAuthorList, formatAuthorName } from "../utils";
+import { logger } from "@deeprecall/telemetry";
 
 interface AuthorInputProps {
   value: string[]; // Array of author IDs
@@ -170,7 +171,7 @@ export function AuthorInput({
         const searchResults = await searchAuthors(inputValue);
         setResults(searchResults);
       } catch (error) {
-        console.error("Search failed:", error);
+        logger.error("ui", "Search failed", { error, query: inputValue });
         setResults([]);
       } finally {
         setIsLoading(false);
@@ -240,7 +241,7 @@ export function AuthorInput({
       setIsOpen(false);
       inputRef.current?.focus();
     } catch (error) {
-      console.error("Failed to create author:", error);
+      logger.error("ui", "Failed to create author", { error, inputValue });
       alert("Failed to create author. Please try again.");
     } finally {
       setIsCreating(false);

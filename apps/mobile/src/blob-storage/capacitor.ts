@@ -11,6 +11,7 @@ import type {
   ScanResult,
   HealthReport,
 } from "@deeprecall/blob-storage";
+import { logger } from "@deeprecall/telemetry";
 
 const CUSTOM_BLOB_DIR = import.meta.env.VITE_MOBILE_BLOB_DIR;
 const DEV_BLOB_DIR = "apps/mobile/data";
@@ -111,10 +112,7 @@ export class CapacitorBlobStorage implements BlobCAS {
         error instanceof Error ? error.message : String(error);
       if (!errorMessage?.includes("exist")) {
         // Only throw if it's NOT a "directory exists" error
-        console.error(
-          "[CapacitorBlobStorage] Failed to create blob dir:",
-          error
-        );
+        logger.error("cas", "Failed to create blob directory", { error });
         throw error;
       }
       // Directory exists - this is fine, continue silently
@@ -141,14 +139,12 @@ export class CapacitorBlobStorage implements BlobCAS {
       const data = JSON.parse(result.data as string);
       this.catalog = new Map(Object.entries(data));
       this.catalogLoaded = true;
-      console.log(
-        `[CapacitorBlobStorage] Loaded catalog: ${this.catalog.size} blobs`
-      );
+      logger.debug("cas", "Loaded catalog", { count: this.catalog.size });
     } catch {
       // Catalog doesn't exist yet - start fresh
       this.catalog = new Map();
       this.catalogLoaded = true;
-      console.log("[CapacitorBlobStorage] No existing catalog, starting fresh");
+      logger.debug("cas", "No existing catalog, starting fresh");
     }
   }
 
@@ -219,9 +215,7 @@ export class CapacitorBlobStorage implements BlobCAS {
 
     // 2. Check if blob already exists
     if (this.catalog.has(sha256)) {
-      console.log(
-        `[CapacitorBlobStorage] Blob ${sha256} already exists, skipping upload`
-      );
+      logger.debug("cas", "Blob already exists, skipping upload", { sha256 });
       return this.catalog.get(sha256) as BlobWithMetadata;
     }
 
@@ -266,13 +260,13 @@ export class CapacitorBlobStorage implements BlobCAS {
 
     // 8. Coordinate with Electric (background - don't block upload)
     this.coordinateWithElectric(sha256, blobInfo).catch((error) => {
-      console.error(
-        `[CapacitorBlobStorage] Failed to coordinate ${sha256.slice(0, 16)}... with Electric:`,
-        error
-      );
+      logger.error("cas", "Failed to coordinate blob with Electric", {
+        sha256,
+        error,
+      });
     });
 
-    console.log(`[CapacitorBlobStorage] Stored blob: ${sha256} (${filename})`);
+    logger.info("cas", "Stored blob", { sha256, filename });
     return blobInfo;
   }
 
@@ -299,9 +293,7 @@ export class CapacitorBlobStorage implements BlobCAS {
       blobInfo.path
     );
 
-    console.log(
-      `[CapacitorBlobStorage] Coordinated ${sha256.slice(0, 16)}... with Electric`
-    );
+    logger.debug("cas", "Coordinated blob with Electric", { sha256 });
   }
 
   /**
@@ -326,10 +318,7 @@ export class CapacitorBlobStorage implements BlobCAS {
         directory,
       });
     } catch (error) {
-      console.error(
-        `[CapacitorBlobStorage] Failed to delete file ${sha256}:`,
-        error
-      );
+      logger.error("cas", "Failed to delete file", { sha256, error });
       // Continue to remove from catalog even if file deletion fails
     }
 
@@ -337,7 +326,7 @@ export class CapacitorBlobStorage implements BlobCAS {
     this.catalog.delete(sha256);
     await this.saveCatalog();
 
-    console.log(`[CapacitorBlobStorage] Deleted blob: ${sha256}`);
+    logger.info("cas", "Deleted blob", { sha256 });
   }
 
   /**
@@ -356,7 +345,7 @@ export class CapacitorBlobStorage implements BlobCAS {
     this.catalog.set(sha256, blob);
     await this.saveCatalog();
 
-    console.log(`[CapacitorBlobStorage] Renamed blob ${sha256} to ${filename}`);
+    logger.info("cas", "Renamed blob", { sha256, filename });
   }
 
   /**
@@ -376,9 +365,9 @@ export class CapacitorBlobStorage implements BlobCAS {
     // In browser dev mode, Capacitor filesystem doesn't access the real project folder
     // User should manually upload files via the UI instead
     if (import.meta.env.DEV && typeof window !== "undefined") {
-      console.log(
-        "[CapacitorBlobStorage] Dev mode: Scan only works for files uploaded via put(). " +
-          "Physical files in apps/mobile/data are not accessible in browser mode."
+      logger.debug(
+        "cas",
+        "Dev mode: Scan only works for uploaded files. Physical files not accessible in browser mode."
       );
       // Still scan the virtual filesystem (uploaded files)
     }

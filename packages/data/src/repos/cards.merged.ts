@@ -6,6 +6,7 @@
 
 import type { Card } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 export interface MergedCard extends Card {
   _local?: {
@@ -141,7 +142,9 @@ export async function getAllMergedCards(): Promise<MergedCard[]> {
     const local = await db.cards_local.toArray();
     return mergeCards(synced, local);
   } catch (error) {
-    console.error("[getAllMergedCards] Error:", error);
+    logger.error("srs", "Failed to get all merged cards", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -165,7 +168,10 @@ export async function getMergedCard(
     const merged = await mergeCards(allCards, local);
     return merged[0];
   } catch (error) {
-    console.error("[getMergedCard] Error:", error);
+    logger.error("srs", "Failed to get merged card", {
+      cardId: id,
+      error: String(error),
+    });
     return undefined;
   }
 }
@@ -183,7 +189,10 @@ export async function getMergedCardsByDoc(
     // Filter to this document only
     return merged.filter((c) => c.sha256 === sha256);
   } catch (error) {
-    console.error("[getMergedCardsByDoc] Error:", error);
+    logger.error("srs", "Failed to get merged cards by doc", {
+      sha256,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -204,7 +213,10 @@ export async function getMergedCardsByAnnotation(
     // Filter to this annotation only
     return merged.filter((c) => c.annotation_id === annotationId);
   } catch (error) {
-    console.error("[getMergedCardsByAnnotation] Error:", error);
+    logger.error("srs", "Failed to get merged cards by annotation", {
+      annotationId,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -220,7 +232,10 @@ export async function getMergedDueCards(nowMs: number): Promise<MergedCard[]> {
     // Filter to due cards only
     return merged.filter((c) => c.due <= nowMs);
   } catch (error) {
-    console.error("[getMergedDueCards] Error:", error);
+    logger.error("srs", "Failed to get merged due cards", {
+      nowMs,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

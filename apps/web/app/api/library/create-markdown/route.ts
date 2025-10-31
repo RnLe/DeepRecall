@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarkdownBlob } from "@/src/server/cas";
 import { z } from "zod";
+import { logger } from "@deeprecall/telemetry";
 
 const CreateMarkdownSchema = z.object({
   content: z.string().min(1),
@@ -27,7 +28,11 @@ export async function POST(request: NextRequest) {
     // Create markdown blob
     const { hash, size } = await createMarkdownBlob(input.content, filename);
 
-    console.log(`Created markdown: ${filename} → ${hash.slice(0, 16)}...`);
+    logger.info("blob.upload", "Markdown note created", {
+      filename,
+      hash: hash.slice(0, 16),
+      size,
+    });
 
     return NextResponse.json({
       blob: {
@@ -44,7 +49,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Markdown creation failed:", error);
+    logger.error("blob.upload", "Markdown creation failed", {
+      error: (error as Error).message,
+    });
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

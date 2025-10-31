@@ -10,11 +10,15 @@ import {
   EXPORT_VERSION,
   ARCHIVE_STRUCTURE,
 } from "@deeprecall/core/schemas/data-sync";
-import type { ImportPreview, ExportPackage } from "@deeprecall/core/schemas/data-sync";
+import type {
+  ImportPreview,
+  ExportPackage,
+} from "@deeprecall/core/schemas/data-sync";
 import { writeFile, readFile, mkdir, rm } from "fs/promises";
 import path from "path";
 import { tmpdir } from "os";
 import { randomBytes } from "crypto";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Extract tar.gz archive
@@ -150,7 +154,9 @@ export async function POST(request: NextRequest) {
       throw error;
     }
   } catch (error) {
-    console.error("Import preview error:", error);
+    logger.error("server.api", "Failed to process import file", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       {
         error: "Failed to process import file",

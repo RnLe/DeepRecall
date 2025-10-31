@@ -12,6 +12,7 @@ import * as strokesMerged from "../repos/strokes.merged";
 import * as strokesCleanup from "../repos/strokes.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Sync Electric data to Dexie strokes table
@@ -32,20 +33,23 @@ async function syncElectricToDexie(electricData: Stroke[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.strokes.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale stroke(s)`
-      );
+      logger.info("sync.electric", "Deleted stale strokes from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.strokes.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} stroke(s)`);
+      logger.info("sync.electric", "Synced strokes from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Strokes table cleared (0 rows)`);
+      logger.info("sync.electric", "Strokes table cleared", { count: 0 });
     }
   });
 }
@@ -76,10 +80,9 @@ export function useStrokesSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useStrokesSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync strokes to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [
@@ -97,7 +100,9 @@ export function useStrokesSync() {
       const syncedIds = electricResult.data.map((s) => s.id);
       strokesCleanup.cleanupStrokesLocal(syncedIds).catch((error) => {
         if (error.name === "DatabaseClosedError") return;
-        console.error("[useStrokesSync] Cleanup failed:", error);
+        logger.error("db.local", "Failed to cleanup strokes", {
+          error: error.message,
+        });
       });
     }
   }, [

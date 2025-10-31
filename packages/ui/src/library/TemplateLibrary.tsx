@@ -22,6 +22,7 @@ import { getPresetColor } from "../utils/presets";
 import { MessageModal } from "./MessageModal";
 import { InputModal } from "./InputModal";
 import { TemplateEditorModal } from "./TemplateEditorModal";
+import { logger } from "@deeprecall/telemetry";
 import {
   X,
   Copy,
@@ -184,7 +185,10 @@ export function TemplateLibrary() {
             variant: "info",
           });
         } catch (error) {
-          console.error("Failed to initialize defaults:", error);
+          logger.error("ui", "Failed to initialize defaults", {
+            error,
+            missingCount: missing.length,
+          });
           setMessageModal({
             isOpen: true,
             title: "Error",
@@ -222,7 +226,7 @@ export function TemplateLibrary() {
             });
           }
         } catch (error) {
-          console.error(`Failed to reset "${name}":`, error);
+          logger.error("ui", "Failed to reset template", { error, name });
           setMessageModal({
             isOpen: true,
             title: "Error",
@@ -248,9 +252,15 @@ export function TemplateLibrary() {
       delete (newPreset as any).updatedAt;
 
       await createPresetMutation.mutateAsync(newPreset as any);
-      console.log(`✅ Duplicated template: ${preset.name}`);
+      logger.info("ui", "Duplicated template", {
+        name: preset.name,
+        id: preset.id,
+      });
     } catch (error) {
-      console.error("Failed to duplicate template:", error);
+      logger.error("ui", "Failed to duplicate template", {
+        error,
+        name: preset.name,
+      });
       setMessageModal({
         isOpen: true,
         title: "Error",
@@ -270,13 +280,19 @@ export function TemplateLibrary() {
       onConfirm: async () => {
         try {
           await deletePresetMutation.mutateAsync(preset.id);
-          console.log(`✅ Deleted template: ${preset.name}`);
+          logger.info("ui", "Deleted template", {
+            name: preset.name,
+            id: preset.id,
+          });
           // Remove from selection
           if (isSelected(preset.id)) {
             toggleSelection(preset.id);
           }
         } catch (error) {
-          console.error("Failed to delete template:", error);
+          logger.error("ui", "Failed to delete template", {
+            error,
+            name: preset.name,
+          });
           setMessageModal({
             isOpen: true,
             title: "Error",
@@ -308,10 +324,16 @@ export function TemplateLibrary() {
         id: editorModal.preset.id,
         updates,
       });
-      console.log(`✅ Updated template: ${editorModal.preset.name}`);
+      logger.info("ui", "Updated template", {
+        name: editorModal.preset.name,
+        id: editorModal.preset.id,
+      });
       setEditorModal({ isOpen: false, preset: null });
     } catch (error) {
-      console.error("Failed to update template:", error);
+      logger.error("ui", "Failed to update template", {
+        error,
+        name: editorModal.preset.name,
+      });
       setMessageModal({
         isOpen: true,
         title: "Error",
@@ -341,11 +363,11 @@ export function TemplateLibrary() {
               deletePresetMutation.mutateAsync(id)
             )
           );
-          console.log(`✅ Deleted ${count} template(s)`);
+          logger.info("ui", "Deleted templates in bulk", { count });
           clearSelection();
           disableSelectMode();
         } catch (error) {
-          console.error("Failed to delete templates:", error);
+          logger.error("ui", "Failed to delete templates", { error, count });
           setMessageModal({
             isOpen: true,
             title: "Error",
@@ -371,9 +393,17 @@ export function TemplateLibrary() {
             id: preset.id,
             updates: { name: newName },
           });
-          console.log(`✅ Renamed template to: ${newName}`);
+          logger.info("ui", "Renamed template", {
+            oldName: preset.name,
+            newName,
+            id: preset.id,
+          });
         } catch (error) {
-          console.error("Failed to rename template:", error);
+          logger.error("ui", "Failed to rename template", {
+            error,
+            oldName: preset.name,
+            newName,
+          });
           setMessageModal({
             isOpen: true,
             title: "Error",

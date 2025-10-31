@@ -4,6 +4,7 @@
  */
 
 "use client";
+import { logger } from "@deeprecall/telemetry";
 
 import {
   OrphanedBlobs as OrphanedBlobsUI,
@@ -23,7 +24,7 @@ export function OrphanedBlobs() {
     syncBlobToElectric: async (sha256: string) => {
       // For web app, blobs are already synced via server-side Electric
       // This is a no-op since the server handles sync automatically
-      console.log(`Blob ${sha256} sync requested (handled server-side)`);
+      logger.info("ui", `Blob ${sha256} sync requested (handled server-side)`);
     },
     cas,
   };

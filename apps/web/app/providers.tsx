@@ -24,18 +24,35 @@ import {
   useStrokesSync,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
+import { initTelemetry } from "@/src/telemetry";
+import { logger } from "@deeprecall/telemetry";
 
 // Configure PDF.js worker for Web platform
 if (typeof window !== "undefined") {
+  // Initialize telemetry first (structured logging)
+  initTelemetry();
+  logger.info("ui", "Telemetry initialized", {
+    env: process.env.NODE_ENV,
+    platform: "web",
+  });
+
   configurePdfWorker("/pdf.worker.min.mjs");
+  logger.info("pdf", "PDF.js worker configured", {
+    workerPath: "/pdf.worker.min.mjs",
+  });
+
   // Initialize console logger for debugging (temporary)
   initConsoleLogger();
-  console.log("[Web] Console logger initialized");
+  logger.info("ui", "Console logger initialized");
 
   // Initialize device ID on app startup (reliable persistence)
-  initializeDeviceId().catch((error) => {
-    console.error("[App] Failed to initialize device ID:", error);
-  });
+  initializeDeviceId()
+    .then((deviceId) => {
+      logger.info("ui", "Device ID initialized", { deviceId });
+    })
+    .catch((error) => {
+      logger.error("ui", "Failed to initialize device ID", { error });
+    });
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -80,54 +97,71 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
     // Fetch runtime config from API (Railway variables available at runtime)
     async function initializeWithRuntimeConfig() {
       try {
-        console.log("[Electric] Fetching runtime config from /api/config...");
+        logger.info(
+          "sync.electric",
+          "Fetching runtime config from /api/config"
+        );
         const response = await fetch("/api/config");
         const config = await response.json();
 
-        console.log("[Electric] Runtime config received:");
-        console.log("  electricUrl:", config.electricUrl);
-        console.log("  hasSourceId:", !!config.electricSourceId);
-        console.log("  hasSecret:", !!config.electricSecret);
+        logger.info("sync.electric", "Runtime config received", {
+          electricUrl: config.electricUrl,
+          hasSourceId: !!config.electricSourceId,
+          hasSecret: !!config.electricSecret,
+        });
 
         initElectric({
           url: config.electricUrl,
           sourceId: config.electricSourceId,
           secret: config.electricSecret,
         });
-        console.log(`[Electric] Initialized with URL: ${config.electricUrl}`);
+        logger.info("sync.electric", "Electric initialized", {
+          electricUrl: config.electricUrl,
+          authenticated: !!(config.electricSourceId && config.electricSecret),
+        });
 
         if (config.electricSourceId && config.electricSecret) {
-          console.log(`[Electric] Using Electric Cloud authentication`);
+          logger.info("sync.electric", "Using Electric Cloud authentication");
         } else {
-          console.warn("[Electric] No authentication - using local instance");
+          logger.warn(
+            "sync.electric",
+            "No authentication - using local instance"
+          );
         }
 
         setConfigLoaded(true);
         onReady();
       } catch (error) {
-        console.error("[Electric] Failed to load runtime config:", error);
+        logger.error("sync.electric", "Failed to load runtime config", {
+          error,
+        });
         // Fallback to build-time env vars
         const electricUrl =
           process.env.NEXT_PUBLIC_ELECTRIC_URL || "http://localhost:5133";
         const electricSourceId = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_ID;
         const electricSecret = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET;
 
-        console.log(
-          "[Electric] Using fallback build-time config:",
-          electricUrl
-        );
+        logger.info("sync.electric", "Using fallback build-time config", {
+          electricUrl,
+        });
 
         initElectric({
           url: electricUrl,
           sourceId: electricSourceId,
           secret: electricSecret,
         });
-        console.log(`[Electric] Initialized with URL: ${electricUrl}`);
+        logger.info("sync.electric", "Electric initialized with fallback", {
+          electricUrl,
+          authenticated: !!(electricSourceId && electricSecret),
+        });
 
         if (electricSourceId && electricSecret) {
-          console.log(`[Electric] Using Electric Cloud authentication`);
+          logger.info("sync.electric", "Using Electric Cloud authentication");
         } else {
-          console.warn("[Electric] No authentication - using local instance");
+          logger.warn(
+            "sync.electric",
+            "No authentication - using local instance"
+          );
         }
         setConfigLoaded(true);
         onReady();
@@ -158,7 +192,9 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
             errors: result.errors || [],
           };
         } catch (error) {
-          console.error("[FlushWorker] API request failed:", error);
+          logger.error("sync.writeBuffer", "FlushWorker API request failed", {
+            error,
+          });
           return {
             applied: [],
             errors: changes.map((c) => ({
@@ -175,18 +211,22 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
     });
     worker.start(1000); // Check every 1 second for responsive sync
     workerRef.current = worker;
-    console.log("[FlushWorker] Started (interval: 1000ms)");
-    console.log(`[FlushWorker] API endpoint: ${apiBase}/api/writes/batch`);
+    logger.info("sync.writeBuffer", "FlushWorker started", {
+      interval: 1000,
+      endpoint: `${apiBase}/api/writes/batch`,
+    });
 
     // Expose for debugging in browser console
     if (typeof window !== "undefined") {
       (window as any).__deeprecall_flush_worker = worker;
       (window as any).__deeprecall_buffer = worker.getBuffer();
-      console.log(
-        "💡 Debug tip: Access flush worker via window.__deeprecall_flush_worker"
+      logger.info(
+        "sync.writeBuffer",
+        "FlushWorker exposed to window.__deeprecall_flush_worker"
       );
-      console.log(
-        "💡 Debug tip: Check buffer stats with: await window.__deeprecall_buffer.getStats()"
+      logger.info(
+        "sync.writeBuffer",
+        "Buffer exposed to window.__deeprecall_buffer"
       );
     }
 
@@ -194,7 +234,7 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
     return () => {
       if (workerRef.current) {
         workerRef.current.stop();
-        console.log("[FlushWorker] Stopped");
+        logger.info("sync.writeBuffer", "FlushWorker stopped");
       }
     };
   }, []);

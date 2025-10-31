@@ -28,6 +28,7 @@ import {
 } from "@deeprecall/ui";
 import { useTemplateLibraryUI } from "@deeprecall/data/stores";
 import { compareWorksByTitle } from "@deeprecall/ui/utils";
+import { logger } from "@deeprecall/telemetry";
 
 // Platform wrappers
 import { WorkCardDetailed } from "../components/library/_components/WorkCardDetailed";
@@ -167,7 +168,10 @@ export default function LibraryPage() {
 
       queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
     } catch (error) {
-      console.error("Failed to upload files to activity:", error);
+      logger.error("blob.upload", "Failed to upload files to activity", {
+        error,
+        activityId,
+      });
       alert(
         `Failed to upload files: ${error instanceof Error ? error.message : "Unknown error"}`
       );
@@ -237,14 +241,11 @@ export default function LibraryPage() {
       e.dataTransfer.types.includes("application/x-blob-id") ||
       e.dataTransfer.types.includes("application/x-asset-id");
 
-    console.log(
-      "[DragEnter] types:",
-      Array.from(e.dataTransfer.types),
-      "hasFiles:",
+    logger.debug("ui", "DragEnter event", {
+      types: Array.from(e.dataTransfer.types),
       hasFiles,
-      "hasBlob:",
-      hasBlob
-    );
+      hasBlob,
+    });
 
     if (hasFiles || hasBlob) {
       e.preventDefault();
@@ -297,9 +298,10 @@ export default function LibraryPage() {
     setIsDraggingOverLibrary(false);
     setDragCounter(0);
 
-    console.log("Drop event triggered");
-    console.log("DataTransfer types:", Array.from(e.dataTransfer.types));
-    console.log("Files count:", e.dataTransfer.files.length);
+    logger.debug("ui", "Drop event triggered", {
+      types: Array.from(e.dataTransfer.types),
+      filesCount: e.dataTransfer.files.length,
+    });
 
     // Try to get blob data from sidebar
     const blobJson = e.dataTransfer.getData("application/x-deeprecall-blob");
@@ -309,20 +311,25 @@ export default function LibraryPage() {
         setLinkingBlob(blob);
         return;
       } catch (error) {
-        console.error("Failed to parse dropped blob:", error);
+        logger.error("ui", "Failed to parse dropped blob", { error });
       }
     }
 
     // Handle external file drops (Tauri)
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      console.log("Processing", files.length, "file(s)");
+      logger.info("blob.upload", "Processing dropped files", {
+        count: files.length,
+      });
       if (files.length === 1) {
         setIsUploadingToLibrary(true);
         try {
           const { invoke } = await import("@tauri-apps/api/core");
           const file = files[0];
-          console.log("Uploading file:", file.name, "size:", file.size);
+          logger.debug("blob.upload", "Uploading file", {
+            filename: file.name,
+            size: file.size,
+          });
           const arrayBuffer = await file.arrayBuffer();
           const uint8Array = new Uint8Array(arrayBuffer);
 
@@ -331,11 +338,13 @@ export default function LibraryPage() {
             data: Array.from(uint8Array),
           });
 
-          console.log("Upload successful:", result);
+          logger.info("blob.upload", "File upload successful", {
+            sha256: result.sha256,
+          });
           queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
           setLinkingBlob(result);
         } catch (error) {
-          console.error("File upload failed:", error);
+          logger.error("blob.upload", "File upload failed", { error });
           alert(
             `Upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
           );
@@ -348,7 +357,10 @@ export default function LibraryPage() {
         try {
           const { invoke } = await import("@tauri-apps/api/core");
           const uploadPromises = Array.from(files).map(async (file) => {
-            console.log("Uploading file:", file.name, "size:", file.size);
+            logger.debug("blob.upload", "Uploading file", {
+              filename: file.name,
+              size: file.size,
+            });
             const arrayBuffer = await file.arrayBuffer();
             const uint8Array = new Uint8Array(arrayBuffer);
 
@@ -359,10 +371,12 @@ export default function LibraryPage() {
           });
 
           const results = await Promise.all(uploadPromises);
-          console.log("All uploads successful:", results.length, "files");
+          logger.info("blob.upload", "All uploads successful", {
+            count: results.length,
+          });
           queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
         } catch (error) {
-          console.error("File upload failed:", error);
+          logger.error("blob.upload", "File upload failed", { error });
           alert(
             `Upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
           );
@@ -371,7 +385,7 @@ export default function LibraryPage() {
         }
       }
     } else {
-      console.log("No files detected in drop event");
+      logger.debug("ui", "No files detected in drop event");
     }
   };
 

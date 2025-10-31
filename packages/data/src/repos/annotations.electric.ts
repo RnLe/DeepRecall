@@ -18,6 +18,7 @@ import {
 } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * React hook to get all annotations for a PDF (live-synced from Postgres)
@@ -117,7 +118,12 @@ export async function createAnnotation(
     payload: validated,
   });
 
-  console.log(`[AnnotationsRepo] Created annotation ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Created annotation (enqueued)", {
+    annotationId: id,
+    sha256: input.sha256.slice(0, 16),
+    page: input.page,
+    type: input.data.type,
+  });
   return validated;
 }
 
@@ -142,9 +148,9 @@ export async function updateAnnotation(
     payload: validated,
   });
 
-  console.log(
-    `[AnnotationsRepo] Updated annotation ${input.id} (enqueued for sync)`
-  );
+  logger.info("db.postgres", "Updated annotation (enqueued)", {
+    annotationId: input.id,
+  });
 }
 
 /**
@@ -157,7 +163,9 @@ export async function deleteAnnotation(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[AnnotationsRepo] Deleted annotation ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Deleted annotation (enqueued)", {
+    annotationId: id,
+  });
 }
 
 /**

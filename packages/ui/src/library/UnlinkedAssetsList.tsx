@@ -10,6 +10,7 @@ import type { Asset } from "@deeprecall/core";
 import { useAssets, useEdges } from "@deeprecall/data/hooks";
 import { assetsElectric } from "@deeprecall/data/repos";
 import { MarkdownPreview } from "../components/MarkdownPreview";
+import { logger } from "@deeprecall/telemetry";
 
 // Platform-specific operations interface (minimal)
 export interface UnlinkedAssetsListOperations {
@@ -217,7 +218,7 @@ export function UnlinkedAssetsList({
 
       setRenamingAsset(null);
     } catch (error) {
-      console.error("Rename failed:", error);
+      logger.error("ui", "Rename failed", { error, hash, assetId });
       alert(
         `Rename failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -238,15 +239,16 @@ export function UnlinkedAssetsList({
         // This is handled by the wrapper, not by the renameBlob operation
         // For now, we'll just delete the asset; blob cleanup can be done separately
       } catch (blobError) {
-        console.warn(
-          "Failed to delete blob from server, but asset was removed:",
-          blobError
+        logger.warn(
+          "ui",
+          "Failed to delete blob from server, but asset was removed",
+          { error: blobError, hash, assetId }
         );
       }
 
       setPendingDelete(null);
     } catch (error) {
-      console.error("Delete failed:", error);
+      logger.error("ui", "Delete failed", { error, hash, assetId });
       alert(
         `Delete failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -267,7 +269,11 @@ export function UnlinkedAssetsList({
       const text = await fetchBlobContent(asset.sha256);
       setViewingMarkdown({ asset, content: text });
     } catch (error) {
-      console.error("Failed to load markdown:", error);
+      logger.error("ui", "Failed to load markdown", {
+        error,
+        hash: asset.sha256,
+        assetId: asset.id,
+      });
       alert("Failed to load markdown file");
     }
   };

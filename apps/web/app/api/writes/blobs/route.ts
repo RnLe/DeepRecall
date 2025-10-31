@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { logger } from "@deeprecall/telemetry";
 
 const BlobCoordinationSchema = z.object({
   sha256: z.string().min(64).max(64),
@@ -54,15 +55,20 @@ export async function POST(request: NextRequest) {
       "healthy"
     );
 
-    console.log(
-      `[BlobCoordination] Created Electric entries for ${data.sha256.slice(0, 16)}... on device ${data.deviceId}`
-    );
+    logger.info("sync.coordination", "Blob coordination entries created", {
+      sha256: data.sha256.slice(0, 16),
+      deviceId: data.deviceId,
+      filename: data.filename,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error(
-      "[BlobCoordination] Failed to create Electric entries:",
-      error
+    logger.error(
+      "sync.coordination",
+      "Failed to create blob coordination entries",
+      {
+        error: (error as Error).message,
+      }
     );
     return NextResponse.json(
       {

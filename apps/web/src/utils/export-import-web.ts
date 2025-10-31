@@ -15,6 +15,7 @@ import type {
   ImportPreview,
   ImportResult,
 } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 
 // Re-export platform-agnostic utilities for convenience
 export { exportDexieData, importDexieData, estimateExportSize, formatBytes };
@@ -66,7 +67,7 @@ export async function exportData(options: ExportOptions): Promise<void> {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (error) {
-    console.error("Export failed:", error);
+    logger.error("ui", "Data export failed", { error });
     throw error;
   }
 }
@@ -124,7 +125,7 @@ export async function previewImport(file: File): Promise<{
 
     return result;
   } catch (error) {
-    console.error("Import preview failed:", error);
+    logger.error("ui", "Import preview failed", { error });
     throw error;
   }
 }
@@ -198,22 +199,22 @@ export async function executeImport(
 
     // Trigger CAS rescan if files were imported
     if (options.importFiles && result.imported.files > 0) {
-      console.log("[Import] Triggering CAS rescan...");
+      logger.info("cas", "Triggering CAS rescan after import", {
+        filesImported: result.imported.files,
+      });
       try {
         const scanResponse = await fetch("/api/scan", { method: "POST" });
         if (scanResponse.ok) {
           const scanResult = await scanResponse.json();
-          console.log(
-            `[Import] CAS rescan complete: ${scanResult.added} blobs added`
-          );
+          logger.info("cas", "CAS rescan complete", {
+            blobsAdded: scanResult.added,
+          });
         } else {
-          console.warn(
-            "[Import] CAS rescan failed:",
-            await scanResponse.text()
-          );
+          const errorText = await scanResponse.text();
+          logger.warn("cas", "CAS rescan failed", { error: errorText });
         }
       } catch (scanError) {
-        console.warn("[Import] CAS rescan error:", scanError);
+        logger.warn("cas", "CAS rescan error", { error: scanError });
         result.warnings = result.warnings || [];
         result.warnings.push(
           "CAS rescan failed - you may need to manually rescan from the admin page"
@@ -223,7 +224,7 @@ export async function executeImport(
 
     // Trigger Electric sync to propagate changes
     if (options.importDexie || options.importSQLite) {
-      console.log("[Import] Triggering Electric sync...");
+      logger.info("sync.electric", "Triggering Electric sync after import");
       try {
         // Get device ID from client
         const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
@@ -236,17 +237,19 @@ export async function executeImport(
         });
         if (syncResponse.ok) {
           const syncResult = await syncResponse.json();
-          console.log(
-            `[Import] Electric sync complete: ${syncResult.synced} records synced`
-          );
+          logger.info("sync.electric", "Electric sync complete", {
+            recordsSynced: syncResult.synced,
+          });
         } else {
-          console.warn(
-            "[Import] Electric sync failed:",
-            await syncResponse.text()
-          );
+          const errorText = await syncResponse.text();
+          logger.warn("sync.electric", "Electric sync failed", {
+            error: errorText,
+          });
         }
       } catch (syncError) {
-        console.warn("[Import] Electric sync error:", syncError);
+        logger.warn("sync.electric", "Electric sync error", {
+          error: syncError,
+        });
         result.warnings = result.warnings || [];
         result.warnings.push(
           "Electric sync failed - data will sync in background"
@@ -256,7 +259,7 @@ export async function executeImport(
 
     return result;
   } catch (error) {
-    console.error("Import execution failed:", error);
+    logger.error("ui", "Import execution failed", { error });
     throw error;
   }
 }

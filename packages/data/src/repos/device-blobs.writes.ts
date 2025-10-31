@@ -4,6 +4,7 @@
  */
 
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -52,9 +53,11 @@ export async function markBlobAvailable(
     },
   });
 
-  console.log(
-    `[DeviceBlobsWrites] Marked blob ${sha256.slice(0, 16)}... available on device ${deviceId} (enqueued)`
-  );
+  logger.info("sync.coordination", "Marked blob available (enqueued)", {
+    sha256: sha256.slice(0, 16),
+    deviceId,
+    health,
+  });
 }
 
 /**
@@ -76,9 +79,10 @@ export async function markBlobUnavailable(
     },
   });
 
-  console.log(
-    `[DeviceBlobsWrites] Marked blob ${sha256.slice(0, 16)}... unavailable on device ${deviceId} (enqueued)`
-  );
+  logger.info("sync.coordination", "Marked blob unavailable (enqueued)", {
+    sha256: sha256.slice(0, 16),
+    deviceId,
+  });
 }
 
 /**
@@ -100,9 +104,11 @@ export async function updateBlobHealth(
     },
   });
 
-  console.log(
-    `[DeviceBlobsWrites] Updated blob ${sha256.slice(0, 16)}... health to ${health} on device ${deviceId} (enqueued)`
-  );
+  logger.info("sync.coordination", "Updated blob health (enqueued)", {
+    sha256: sha256.slice(0, 16),
+    deviceId,
+    health,
+  });
 }
 
 /**
@@ -118,7 +124,8 @@ export async function deleteDeviceBlob(
     payload: { sha256, device_id: deviceId },
   });
 
-  console.log(
-    `[DeviceBlobsWrites] Deleted device blob ${sha256.slice(0, 16)}... from device ${deviceId} (enqueued)`
-  );
+  logger.info("sync.coordination", "Deleted device blob (enqueued)", {
+    sha256: sha256.slice(0, 16),
+    deviceId,
+  });
 }

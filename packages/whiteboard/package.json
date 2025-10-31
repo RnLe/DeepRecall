@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@deeprecall/core": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
     "comlink": "^4.4.1",
     "pixi.js": "^8.0.0",
     "rbush": "^4.0.1"

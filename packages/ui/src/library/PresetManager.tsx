@@ -17,6 +17,7 @@ import {
 } from "@deeprecall/data/hooks";
 import { getPresetColor } from "../utils/presets";
 import { DEFAULT_PRESET_NAMES } from "@deeprecall/data";
+import { logger } from "@deeprecall/telemetry";
 
 export function PresetManager() {
   const { data: presets = [] } = usePresets();
@@ -64,9 +65,13 @@ export function PresetManager() {
 
     try {
       await deletePreset.mutateAsync(preset.id);
-      console.log(`✅ Deleted preset: ${preset.name}`);
+      logger.info("ui", "Deleted preset", { name: preset.name, id: preset.id });
     } catch (error) {
-      console.error("Failed to delete preset:", error);
+      logger.error("ui", "Failed to delete preset", {
+        error,
+        name: preset.name,
+        id: preset.id,
+      });
       alert("Failed to delete preset");
     }
   };
@@ -80,9 +85,15 @@ export function PresetManager() {
         isSystem: false,
       };
       await createPreset.mutateAsync(newPreset);
-      console.log(`✅ Duplicated preset: ${preset.name}`);
+      logger.info("ui", "Duplicated preset", {
+        name: preset.name,
+        id: preset.id,
+      });
     } catch (error) {
-      console.error("Failed to duplicate preset:", error);
+      logger.error("ui", "Failed to duplicate preset", {
+        error,
+        name: preset.name,
+      });
       alert("Failed to duplicate preset");
     }
   };
@@ -110,7 +121,10 @@ export function PresetManager() {
         `Successfully initialized ${missingDefaults.length} default preset(s)`
       );
     } catch (error) {
-      console.error("Failed to initialize defaults:", error);
+      logger.error("ui", "Failed to initialize defaults", {
+        error,
+        missingCount: missingDefaults.length,
+      });
       alert("Failed to initialize default presets");
     }
   };
@@ -131,7 +145,7 @@ export function PresetManager() {
         alert(`"${name}" is not a default preset`);
       }
     } catch (error) {
-      console.error(`Failed to reset "${name}":`, error);
+      logger.error("ui", `Failed to reset preset`, { error, name });
       alert(`Failed to reset "${name}"`);
     }
   };

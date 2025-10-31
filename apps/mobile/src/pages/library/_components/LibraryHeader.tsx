@@ -12,6 +12,7 @@ import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
 import { useAssets } from "@deeprecall/data/hooks";
 import { db } from "@deeprecall/data";
 import { useFileUpload } from "../../../utils/fileUpload";
+import { logger } from "@deeprecall/telemetry";
 
 interface LibraryHeaderProps {
   onCreateWork?: () => void;
@@ -52,7 +53,7 @@ export function LibraryHeader({
       }
 
       if (result.failed > 0) {
-        console.error("Upload errors:", result.errors);
+        logger.error("blob.upload", "Upload errors", { errors: result.errors });
         alert(
           `Failed to upload ${result.failed} file(s). Check console for details.`
         );
@@ -63,7 +64,7 @@ export function LibraryHeader({
         onUploadFiles();
       }
     } catch (error) {
-      console.error("Upload error:", error);
+      logger.error("blob.upload", "Upload error", { error });
       alert("Failed to upload files");
     } finally {
       setIsUploading(false);
@@ -120,7 +121,7 @@ export function LibraryHeader({
           });
         }
       } catch (error) {
-        console.error("Failed to calculate blob stats:", error);
+        logger.error("cas", "Failed to calculate blob stats", { error });
         if (mounted) {
           setBlobStats(undefined);
         }
@@ -153,13 +154,13 @@ export function LibraryHeader({
       // Recreate database
       await db.open();
 
-      console.log("Database cleared successfully");
+      logger.info("cas", "Database cleared successfully");
       alert("Database cleared successfully. Please refresh the page.");
 
       // Refresh the page to reset state
       window.location.reload();
     } catch (error) {
-      console.error("Failed to clear database:", error);
+      logger.error("cas", "Failed to clear database", { error });
       alert("Failed to clear database. Check console for details.");
     }
   };

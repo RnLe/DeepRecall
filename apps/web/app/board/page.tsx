@@ -3,6 +3,7 @@
  */
 
 "use client";
+import { logger } from "@deeprecall/telemetry";
 
 import { useBoards, useCreateBoard, useDeleteBoard } from "@deeprecall/data";
 import { useRouter } from "next/navigation";
@@ -33,7 +34,7 @@ export default function BoardsPage() {
       setNewBoardTitle("");
       router.push(`/board/${board.id}`);
     } catch (error) {
-      console.error("Failed to create board:", error);
+      logger.error("ui", "Failed to create board:", error);
     } finally {
       setIsCreating(false);
     }
@@ -45,7 +46,7 @@ export default function BoardsPage() {
     try {
       await deleteBoard.mutateAsync(id);
     } catch (error) {
-      console.error("Failed to delete board:", error);
+      logger.error("ui", "Failed to delete board:", error);
     }
   };
 

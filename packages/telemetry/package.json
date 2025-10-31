@@ -1,0 +1,13 @@
+{
+  "name": "@deeprecall/telemetry",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sinks": "./src/sinks/index.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

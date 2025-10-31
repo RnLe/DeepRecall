@@ -9,6 +9,7 @@ import { db } from "../db";
 import { StrokeSchema, type Stroke } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "@deeprecall/telemetry";
 
 export interface LocalStrokeChange {
   _localId?: number;
@@ -46,7 +47,10 @@ export async function createStrokeLocal(
   };
 
   await db.strokes_local.add(change);
-  console.log(`[Stroke Local] Created stroke locally: ${stroke.id}`);
+  logger.info("ink", "Created stroke locally", {
+    strokeId: stroke.id,
+    boardId: stroke.boardId,
+  });
 
   // 2. Enqueue for background sync
   await buffer.enqueue({
@@ -72,7 +76,7 @@ export async function deleteStrokeLocal(id: string): Promise<void> {
   };
 
   await db.strokes_local.add(change);
-  console.log(`[Stroke Local] Deleted stroke locally: ${id}`);
+  logger.info("ink", "Deleted stroke locally", { strokeId: id });
 
   // 2. Enqueue for background sync
   await buffer.enqueue({
@@ -97,7 +101,7 @@ export async function deleteStrokesLocal(ids: string[]): Promise<void> {
   }));
 
   await db.strokes_local.bulkAdd(changes);
-  console.log(`[Stroke Local] Batch deleted ${ids.length} stroke(s) locally`);
+  logger.info("ink", "Batch deleted strokes locally", { count: ids.length });
 
   // 2. Enqueue for background sync
   for (const id of ids) {

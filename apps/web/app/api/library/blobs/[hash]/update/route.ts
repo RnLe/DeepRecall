@@ -11,6 +11,7 @@ import { blobs, paths } from "@/src/server/schema";
 import { eq } from "drizzle-orm";
 import { rename } from "fs/promises";
 import path from "path";
+import { logger } from "@deeprecall/telemetry";
 
 export async function PUT(
   request: Request,
@@ -61,7 +62,6 @@ export async function PUT(
     if (newPath !== desiredPath) {
       try {
         await rename(newPath, desiredPath);
-        console.log(`Renamed file: ${newPath} → ${desiredPath}`);
 
         // Delete the old path entry and insert new one
         // (path is primary key, so we can't update to an existing path)
@@ -73,8 +73,18 @@ export async function PUT(
             path: desiredPath,
           })
           .run();
+
+        logger.info("cas", "Blob file renamed successfully", {
+          hash: newHash.slice(0, 16),
+          filename,
+          oldPath: path.basename(newPath),
+          newPath: path.basename(desiredPath),
+        });
       } catch (error) {
-        console.error("Failed to rename file:", error);
+        logger.error("cas", "Failed to rename blob file", {
+          hash: newHash.slice(0, 16),
+          error: (error as Error).message,
+        });
         // Continue anyway - file exists with hash name
       }
     }
@@ -86,7 +96,10 @@ export async function PUT(
       path: desiredPath,
     });
   } catch (error) {
-    console.error("Error updating blob:", error);
+    logger.error("server.api", "Failed to update blob", {
+      hash: (await params).hash.slice(0, 16),
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to update blob" },
       { status: 500 }

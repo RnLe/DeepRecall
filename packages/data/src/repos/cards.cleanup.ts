@@ -5,6 +5,7 @@
 
 import type { Card } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 let cleanupTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -43,7 +44,9 @@ export async function cleanupSyncedCards(syncedCards: Card[]): Promise<void> {
     }
 
     if (deletedCount > 0) {
-      console.log(`[CardsCleanup] Cleaned up ${deletedCount} synced change(s)`);
+      logger.info("srs", "Cleanup: Removed confirmed changes", {
+        count: deletedCount,
+      });
     }
   }, 100);
 }
@@ -61,8 +64,8 @@ export async function cleanupOldErrors(): Promise<void> {
 
   if (errorChanges.length > 0) {
     await db.cards_local.bulkDelete(errorChanges.map((c) => c._localId!));
-    console.log(
-      `[CardsCleanup] Cleaned up ${errorChanges.length} old error(s)`
-    );
+    logger.info("srs", "Cleanup: Removed old errors", {
+      count: errorChanges.length,
+    });
   }
 }

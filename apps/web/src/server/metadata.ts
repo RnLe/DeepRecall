@@ -5,6 +5,7 @@
 
 import { readFile } from "fs/promises";
 import sizeOf from "image-size";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Extract metadata from a file based on its MIME type
@@ -37,10 +38,10 @@ export async function extractFileMetadata(
           metadata.imageHeight = dimensions.height;
         }
       } catch (error) {
-        console.warn(
-          `Failed to extract image dimensions from ${filePath}:`,
-          error
-        );
+        logger.warn("server.api", "Failed to extract image dimensions", {
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -54,11 +55,18 @@ export async function extractFileMetadata(
         const content = await readFile(filePath, "utf-8");
         metadata.lineCount = content.split("\n").length;
       } catch (error) {
-        console.warn(`Failed to count lines in ${filePath}:`, error);
+        logger.warn("server.api", "Failed to count lines", {
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   } catch (error) {
-    console.error(`Error extracting metadata from ${filePath}:`, error);
+    logger.error("server.api", "Error extracting file metadata", {
+      filePath,
+      mime,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return metadata;
@@ -94,7 +102,11 @@ export async function extractBufferMetadata(
           metadata.imageHeight = dimensions.height;
         }
       } catch (error) {
-        console.warn(`Failed to extract image dimensions from buffer:`, error);
+        logger.warn("server.api", "Failed to extract image dimensions", {
+          source: "buffer",
+          mime,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -108,11 +120,17 @@ export async function extractBufferMetadata(
         const content = buffer.toString("utf-8");
         metadata.lineCount = content.split("\n").length;
       } catch (error) {
-        console.warn(`Failed to count lines in buffer:`, error);
+        logger.warn("server.api", "Failed to count lines from buffer", {
+          mime,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   } catch (error) {
-    console.error(`Error extracting metadata from buffer:`, error);
+    logger.error("server.api", "Error extracting buffer metadata", {
+      mime,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return metadata;

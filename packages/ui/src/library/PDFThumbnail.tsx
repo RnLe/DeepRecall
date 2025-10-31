@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BookOpen } from "lucide-react";
 import { usePDF } from "@deeprecall/pdf";
+import { logger } from "@deeprecall/telemetry";
 
 export interface PDFThumbnailProps {
   /** SHA-256 hash of the PDF to display */
@@ -92,7 +93,10 @@ export function PDFThumbnail({
         // Clean up page
         page.cleanup();
       } catch (err) {
-        console.error("Error rendering PDF thumbnail:", err);
+        logger.error("ui", "Error rendering PDF thumbnail", {
+          error: err,
+          sha256,
+        });
       }
     };
 

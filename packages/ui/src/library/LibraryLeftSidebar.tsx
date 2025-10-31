@@ -13,6 +13,7 @@ import { FileInbox } from "./FileInbox";
 import { UnlinkedAssetsList } from "./UnlinkedAssetsList";
 import { SimplePDFViewer } from "../components/SimplePDFViewer";
 import { MarkdownPreview } from "../components/MarkdownPreview";
+import { logger } from "@deeprecall/telemetry";
 
 // Platform-specific operations interface (minimal)
 export interface LibraryLeftSidebarOperations {
@@ -65,7 +66,7 @@ export function LibraryLeftSidebar({
     try {
       await fetchOrphanedBlobs();
     } catch (error) {
-      console.error("Failed to refresh orphaned blobs:", error);
+      logger.error("ui", "Failed to refresh orphaned blobs", { error });
     }
   };
 
@@ -87,7 +88,11 @@ export function LibraryLeftSidebar({
       // Refresh data - blob will now appear as unlinked asset
       await refreshOrphanedBlobs();
     } catch (error) {
-      console.error("Convert to asset failed:", error);
+      logger.error("ui", "Convert to asset failed", {
+        error,
+        hash: blob.sha256,
+        filename: blob.filename,
+      });
       alert(
         `Convert to asset failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -104,7 +109,7 @@ export function LibraryLeftSidebar({
       // Refresh data - asset will now appear as orphaned blob
       await refreshOrphanedBlobs();
     } catch (error) {
-      console.error("Move to inbox failed:", error);
+      logger.error("ui", "Move to inbox failed", { error, assetId });
       alert(
         `Move to inbox failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -122,7 +127,10 @@ export function LibraryLeftSidebar({
       // Refresh the orphaned blobs list
       await refreshOrphanedBlobs();
     } catch (error) {
-      console.error("File upload failed:", error);
+      logger.error("ui", "File upload failed", {
+        error,
+        fileCount: files.length,
+      });
       alert(
         `Upload failed: ${
           error instanceof Error ? error.message : "Unknown error"

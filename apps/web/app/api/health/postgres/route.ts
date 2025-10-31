@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getPostgresPool } from "@/app/api/lib/postgres";
+import { logger } from "@deeprecall/telemetry";
 
 export async function GET() {
   const pool = getPostgresPool();
@@ -34,10 +35,11 @@ export async function GET() {
       }
     } catch (error) {
       lastError = error as Error;
-      console.error(
-        `[PostgresHealth] Connection attempt ${attempt}/${maxRetries} failed:`,
-        error
-      );
+      logger.error("db.postgres", "Postgres health check connection failed", {
+        attempt,
+        maxRetries,
+        error: (error as Error).message,
+      });
 
       // Clean up failed connection
       if (client) {
@@ -49,7 +51,7 @@ export async function GET() {
 
       // Don't retry on last attempt
       if (attempt < maxRetries) {
-        console.log("[PostgresHealth] Retrying...");
+        logger.debug("db.postgres", "Retrying Postgres health check");
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     } finally {

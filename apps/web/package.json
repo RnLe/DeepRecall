@@ -16,6 +16,7 @@
   "dependencies": {
     "@deeprecall/core": "workspace:*",
     "@deeprecall/pdf": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
     "@tanstack/react-query": "^5.90.3",
     "@types/d3-force": "^3.0.10",
     "@types/d3-selection": "^3.0.11",

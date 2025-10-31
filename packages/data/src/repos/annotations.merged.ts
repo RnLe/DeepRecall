@@ -6,6 +6,7 @@
 
 import type { Annotation } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 export interface MergedAnnotation extends Annotation {
   _local?: {
@@ -196,7 +197,10 @@ export async function getMergedPDFAnnotations(
     // Filter to this PDF only (local changes might be for other PDFs)
     return merged.filter((a) => a.sha256 === sha256);
   } catch (error) {
-    console.error("[getMergedPDFAnnotations] Error:", error);
+    logger.error("db.local", "Failed to get merged PDF annotations", {
+      sha256,
+      error: String(error),
+    });
     // Always return an array, never undefined
     return [];
   }
@@ -238,7 +242,10 @@ export async function getMergedAnnotation(
     const merged = await mergeAnnotations(allAnnotations, local);
     return merged[0]; // Can be undefined if deleted
   } catch (error) {
-    console.error(`[getMergedAnnotation] Error for id ${id}:`, error);
+    logger.error("db.local", "Failed to get merged annotation", {
+      annotationId: id,
+      error: String(error),
+    });
     return undefined;
   }
 }

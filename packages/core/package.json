@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "zod": "^4.0.0",
-    "nanoid": "^5.1.6"
+    "nanoid": "^5.1.6",
+    "@deeprecall/telemetry": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

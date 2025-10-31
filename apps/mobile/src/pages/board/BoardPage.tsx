@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useBoard } from "@deeprecall/data";
 import { WhiteboardView, WhiteboardToolbar, type ToolId } from "@deeprecall/ui";
+import { logger } from "@deeprecall/telemetry";
 
 export default function BoardPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,7 +26,7 @@ export default function BoardPage() {
   // Redirect if board not found
   useEffect(() => {
     if (!isLoading && !board && !error) {
-      console.error(`Board ${id} not found`);
+      logger.error("ui", "Board not found", { boardId: id });
       navigate("/board");
     }
   }, [isLoading, board, error, id, navigate]);

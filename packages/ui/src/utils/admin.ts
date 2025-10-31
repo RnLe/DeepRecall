@@ -5,26 +5,31 @@
 
 import { db } from "@deeprecall/data/db";
 import { resetSystemPresets } from "@deeprecall/data/repos";
+import { logger } from "@deeprecall/telemetry";
 
 export async function cleanupDuplicatePresets() {
-  console.log("🧹 Cleaning up duplicate presets...");
+  logger.info("ui", "Starting preset cleanup");
 
   try {
     // Delete ALL presets (system and user)
     const allPresets = await db.presets.toArray();
-    console.log(`Found ${allPresets.length} presets`);
+    logger.info("ui", "Found presets to cleanup", {
+      count: allPresets.length,
+    });
 
     await db.presets.clear();
-    console.log("✅ Cleared all presets");
+    logger.info("ui", "Cleared all presets");
 
     // Re-seed system presets
     await resetSystemPresets();
-    console.log("✅ Re-seeded system presets");
+    logger.info("ui", "Re-seeded system presets");
 
     const finalCount = await db.presets.count();
-    console.log(`✅ Cleanup complete! ${finalCount} presets remaining`);
+    logger.info("ui", "Preset cleanup complete", {
+      finalCount,
+    });
   } catch (error) {
-    console.error("❌ Cleanup failed:", error);
+    logger.error("ui", "Preset cleanup failed", { error });
   }
 }
 

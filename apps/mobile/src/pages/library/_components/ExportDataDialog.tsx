@@ -9,6 +9,7 @@ import {
   ExportDataDialog as ExportDataDialogUI,
   type ExportOperations,
 } from "@deeprecall/ui";
+import { logger } from "@deeprecall/telemetry";
 
 interface ExportDataDialogProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ interface ExportDataDialogProps {
 const exportOps: ExportOperations = {
   exportData: async () => {
     // TODO: Implement with Capacitor Filesystem + Share plugin
-    console.warn("Export not yet implemented on mobile");
+    logger.warn("ui", "Export not yet implemented on mobile");
     throw new Error("Export not yet implemented on mobile");
   },
   estimateExportSize: async () => {

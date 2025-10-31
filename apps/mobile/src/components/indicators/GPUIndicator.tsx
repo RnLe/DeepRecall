@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 interface GPUStatus {
   available: boolean;
@@ -47,7 +48,7 @@ export function GPUIndicator() {
             return;
           }
         } catch (e) {
-          console.warn("[GPUIndicator] WebGPU check failed:", e);
+          logger.debug("ui", "WebGPU check failed", { error: e });
         }
       }
 
@@ -85,7 +86,7 @@ export function GPUIndicator() {
           loseContext?.loseContext();
         }
       } catch (e) {
-        console.warn("[GPUIndicator] WebGL check failed:", e);
+        logger.debug("ui", "WebGL check failed", { error: e });
       }
 
       setStatus(result);

@@ -10,6 +10,7 @@ import { blobs, paths } from "./schema";
 import { hashFile, hashBuffer } from "./hash";
 import { eq } from "drizzle-orm";
 import { extractFileMetadata, extractBufferMetadata } from "./metadata";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get the library directory path from environment or default
@@ -83,7 +84,10 @@ async function scanDirectory(dirPath: string): Promise<string[]> {
       }
     }
   } catch (error) {
-    console.error(`Error scanning directory ${dirPath}:`, error);
+    logger.error("cas", "Error scanning directory", {
+      dirPath,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return results;
@@ -187,12 +191,16 @@ async function processFile(filePath: string): Promise<boolean> {
         },
       });
 
-    console.log(
-      `Processed: ${path.basename(filePath)} → ${hash.slice(0, 16)}...`
-    );
+    logger.debug("cas", "File processed", {
+      filename: path.basename(filePath),
+      hashPrefix: hash.slice(0, 16),
+    });
     return true;
   } catch (error) {
-    console.error(`Failed to process ${filePath}:`, error);
+    logger.error("cas", "Failed to process file", {
+      filePath,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 }
@@ -227,7 +235,7 @@ export async function scanLibrary(): Promise<{
     }>;
   }>;
 }> {
-  console.log("Starting systematic library scan...");
+  logger.info("cas", "Starting systematic library scan");
 
   const db = getDB();
   const libraryPath = getLibraryPath();
@@ -236,7 +244,7 @@ export async function scanLibrary(): Promise<{
   const avatarsPath = path.join(process.cwd(), "data", "avatars");
   await mkdir(libraryPath, { recursive: true });
   await mkdir(avatarsPath, { recursive: true });
-  console.log(`Ensured directories exist: ${libraryPath}, ${avatarsPath}`);
+  logger.info("cas", "Directories ensured", { libraryPath, avatarsPath });
 
   // Statistics
   let scanned = 0;
@@ -250,9 +258,9 @@ export async function scanLibrary(): Promise<{
   // ========================================
   // STEP 1: Build hard disk file map
   // ========================================
-  console.log("\\n=== Step 1: Scanning hard disk ===");
+  logger.info("cas", "Step 1: Scanning hard disk");
   const diskFiles = await scanDirectory(libraryPath);
-  console.log(`Found ${diskFiles.length} files on disk`);
+  logger.info("cas", "Disk scan complete", { fileCount: diskFiles.length });
 
   // Map: path -> { hash, filename, size, stats }
   const diskFileMap = new Map<
@@ -269,7 +277,10 @@ export async function scanLibrary(): Promise<{
       diskFileMap.set(filePath, { hash, filename, size: stats.size, stats });
       scanned++;
     } catch (error) {
-      console.error(`Failed to hash ${filePath}:`, error);
+      logger.error("cas", "Failed to hash file", {
+        filePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
       failed++;
     }
   }
@@ -286,13 +297,14 @@ export async function scanLibrary(): Promise<{
   // ========================================
   // STEP 2: Build database maps
   // ========================================
-  console.log("\\n=== Step 2: Loading database ===");
+  logger.info("cas", "Step 2: Loading database");
   const existingBlobs = await db.select().from(blobs).all();
   const existingPaths = await db.select().from(paths).all();
 
-  console.log(
-    `Database has ${existingBlobs.length} blobs, ${existingPaths.length} paths`
-  );
+  logger.info("cas", "Database loaded", {
+    blobCount: existingBlobs.length,
+    pathCount: existingPaths.length,
+  });
 
   // Map: hash -> blob
   const hashToBlob = new Map(existingBlobs.map((b) => [b.hash, b]));
@@ -303,7 +315,7 @@ export async function scanLibrary(): Promise<{
   // ========================================
   // STEP 3: Process database queue
   // ========================================
-  console.log("\\n=== Step 3: Processing database queue ===");
+  logger.info("cas", "Step 3: Processing database queue");
   const duplicationQueue: Map<string, Set<string>> = new Map(); // hash -> Set of paths
   const processedDiskPaths = new Set<string>(); // Paths we've already handled
 
@@ -313,7 +325,10 @@ export async function scanLibrary(): Promise<{
 
     if (!diskFile) {
       // File missing from disk
-      console.log(`MISSING: ${dbPath.path} (hash: ${dbHash.slice(0, 16)}...)`);
+      logger.warn("cas", "File missing from disk", {
+        path: dbPath.path,
+        hashPrefix: dbHash.slice(0, 16),
+      });
       await db
         .update(blobs)
         .set({ health: "missing" })
@@ -326,9 +341,10 @@ export async function scanLibrary(): Promise<{
 
       if (pathsWithThisHash.length > 1) {
         // DUPLICATE: Multiple files on disk with this hash
-        console.log(
-          `DUPLICATE: ${dbPath.path} has ${pathsWithThisHash.length} copies on disk`
-        );
+        logger.info("cas", "Duplicate detected", {
+          path: dbPath.path,
+          copyCount: pathsWithThisHash.length,
+        });
 
         // Add all paths to duplication queue
         if (!duplicationQueue.has(dbHash)) {
@@ -355,9 +371,11 @@ export async function scanLibrary(): Promise<{
       }
     } else {
       // File exists but hash changed (edited)
-      console.log(
-        `EDITED: ${dbPath.path} (hash changed from ${dbHash.slice(0, 16)}... to ${diskFile.hash.slice(0, 16)}...)`
-      );
+      logger.info("cas", "File edited (hash changed)", {
+        path: dbPath.path,
+        oldHashPrefix: dbHash.slice(0, 16),
+        newHashPrefix: diskFile.hash.slice(0, 16),
+      });
 
       // Remove old path mapping
       await db.delete(paths).where(eq(paths.path, dbPath.path));
@@ -370,7 +388,7 @@ export async function scanLibrary(): Promise<{
   // ========================================
   // STEP 4: Process remaining disk files
   // ========================================
-  console.log("\\n=== Step 4: Processing new disk files ===");
+  logger.info("cas", "Step 4: Processing new disk files");
 
   for (const [filePath, fileInfo] of diskFileMap.entries()) {
     // Skip if already processed
@@ -385,9 +403,10 @@ export async function scanLibrary(): Promise<{
 
     if (unprocessedPathsWithThisHash.length > 1) {
       // NEW DUPLICATE GROUP
-      console.log(
-        `NEW DUPLICATE: Found ${unprocessedPathsWithThisHash.length} new files with hash ${fileInfo.hash.slice(0, 16)}...`
-      );
+      logger.info("cas", "New duplicate group detected", {
+        fileCount: unprocessedPathsWithThisHash.length,
+        hashPrefix: fileInfo.hash.slice(0, 16),
+      });
 
       if (!duplicationQueue.has(fileInfo.hash)) {
         duplicationQueue.set(fileInfo.hash, new Set());
@@ -401,12 +420,15 @@ export async function scanLibrary(): Promise<{
       const isRelocated = hashToBlob.has(fileInfo.hash);
 
       if (isRelocated) {
-        console.log(
-          `RELOCATED: ${fileInfo.filename} (found at new path: ${filePath})`
-        );
+        logger.info("cas", "File relocated", {
+          filename: fileInfo.filename,
+          newPath: filePath,
+        });
         relocatedFiles++;
       } else {
-        console.log(`NEW: ${fileInfo.filename}`);
+        logger.info("cas", "New file discovered", {
+          filename: fileInfo.filename,
+        });
         newFiles++;
       }
 
@@ -463,7 +485,7 @@ export async function scanLibrary(): Promise<{
   // ========================================
   // STEP 5: Build duplication queue result
   // ========================================
-  console.log("\\n=== Step 5: Building duplication queue ===");
+  logger.info("cas", "Step 5: Building duplication queue");
   const duplicateGroups: Array<{
     hash: string;
     files: Array<{
@@ -489,27 +511,30 @@ export async function scanLibrary(): Promise<{
     });
 
     duplicateGroups.push({ hash, files });
-    console.log(
-      `⚠️  DUPLICATE GROUP: ${files.length} files with hash ${hash.slice(0, 16)}...`
-    );
-    files.forEach((f) => console.log(`   - ${f.filename} (${f.path})`));
+    logger.warn("cas", "Duplicate group requires resolution", {
+      fileCount: files.length,
+      hashPrefix: hash.slice(0, 16),
+      files: files.map((f) => ({ filename: f.filename, path: f.path })),
+    });
   }
 
   // ========================================
   // Summary
   // ========================================
-  console.log("\\n=== Scan Complete ===");
-  console.log(`Scanned: ${scanned} files`);
-  console.log(`Processed: ${processed} files`);
-  console.log(
-    `New: ${newFiles}, Edited: ${editedFiles}, Relocated: ${relocatedFiles}, Missing: ${missingFiles}`
-  );
-  console.log(
-    `Duplicates: ${duplicateGroups.length} groups requiring resolution`
-  );
+  logger.info("cas", "Scan complete", {
+    scanned,
+    processed,
+    newFiles,
+    editedFiles,
+    relocatedFiles,
+    missingFiles,
+    duplicateGroups: duplicateGroups.length,
+  });
 
   if (duplicateGroups.length > 0) {
-    console.log("\\n⚠️  Duplicates found - user resolution required");
+    logger.warn("cas", "Duplicates found - user resolution required", {
+      groupCount: duplicateGroups.length,
+    });
     return {
       scanned,
       processed,
@@ -606,7 +631,7 @@ export async function getPathForHash(hash: string): Promise<string | null> {
 export async function clearDatabase(): Promise<void> {
   const db = getDB();
 
-  console.log("Clearing database...");
+  logger.info("cas", "Clearing database");
 
   // Delete all paths first (foreign key constraint)
   await db.delete(paths);
@@ -614,7 +639,7 @@ export async function clearDatabase(): Promise<void> {
   // Delete all blobs
   await db.delete(blobs);
 
-  console.log("Database cleared");
+  logger.info("cas", "Database cleared");
 }
 
 /**
@@ -641,16 +666,19 @@ export async function storeBlob(
 
   if (existingBlob) {
     // Hash already exists - this is a duplicate file
-    console.log(
-      `DUPLICATE DETECTED: ${filename} → ${hash.slice(0, 16)}... (already exists as ${existingBlob.filename})`
-    );
+    logger.info("cas", "Duplicate detected", {
+      filename,
+      hashPrefix: hash.slice(0, 16),
+      existingFilename: existingBlob.filename,
+    });
 
     // Get existing path for this hash
     const existingPath = await getPathForHash(hash);
 
     if (existingPath) {
-      console.log(`  Reusing existing file at: ${existingPath}`);
-      console.log(`  Skipping duplicate upload (no new file written to disk)`);
+      logger.debug("cas", "Reusing existing file", {
+        path: existingPath,
+      });
 
       // Ensure Electric coordination exists for this blob
       // (It might not if this was uploaded before Electric coordination was implemented)
@@ -662,10 +690,10 @@ export async function storeBlob(
         existingPath,
         deviceId
       ).catch((error) => {
-        console.error(
-          `[CAS] Failed to ensure Electric coordination for duplicate ${hash.slice(0, 16)}...`,
-          error
-        );
+        logger.error("cas", "Failed to ensure Electric coordination", {
+          hashPrefix: hash.slice(0, 16),
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
 
       // Return existing blob info (no new file created)
@@ -689,9 +717,11 @@ export async function storeBlob(
 
   // Write file (idempotent - content-addressed)
   await writeFile(targetPath, buffer);
-  console.log(
-    `NEW FILE: ${filename} → ${hash.slice(0, 16)}... stored at ${targetPath}`
-  );
+  logger.info("blob.upload", "New file stored", {
+    filename,
+    hashPrefix: hash.slice(0, 16),
+    path: targetPath,
+  });
 
   const size = buffer.length;
   const now = Date.now();
@@ -739,10 +769,10 @@ export async function storeBlob(
     metadata,
     deviceId
   ).catch((error) => {
-    console.error(
-      `[CAS] Failed to create Electric coordination for ${hash.slice(0, 16)}...`,
-      error
-    );
+    logger.error("cas", "Failed to create Electric coordination", {
+      hashPrefix: hash.slice(0, 16),
+      error: error instanceof Error ? error.message : String(error),
+    });
     // Don't fail the upload if Electric coordination fails
   });
 
@@ -797,14 +827,15 @@ async function createBlobCoordination(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    console.log(
-      `[CAS] Created Electric coordination for ${sha256.slice(0, 16)}... on device ${finalDeviceId.slice(0, 8)}...`
-    );
+    logger.info("sync.coordination", "Electric coordination created", {
+      hashPrefix: sha256.slice(0, 16),
+      deviceIdPrefix: finalDeviceId.slice(0, 8),
+    });
   } catch (error) {
-    console.error(
-      `[CAS] Electric coordination failed for ${sha256.slice(0, 16)}...`,
-      error
-    );
+    logger.error("sync.coordination", "Electric coordination failed", {
+      hashPrefix: sha256.slice(0, 16),
+      error: error instanceof Error ? error.message : String(error),
+    });
     // Don't re-throw - coordination failure shouldn't break blob storage
   }
 }
@@ -844,21 +875,27 @@ async function ensureBlobCoordination(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn(
-        `[CAS] Could not ensure Electric coordination: ${response.status} - ${errorText}`
+      logger.warn(
+        "sync.coordination",
+        "Could not ensure Electric coordination",
+        {
+          status: response.status,
+          error: errorText,
+        }
       );
       return;
     }
 
-    console.log(
-      `[CAS] Ensured Electric coordination for ${sha256.slice(0, 16)}... on device ${finalDeviceId.slice(0, 8)}...`
-    );
+    logger.debug("sync.coordination", "Electric coordination ensured", {
+      hashPrefix: sha256.slice(0, 16),
+      deviceIdPrefix: finalDeviceId.slice(0, 8),
+    });
   } catch (error) {
     // Silently fail - this is a best-effort operation
-    console.warn(
-      `[CAS] Could not ensure Electric coordination for ${sha256.slice(0, 16)}...`,
-      error
-    );
+    logger.warn("sync.coordination", "Could not ensure Electric coordination", {
+      hashPrefix: sha256.slice(0, 16),
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -899,10 +936,13 @@ export async function deleteBlob(hash: string): Promise<void> {
   if (pathRecord?.path) {
     try {
       await unlink(pathRecord.path);
-      console.log(`Deleted file: ${pathRecord.path}`);
+      logger.info("cas", "File deleted", { path: pathRecord.path });
     } catch (error) {
       // File might already be deleted or not exist - log but don't fail
-      console.warn(`Failed to delete file ${pathRecord.path}:`, error);
+      logger.warn("cas", "Failed to delete file", {
+        path: pathRecord.path,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

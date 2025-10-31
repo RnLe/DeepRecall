@@ -12,6 +12,7 @@ import * as worksMerged from "../repos/works.merged";
 import * as worksCleanup from "../repos/works.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -39,20 +40,23 @@ async function syncElectricToDexie(electricData: Work[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.works.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale work(s)`
-      );
+      logger.info("sync.electric", "Deleted stale works from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.works.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} work(s)`);
+      logger.info("sync.electric", "Synced works from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Works table cleared (0 rows)`);
+      logger.info("sync.electric", "Works table cleared", { count: 0 });
     }
   });
 }
@@ -87,10 +91,9 @@ export function useWorksSync() {
           if (error.name === "DatabaseClosedError") {
             return;
           }
-          console.error(
-            "[useWorksSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync works to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -215,14 +218,16 @@ export function useCreateWork() {
       return worksLocal.createWorkLocal(data);
     },
     onSuccess: (newWork: Work) => {
-      console.log(
-        `✅ [useCreateWork] Created work ${newWork.id} (pending sync)`
-      );
+      logger.info("db.local", "Created work locally (pending sync)", {
+        workId: newWork.id,
+      });
       // Invalidate merged queries to show new work immediately
       queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useCreateWork] Failed to create work:", error);
+      logger.error("db.local", "Failed to create work", {
+        error: error.message,
+      });
     },
   });
 }
@@ -245,12 +250,16 @@ export function useUpdateWork() {
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Work> }) => {
-      console.log(`✅ [useUpdateWork] Updated work ${id} (pending sync)`);
+      logger.info("db.local", "Updated work locally (pending sync)", {
+        workId: id,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useUpdateWork] Failed to update work:", error);
+      logger.error("db.local", "Failed to update work", {
+        error: error.message,
+      });
     },
   });
 }
@@ -267,12 +276,16 @@ export function useDeleteWork() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(`✅ [useDeleteWork] Deleted work ${id} (pending sync)`);
+      logger.info("db.local", "Deleted work locally (pending sync)", {
+        workId: id,
+      });
       // Invalidate merged queries to remove immediately
       queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useDeleteWork] Failed to delete work:", error);
+      logger.error("db.local", "Failed to delete work", {
+        error: error.message,
+      });
     },
   });
 }
@@ -291,10 +304,9 @@ export function useToggleWorkFavorite() {
       });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useToggleWorkFavorite] Failed to toggle favorite:",
-        error
-      );
+      logger.error("db.local", "Failed to toggle work favorite", {
+        error: error.message,
+      });
     },
   });
 }
@@ -332,11 +344,11 @@ export function useCreateWorkWithAsset() {
       return worksElectric.createWorkWithAsset(params);
     },
     onSuccess: ({ work, asset }: { work: any; asset: any }) => {
-      console.log(
-        `✅ [useCreateWorkWithAsset] Created work ${work.id}${
-          asset ? ` with asset ${asset.id}` : ""
-        } (pending sync)`
-      );
+      logger.info("db.local", "Created work with asset (pending sync)", {
+        workId: work.id,
+        hasAsset: !!asset,
+        assetId: asset?.id,
+      });
 
       // Invalidate both works and assets queries
       queryClient.invalidateQueries({ queryKey: ["works", "merged"] });
@@ -344,10 +356,9 @@ export function useCreateWorkWithAsset() {
       queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useCreateWorkWithAsset] Failed to create work with asset:",
-        error
-      );
+      logger.error("db.local", "Failed to create work with asset", {
+        error: error.message,
+      });
     },
   });
 }

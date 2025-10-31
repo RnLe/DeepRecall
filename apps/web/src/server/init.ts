@@ -5,6 +5,7 @@
 
 import { mkdir } from "fs/promises";
 import path from "path";
+import { logger } from "@deeprecall/telemetry";
 
 let initialized = false;
 
@@ -20,9 +21,16 @@ async function ensureDirectories() {
   try {
     await mkdir(libraryPath, { recursive: true });
     await mkdir(dataPath, { recursive: true });
-    console.log("Directories initialized");
+    logger.info("server.api", "Directories initialized", {
+      dataPath,
+      libraryPath,
+    });
   } catch (error) {
-    console.error("Failed to create directories:", error);
+    logger.error("server.api", "Failed to create directories", {
+      error: error instanceof Error ? error.message : String(error),
+      dataPath,
+      libraryPath,
+    });
     throw error;
   }
 }
@@ -30,7 +38,7 @@ async function ensureDirectories() {
 export async function initializeServer() {
   if (initialized) return;
 
-  console.log("Initializing DeepRecall server...");
+  logger.info("server.api", "Initializing DeepRecall server");
 
   // Ensure directories exist
   await ensureDirectories();
@@ -40,5 +48,5 @@ export async function initializeServer() {
   initDB();
 
   initialized = true;
-  console.log("Server ready");
+  logger.info("server.api", "Server ready");
 }

@@ -7,6 +7,7 @@ import type { Collection } from "@deeprecall/core";
 import { CollectionSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -44,9 +45,10 @@ export async function createCollectionLocal(
     payload: validated,
   });
 
-  console.log(
-    `[CollectionsLocal] Created collection ${collection.id} (pending sync)`
-  );
+  logger.info("db.local", "Created collection (pending sync)", {
+    collectionId: collection.id,
+    name: collection.name,
+  });
   return validated;
 }
 
@@ -76,7 +78,10 @@ export async function updateCollectionLocal(
     payload: updated,
   });
 
-  console.log(`[CollectionsLocal] Updated collection ${id} (pending sync)`);
+  logger.info("db.local", "Updated collection (pending sync)", {
+    collectionId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -99,5 +104,7 @@ export async function deleteCollectionLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[CollectionsLocal] Deleted collection ${id} (pending sync)`);
+  logger.info("db.local", "Deleted collection (pending sync)", {
+    collectionId: id,
+  });
 }

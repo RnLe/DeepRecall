@@ -19,6 +19,7 @@ import { tmpdir } from "os";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { eq } from "drizzle-orm";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Import SQLite data (merge or replace)
@@ -77,7 +78,10 @@ async function importSQLiteData(
         blobsImported++;
       }
     } catch (error) {
-      console.warn(`Failed to import blob ${blob.hash}:`, error);
+      logger.warn("server.api", "Failed to import blob during data sync", {
+        hash: blob.hash.substring(0, 12),
+        error: (error as Error).message,
+      });
     }
   }
 
@@ -101,7 +105,10 @@ async function importSQLiteData(
         pathsImported++;
       }
     } catch (error) {
-      console.warn(`Failed to import path ${pathRecord.path}:`, error);
+      logger.warn("server.api", "Failed to import path during data sync", {
+        path: pathRecord.path,
+        error: (error as Error).message,
+      });
     }
   }
 
@@ -139,11 +146,16 @@ async function copyFiles(
         );
         copied++;
       } catch (error) {
-        console.warn(`Failed to copy avatar ${file}:`, error);
+        logger.warn("server.api", "Failed to copy avatar file during import", {
+          file,
+          error: (error as Error).message,
+        });
       }
     }
   } catch (error) {
-    console.warn("Error copying avatars:", error);
+    logger.warn("server.api", "Error copying avatars during import", {
+      error: (error as Error).message,
+    });
   }
 
   // Copy library files
@@ -161,11 +173,16 @@ async function copyFiles(
         await copyFile(sourcePath, destPath);
         copied++;
       } catch (error) {
-        console.warn(`Failed to copy library file ${file}:`, error);
+        logger.warn("server.api", "Failed to copy library file during import", {
+          file,
+          error: (error as Error).message,
+        });
       }
     }
   } catch (error) {
-    console.warn("Error copying library files:", error);
+    logger.warn("server.api", "Error copying library files during import", {
+      error: (error as Error).message,
+    });
   }
 
   // Copy .db files
@@ -177,11 +194,16 @@ async function copyFiles(
         await copyFile(path.join(dbSourceDir, file), path.join(dataDir, file));
         copied++;
       } catch (error) {
-        console.warn(`Failed to copy db file ${file}:`, error);
+        logger.warn("server.api", "Failed to copy db file during import", {
+          file,
+          error: (error as Error).message,
+        });
       }
     }
   } catch (error) {
-    console.warn("Error copying db files:", error);
+    logger.warn("server.api", "Error copying db files during import", {
+      error: (error as Error).message,
+    });
   }
 
   return copied;
@@ -284,7 +306,9 @@ export async function POST(request: NextRequest) {
       throw error;
     }
   } catch (error) {
-    console.error("Import execute error:", error);
+    logger.error("server.api", "Failed to execute import", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       {
         error: "Failed to execute import",

@@ -7,6 +7,7 @@ import { FilePicker } from "@capawesome/capacitor-file-picker";
 import type { PickFilesResult } from "@capawesome/capacitor-file-picker";
 import { useCapacitorBlobStorage } from "../hooks/useBlobStorage";
 import { assets } from "@deeprecall/data";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Supported file types for upload
@@ -88,7 +89,10 @@ export function useFileUpload() {
 
           successCount++;
         } catch (error) {
-          console.error(`Failed to upload ${file.name}:`, error);
+          logger.error("blob.upload", "Failed to upload file", {
+            filename: file.name,
+            error,
+          });
           errors.push(
             `${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`
           );
@@ -101,7 +105,7 @@ export function useFileUpload() {
         errors,
       };
     } catch (error) {
-      console.error("File picker error:", error);
+      logger.error("blob.upload", "File picker error", { error });
       return {
         success: 0,
         failed: 1,

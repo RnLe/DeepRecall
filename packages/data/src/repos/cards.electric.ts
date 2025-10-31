@@ -6,6 +6,7 @@ import type { Card, ReviewLog } from "@deeprecall/core";
 import { CardSchema, ReviewLogSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 export function useCards() {
   return useShape<Card>({ table: "cards" });
@@ -52,7 +53,7 @@ export async function createCard(
   };
   const validated = CardSchema.parse(card);
   await buffer.enqueue({ table: "cards", op: "insert", payload: validated });
-  console.log(`[CardsRepo] Created card ${card.id} (enqueued)`);
+  logger.info("db.local", "Created card", { cardId: card.id });
   return validated;
 }
 
@@ -65,12 +66,12 @@ export async function updateCard(
     op: "update",
     payload: { id, ...updates },
   });
-  console.log(`[CardsRepo] Updated card ${id} (enqueued)`);
+  logger.info("db.local", "Updated card", { cardId: id });
 }
 
 export async function deleteCard(id: string): Promise<void> {
   await buffer.enqueue({ table: "cards", op: "delete", payload: { id } });
-  console.log(`[CardsRepo] Deleted card ${id} (enqueued)`);
+  logger.info("db.local", "Deleted card", { cardId: id });
 }
 
 export async function createReviewLog(log: ReviewLog): Promise<ReviewLog> {
@@ -80,7 +81,7 @@ export async function createReviewLog(log: ReviewLog): Promise<ReviewLog> {
     op: "insert",
     payload: validated,
   });
-  console.log(`[CardsRepo] Created review log ${log.id} (enqueued)`);
+  logger.info("db.local", "Created review log", { logId: log.id });
   return validated;
 }
 

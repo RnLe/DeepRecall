@@ -26,6 +26,7 @@ import { pipeline } from "stream";
 import { createGzip } from "zlib";
 import { tmpdir } from "os";
 import { randomBytes } from "crypto";
+import { logger } from "@deeprecall/telemetry";
 
 const pipelineAsync = promisify(pipeline);
 
@@ -84,7 +85,13 @@ async function getFileManifest(): Promise<FileManifest> {
       manifest.totalSize += stats.size;
     }
   } catch (err) {
-    console.warn("Could not read avatars directory:", err);
+    logger.warn(
+      "server.api",
+      "Could not read avatars directory during export",
+      {
+        error: (err as Error).message,
+      }
+    );
   }
 
   // List library files (recursively)
@@ -116,7 +123,13 @@ async function getFileManifest(): Promise<FileManifest> {
 
     manifest.libraryFiles = await listFiles(libraryDir, libraryDir);
   } catch (err) {
-    console.warn("Could not read library directory:", err);
+    logger.warn(
+      "server.api",
+      "Could not read library directory during export",
+      {
+        error: (err as Error).message,
+      }
+    );
   }
 
   // List .db files
@@ -132,7 +145,9 @@ async function getFileManifest(): Promise<FileManifest> {
       }
     }
   } catch (err) {
-    console.warn("Could not read .db files:", err);
+    logger.warn("server.api", "Could not read .db files during export", {
+      error: (err as Error).message,
+    });
   }
 
   return manifest;
@@ -228,7 +243,14 @@ async function createArchive(
           const content = await readFile(sourcePath);
           await writeFile(destPath, content);
         } catch (err) {
-          console.warn(`Could not copy avatar ${file}:`, err);
+          logger.warn(
+            "server.api",
+            "Could not copy avatar file during export",
+            {
+              file,
+              error: (err as Error).message,
+            }
+          );
         }
       }
 
@@ -246,7 +268,14 @@ async function createArchive(
           const content = await readFile(sourcePath);
           await writeFile(destPath, content);
         } catch (err) {
-          console.warn(`Could not copy library file ${file}:`, err);
+          logger.warn(
+            "server.api",
+            "Could not copy library file during export",
+            {
+              file,
+              error: (err as Error).message,
+            }
+          );
         }
       }
 
@@ -261,7 +290,10 @@ async function createArchive(
           await writeFile(destPath, content);
         } catch (err) {
           // OK if file doesn't exist (e.g., -shm and -wal)
-          console.warn(`Could not copy db file ${file}:`, err);
+          logger.warn("server.api", "Could not copy db file during export", {
+            file,
+            error: (err as Error).message,
+          });
         }
       }
     }
@@ -366,7 +398,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Export error:", error);
+    logger.error("server.api", "Failed to create export", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       {
         error: "Failed to create export",

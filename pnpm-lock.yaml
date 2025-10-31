@@ -32,6 +32,9 @@ importers:
       '@deeprecall/pdf':
         specifier: workspace:*
         version: link:../../packages/pdf
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@deeprecall/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -135,6 +138,9 @@ importers:
       '@deeprecall/pdf':
         specifier: workspace:*
         version: link:../../packages/pdf
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@deeprecall/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -214,6 +220,9 @@ importers:
       '@deeprecall/pdf':
         specifier: workspace:*
         version: link:../../packages/pdf
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@tanstack/react-query':
         specifier: ^5.90.3
         version: 5.90.5(react@19.2.0)
@@ -368,6 +377,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
@@ -387,6 +399,9 @@ importers:
       '@deeprecall/core':
         specifier: workspace:*
         version: link:../core
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       '@electric-sql/client':
         specifier: ^1.0.0
         version: 1.1.1
@@ -424,6 +439,9 @@ importers:
       '@deeprecall/core':
         specifier: workspace:*
         version: link:../core
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       pdfjs-dist:
         specifier: ^5.0.0
         version: 5.4.296
@@ -436,6 +454,12 @@ importers:
         version: 19.2.2
       typescript:
         specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/telemetry:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
         version: 5.9.3
 
   packages/ui:
@@ -452,6 +476,9 @@ importers:
       '@deeprecall/pdf':
         specifier: workspace:*
         version: link:../pdf
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       '@deeprecall/whiteboard':
         specifier: workspace:*
         version: link:../whiteboard
@@ -510,6 +537,9 @@ importers:
       '@deeprecall/core':
         specifier: workspace:*
         version: link:../core
+      '@deeprecall/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       comlink:
         specifier: ^4.4.1
         version: 4.4.2
@@ -2212,8 +2242,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  baseline-browser-mapping@2.8.21:
-    resolution: {integrity: sha512-JU0h5APyQNsHOlAM7HnQnPToSDQoEBZqzu/YBlqDnEeymPnZDREeXJA3KBMQee+dKteAxZ2AtvQEvVYdZf241Q==}
+  baseline-browser-mapping@2.8.22:
+    resolution: {integrity: sha512-/tk9kky/d8T8CTXIQYASLyhAxR5VwL3zct1oAoVTaOUHwrmsGnfbRwNdEq+vOl2BN8i3PcDdP0o4Q+jjKQoFbQ==}
     hasBin: true
 
   better-sqlite3@12.4.1:
@@ -2274,8 +2304,8 @@ packages:
     resolution: {integrity: sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==}
     engines: {node: '>=6'}
 
-  caniuse-lite@1.0.30001751:
-    resolution: {integrity: sha512-A0QJhug0Ly64Ii3eIqHu5X51ebln3k4yTUkY1j8drqpWHVreg/VLijN48cZ1bYPiqOQuqpkIKnzr/Ul8V+p6Cw==}
+  caniuse-lite@1.0.30001752:
+    resolution: {integrity: sha512-vKUk7beoukxE47P5gcVNKkDRzXdVofotshHwfR9vmpeFKxmI5PBpgOMC18LUJUA/DvJ70Y7RveasIBraqsyO/g==}
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
@@ -5979,7 +6009,7 @@ snapshots:
   autoprefixer@10.4.21(postcss@8.5.6):
     dependencies:
       browserslist: 4.27.0
-      caniuse-lite: 1.0.30001751
+      caniuse-lite: 1.0.30001752
       fraction.js: 4.3.7
       normalize-range: 0.1.2
       picocolors: 1.1.1
@@ -6000,7 +6030,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  baseline-browser-mapping@2.8.21: {}
+  baseline-browser-mapping@2.8.22: {}
 
   better-sqlite3@12.4.1:
     dependencies:
@@ -6038,8 +6068,8 @@ snapshots:
 
   browserslist@4.27.0:
     dependencies:
-      baseline-browser-mapping: 2.8.21
-      caniuse-lite: 1.0.30001751
+      baseline-browser-mapping: 2.8.22
+      caniuse-lite: 1.0.30001752
       electron-to-chromium: 1.5.244
       node-releases: 2.0.27
       update-browserslist-db: 1.1.4(browserslist@4.27.0)
@@ -6072,7 +6102,7 @@ snapshots:
 
   callsites@3.1.0: {}
 
-  caniuse-lite@1.0.30001751: {}
+  caniuse-lite@1.0.30001752: {}
 
   ccount@2.0.1: {}
 
@@ -7721,7 +7751,7 @@ snapshots:
     dependencies:
       '@next/env': 15.5.6
       '@swc/helpers': 0.5.15
-      caniuse-lite: 1.0.30001751
+      caniuse-lite: 1.0.30001752
       postcss: 8.4.31
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)

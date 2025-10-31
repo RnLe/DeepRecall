@@ -9,6 +9,7 @@ import { useState } from "react";
 import type { ActivityType } from "@deeprecall/core";
 import { Calendar, X } from "lucide-react";
 import { useCreateActivity } from "@deeprecall/data/hooks";
+import { logger } from "@deeprecall/telemetry";
 
 interface CreateActivityDialogProps {
   isOpen: boolean;
@@ -65,7 +66,11 @@ export function CreateActivityDialog({
       onSuccess();
       handleClose();
     } catch (error) {
-      console.error("Failed to create activity:", error);
+      logger.error("ui", "Failed to create activity", {
+        error,
+        activityType,
+        title,
+      });
       alert(
         `Failed to create activity: ${
           error instanceof Error ? error.message : "Unknown error"

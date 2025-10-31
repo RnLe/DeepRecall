@@ -14,6 +14,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, X, Move } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 interface CropRegion {
   x: number; // 0-1 normalized
@@ -504,7 +505,7 @@ export function ImageCropper({
       await onSave({ originalBlob, displayBlob, cropRegion });
     } catch (err) {
       setError("Failed to save image");
-      console.error(err);
+      logger.error("ui", "Failed to save cropped image", { error: err });
     } finally {
       setIsProcessing(false);
     }

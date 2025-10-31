@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Sync Electric data to Dexie (replace entire table)
@@ -25,15 +26,18 @@ async function syncElectricToDexie(electricData: BlobMeta[]): Promise<void> {
 
     if (idsToDelete.length > 0) {
       await db.blobsMeta.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale blobs_meta`
-      );
+      logger.info("cas", "Deleted stale blobs_meta from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
     if (electricData.length > 0) {
       await db.blobsMeta.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} blobs_meta`);
+      logger.info("cas", "Synced blobs_meta from Electric to Dexie", {
+        count: electricData.length,
+      });
     } else if (idsToDelete.length === 0 && currentIds.size === 0) {
-      console.log(`[Electric→Dexie] blobs_meta: empty (no changes)`);
+      logger.info("cas", "blobs_meta table empty", { count: 0 });
     }
   });
 }
@@ -66,10 +70,9 @@ export function useBlobsMetaSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useBlobsMetaSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("cas", "Failed to sync blobs_meta to Dexie", {
+            error: (error as Error).message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -95,7 +98,9 @@ export function useBlobsMeta() {
         const data = await db.blobsMeta.toArray();
         return data;
       } catch (error) {
-        console.error("[useBlobsMeta] Error:", error);
+        logger.error("cas", "Failed to query blobs_meta", {
+          error: (error as Error).message,
+        });
         return []; // Always return array, never undefined
       }
     },

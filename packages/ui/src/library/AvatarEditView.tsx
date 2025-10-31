@@ -6,6 +6,7 @@
 
 import type { Author, CropRegion } from "@deeprecall/core";
 import { Trash2 } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 interface AvatarEditViewProps {
   author: Author;
@@ -77,7 +78,10 @@ export function AvatarEditView({
       alert("Avatar updated successfully!");
       onBack();
     } catch (error) {
-      console.error("Failed to update avatar:", error);
+      logger.error("ui", "Failed to update author avatar", {
+        error,
+        authorId: author.id,
+      });
       alert("Failed to update avatar. Please try again.");
     }
   };
@@ -109,7 +113,10 @@ export function AvatarEditView({
       alert("Avatar removed successfully!");
       onBack();
     } catch (error) {
-      console.error("Failed to remove avatar:", error);
+      logger.error("ui", "Failed to remove author avatar", {
+        error,
+        authorId: author.id,
+      });
       alert("Failed to remove avatar. Please try again.");
     }
   };

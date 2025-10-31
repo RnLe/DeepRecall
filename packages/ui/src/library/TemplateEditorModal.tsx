@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Lock,
 } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 type FieldType =
   | "text"
@@ -261,7 +262,11 @@ export function TemplateEditorModal({
       });
       onClose();
     } catch (error) {
-      console.error("Failed to save template:", error);
+      logger.error("ui", "Failed to save template", {
+        error,
+        presetId: preset.id,
+        name: name.trim(),
+      });
     } finally {
       setIsSaving(false);
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPostgresPool } from "@/app/api/lib/postgres";
 import { getClientWithRetry } from "@/app/api/lib/postgres-client";
+import { logger } from "@deeprecall/telemetry";
 
 // Valid Postgres table names
 const VALID_TABLES = [
@@ -42,10 +43,10 @@ export async function GET(
     try {
       client = await pool.connect();
     } catch (poolError) {
-      console.error(
-        `[PostgresAdmin] Pool connection timeout for ${tableName}:`,
-        poolError
-      );
+      logger.error("db.postgres", "Connection pool exhausted", {
+        table: tableName,
+        error: (poolError as Error).message,
+      });
       return NextResponse.json(
         {
           error: "Database connection pool exhausted",
@@ -61,7 +62,10 @@ export async function GET(
 
     return NextResponse.json(result.rows);
   } catch (error) {
-    console.error("Error fetching Postgres data:", error);
+    logger.error("server.api", "Failed to fetch Postgres table data", {
+      table: (await params).table,
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       {
         error: "Failed to fetch data",

@@ -8,6 +8,7 @@
 import { useBoards, useCreateBoard, useDeleteBoard } from "@deeprecall/data";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 export default function BoardsPage() {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ export default function BoardsPage() {
       setNewBoardTitle("");
       navigate(`/board/${board.id}`);
     } catch (error) {
-      console.error("Failed to create board:", error);
+      logger.error("ui", "Failed to create board", { error });
     } finally {
       setIsCreating(false);
     }
@@ -46,7 +47,7 @@ export default function BoardsPage() {
     try {
       await deleteBoard.mutateAsync(id);
     } catch (error) {
-      console.error("Failed to delete board:", error);
+      logger.error("ui", "Failed to delete board", { boardId: id, error });
     }
   };
 

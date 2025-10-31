@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { eq } from "drizzle-orm";
+import { logger } from "@deeprecall/telemetry";
 
 export async function DELETE(
   request: Request,
@@ -43,13 +44,17 @@ export async function DELETE(
       // Delete blob metadata (will cascade delete device_blobs via FK)
       await deleteBlobMetaServer(hash);
 
-      console.log(
-        `[AdminAPI] Deleted Electric entries for blob ${hash.slice(0, 16)}...`
-      );
+      logger.info("sync.coordination", "Blob deleted from CAS and Electric", {
+        hash: hash.slice(0, 16),
+      });
     } catch (electricError) {
-      console.warn(
-        `[AdminAPI] Failed to delete Electric entries for ${hash.slice(0, 16)}...`,
-        electricError
+      logger.warn(
+        "sync.coordination",
+        "Blob deleted from CAS but failed to sync to Electric",
+        {
+          hash: hash.slice(0, 16),
+          error: (electricError as Error).message,
+        }
       );
       // Continue anyway - CAS deletion succeeded
     }
@@ -59,7 +64,10 @@ export async function DELETE(
       message: `Blob ${hash.slice(0, 16)}... deleted`,
     });
   } catch (error) {
-    console.error("Error deleting blob:", error);
+    logger.error("server.api", "Failed to delete blob", {
+      hash: (await params).hash.slice(0, 16),
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to delete blob" },
       { status: 500 }

@@ -7,6 +7,7 @@
 
 import { ShapeStream, Shape } from "@electric-sql/client";
 import { useState, useEffect, useRef } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Electric configuration
@@ -78,10 +79,11 @@ function parseJsonbColumns<T>(table: string, row: any): T {
       try {
         result[camelKey] = JSON.parse(value);
       } catch (error) {
-        console.warn(
-          `[Electric] Failed to parse JSONB column ${key} in ${table}:`,
-          error
-        );
+        logger.warn("sync.electric", "Failed to parse JSONB column", {
+          table,
+          column: key,
+          error: error instanceof Error ? error.message : String(error),
+        });
         result[camelKey] = value;
       }
     } else {
@@ -172,7 +174,10 @@ let electricConfig: ElectricConfig | null = null;
  */
 export function initElectric(config: ElectricConfig): void {
   electricConfig = config;
-  console.log(`[Electric] Initialized with URL: ${config.url}`);
+  logger.info("sync.electric", "Initialized Electric", {
+    url: config.url,
+    mode: config.mode,
+  });
 }
 
 /**
@@ -190,7 +195,9 @@ export function getElectricConfig(): ElectricConfig {
  * Useful for development/debugging or when resetting the database
  */
 export function clearElectricCache(): void {
-  console.log(`[Electric] Clearing ${shapeCache.size} cached connections`);
+  logger.info("sync.electric", "Clearing cached connections", {
+    count: shapeCache.size,
+  });
   shapeCache.clear();
 }
 
@@ -288,11 +295,11 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
 
     // Reuse existing connection if available
     if (cached) {
-      console.log(
-        `[Electric] Reusing cached shape: ${spec.table}${
-          spec.where ? ` (${spec.where})` : ""
-        }${cached.hasReceivedFreshData ? " (fresh data)" : " (stale cache)"}`
-      );
+      logger.debug("sync.electric", "Reusing cached shape", {
+        table: spec.table,
+        where: spec.where,
+        hasFreshData: cached.hasReceivedFreshData,
+      });
       streamRef.current = cached.stream;
       shapeRef.current = cached.shape;
 
@@ -349,12 +356,12 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
 
     shapeUrl += `?${params.toString()}`;
 
-    console.log(
-      `[Electric] Subscribing to shape: ${spec.table}${
-        spec.where ? ` (${spec.where})` : ""
-      } (mode: ${SYNC_MODE})`
-    );
-    console.log(`[Electric] Shape URL: ${shapeUrl}`);
+    logger.info("sync.electric", "Subscribing to shape", {
+      table: spec.table,
+      where: spec.where,
+      mode: SYNC_MODE,
+      shapeUrl,
+    });
     setSyncStatus("connecting");
 
     // Create shape stream
@@ -380,9 +387,10 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     // Subscribe to shape changes
     const unsubscribe = shape.subscribe((shapeData) => {
       const parsedRows = normalizeShapeRows<T>(spec.table, shapeData);
-      console.log(
-        `[Electric] Shape updated: ${spec.table} (${parsedRows.length} rows)`
-      );
+      logger.debug("sync.electric", "Shape updated", {
+        table: spec.table,
+        rowCount: parsedRows.length,
+      });
 
       updateStateFromRows(parsedRows, true);
 
@@ -409,15 +417,18 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
         // This happens during database clear operations and is expected
         const error = err as any;
         if (error.status === 409 || error.message?.includes("409")) {
-          console.log(
-            `[Electric] Shape conflict for ${spec.table} (table cleared)`
-          );
+          logger.info("sync.electric", "Shape conflict (table cleared)", {
+            table: spec.table,
+          });
           setSyncStatus("error");
           setIsLoading(false);
           return;
         }
 
-        console.error(`[Electric] Shape error for ${spec.table}:`, err);
+        logger.error("sync.electric", "Shape error", {
+          table: spec.table,
+          error: err instanceof Error ? err.message : String(err),
+        });
         setError(err as Error);
         setSyncStatus("error");
         setIsLoading(false);
@@ -432,13 +443,17 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
       lastUpdateTime: Date.now(),
       hasReceivedFreshData: false, // Will be set true on first network update
     });
-    console.log(`[Electric] Cached shape connection: ${cacheKey}`);
+    logger.debug("sync.electric", "Cached shape connection", { cacheKey });
 
     // Cleanup on unmount - DON'T close connection, keep it alive for cache
     return () => {
       // Connection stays alive in cache for hot reloads
-      console.log(
-        `[Electric] Component unmounted, keeping connection alive: ${spec.table}`
+      logger.debug(
+        "sync.electric",
+        "Component unmounted, keeping connection alive",
+        {
+          table: spec.table,
+        }
       );
     };
   }, [spec.table, spec.where, spec.columns?.join(",")]);
@@ -474,11 +489,10 @@ export async function queryShape<T = any>(spec: ShapeSpec<T>): Promise<T[]> {
 
   shapeUrl += `?${params.toString()}`;
 
-  console.log(
-    `[Electric] Querying shape: ${spec.table}${
-      spec.where ? ` (${spec.where})` : ""
-    }`
-  );
+  logger.info("sync.electric", "Querying shape", {
+    table: spec.table,
+    where: spec.where,
+  });
 
   // Create temporary stream and shape
   const stream = new ShapeStream({

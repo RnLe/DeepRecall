@@ -13,6 +13,7 @@ import * as assetsMerged from "../repos/assets.merged";
 import * as assetsCleanup from "../repos/assets.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 import { useEdges } from "./useEdges";
 
 // ============================================================================
@@ -41,20 +42,23 @@ async function syncElectricToDexie(electricData: Asset[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.assets.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale asset(s)`
-      );
+      logger.info("sync.electric", "Deleted stale assets from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.assets.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} asset(s)`);
+      logger.info("sync.electric", "Synced assets from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Assets table cleared (0 rows)`);
+      logger.info("sync.electric", "Assets table cleared", { count: 0 });
     }
   });
 }
@@ -87,10 +91,9 @@ export function useAssetsSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useAssetsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync assets to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -104,7 +107,9 @@ export function useAssetsSync() {
     ) {
       assetsCleanup.cleanupSyncedAssets(electricResult.data).catch((error) => {
         if (error.name === "DatabaseClosedError") return;
-        console.error("[useAssetsSync] Failed to cleanup:", error);
+        logger.error("db.local", "Failed to cleanup assets", {
+          error: error.message,
+        });
       });
     }
   }, [
@@ -208,9 +213,10 @@ export function useCreateAsset() {
       return assetsLocal.createAssetLocal(data);
     },
     onSuccess: (newAsset: Asset) => {
-      console.log(
-        `✅ [useCreateAsset] Created asset ${newAsset.id} (pending sync)`
-      );
+      logger.info("db.local", "Created asset locally (pending sync)", {
+        assetId: newAsset.id,
+        workId: newAsset.workId,
+      });
       // Invalidate merged queries to show new asset immediately
       queryClient.invalidateQueries({ queryKey: ["assets", "merged"] });
       if (newAsset.workId) {
@@ -220,7 +226,9 @@ export function useCreateAsset() {
       }
     },
     onError: (error: Error) => {
-      console.error("❌ [useCreateAsset] Failed to create asset:", error);
+      logger.error("db.local", "Failed to create asset", {
+        error: error.message,
+      });
     },
   });
 }
@@ -243,12 +251,16 @@ export function useUpdateAsset() {
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Asset> }) => {
-      console.log(`✅ [useUpdateAsset] Updated asset ${id} (pending sync)`);
+      logger.info("db.local", "Updated asset locally (pending sync)", {
+        assetId: id,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["assets", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useUpdateAsset] Failed to update asset:", error);
+      logger.error("db.local", "Failed to update asset", {
+        error: error.message,
+      });
     },
   });
 }
@@ -265,12 +277,16 @@ export function useDeleteAsset() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(`✅ [useDeleteAsset] Deleted asset ${id} (pending sync)`);
+      logger.info("db.local", "Deleted asset locally (pending sync)", {
+        assetId: id,
+      });
       // Invalidate merged queries to remove immediately
       queryClient.invalidateQueries({ queryKey: ["assets", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useDeleteAsset] Failed to delete asset:", error);
+      logger.error("db.local", "Failed to delete asset", {
+        error: error.message,
+      });
     },
   });
 }

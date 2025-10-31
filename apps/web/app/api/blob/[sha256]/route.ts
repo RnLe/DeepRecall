@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { getBlobByHash, getPathForHash } from "@/src/server/cas";
 import { readFile } from "fs/promises";
+import { logger } from "@deeprecall/telemetry";
 
 export async function GET(
   request: Request,
@@ -40,7 +41,10 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Error serving blob:", error);
+    logger.error("blob.download", "Failed to serve blob", {
+      sha256: (await params).sha256,
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to serve blob" },
       { status: 500 }

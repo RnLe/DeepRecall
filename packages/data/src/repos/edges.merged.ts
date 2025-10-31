@@ -6,6 +6,7 @@
 
 import type { Edge, Relation } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 export interface MergedEdge extends Edge {
   _local?: {
@@ -141,7 +142,9 @@ export async function getAllMergedEdges(): Promise<MergedEdge[]> {
     const local = await db.edges_local.toArray();
     return mergeEdges(synced, local);
   } catch (error) {
-    console.error("[getAllMergedEdges] Error:", error);
+    logger.error("db.local", "Failed to get all merged edges", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -165,7 +168,10 @@ export async function getMergedEdge(
     const merged = await mergeEdges(allEdges, local);
     return merged[0];
   } catch (error) {
-    console.error("[getMergedEdge] Error:", error);
+    logger.error("db.local", "Failed to get merged edge", {
+      edgeId: id,
+      error: String(error),
+    });
     return undefined;
   }
 }
@@ -183,7 +189,10 @@ export async function getMergedEdgesFrom(
     // Filter for fromId (local changes might have different fromId)
     return allMerged.filter((e) => e.fromId === fromId);
   } catch (error) {
-    console.error("[getMergedEdgesFrom] Error:", error);
+    logger.error("db.local", "Failed to get merged edges from", {
+      fromId,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -199,7 +208,10 @@ export async function getMergedEdgesTo(toId: string): Promise<MergedEdge[]> {
     // Filter for toId (local changes might have different toId)
     return allMerged.filter((e) => e.toId === toId);
   } catch (error) {
-    console.error("[getMergedEdgesTo] Error:", error);
+    logger.error("db.local", "Failed to get merged edges to", {
+      toId,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -215,7 +227,11 @@ export async function getMergedEdgesByRelation(
     const allEdges = await getMergedEdgesFrom(fromId);
     return allEdges.filter((e) => e.relation === relation);
   } catch (error) {
-    console.error("[getMergedEdgesByRelation] Error:", error);
+    logger.error("db.local", "Failed to get merged edges by relation", {
+      fromId,
+      relation,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

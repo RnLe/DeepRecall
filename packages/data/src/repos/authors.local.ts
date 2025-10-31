@@ -7,6 +7,7 @@ import type { Author } from "@deeprecall/core";
 import { AuthorSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -44,7 +45,9 @@ export async function createAuthorLocal(
     payload: validated,
   });
 
-  console.log(`[AuthorsLocal] Created author ${author.id} (pending sync)`);
+  logger.info("db.local", "Created author (pending sync)", {
+    authorId: author.id,
+  });
   return validated;
 }
 
@@ -74,7 +77,7 @@ export async function updateAuthorLocal(
     payload: updated,
   });
 
-  console.log(`[AuthorsLocal] Updated author ${id} (pending sync)`);
+  logger.info("db.local", "Updated author (pending sync)", { authorId: id });
 }
 
 /**
@@ -97,5 +100,5 @@ export async function deleteAuthorLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[AuthorsLocal] Deleted author ${id} (pending sync)`);
+  logger.info("db.local", "Deleted author (pending sync)", { authorId: id });
 }

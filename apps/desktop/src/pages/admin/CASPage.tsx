@@ -15,6 +15,7 @@ import {
   SimplePDFViewer,
 } from "@deeprecall/ui";
 import type { DuplicateGroup } from "@deeprecall/ui";
+import { logger } from "@deeprecall/telemetry";
 
 export default function CASPage() {
   const queryClient = useQueryClient();
@@ -53,7 +54,7 @@ export default function CASPage() {
 
     clearDatabase: async (): Promise<void> => {
       // Step 1: Clear Dexie first (optimistic - instant UI update)
-      console.log("Clearing local Dexie database (optimistic)...");
+      logger.info("cas", "Clearing local Dexie database (optimistic)");
       const { db } = await import("@deeprecall/data/db");
 
       await db.transaction(
@@ -120,7 +121,7 @@ export default function CASPage() {
         }
       );
 
-      console.log("✅ Dexie cleared");
+      logger.info("cas", "Dexie cleared");
 
       // Step 2: Invalidate React Query to show empty state
       queryClient.clear();
@@ -130,12 +131,12 @@ export default function CASPage() {
         queryClient.refetchQueries({ queryKey: ["device-blobs"] }),
       ]);
 
-      console.log("✅ React Query cleared");
+      logger.info("cas", "React Query cleared");
 
       // Step 3: Clear Postgres via Tauri command
       await invoke("clear_all_database");
 
-      console.log("✅ Postgres cleared");
+      logger.info("cas", "Postgres cleared");
     },
 
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
@@ -146,7 +147,9 @@ export default function CASPage() {
           orphanedOnly: false,
         });
 
-        console.log(`[SyncToElectric] Found ${localBlobs.length} blobs in CAS`);
+        logger.info("sync.coordination", "Found blobs in CAS", {
+          count: localBlobs.length,
+        });
 
         // Use write buffer repos to coordinate blobs
         const { coordinateBlobUploadAuto } = await import(
@@ -171,17 +174,18 @@ export default function CASPage() {
             );
             synced++;
           } catch (err) {
-            console.error(
-              `Failed to coordinate blob ${blob.sha256.slice(0, 16)}:`,
-              err
-            );
+            logger.error("sync.coordination", "Failed to coordinate blob", {
+              sha256: blob.sha256,
+              error: err,
+            });
             failed++;
           }
         }
 
-        console.log(
-          `[SyncToElectric] Coordinated ${synced} blobs, ${failed} failed`
-        );
+        logger.info("sync.coordination", "Blob coordination complete", {
+          synced,
+          failed,
+        });
 
         // Invalidate Electric queries to trigger refetch
         await Promise.all([
@@ -213,7 +217,10 @@ export default function CASPage() {
       }>
     ): Promise<void> => {
       // Tauri implementation - would need a Rust command for this
-      console.log("Resolving duplicates:", mode, resolutions);
+      logger.info("cas", "Resolving duplicates", {
+        mode,
+        count: resolutions.length,
+      });
       // For now, just delete the duplicate blobs
       for (const resolution of resolutions) {
         if (resolution.deletePaths) {

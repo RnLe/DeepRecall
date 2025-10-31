@@ -6,6 +6,7 @@
 
 import type { Author } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 export interface MergedAuthor extends Author {
   _local?: {
@@ -141,7 +142,9 @@ export async function getAllMergedAuthors(): Promise<MergedAuthor[]> {
     const local = await db.authors_local.toArray();
     return mergeAuthors(synced, local);
   } catch (error) {
-    console.error("[getAllMergedAuthors] Error:", error);
+    logger.error("db.local", "Failed to get all merged authors", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -165,7 +168,10 @@ export async function getMergedAuthor(
     const merged = await mergeAuthors(allAuthors, local);
     return merged[0];
   } catch (error) {
-    console.error("[getMergedAuthor] Error:", error);
+    logger.error("db.local", "Failed to get merged author", {
+      authorId: id,
+      error: String(error),
+    });
     return undefined;
   }
 }
@@ -181,7 +187,10 @@ export async function getMergedAuthorsByIds(
     const local = await db.authors_local.where("id").anyOf(ids).toArray();
     return mergeAuthors(synced, local);
   } catch (error) {
-    console.error("[getMergedAuthorsByIds] Error:", error);
+    logger.error("db.local", "Failed to get merged authors by IDs", {
+      count: ids.length,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -201,7 +210,10 @@ export async function searchMergedAuthorsByName(
         a.lastName.toLowerCase().includes(lower)
     );
   } catch (error) {
-    console.error("[searchMergedAuthorsByName] Error:", error);
+    logger.error("db.local", "Failed to search merged authors by name", {
+      query,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PDFPageProxy } from "@deeprecall/pdf";
+import { logger } from "@deeprecall/telemetry";
 
 export interface PDFTextLayerProps {
   page: PDFPageProxy;
@@ -138,7 +139,11 @@ export function PDFTextLayer({
 
         setIsReady(true);
       } catch (error) {
-        console.error("Failed to render text/annotation layers:", error);
+        logger.error("pdf", "Failed to render text/annotation layers", {
+          error,
+          pageNum: page.pageNumber,
+          scale,
+        });
       }
     };
 

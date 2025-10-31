@@ -13,6 +13,7 @@
 import Dexie, { type EntityTable } from "dexie";
 import { v4 as uuidv4 } from "uuid";
 import type { z } from "zod";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Write operation types
@@ -161,9 +162,11 @@ export function createWriteBuffer(): WriteBuffer {
       };
 
       await writeBufferDB.changes.add(writeChange);
-      console.log(
-        `[WriteBuffer] Enqueued ${change.op} on ${change.table} (id: ${writeChange.id})`
-      );
+      logger.info("sync.writeBuffer", "Operation enqueued", {
+        table: change.table,
+        op: change.op,
+        changeId: writeChange.id,
+      });
 
       return writeChange;
     },
@@ -194,7 +197,9 @@ export function createWriteBuffer(): WriteBuffer {
         await writeBufferDB.changes.update(update.id, update);
       }
 
-      console.log(`[WriteBuffer] Marked ${ids.length} changes as applied`);
+      logger.info("sync.writeBuffer", "Changes marked as applied", {
+        count: ids.length,
+      });
     },
 
     async markFailed(ids, errors) {
@@ -215,7 +220,10 @@ export function createWriteBuffer(): WriteBuffer {
         }
       }
 
-      console.warn(`[WriteBuffer] Marked ${ids.length} changes as failed`);
+      logger.warn("sync.writeBuffer", "Changes marked as failed", {
+        count: ids.length,
+        errors: errors.slice(0, 3), // Log first 3 errors
+      });
     },
 
     async size() {
@@ -228,12 +236,12 @@ export function createWriteBuffer(): WriteBuffer {
 
     async clear() {
       await writeBufferDB.changes.clear();
-      console.log("[WriteBuffer] Cleared all changes");
+      logger.info("sync.writeBuffer", "Buffer cleared");
     },
 
     async remove(id) {
       await writeBufferDB.changes.delete(id);
-      console.log(`[WriteBuffer] Removed change ${id}`);
+      logger.debug("sync.writeBuffer", "Change removed", { changeId: id });
     },
 
     /**
@@ -278,7 +286,9 @@ export function createWriteBuffer(): WriteBuffer {
         await writeBufferDB.changes.delete(change.id);
       }
 
-      console.log(`[WriteBuffer] Cleared ${failed.length} failed changes`);
+      logger.info("sync.writeBuffer", "Failed changes cleared", {
+        count: failed.length,
+      });
       return failed.length;
     },
 
@@ -291,8 +301,9 @@ export function createWriteBuffer(): WriteBuffer {
       if (worker) {
         await worker.flush();
       } else {
-        console.warn(
-          "[WriteBuffer] No FlushWorker initialized, changes will flush on next scheduled interval"
+        logger.warn(
+          "sync.writeBuffer",
+          "No FlushWorker initialized, changes will flush on next scheduled interval"
         );
       }
     },
@@ -307,9 +318,7 @@ export interface FlushWorkerConfig {
   apiBase?: string;
 
   /** Custom flush handler (e.g., for Tauri commands) */
-  flushHandler?: (
-    changes: WriteChange[]
-  ) => Promise<{
+  flushHandler?: (changes: WriteChange[]) => Promise<{
     applied: string[];
     errors: Array<{ id: string; error: string }>;
   }>;
@@ -364,11 +373,11 @@ export class FlushWorker {
    */
   start(intervalMs = 5000): void {
     if (this.isRunning) {
-      console.warn("[FlushWorker] Already running");
+      logger.warn("sync.writeBuffer", "FlushWorker already running");
       return;
     }
 
-    console.log(`[FlushWorker] Starting (interval: ${intervalMs}ms)`);
+    logger.info("sync.writeBuffer", "FlushWorker started", { intervalMs });
     this.isRunning = true;
 
     // Immediate first flush
@@ -388,7 +397,7 @@ export class FlushWorker {
       return;
     }
 
-    console.log("[FlushWorker] Stopping");
+    logger.info("sync.writeBuffer", "FlushWorker stopped");
     this.isRunning = false;
 
     if (this.intervalId) {
@@ -407,18 +416,18 @@ export class FlushWorker {
       // Check if there are stuck changes and clean them up
       const stats = await this.buffer.getStats();
       if (stats.stuckChanges.length > 0) {
-        console.warn(
-          `[FlushWorker] Found ${stats.stuckChanges.length} stuck changes (exceeded max retries), clearing them...`
-        );
+        logger.warn("sync.writeBuffer", "Found stuck changes, clearing", {
+          stuckCount: stats.stuckChanges.length,
+        });
         await this.buffer.clearFailed();
-        console.log(
-          "[FlushWorker] Stuck changes cleared, will retry fresh changes on next flush"
-        );
+        logger.info("sync.writeBuffer", "Stuck changes cleared");
       }
       return;
     }
 
-    console.log(`[FlushWorker] Flushing ${pending.length} changes`);
+    logger.info("sync.writeBuffer", "Flush started", {
+      batchSize: pending.length,
+    });
 
     // Filter out changes that exceeded max retries
     const retryable = pending.filter(
@@ -426,13 +435,14 @@ export class FlushWorker {
     );
 
     if (retryable.length === 0) {
-      console.warn(
-        `[FlushWorker] ${pending.length} changes exceeded max retries, clearing them...`
-      );
+      logger.warn("sync.writeBuffer", "All changes exceeded max retries", {
+        count: pending.length,
+      });
       // Clear them instead of leaving them stuck
       for (const change of pending) {
         await this.buffer.remove(change.id);
-        console.error(`[FlushWorker] Removed stuck change ${change.id}:`, {
+        logger.error("sync.writeBuffer", "Removed stuck change", {
+          changeId: change.id,
           table: change.table,
           op: change.op,
           retries: change.retry_count,
@@ -450,9 +460,9 @@ export class FlushWorker {
 
       // Use custom flush handler if provided (e.g., Tauri command)
       if (this.config.flushHandler) {
-        console.log(
-          `[FlushWorker] Using custom flush handler with ${retryable.length} changes`
-        );
+        logger.debug("sync.writeBuffer", "Using custom flush handler", {
+          changeCount: retryable.length,
+        });
         result = await this.config.flushHandler(retryable);
       } else {
         // Use HTTP API (web app)
@@ -461,9 +471,10 @@ export class FlushWorker {
         }
 
         const url = `${this.config.apiBase}/api/writes/batch/`;
-        console.log(
-          `[FlushWorker] POSTing to ${url} with ${retryable.length} changes`
-        );
+        logger.debug("sync.writeBuffer", "POSTing to API", {
+          url,
+          changeCount: retryable.length,
+        });
 
         const response = await fetch(url, {
           method: "POST",
@@ -480,10 +491,11 @@ export class FlushWorker {
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(
-            `[FlushWorker] Server error (${response.status}):`,
-            errorText
-          );
+          logger.error("sync.writeBuffer", "Server error during flush", {
+            status: response.status,
+            statusText: response.statusText,
+            errorText,
+          });
           throw new Error(
             `Server returned ${response.status}: ${response.statusText}`
           );
@@ -492,37 +504,47 @@ export class FlushWorker {
         result = await response.json();
       }
 
-      console.log("[FlushWorker] Flush response:", result);
+      logger.debug("sync.writeBuffer", "Flush response received", {
+        appliedCount: result.applied?.length || 0,
+        errorCount: result.errors?.length || 0,
+      });
 
       // Check if there were errors
       if (result.errors && result.errors.length > 0) {
-        console.error("[FlushWorker] Server reported errors:", result.errors);
+        logger.error("sync.writeBuffer", "Server reported errors", {
+          errorCount: result.errors.length,
+          errors: result.errors.slice(0, 3), // First 3 errors for context
+        });
 
         // Mark failed changes as failed
         const failedIds = result.errors.map((e: any) => e.id);
         const errorMessages = result.errors.map((e: any) => e.error);
         await this.buffer.markFailed(failedIds, errorMessages);
 
-        console.warn(
-          `[FlushWorker] Marked ${failedIds.length} changes as failed`
-        );
+        logger.warn("sync.writeBuffer", "Marked changes as failed", {
+          count: failedIds.length,
+        });
       }
 
       // Mark successful changes as applied
       const successIds = result.applied || [];
       if (successIds.length > 0) {
         await this.buffer.markApplied(successIds);
-        console.log(
-          `[FlushWorker] Successfully applied ${successIds.length} changes`
-        );
+        logger.info("sync.writeBuffer", "Successfully applied changes", {
+          count: successIds.length,
+        });
       } else {
-        console.warn("[FlushWorker] No changes were successfully applied");
+        logger.warn(
+          "sync.writeBuffer",
+          "No changes were successfully applied",
+          {}
+        );
       }
     } catch (error) {
-      console.error("[FlushWorker] Flush failed:", error);
-      console.error("[FlushWorker] Error details:", {
+      logger.error("sync.writeBuffer", "Flush failed", {
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
+        changeCount: retryable.length,
       });
 
       // Mark all as failed (will be retried with exponential backoff)

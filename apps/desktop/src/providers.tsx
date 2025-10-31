@@ -23,6 +23,7 @@ import {
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 import { DevToolsShortcut } from "./components/DevToolsShortcut";
+import { logger } from "@deeprecall/telemetry";
 
 // Configure PDF.js worker for Tauri platform
 // Tauri serves static assets from public/ directory
@@ -30,7 +31,9 @@ configurePdfWorker("/pdf.worker.min.mjs");
 
 // Initialize device ID on app startup (Tauri Store persistence)
 initializeDeviceId().catch((error) => {
-  console.error("[Desktop] Failed to initialize device ID:", error);
+  logger.error("sync.coordination", "Failed to initialize device ID", {
+    error,
+  });
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -75,9 +78,9 @@ function ElectricInitializer() {
       sourceId: electricSourceId, // Electric Cloud source ID
       secret: electricSecret, // Electric Cloud source secret
     });
-    console.log(`[Electric] Desktop app connected to: ${electricUrl}`);
+    logger.info("sync.electric", "Desktop app connected", { electricUrl });
     if (electricSourceId && electricSecret) {
-      console.log(`[Electric] Using Electric Cloud authentication`);
+      logger.debug("sync.electric", "Using Electric Cloud authentication");
     }
 
     // Initialize FlushWorker for desktop
@@ -106,7 +109,11 @@ function ElectricInitializer() {
 
           return { applied, errors };
         } catch (error) {
-          console.error("[FlushWorker] Tauri command failed:", error);
+          logger.error(
+            "sync.writeBuffer",
+            "Tauri flush_writes command failed",
+            { error }
+          );
           // Return all changes as failed
           return {
             applied: [],
@@ -124,23 +131,30 @@ function ElectricInitializer() {
     });
     worker.start(1000); // Check every 1 second
     workerRef.current = worker;
-    console.log("[FlushWorker] Started (interval: 1000ms)");
-    console.log(
-      "[FlushWorker] Using Tauri flush_writes command for direct Postgres writes"
+    logger.info("sync.writeBuffer", "FlushWorker started", {
+      intervalMs: 1000,
+    });
+    logger.debug(
+      "sync.writeBuffer",
+      "Using Tauri flush_writes command for direct Postgres writes"
     );
 
     // Expose for debugging
     if (typeof window !== "undefined") {
       (window as any).__deeprecall_flush_worker = worker;
       (window as any).__deeprecall_buffer = worker.getBuffer();
-      console.log("💡 Desktop debug: window.__deeprecall_flush_worker");
-      console.log("💡 Desktop debug: window.__deeprecall_buffer.getStats()");
+      logger.debug("ui", "Desktop debug tools exposed", {
+        tools: [
+          "window.__deeprecall_flush_worker",
+          "window.__deeprecall_buffer.getStats()",
+        ],
+      });
     }
 
     return () => {
       if (workerRef.current) {
         workerRef.current.stop();
-        console.log("[FlushWorker] Stopped");
+        logger.info("sync.writeBuffer", "FlushWorker stopped");
       }
     };
   }, []);

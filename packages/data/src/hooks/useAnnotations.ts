@@ -16,6 +16,7 @@ import * as annotationsMerged from "../repos/annotations.merged";
 import * as annotationsCleanup from "../repos/annotations.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -45,22 +46,27 @@ async function syncElectricToDexie(electricData: Annotation[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.annotations.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale annotation(s)`
-      );
+      logger.info("sync.electric", "Deleted stale annotations from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.annotations.bulkPut(electricData);
-      console.log(
-        `[Electric→Dexie] Synced ${electricData.length} annotation(s)`
+      logger.info(
+        "sync.electric",
+        "Synced annotations from Electric to Dexie",
+        {
+          count: electricData.length,
+        }
       );
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Annotations table cleared (0 rows)`);
+      logger.info("sync.electric", "Annotations table cleared", { count: 0 });
     }
   });
 }
@@ -93,10 +99,9 @@ export function useAnnotationsSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useAnnotationsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync annotations to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -112,7 +117,9 @@ export function useAnnotationsSync() {
         .cleanupSyncedAnnotations(electricResult.data)
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error("[useAnnotationsSync] Failed to cleanup:", error);
+          logger.error("db.local", "Failed to cleanup annotations", {
+            error: error.message,
+          });
         });
     }
   }, [
@@ -223,17 +230,16 @@ export function useCreateAnnotation() {
       return annotationsLocal.createAnnotationLocal(input);
     },
     onSuccess: (newAnnotation: Annotation) => {
-      console.log(
-        `✅ [useCreateAnnotation] Created annotation ${newAnnotation.id} (pending sync)`
-      );
+      logger.info("db.local", "Created annotation locally (pending sync)", {
+        annotationId: newAnnotation.id,
+      });
       // Invalidate merged queries to show new annotation immediately
       queryClient.invalidateQueries({ queryKey: ["annotations", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useCreateAnnotation] Failed to create annotation:",
-        error
-      );
+      logger.error("db.local", "Failed to create annotation", {
+        error: error.message,
+      });
     },
   });
 }
@@ -250,17 +256,16 @@ export function useUpdateAnnotation() {
       return input;
     },
     onSuccess: (input: UpdateAnnotationInput) => {
-      console.log(
-        `✅ [useUpdateAnnotation] Updated annotation ${input.id} (pending sync)`
-      );
+      logger.info("db.local", "Updated annotation locally (pending sync)", {
+        annotationId: input.id,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["annotations", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useUpdateAnnotation] Failed to update annotation:",
-        error
-      );
+      logger.error("db.local", "Failed to update annotation", {
+        error: error.message,
+      });
     },
   });
 }
@@ -277,17 +282,16 @@ export function useDeleteAnnotation() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(
-        `✅ [useDeleteAnnotation] Deleted annotation ${id} (pending sync)`
-      );
+      logger.info("db.local", "Deleted annotation locally (pending sync)", {
+        annotationId: id,
+      });
       // Invalidate merged queries to remove immediately
       queryClient.invalidateQueries({ queryKey: ["annotations", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useDeleteAnnotation] Failed to delete annotation:",
-        error
-      );
+      logger.error("db.local", "Failed to delete annotation", {
+        error: error.message,
+      });
     },
   });
 }
@@ -306,14 +310,20 @@ export function useBulkCreateAnnotations() {
       return created;
     },
     onSuccess: (annotations: Annotation[]) => {
-      console.log(
-        `✅ [useBulkCreateAnnotations] Created ${annotations.length} annotations (pending sync)`
+      logger.info(
+        "db.local",
+        "Bulk created annotations locally (pending sync)",
+        {
+          count: annotations.length,
+        }
       );
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["annotations", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useBulkCreateAnnotations] Failed:", error);
+      logger.error("db.local", "Failed to bulk create annotations", {
+        error: error.message,
+      });
     },
   });
 }

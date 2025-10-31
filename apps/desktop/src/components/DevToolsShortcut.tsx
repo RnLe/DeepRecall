@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * DevTools keyboard shortcut component
@@ -15,13 +16,13 @@ export function DevToolsShortcut() {
           const isOpen = await invoke<boolean>("is_devtools_open");
           if (isOpen) {
             await invoke("close_devtools");
-            console.log("[DevTools] Closed via F12");
+            logger.debug("ui", "DevTools closed via F12");
           } else {
             await invoke("open_devtools");
-            console.log("[DevTools] Opened via F12");
+            logger.debug("ui", "DevTools opened via F12");
           }
         } catch (error) {
-          console.error("[DevTools] Failed to toggle:", error);
+          logger.error("ui", "Failed to toggle DevTools", { error });
         }
       }
     };

@@ -7,6 +7,7 @@ import type { ReviewLog } from "@deeprecall/core";
 import { ReviewLogSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -33,7 +34,10 @@ export async function createReviewLogLocal(log: ReviewLog): Promise<ReviewLog> {
     payload: validated,
   });
 
-  console.log(`[ReviewLogsLocal] Created review log ${log.id} (pending sync)`);
+  logger.info("srs", "Created review log (pending sync)", {
+    reviewLogId: log.id,
+    cardId: log.card_id,
+  });
   return validated;
 }
 
@@ -58,5 +62,5 @@ export async function deleteReviewLogLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[ReviewLogsLocal] Deleted review log ${id} (pending sync)`);
+  logger.info("srs", "Deleted review log (pending sync)", { reviewLogId: id });
 }

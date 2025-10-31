@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { X, FileText, Upload, Loader2 } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Platform-specific operations interface
@@ -109,7 +110,11 @@ export function CreateNoteDialog({
       onNoteCreated?.();
       onClose();
     } catch (err) {
-      console.error("Failed to create note:", err);
+      logger.error("ui", "Failed to create note", {
+        error: err,
+        annotationId,
+        title,
+      });
       setError(err instanceof Error ? err.message : "Failed to create note");
     } finally {
       setUploading(false);
@@ -145,7 +150,12 @@ export function CreateNoteDialog({
       onNoteCreated?.();
       onClose();
     } catch (err) {
-      console.error("Failed to upload:", err);
+      logger.error("ui", "Failed to upload note file", {
+        error: err,
+        annotationId,
+        filename: file.name,
+        mime: file.type,
+      });
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);

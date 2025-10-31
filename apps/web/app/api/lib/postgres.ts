@@ -4,6 +4,7 @@
  */
 
 import { Pool, PoolConfig } from "pg";
+import { logger } from "@deeprecall/telemetry";
 
 // Singleton pool instance (reused across API routes)
 let globalPool: Pool | null = null;
@@ -26,12 +27,12 @@ export function getPostgresConfig(): PoolConfig {
       connectionTimeoutMillis: 5000,
     };
 
-    console.log("[PostgresConfig] Using DATABASE_URL connection");
+    logger.debug("db.postgres", "Using DATABASE_URL connection");
     return baseConfig;
   }
 
   // Option 2: Use individual environment variables
-  console.log("[PostgresConfig] Using individual env vars");
+  logger.debug("db.postgres", "Using individual env vars for connection");
   return {
     host: process.env.POSTGRES_HOST || "localhost",
     port: parseInt(process.env.POSTGRES_PORT || "5432", 10),
@@ -61,16 +62,20 @@ export function getPostgresPool(): Pool {
 
     // Handle pool-level errors (stale/dead connections)
     globalPool.on("error", (err, client) => {
-      console.error("[PostgresPool] Idle client error, will be removed:", err);
+      logger.error("db.postgres", "Idle client error, will be removed", {
+        error: err.message,
+      });
       // Pool automatically removes and replaces bad connections
     });
 
     // Log connection stats in development
     if (process.env.NODE_ENV === "development") {
       globalPool.on("connect", (client) => {
-        console.log(
-          `[PostgresPool] ✓ Connected (total: ${globalPool?.totalCount}, idle: ${globalPool?.idleCount}, waiting: ${globalPool?.waitingCount})`
-        );
+        logger.debug("db.postgres", "Pool connection established", {
+          total: globalPool?.totalCount,
+          idle: globalPool?.idleCount,
+          waiting: globalPool?.waitingCount,
+        });
       });
     }
   }
@@ -82,7 +87,7 @@ export function getPostgresPool(): Pool {
  */
 export async function resetPostgresPool(): Promise<void> {
   if (globalPool) {
-    console.log("[PostgresPool] Resetting pool...");
+    logger.info("db.postgres", "Resetting Postgres pool");
     await globalPool.end();
     globalPool = null;
   }

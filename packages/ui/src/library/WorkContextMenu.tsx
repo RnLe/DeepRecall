@@ -12,6 +12,7 @@ import {
   Link as LinkIcon,
   FileCode,
 } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 export interface WorkContextMenuProps {
   workId: string;
@@ -62,7 +63,7 @@ export function WorkContextMenu({
       setIsOpen(false);
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error("Failed to delete work:", error);
+      logger.error("ui", "Failed to delete work", { error, workId });
       alert(
         `Failed to delete work: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -162,8 +163,8 @@ export function WorkContextMenu({
               {isDeleting
                 ? "Deleting..."
                 : showDeleteConfirm
-                ? "Click to Confirm"
-                : "Delete Work"}
+                  ? "Click to Confirm"
+                  : "Delete Work"}
             </span>
           </button>
         </div>

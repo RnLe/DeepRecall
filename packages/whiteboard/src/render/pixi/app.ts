@@ -5,6 +5,7 @@
 
 import { Application } from "pixi.js";
 import type { PixiApp, PixiRendererConfig } from "./types";
+import { logger } from "@deeprecall/telemetry";
 
 const DEFAULT_RESOLUTION =
   typeof window !== "undefined" && window.devicePixelRatio
@@ -69,7 +70,10 @@ export async function createPixiApp(
 
       const rendererType = detectRendererType(app, preference);
 
-      console.info(`[PixiJS] Initialized with ${rendererType} renderer`);
+      logger.info("whiteboard", "PixiJS initialized", {
+        renderer: rendererType,
+        resolution: mergedConfig.resolution,
+      });
 
       return {
         app,
@@ -234,6 +238,8 @@ export function destroyPixiApp(pixiApp: PixiApp): void {
       textureSource: true,
     });
   } catch (error) {
-    console.error("[PixiJS] Cleanup error:", error);
+    logger.error("whiteboard", "PixiJS cleanup error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }

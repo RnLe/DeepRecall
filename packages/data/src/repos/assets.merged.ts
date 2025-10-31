@@ -19,6 +19,7 @@
 import { db } from "../db";
 import type { Asset } from "@deeprecall/core";
 import type { LocalAssetChange } from "./assets.local";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Merged asset with sync status metadata
@@ -179,7 +180,10 @@ export async function getMergedAsset(
 
     return merged[0];
   } catch (error) {
-    console.error("[getMergedAsset] Error:", error);
+    logger.error("db.local", "Failed to get merged asset", {
+      assetId: id,
+      error: String(error),
+    });
     return undefined; // Always return valid type
   }
 }
@@ -196,7 +200,9 @@ export async function getAllMergedAssets(): Promise<MergedAsset[]> {
 
     return mergeAssets(synced, local);
   } catch (error) {
-    console.error("[getAllMergedAssets] Error:", error);
+    logger.error("db.local", "Failed to get all merged assets", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -217,7 +223,10 @@ export async function getMergedAssetsByWork(
     const merged = mergeAssets(synced, local);
     return merged.filter((a) => a.workId === workId);
   } catch (error) {
-    console.error("[getMergedAssetsByWork] Error:", error);
+    logger.error("db.local", "Failed to get merged assets by work", {
+      workId,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -237,7 +246,10 @@ export async function getMergedAssetByHash(
     const merged = mergeAssets(synced, local);
     return merged.find((a) => a.sha256 === sha256);
   } catch (error) {
-    console.error("[getMergedAssetByHash] Error:", error);
+    logger.error("db.local", "Failed to get merged asset by hash", {
+      sha256,
+      error: String(error),
+    });
     return undefined; // Always return valid type
   }
 }
@@ -257,7 +269,10 @@ export async function getMergedAssetsByAnnotation(
     const merged = mergeAssets(synced, local);
     return merged.filter((a) => a.annotationId === annotationId);
   } catch (error) {
-    console.error("[getMergedAssetsByAnnotation] Error:", error);
+    logger.error("db.local", "Failed to get merged assets by annotation", {
+      annotationId,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

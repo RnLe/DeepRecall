@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storeBlob } from "@/src/server/cas";
 import { z } from "zod";
+import { logger } from "@deeprecall/telemetry";
 
 const UploadMetadataSchema = z.object({
   role: z.string().default("notes"),
@@ -82,9 +83,13 @@ export async function POST(request: NextRequest) {
       size,
     } = await storeBlob(buffer, file.name, metadata.role, metadata.deviceId);
 
-    console.log(
-      `Uploaded: ${file.name} → ${hash.slice(0, 16)}... (${metadata.role}) by device ${metadata.deviceId?.slice(0, 8) || "server"}...`
-    );
+    logger.info("blob.upload", "Blob uploaded successfully", {
+      filename: file.name,
+      hash: hash.slice(0, 16),
+      role: metadata.role,
+      size,
+      mime: mimeType,
+    });
 
     // Return blob metadata (client will create Asset in Dexie)
     return NextResponse.json({
@@ -97,7 +102,9 @@ export async function POST(request: NextRequest) {
       metadata,
     });
   } catch (error) {
-    console.error("Upload failed:", error);
+    logger.error("blob.upload", "Blob upload failed", {
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Upload failed" },
       { status: 500 }

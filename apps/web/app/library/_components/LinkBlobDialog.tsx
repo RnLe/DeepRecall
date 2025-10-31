@@ -5,6 +5,7 @@
  */
 
 "use client";
+import { logger } from "@deeprecall/telemetry";
 
 import {
   LinkBlobDialog as LinkBlobDialogUI,
@@ -44,7 +45,7 @@ export function LinkBlobDialog({
         try {
           const error = await response.json();
           errorMessage = error.error || error.details || errorMessage;
-          console.error("[LinkBlobDialog] Sync failed:", {
+          logger.error("ui", "[LinkBlobDialog] Sync failed:", {
             status: response.status,
             statusText: response.statusText,
             error,
@@ -54,7 +55,7 @@ export function LinkBlobDialog({
         } catch (parseError) {
           // Response is not JSON, get text
           const text = await response.text();
-          console.error("[LinkBlobDialog] Sync failed (non-JSON response):", {
+          logger.error("ui", "[LinkBlobDialog] Sync failed (non-JSON response):", {
             status: response.status,
             statusText: response.statusText,
             responseText: text,
@@ -66,7 +67,7 @@ export function LinkBlobDialog({
         throw new Error(errorMessage);
       }
 
-      console.log(
+      logger.info("ui", 
         `[LinkBlobDialog] Successfully synced blob ${sha256.slice(0, 16)}...`
       );
     },

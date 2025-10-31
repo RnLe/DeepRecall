@@ -22,6 +22,7 @@
     "@deeprecall/whiteboard": "workspace:*",
     "@deeprecall/data": "workspace:*",
     "@deeprecall/pdf": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
     "@tanstack/react-query": "^5.90.3",
     "clsx": "^2.1.1",
     "dexie": "^4.0.11",

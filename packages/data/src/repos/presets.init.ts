@@ -9,6 +9,7 @@ import type { Preset } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { db } from "../db";
 import * as presetsLocal from "./presets.local";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get write buffer instance
@@ -53,25 +54,27 @@ export async function initializePresets(): Promise<void> {
     );
 
     if (presetsToAdd.length > 0) {
-      console.log(
-        `[Init] Seeding ${presetsToAdd.length} system presets locally...`
-      );
+      logger.info("db.local", "Seeding system presets locally", {
+        count: presetsToAdd.length,
+      });
 
       // Write to local layer (instant, non-blocking)
       for (const preset of presetsToAdd) {
         await presetsLocal.createPresetLocal(preset);
       }
 
-      console.log(
-        `✅ [Init] Seeded ${presetsToAdd.length} system presets (syncing in background)`
-      );
+      logger.info("db.local", "Seeded system presets (syncing in background)", {
+        count: presetsToAdd.length,
+      });
     } else {
-      console.log(
-        `✓ [Init] System presets already initialized (${existingNames.size} found)`
-      );
+      logger.debug("db.local", "System presets already initialized", {
+        count: existingNames.size,
+      });
     }
   } catch (error) {
-    console.error("Failed to initialize presets:", error);
+    logger.error("db.local", "Failed to initialize presets", {
+      error: String(error),
+    });
     throw error;
   }
 }
@@ -94,18 +97,22 @@ export async function resetSystemPresets(): Promise<void> {
       await presetsLocal.deletePresetLocal(preset.id);
     }
 
-    console.log(`Deleted ${systemPresets.length} system presets (local)`);
+    logger.info("db.local", "Deleted system presets (local)", {
+      count: systemPresets.length,
+    });
 
     // Re-seed defaults using local layer
     for (const preset of DEFAULT_PRESETS) {
       await presetsLocal.createPresetLocal(preset);
     }
 
-    console.log(
-      `✅ Reset ${DEFAULT_PRESETS.length} system presets (syncing in background)`
-    );
+    logger.info("db.local", "Reset system presets (syncing in background)", {
+      count: DEFAULT_PRESETS.length,
+    });
   } catch (error) {
-    console.error("Failed to reset system presets:", error);
+    logger.error("db.local", "Failed to reset system presets", {
+      error: String(error),
+    });
     throw error;
   }
 }
@@ -137,10 +144,10 @@ export async function resetDefaultPresetsByName(
       for (const preset of presetsToDelete) {
         await presetsLocal.deletePresetLocal(preset.id);
       }
-      console.log(
-        `Deleted ${presetsToDelete.length} existing presets:`,
-        presetsToDelete.map((p: Preset) => p.name)
-      );
+      logger.info("db.local", "Deleted existing presets", {
+        count: presetsToDelete.length,
+        names: presetsToDelete.map((p: Preset) => p.name),
+      });
     }
 
     // Re-add the default versions using local layer
@@ -149,16 +156,18 @@ export async function resetDefaultPresetsByName(
       for (const preset of defaultsToAdd) {
         await presetsLocal.createPresetLocal(preset);
       }
-      console.log(
-        `✅ Reset ${defaultsToAdd.length} default presets:`,
-        defaultsToAdd.map((p) => p.name)
-      );
+      logger.info("db.local", "Reset default presets", {
+        count: defaultsToAdd.length,
+        names: defaultsToAdd.map((p) => p.name),
+      });
     }
 
     const skipped = namesToReset.length - defaultsToAdd.length;
     return { reset: defaultsToAdd.length, skipped };
   } catch (error) {
-    console.error("Failed to reset default presets:", error);
+    logger.error("db.local", "Failed to reset default presets", {
+      error: String(error),
+    });
     throw error;
   }
 }
@@ -189,14 +198,16 @@ export async function resetSinglePresetByName(name: string): Promise<boolean> {
   try {
     // Check if this is a default preset name
     if (!DEFAULT_PRESET_NAMES.includes(name as any)) {
-      console.log(`"${name}" is not a default preset name`);
+      logger.debug("db.local", "Not a default preset name", { name });
       return false;
     }
 
     // Find the default definition
     const defaultPreset = DEFAULT_PRESETS.find((p) => p.name === name);
     if (!defaultPreset) {
-      console.error(`Default preset "${name}" not found in definitions`);
+      logger.error("db.local", "Default preset not found in definitions", {
+        name,
+      });
       return false;
     }
 
@@ -210,16 +221,19 @@ export async function resetSinglePresetByName(name: string): Promise<boolean> {
       for (const preset of existing) {
         await presetsLocal.deletePresetLocal(preset.id);
       }
-      console.log(`Deleted existing "${name}" preset`);
+      logger.info("db.local", "Deleted existing preset", { name });
     }
 
     // Add the default version using local layer
     await presetsLocal.createPresetLocal(defaultPreset);
-    console.log(`✅ Reset "${name}" preset to default (enqueued)`);
+    logger.info("db.local", "Reset preset to default (enqueued)", { name });
 
     return true;
   } catch (error) {
-    console.error(`Failed to reset preset "${name}":`, error);
+    logger.error("db.local", "Failed to reset preset", {
+      name,
+      error: String(error),
+    });
     throw error;
   }
 }

@@ -5,6 +5,7 @@
  */
 
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Clean up local changes that have been synced
@@ -26,7 +27,9 @@ export async function cleanupBoardsLocal(syncedIds: string[]): Promise<void> {
 
   if (toDelete.length > 0) {
     await db.boards_local.bulkDelete(toDelete);
-    console.log(`[Boards Cleanup] Removed ${toDelete.length} synced change(s)`);
+    logger.debug("whiteboard", "Cleanup: Removed synced board changes", {
+      count: toDelete.length,
+    });
   }
 }
 
@@ -42,8 +45,8 @@ export async function cleanupAllSyncedBoards(): Promise<void> {
   if (synced.length > 0) {
     const ids = synced.map((c) => c._localId!).filter((id) => id !== undefined);
     await db.boards_local.bulkDelete(ids);
-    console.log(
-      `[Boards Cleanup] Removed ${ids.length} synced local change(s)`
-    );
+    logger.debug("whiteboard", "Cleanup: Removed all synced boards", {
+      count: ids.length,
+    });
   }
 }

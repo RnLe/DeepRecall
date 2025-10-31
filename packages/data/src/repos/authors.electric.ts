@@ -6,6 +6,7 @@ import type { Author } from "@deeprecall/core";
 import { AuthorSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 export function useAuthors() {
   return useShape<Author>({ table: "authors" });
@@ -44,7 +45,7 @@ export async function createAuthor(
   };
   const validated = AuthorSchema.parse(author);
   await buffer.enqueue({ table: "authors", op: "insert", payload: validated });
-  console.log(`[AuthorsRepo] Created author ${author.id} (enqueued)`);
+  logger.info("db.local", "Created author (enqueued)", { authorId: author.id });
   return validated;
 }
 
@@ -54,12 +55,12 @@ export async function updateAuthor(
 ): Promise<void> {
   const updated = { id, ...updates, updatedAt: new Date().toISOString() };
   await buffer.enqueue({ table: "authors", op: "update", payload: updated });
-  console.log(`[AuthorsRepo] Updated author ${id} (enqueued)`);
+  logger.info("db.local", "Updated author (enqueued)", { authorId: id });
 }
 
 export async function deleteAuthor(id: string): Promise<void> {
   await buffer.enqueue({ table: "authors", op: "delete", payload: { id } });
-  console.log(`[AuthorsRepo] Deleted author ${id} (enqueued)`);
+  logger.info("db.local", "Deleted author (enqueued)", { authorId: id });
 }
 
 export function searchAuthorsByName(

@@ -18,6 +18,7 @@
 
 import { db } from "../db";
 import type { Preset } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 import type { LocalPresetChange } from "./presets.local";
 
 /**
@@ -145,7 +146,10 @@ export async function getMergedPreset(
 
     return merged[0];
   } catch (error) {
-    console.error("[getMergedPreset] Error:", error);
+    logger.error("db.local", "Failed to get merged preset", {
+      presetId: id,
+      error: String(error),
+    });
     return undefined;
   }
 }
@@ -162,7 +166,9 @@ export async function getAllMergedPresets(): Promise<MergedPreset[]> {
 
     return mergePresets(synced, local);
   } catch (error) {
-    console.error("[getAllMergedPresets] Error:", error);
+    logger.error("db.local", "Failed to get all merged presets", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -183,7 +189,10 @@ export async function getMergedPresetsForTarget(
     const merged = mergePresets(synced, local);
     return merged.filter((p) => p.targetEntity === targetEntity);
   } catch (error) {
-    console.error("[getMergedPresetsForTarget] Error:", error);
+    logger.error("db.local", "Failed to get merged presets for target", {
+      targetEntity,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -201,7 +210,9 @@ export async function getMergedSystemPresets(): Promise<MergedPreset[]> {
     const merged = mergePresets(synced, local);
     return merged.filter((p) => p.isSystem === true);
   } catch (error) {
-    console.error("[getMergedSystemPresets] Error:", error);
+    logger.error("db.local", "Failed to get merged system presets", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

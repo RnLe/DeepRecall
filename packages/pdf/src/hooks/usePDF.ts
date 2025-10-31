@@ -5,6 +5,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { loadPDFDocument, PDFDocumentProxy } from "../utils/pdf";
+import { logger } from "@deeprecall/telemetry";
 
 export interface UsePDFResult {
   pdf: PDFDocumentProxy | null;
@@ -69,7 +70,9 @@ export function usePDF(
     return () => {
       if (pdf && taskId === loadingTaskRef.current) {
         pdf.destroy().catch((err) => {
-          console.warn("Failed to destroy PDF document:", err);
+          logger.warn("pdf", "Failed to destroy PDF document", {
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
       }
     };

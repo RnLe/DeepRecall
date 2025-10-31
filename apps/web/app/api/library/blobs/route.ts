@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { listFilesWithPaths } from "@/src/server/cas";
 import { extractPDFMetadata } from "@/src/server/pdf";
+import { logger } from "@deeprecall/telemetry";
 
 export interface BlobWithMetadata {
   sha256: string;
@@ -76,9 +77,13 @@ export async function GET() {
               modificationDate: pdfMeta.modificationDate,
             };
           } catch (error) {
-            console.error(
-              `Error extracting PDF metadata for ${blob.hash}:`,
-              error
+            logger.error(
+              "pdf",
+              "Failed to extract PDF metadata during blob listing",
+              {
+                hash: blob.hash.slice(0, 16),
+                error: (error as Error).message,
+              }
             );
             // Continue without PDF metadata
           }
@@ -90,7 +95,9 @@ export async function GET() {
 
     return NextResponse.json(enrichedBlobs);
   } catch (error) {
-    console.error("Error fetching blobs:", error);
+    logger.error("server.api", "Failed to fetch blobs list", {
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to fetch blobs" },
       { status: 500 }

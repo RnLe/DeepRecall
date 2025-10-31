@@ -5,6 +5,7 @@
 
 import type { BlobCAS } from "@deeprecall/blob-storage";
 import { CapacitorBlobStorage } from "../blob-storage/capacitor";
+import { logger } from "@deeprecall/telemetry";
 
 let casInstance: BlobCAS | null = null;
 
@@ -19,7 +20,7 @@ let casInstance: BlobCAS | null = null;
 export function useCapacitorBlobStorage(): BlobCAS {
   if (!casInstance) {
     casInstance = new CapacitorBlobStorage();
-    console.log("[useCapacitorBlobStorage] Created new CAS instance");
+    logger.debug("cas", "Created new CAS instance");
   }
   return casInstance;
 }

@@ -16,6 +16,7 @@ import {
 import { AuthorInput } from "./AuthorInput";
 import { CompactDynamicForm } from "./CompactDynamicForm";
 import { PDFPreview } from "../components/PDFPreview";
+import { logger } from "@deeprecall/telemetry";
 
 export interface EditWorkDialogProps {
   work: WorkExtended;
@@ -102,7 +103,7 @@ export function EditWorkDialog({
 
     try {
       setIsSubmitting(true);
-      console.log("Updating work with:", data);
+      logger.info("ui", "Updating work", { workId: work.id, data });
 
       const { coreFields, metadata } = data;
 
@@ -134,11 +135,11 @@ export function EditWorkDialog({
         updates,
       });
 
-      console.log("✅ Work updated successfully!");
+      logger.info("ui", "Work updated successfully", { workId: work.id });
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("❌ Failed to update work:", error);
+      logger.error("ui", "Failed to update work", { error, workId: work.id });
       alert(
         `Failed to update work: ${
           error instanceof Error ? error.message : "Unknown error"

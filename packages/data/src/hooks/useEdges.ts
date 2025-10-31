@@ -12,6 +12,7 @@ import * as edgesMerged from "../repos/edges.merged";
 import * as edgesCleanup from "../repos/edges.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -39,20 +40,23 @@ async function syncElectricToDexie(electricData: Edge[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.edges.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale edge(s)`
-      );
+      logger.info("sync.electric", "Deleted stale edges from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.edges.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} edge(s)`);
+      logger.info("sync.electric", "Synced edges from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Edges table cleared (0 rows)`);
+      logger.info("sync.electric", "Edges table cleared", { count: 0 });
     }
   });
 }
@@ -84,10 +88,9 @@ export function useEdgesSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useEdgesSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync edges to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -228,14 +231,17 @@ export function useCreateEdge() {
       });
     },
     onSuccess: (newEdge: Edge) => {
-      console.log(
-        `✅ [useCreateEdge] Created edge ${newEdge.id} (${newEdge.relation}) (pending sync)`
-      );
+      logger.info("db.local", "Created edge locally (pending sync)", {
+        edgeId: newEdge.id,
+        relation: newEdge.relation,
+      });
       // Invalidate merged queries to show new edge immediately
       queryClient.invalidateQueries({ queryKey: ["edges", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useCreateEdge] Failed to create edge:", error);
+      logger.error("db.local", "Failed to create edge", {
+        error: error.message,
+      });
     },
   });
 }
@@ -258,12 +264,16 @@ export function useUpdateEdge() {
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Edge> }) => {
-      console.log(`✅ [useUpdateEdge] Updated edge ${id} (pending sync)`);
+      logger.info("db.local", "Updated edge locally (pending sync)", {
+        edgeId: id,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["edges", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useUpdateEdge] Failed to update edge:", error);
+      logger.error("db.local", "Failed to update edge", {
+        error: error.message,
+      });
     },
   });
 }
@@ -280,12 +290,16 @@ export function useDeleteEdge() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(`✅ [useDeleteEdge] Deleted edge ${id} (pending sync)`);
+      logger.info("db.local", "Deleted edge locally (pending sync)", {
+        edgeId: id,
+      });
       // Invalidate merged queries to remove immediately
       queryClient.invalidateQueries({ queryKey: ["edges", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useDeleteEdge] Failed to delete edge:", error);
+      logger.error("db.local", "Failed to delete edge", {
+        error: error.message,
+      });
     },
   });
 }
@@ -320,17 +334,18 @@ export function useDeleteEdgesBetween() {
       toId: string;
       deletedCount: number;
     }) => {
-      console.log(
-        `✅ [useDeleteEdgesBetween] Deleted ${deletedCount} edge(s) between ${fromId} and ${toId} (pending sync)`
-      );
+      logger.info("db.local", "Deleted edges between entities", {
+        fromId,
+        toId,
+        count: deletedCount,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["edges", "merged"] });
     },
     onError: (error: Error) => {
-      console.error(
-        "❌ [useDeleteEdgesBetween] Failed to delete edges between entities:",
-        error
-      );
+      logger.error("db.local", "Failed to delete edges between entities", {
+        error: error.message,
+      });
     },
   });
 }

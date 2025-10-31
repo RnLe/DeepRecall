@@ -24,6 +24,7 @@
   "dependencies": {
     "@deeprecall/blob-storage": "workspace:*",
     "@deeprecall/core": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
     "@electric-sql/client": "^1.0.0",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^4.0.0",

@@ -25,6 +25,7 @@
     "@deeprecall/core": "workspace:*",
     "@deeprecall/data": "workspace:*",
     "@deeprecall/pdf": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
     "@deeprecall/ui": "workspace:*",
     "@tanstack/react-query": "^5.62.11",
     "react": "^19.1.1",

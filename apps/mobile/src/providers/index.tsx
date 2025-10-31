@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { initFlushWorker } from "@deeprecall/data";
 import { queryClient } from "../lib/queryClient";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Initialize WriteBuffer flush worker
@@ -17,16 +18,11 @@ function WriteBufferProvider({ children }: { children: React.ReactNode }) {
     const apiBase =
       import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
-    console.log("[WriteBufferProvider] Initializing FlushWorker");
-    console.log("[WriteBufferProvider] API Base:", apiBase);
-    console.log(
-      "[WriteBufferProvider] VITE_API_BASE_URL env:",
-      import.meta.env.VITE_API_BASE_URL
-    );
-    console.log(
-      "[WriteBufferProvider] Full endpoint:",
-      `${apiBase}/api/writes/batch`
-    );
+    logger.info("sync.writeBuffer", "Initializing FlushWorker", {
+      apiBase,
+      endpoint: `${apiBase}/api/writes/batch`,
+      viteApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+    });
 
     const worker = initFlushWorker({
       apiBase,
@@ -38,10 +34,12 @@ function WriteBufferProvider({ children }: { children: React.ReactNode }) {
     // Start worker with 5-second interval
     worker.start(5000);
 
-    console.log("[WriteBufferProvider] FlushWorker started");
+    logger.info("sync.writeBuffer", "FlushWorker started", {
+      intervalMs: 5000,
+    });
 
     return () => {
-      console.log("[WriteBufferProvider] Stopping FlushWorker");
+      logger.info("sync.writeBuffer", "FlushWorker stopping");
       worker.stop();
     };
   }, []);

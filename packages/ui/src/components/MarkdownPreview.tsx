@@ -13,6 +13,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { X, List, Check, AlertCircle, Save } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Platform-specific operations interface
@@ -198,7 +199,11 @@ export function MarkdownPreview({
         setSaveStatus("idle");
       }, 1000);
     } catch (error) {
-      console.error("Failed to save:", error);
+      logger.error("ui", "Failed to save markdown content", {
+        error,
+        sha256,
+        filename,
+      });
       setSaveStatus("error");
       setTimeout(() => {
         setSaveStatus("idle");
@@ -250,7 +255,12 @@ export function MarkdownPreview({
           filename: finalFilename,
         });
       } catch (error) {
-        console.error("Failed to rename:", error);
+        logger.error("ui", "Failed to rename markdown file", {
+          error,
+          sha256,
+          oldFilename: title,
+          newFilename: finalFilename,
+        });
         // Revert on error
         setFilename(title);
       }

@@ -6,6 +6,7 @@
 
 import type { ReviewLog } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 export interface MergedReviewLog extends ReviewLog {
   _local?: {
@@ -72,7 +73,10 @@ export async function getMergedReviewLogsByCard(
     // Filter to this card only
     return merged.filter((r) => r.card_id === cardId);
   } catch (error) {
-    console.error("[getMergedReviewLogsByCard] Error:", error);
+    logger.error("srs", "Failed to get merged review logs by card", {
+      cardId,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -86,7 +90,9 @@ export async function getAllMergedReviewLogs(): Promise<MergedReviewLog[]> {
     const local = await db.reviewLogs_local.toArray();
     return mergeReviewLogs(synced, local);
   } catch (error) {
-    console.error("[getAllMergedReviewLogs] Error:", error);
+    logger.error("srs", "Failed to get all merged review logs", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
+import { logger } from "@deeprecall/telemetry";
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +27,10 @@ export async function POST(request: Request) {
     // Get all blobs from CAS
     const allBlobs = await db.select().from(blobs).all();
 
-    console.log(`[SyncToElectric] Found ${allBlobs.length} blobs in CAS`);
+    logger.info("sync.coordination", "Starting Electric sync backfill", {
+      blobCount: allBlobs.length,
+      deviceId: clientDeviceId.slice(0, 8),
+    });
 
     let synced = 0;
     let failed = 0;
@@ -44,9 +48,6 @@ export async function POST(request: Request) {
     // Use client's device ID instead of server-side fallback
     const { v4: uuidv4 } = await import("uuid");
     const deviceId = clientDeviceId;
-    console.log(
-      `[SyncToElectric] Using device ID: ${deviceId.slice(0, 16)}...`
-    );
 
     const now = Date.now();
     const nowISO = new Date(now).toISOString();
@@ -114,15 +115,20 @@ export async function POST(request: Request) {
       }
 
       synced = allBlobs.length;
-      console.log(
-        `[SyncToElectric] Successfully sent ${changes.length} changes to batch API`
-      );
+      logger.info("sync.coordination", "Electric sync backfill completed", {
+        synced,
+        changeCount: changes.length,
+      });
     } catch (error) {
-      console.error("[SyncToElectric] Batch API request failed:", error);
+      logger.error(
+        "sync.coordination",
+        "Batch API request failed during sync",
+        {
+          error: (error as Error).message,
+        }
+      );
       failed = allBlobs.length;
     }
-
-    console.log(`[SyncToElectric] Synced ${synced} blobs, ${failed} failed`);
 
     return NextResponse.json({
       success: true,
@@ -131,7 +137,9 @@ export async function POST(request: Request) {
       total: allBlobs.length,
     });
   } catch (error) {
-    console.error("[SyncToElectric] Failed:", error);
+    logger.error("sync.coordination", "Electric sync backfill failed", {
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to sync to Electric" },
       { status: 500 }

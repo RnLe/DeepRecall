@@ -8,6 +8,7 @@ import type { Preset, PresetTarget } from "@deeprecall/core";
 import { PresetSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * React hook to get all Presets (live-synced from Postgres)
@@ -90,7 +91,7 @@ export async function createPreset(
     payload: validated,
   });
 
-  console.log(`[PresetsRepo] Created preset ${id} (enqueued)`);
+  logger.info("db.local", "Created preset (enqueued)", { presetId: id });
   return validated;
 }
 
@@ -113,7 +114,7 @@ export async function updatePreset(
     payload,
   });
 
-  console.log(`[PresetsRepo] Updated preset ${id} (enqueued)`);
+  logger.info("db.local", "Updated preset (enqueued)", { presetId: id });
 }
 
 /**
@@ -126,5 +127,5 @@ export async function deletePreset(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[PresetsRepo] Deleted preset ${id} (enqueued)`);
+  logger.info("db.local", "Deleted preset (enqueued)", { presetId: id });
 }

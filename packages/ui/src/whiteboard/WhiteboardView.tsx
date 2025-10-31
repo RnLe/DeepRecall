@@ -23,6 +23,7 @@ import {
   strokeToSceneObject,
   type StrokeObject,
 } from "@deeprecall/whiteboard/scene";
+import { logger } from "@deeprecall/telemetry";
 import {
   createRenderContext,
   clearCanvas,
@@ -265,7 +266,7 @@ export function WhiteboardView({
     const canvas = canvasRef.current;
     const size = canvasSizeRef.current;
 
-    console.log("[WhiteboardView] Init effect", {
+    logger.debug("whiteboard", "WhiteboardView initialization effect", {
       rendererMode: rendererModeRef.current,
       hasCanvas: !!canvas,
       canvasWidth: size.width,
@@ -283,12 +284,12 @@ export function WhiteboardView({
     }
 
     if (size.width === 0 || size.height === 0) {
-      console.log("[WhiteboardView] Canvas size unavailable, waiting");
+      logger.debug("whiteboard", "Canvas size unavailable, waiting");
       return;
     }
 
     if (initializationAttemptedRef.current) {
-      console.log("[WhiteboardView] Initialization already in progress");
+      logger.debug("whiteboard", "Initialization already in progress");
       return;
     }
 
@@ -298,15 +299,16 @@ export function WhiteboardView({
     let cancelled = false;
 
     const run = async () => {
-      console.log("[WhiteboardView] Starting PixiJS initialization...");
+      logger.info("whiteboard", "Starting PixiJS initialization");
       try {
         const pixiApp = await createPixiApp(canvas, {
           backgroundColor: 0x1f2937,
         });
 
         if (cancelled) {
-          console.log(
-            "[WhiteboardView] Initialization cancelled before completion"
+          logger.debug(
+            "whiteboard",
+            "Initialization cancelled before completion"
           );
           if (pixiApp) {
             destroyPixiApp(pixiApp);
@@ -317,8 +319,9 @@ export function WhiteboardView({
         }
 
         if (!pixiApp) {
-          console.log(
-            "[WhiteboardView] PixiJS unavailable, falling back to Canvas 2D"
+          logger.info(
+            "whiteboard",
+            "PixiJS unavailable, falling back to Canvas 2D"
           );
           rendererModeRef.current = "canvas";
           setRendererMode("canvas");
@@ -327,7 +330,7 @@ export function WhiteboardView({
           return;
         }
 
-        console.log("[WhiteboardView] PixiJS app created, setting up renderer");
+        logger.info("whiteboard", "PixiJS app created successfully");
         pixiAppRef.current = pixiApp;
         const pixiRenderer = new PixiRenderer(pixiApp);
         pixiRenderer.updateResolution(size.width, size.height);
@@ -386,20 +389,22 @@ export function WhiteboardView({
         });
 
         if (cancelled) {
-          console.log(
-            "[WhiteboardView] Initialization cancelled after readiness"
+          logger.debug(
+            "whiteboard",
+            "Initialization cancelled after readiness"
           );
           return;
         }
 
-        console.log(
-          "[WhiteboardView] PixiJS fully ready, setting renderer mode to pixi"
+        logger.info(
+          "whiteboard",
+          "PixiJS fully ready, renderer mode set to pixi"
         );
         rendererModeRef.current = "pixi";
         setRendererMode("pixi");
       } catch (error) {
         if (!cancelled) {
-          console.error("[WhiteboardView] PixiJS init error:", error);
+          logger.error("whiteboard", "PixiJS initialization error", { error });
           rendererModeRef.current = "canvas";
           setRendererMode("canvas");
         }

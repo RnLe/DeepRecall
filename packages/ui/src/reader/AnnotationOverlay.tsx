@@ -13,6 +13,7 @@ import type { AnnotationTool } from "@deeprecall/data";
 import { useAnnotationUI } from "@deeprecall/data";
 import { useReaderUI } from "@deeprecall/data";
 import { AnnotationContextMenu } from "./AnnotationContextMenu";
+import { logger } from "@deeprecall/telemetry";
 import {
   ChevronRight,
   FunctionSquare,
@@ -138,9 +139,16 @@ export function AnnotationOverlay({
   const handleFileDrop = async (annotationId: string, file: File) => {
     try {
       await uploadAndAttachNote(annotationId, file);
-      console.log(`Attached note to annotation: ${file.name}`);
+      logger.info("ui", "Attached note to annotation", {
+        annotationId,
+        filename: file.name,
+      });
     } catch (error) {
-      console.error("Failed to attach note:", error);
+      logger.error("ui", "Failed to attach note to annotation", {
+        error,
+        annotationId,
+        filename: file.name,
+      });
     }
   };
 

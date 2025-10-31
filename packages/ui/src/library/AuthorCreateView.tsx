@@ -7,6 +7,7 @@
 import { useState } from "react";
 import type { Author } from "@deeprecall/core";
 import { AuthorFormFields, type AuthorFormData } from "./AuthorFormFields";
+import { logger } from "@deeprecall/telemetry";
 
 interface AuthorCreateViewProps {
   onBack: () => void;
@@ -45,7 +46,7 @@ export function AuthorCreateView({ onBack, onCreate }: AuthorCreateViewProps) {
       alert("Author created successfully!");
       onBack();
     } catch (error) {
-      console.error("Failed to create author:", error);
+      logger.error("ui", "Failed to create author", { error, formData });
       alert("Failed to create author. Please try again.");
     } finally {
       setIsSubmitting(false);

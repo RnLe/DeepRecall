@@ -12,6 +12,7 @@ import * as activitiesMerged from "../repos/activities.merged";
 import * as activitiesCleanup from "../repos/activities.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -41,22 +42,23 @@ async function syncElectricToDexie(electricData: Activity[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.activities.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale activity/activities`
-      );
+      logger.info("sync.electric", "Deleted stale activities from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.activities.bulkPut(electricData);
-      console.log(
-        `[Electric→Dexie] Synced ${electricData.length} activity/activities`
-      );
+      logger.info("sync.electric", "Synced activities from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Activities table cleared (0 rows)`);
+      logger.info("sync.electric", "Activities table cleared", { count: 0 });
     }
   });
 }
@@ -89,10 +91,9 @@ export function useActivitiesSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useActivitiesSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync activities to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -108,7 +109,9 @@ export function useActivitiesSync() {
         .cleanupSyncedActivities(electricResult.data)
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error("[useActivitiesSync] Failed to cleanup:", error);
+          logger.error("db.local", "Failed to cleanup activities", {
+            error: error.message,
+          });
         });
     }
   }, [
@@ -222,14 +225,16 @@ export function useCreateActivity() {
       return activitiesLocal.createActivityLocal(data);
     },
     onSuccess: (newActivity: Activity) => {
-      console.log(
-        `✅ [useCreateActivity] Created activity ${newActivity.id} (pending sync)`
-      );
+      logger.info("db.local", "Created activity locally (pending sync)", {
+        activityId: newActivity.id,
+      });
       // Invalidate merged queries to show new activity immediately
       queryClient.invalidateQueries({ queryKey: ["activities", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useCreateActivity] Failed to create activity:", error);
+      logger.error("db.local", "Failed to create activity", {
+        error: error.message,
+      });
     },
   });
 }
@@ -252,14 +257,16 @@ export function useUpdateActivity() {
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Activity> }) => {
-      console.log(
-        `✅ [useUpdateActivity] Updated activity ${id} (pending sync)`
-      );
+      logger.info("db.local", "Updated activity locally (pending sync)", {
+        activityId: id,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["activities", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useUpdateActivity] Failed to update activity:", error);
+      logger.error("db.local", "Failed to update activity", {
+        error: error.message,
+      });
     },
   });
 }
@@ -276,14 +283,16 @@ export function useDeleteActivity() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(
-        `✅ [useDeleteActivity] Deleted activity ${id} (pending sync)`
-      );
+      logger.info("db.local", "Deleted activity locally (pending sync)", {
+        activityId: id,
+      });
       // Invalidate merged queries to remove immediately
       queryClient.invalidateQueries({ queryKey: ["activities", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useDeleteActivity] Failed to delete activity:", error);
+      logger.error("db.local", "Failed to delete activity", {
+        error: error.message,
+      });
     },
   });
 }

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { readdir, unlink, stat } from "fs/promises";
 import path from "path";
+import { logger } from "@deeprecall/telemetry";
 
 function getLibraryPath(): string {
   const dataPath = process.env.DATA_PATH || path.join(process.cwd(), "data");
@@ -15,8 +16,10 @@ function getLibraryPath(): string {
 
 export async function DELETE() {
   try {
-    console.log("🗑️  Deleting all blob files from disk...");
     const libraryPath = getLibraryPath();
+    logger.warn("cas", "EMERGENCY: Deleting all blob files from disk", {
+      libraryPath,
+    });
 
     let deletedCount = 0;
     let failedCount = 0;
@@ -51,20 +54,24 @@ export async function DELETE() {
           } catch (error: any) {
             // Ignore ENOENT (file disappeared between readdir and stat)
             if (error.code !== "ENOENT") {
-              console.warn(`  ⚠️  Failed to delete ${filePath}:`, error);
+              logger.warn("cas", "Failed to delete blob file", {
+                path: filePath,
+                error: error.message,
+              });
               failedCount++;
             }
           }
         }
       } catch (error) {
         // Directory might not exist, that's fine
-        console.log(`  ℹ️  Directory ${dir} not found or empty`);
+        logger.debug("cas", "Directory not found or empty", { dir });
       }
     }
 
-    console.log(
-      `✅ Deleted ${deletedCount} blob files (${failedCount} failed)`
-    );
+    logger.info("cas", "Blob file deletion completed", {
+      deleted: deletedCount,
+      failed: failedCount,
+    });
 
     return NextResponse.json({
       success: true,
@@ -73,7 +80,9 @@ export async function DELETE() {
       failed: failedCount,
     });
   } catch (error) {
-    console.error("❌ Error deleting blob files:", error);
+    logger.error("cas", "Failed to delete blob files", {
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       {
         error: "Failed to delete blob files",

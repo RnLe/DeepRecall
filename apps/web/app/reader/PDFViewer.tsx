@@ -15,6 +15,7 @@ import {
   ChevronsUpDown,
   RotateCcw,
 } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 // ========================================
 // PURE UI IMPORTS (from @deeprecall/ui)
@@ -288,7 +289,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
       // Switch to pan tool after saving
       annotationUI.setTool("pan");
     } catch (error) {
-      console.error("Failed to save annotation:", error);
+      logger.error("pdf", "Failed to save annotation", { sha256, error });
     }
   }, [sha256, annotationUI, createAnnotation]);
 

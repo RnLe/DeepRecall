@@ -7,6 +7,7 @@ import type { Card } from "@deeprecall/core";
 import { CardSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -41,7 +42,7 @@ export async function createCardLocal(
     payload: validated,
   });
 
-  console.log(`[CardsLocal] Created card ${card.id} (pending sync)`);
+  logger.info("db.local", "Created card (optimistic)", { cardId: card.id });
   return validated;
 }
 
@@ -70,7 +71,7 @@ export async function updateCardLocal(
     payload: updated,
   });
 
-  console.log(`[CardsLocal] Updated card ${id} (pending sync)`);
+  logger.info("db.local", "Updated card (optimistic)", { cardId: id });
 }
 
 /**
@@ -93,5 +94,5 @@ export async function deleteCardLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[CardsLocal] Deleted card ${id} (pending sync)`);
+  logger.info("db.local", "Deleted card (optimistic)", { cardId: id });
 }

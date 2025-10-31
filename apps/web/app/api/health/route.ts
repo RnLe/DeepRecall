@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { sql } from "drizzle-orm";
+import { logger } from "@deeprecall/telemetry";
 
 export const runtime = "nodejs"; // Ensure Node.js runtime (not Edge)
 export const dynamic = "force-dynamic"; // no caching
@@ -30,7 +31,9 @@ export async function GET() {
       paths: pathCountResult?.count ?? 0,
     });
   } catch (error) {
-    console.error("Health check failed:", error);
+    logger.error("server.api", "Health check failed", {
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { ok: false, error: "Database connection failed" },
       { status: 500 }

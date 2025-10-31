@@ -21,6 +21,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { logger } from "@deeprecall/telemetry";
 import {
   X,
   Tag,
@@ -212,7 +213,10 @@ export function AnnotationEditor({
       setCopiedText(true);
       setTimeout(() => setCopiedText(false), 2000);
     } catch (error) {
-      console.error("Failed to copy text:", error);
+      logger.error("ui", "Failed to copy annotation text", {
+        error,
+        annotationId: annotation.id,
+      });
     }
   };
 

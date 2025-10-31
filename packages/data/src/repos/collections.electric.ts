@@ -6,6 +6,7 @@ import type { Collection } from "@deeprecall/core";
 import { CollectionSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 export function useCollections() {
   return useShape<Collection>({ table: "collections" });
@@ -45,9 +46,10 @@ export async function createCollection(
     op: "insert",
     payload: validated,
   });
-  console.log(
-    `[CollectionsRepo] Created collection ${collection.id} (enqueued)`
-  );
+  logger.info("db.postgres", "Created collection (enqueued)", {
+    collectionId: collection.id,
+    name: collection.name,
+  });
   return validated;
 }
 
@@ -61,10 +63,15 @@ export async function updateCollection(
     op: "update",
     payload: updated,
   });
-  console.log(`[CollectionsRepo] Updated collection ${id} (enqueued)`);
+  logger.info("db.postgres", "Updated collection (enqueued)", {
+    collectionId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 export async function deleteCollection(id: string): Promise<void> {
   await buffer.enqueue({ table: "collections", op: "delete", payload: { id } });
-  console.log(`[CollectionsRepo] Deleted collection ${id} (enqueued)`);
+  logger.info("db.postgres", "Deleted collection (enqueued)", {
+    collectionId: id,
+  });
 }

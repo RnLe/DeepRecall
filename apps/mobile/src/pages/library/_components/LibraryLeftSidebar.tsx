@@ -15,6 +15,7 @@ import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
 import { useOrphanedBlobsFromElectric } from "@deeprecall/data/hooks";
 import { getDeviceId } from "@deeprecall/data";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { logger } from "@deeprecall/telemetry";
 
 // Stub LinkBlobDialog component - will be replaced with real one
 function LinkBlobDialogStub({
@@ -90,7 +91,7 @@ export function LibraryLeftSidebar() {
         // Return the data as string
         return typeof result.data === "string" ? result.data : "";
       } catch (error) {
-        console.error("Failed to fetch blob content:", error);
+        logger.error("cas", "Failed to fetch blob content", { sha256, error });
         throw error;
       }
     },
@@ -100,7 +101,7 @@ export function LibraryLeftSidebar() {
         await cas.rename(hash, filename);
         await fetchOrphanedBlobs(); // Refresh list
       } catch (error) {
-        console.error("Failed to rename blob:", error);
+        logger.error("cas", "Failed to rename blob", { hash, filename, error });
         throw error;
       }
     },
@@ -110,7 +111,7 @@ export function LibraryLeftSidebar() {
         await cas.delete(hash);
         await fetchOrphanedBlobs(); // Refresh list
       } catch (error) {
-        console.error("Failed to delete blob:", error);
+        logger.error("cas", "Failed to delete blob", { hash, error });
         throw error;
       }
     },
@@ -123,7 +124,7 @@ export function LibraryLeftSidebar() {
         }
         await fetchOrphanedBlobs(); // Refresh list
       } catch (error) {
-        console.error("Failed to upload files:", error);
+        logger.error("blob.upload", "Failed to upload files", { error });
         throw error;
       }
     },

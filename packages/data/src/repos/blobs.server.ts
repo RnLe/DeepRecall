@@ -7,6 +7,7 @@
  */
 
 import { Client } from "pg";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get a Postgres client connection
@@ -77,9 +78,11 @@ export async function createBlobMetaServer(
       ]
     );
 
-    console.log(
-      `[BlobsMetaServer] Created blob meta ${input.sha256.slice(0, 16)}... in Postgres`
-    );
+    logger.info("server.api", "Created blob meta in Postgres", {
+      sha256: input.sha256.slice(0, 16),
+      size: input.size,
+      mime: input.mime,
+    });
   } finally {
     await client.end();
   }
@@ -111,9 +114,11 @@ export async function markBlobAvailableServer(
       [id, deviceId, sha256, true, localPath, health, now, now]
     );
 
-    console.log(
-      `[DeviceBlobsServer] Marked blob ${sha256.slice(0, 16)}... available on device ${deviceId} in Postgres`
-    );
+    logger.info("server.api", "Marked blob available in Postgres", {
+      sha256: sha256.slice(0, 16),
+      deviceId,
+      health,
+    });
   } finally {
     await client.end();
   }
@@ -156,9 +161,10 @@ export async function updateBlobMetaServer(
         values
       );
 
-      console.log(
-        `[BlobsMetaServer] Updated blob meta ${sha256.slice(0, 16)}... in Postgres`
-      );
+      logger.info("server.api", "Updated blob meta in Postgres", {
+        sha256: sha256.slice(0, 16),
+        fields: Object.keys(updates),
+      });
     }
   } finally {
     await client.end();
@@ -173,9 +179,9 @@ export async function deleteBlobMetaServer(sha256: string): Promise<void> {
   try {
     await client.query(`DELETE FROM blobs_meta WHERE sha256 = $1`, [sha256]);
 
-    console.log(
-      `[BlobsMetaServer] Deleted blob meta ${sha256.slice(0, 16)}... from Postgres`
-    );
+    logger.info("server.api", "Deleted blob meta from Postgres", {
+      sha256: sha256.slice(0, 16),
+    });
   } finally {
     await client.end();
   }
@@ -195,9 +201,10 @@ export async function deleteDeviceBlobServer(
       [sha256, deviceId]
     );
 
-    console.log(
-      `[DeviceBlobsServer] Deleted device blob ${sha256.slice(0, 16)}... from device ${deviceId} in Postgres`
-    );
+    logger.info("server.api", "Deleted device blob from Postgres", {
+      sha256: sha256.slice(0, 16),
+      deviceId,
+    });
   } finally {
     await client.end();
   }

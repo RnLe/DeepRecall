@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useCreatePreset } from "@deeprecall/data/hooks";
 import type { PresetTarget } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 
 interface QuickPresetDialogProps {
   targetEntity: PresetTarget;
@@ -50,7 +51,11 @@ export function QuickPresetDialog({
 
       onSuccess(preset.id);
     } catch (error) {
-      console.error("Failed to create preset:", error);
+      logger.error("ui", "Failed to create quick preset", {
+        error,
+        name,
+        targetEntity,
+      });
       alert("Failed to create template. Please try again.");
     }
   };

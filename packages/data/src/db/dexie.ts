@@ -22,6 +22,7 @@ import type {
   Board,
   Stroke,
 } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 
 class DeepRecallDB extends Dexie {
   // Library entities (synced from Electric)
@@ -247,7 +248,8 @@ class DeepRecallDB extends Dexie {
       .upgrade(async (tx) => {
         // Migration: existing records don't need changes
         // presetId is optional, so existing records without it are valid
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 2 (adding presetId indexes)"
         );
         // No data transformation needed - just index changes
@@ -275,7 +277,8 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 3 (removing versions, migrating to Work→Asset)"
         );
 
@@ -334,7 +337,8 @@ class DeepRecallDB extends Dexie {
           }
         }
 
-        console.log(
+        logger.info(
+          "db.local",
           `✅ Migrated ${oldWorks.length} works, ${oldVersions.length} versions → ${oldAssets.length} assets`
         );
       });
@@ -360,7 +364,8 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 4 (adding annotation attachment support)"
         );
 
@@ -368,7 +373,8 @@ class DeepRecallDB extends Dexie {
         // Existing annotations without attachedAssets are valid
         // Existing assets without purpose/annotationId are valid
 
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v4 - annotation attachment support enabled"
         );
       });
@@ -398,7 +404,8 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 5 (adding Authors table and migrating author data)"
         );
 
@@ -476,7 +483,8 @@ class DeepRecallDB extends Dexie {
           worksUpdated++;
         }
 
-        console.log(
+        logger.info(
+          "db.local",
           `✅ Database upgraded to v5: Created ${authorsCreated} authors, updated ${worksUpdated} works`
         );
       });
@@ -506,7 +514,8 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 6 (adding avatar fields to Authors)"
         );
         // No data migration needed - new fields are optional
@@ -538,7 +547,8 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 7 (migrating title to titles array)"
         );
 
@@ -556,7 +566,8 @@ class DeepRecallDB extends Dexie {
           }
         }
 
-        console.log(
+        logger.info(
+          "db.local",
           `✅ Database upgraded to v7: Migrated ${migrated} authors with titles`
         );
       });
@@ -589,12 +600,16 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 8 (adding local optimistic tables for two-layer architecture)"
         );
         // No data migration needed - new tables start empty
         // Local changes will be written on next user interaction
-        console.log("✅ Database upgraded to v8 - optimistic updates enabled");
+        logger.info(
+          "db.local",
+          "✅ Database upgraded to v8 - optimistic updates enabled"
+        );
       });
 
     // Version 9: Add works_local table for optimistic Work updates
@@ -626,11 +641,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 9 (adding works_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v9 - works optimistic updates enabled"
         );
       });
@@ -665,11 +682,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 10 (adding assets_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v10 - assets optimistic updates enabled"
         );
       });
@@ -705,11 +724,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 11 (adding activities_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v11 - activities optimistic updates enabled"
         );
       });
@@ -746,11 +767,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 12 (adding authors_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v12 - authors optimistic updates enabled"
         );
       });
@@ -788,11 +811,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 13 (adding collections_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v13 - collections optimistic updates enabled"
         );
       });
@@ -831,11 +856,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 14 (adding edges_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v14 - edges optimistic updates enabled"
         );
       });
@@ -875,11 +902,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 15 (adding annotations_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v15 - annotations optimistic updates enabled"
         );
       });
@@ -920,11 +949,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 16 (adding cards_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v16 - cards optimistic updates enabled"
         );
       });
@@ -966,11 +997,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 17 (adding reviewLogs_local table for optimistic updates)"
         );
         // No data migration needed - new table starts empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v17 - reviewLogs optimistic updates enabled"
         );
       });
@@ -1018,11 +1051,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 18 (adding blobsMeta and deviceBlobs tables)"
         );
         // No data migration needed - new tables start empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v18 - blob coordination tables enabled"
         );
       });
@@ -1076,11 +1111,13 @@ class DeepRecallDB extends Dexie {
         reviewLogs: "id, card_id, review_ms",
       })
       .upgrade(async (tx) => {
-        console.log(
+        logger.info(
+          "db.local",
           "Upgrading database to version 19 (adding boards and strokes tables)"
         );
         // No data migration needed - new tables start empty
-        console.log(
+        logger.info(
+          "db.local",
           "✅ Database upgraded to v19 - boards and strokes tables enabled"
         );
       });
@@ -1091,7 +1128,7 @@ export const db = new DeepRecallDB();
 
 // Add error handling for database opening
 db.on("versionchange", () => {
-  console.warn("Database version changed by another tab");
+  logger.warn("db.local", "Database version changed by another tab");
   db.close();
   window.location.reload();
 });
@@ -1106,7 +1143,7 @@ db.on("versionchange", () => {
  * await clearAllDexieData();
  */
 export async function clearAllDexieData(): Promise<void> {
-  console.log("[Dexie] Clearing all data...");
+  logger.info("db.local", "[Dexie] Clearing all data...");
 
   try {
     // Clear all tables
@@ -1142,9 +1179,9 @@ export async function clearAllDexieData(): Promise<void> {
       db.strokes_local.clear(),
     ]);
 
-    console.log("[Dexie] ✅ All data cleared successfully");
+    logger.info("db.local", "[Dexie] ✅ All data cleared successfully");
   } catch (error) {
-    console.error("[Dexie] Failed to clear data:", error);
+    logger.error("db.local", "[Dexie] Failed to clear data", { error });
     throw error;
   }
 }

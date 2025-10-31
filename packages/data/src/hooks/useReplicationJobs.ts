@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Sync Electric data to Dexie (replace entire table)
@@ -26,17 +27,23 @@ async function syncElectricToDexie(
 
     if (idsToDelete.length > 0) {
       await db.replicationJobs.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale replication_jobs`
+      logger.info(
+        "sync.coordination",
+        "Deleted stale replication_jobs from Dexie",
+        { count: idsToDelete.length, ids: idsToDelete }
       );
     }
     if (electricData.length > 0) {
       await db.replicationJobs.bulkPut(electricData);
-      console.log(
-        `[Electric→Dexie] Synced ${electricData.length} replication_jobs`
+      logger.info(
+        "sync.coordination",
+        "Synced replication_jobs from Electric to Dexie",
+        { count: electricData.length }
       );
     } else if (idsToDelete.length === 0 && currentIds.size === 0) {
-      console.log(`[Electric→Dexie] replication_jobs: empty (no changes)`);
+      logger.info("sync.coordination", "replication_jobs table empty", {
+        count: 0,
+      });
     }
   });
 }
@@ -65,9 +72,10 @@ export function useReplicationJobsSync() {
           queryClient.invalidateQueries({ queryKey: ["replication-jobs"] });
         })
         .catch((error) => {
-          console.error(
-            "[useReplicationJobsSync] Failed to sync replication_jobs:",
-            error
+          logger.error(
+            "sync.coordination",
+            "Failed to sync replication_jobs to Dexie",
+            { error: (error as Error).message }
           );
         });
     }
@@ -87,7 +95,9 @@ export function useReplicationJobs() {
       try {
         return await db.replicationJobs.toArray();
       } catch (error) {
-        console.error("[useReplicationJobs] Error:", error);
+        logger.error("sync.coordination", "Failed to query replication_jobs", {
+          error: (error as Error).message,
+        });
         return [];
       }
     },
@@ -113,7 +123,11 @@ export function useReplicationJobsByStatus(
           .equals(status)
           .toArray();
       } catch (error) {
-        console.error("[useReplicationJobsByStatus] Error:", error);
+        logger.error(
+          "sync.coordination",
+          "Failed to query replication_jobs by status",
+          { status, error: (error as Error).message }
+        );
         return [];
       }
     },
@@ -137,7 +151,11 @@ export function useReplicationJobsByBlob(sha256: string | undefined) {
           .equals(sha256)
           .toArray();
       } catch (error) {
-        console.error("[useReplicationJobsByBlob] Error:", error);
+        logger.error(
+          "sync.coordination",
+          "Failed to query replication_jobs by blob",
+          { sha256, error: (error as Error).message }
+        );
         return [];
       }
     },
@@ -158,7 +176,11 @@ export function useReplicationJob(id: string | undefined) {
       try {
         return await db.replicationJobs.get(id);
       } catch (error) {
-        console.error("[useReplicationJob] Error:", error);
+        logger.error(
+          "sync.coordination",
+          "Failed to query replication_job by id",
+          { id, error: (error as Error).message }
+        );
         return undefined;
       }
     },
@@ -181,7 +203,11 @@ export function usePendingReplicationJobs() {
           .equals("pending")
           .sortBy("priority");
       } catch (error) {
-        console.error("[usePendingReplicationJobs] Error:", error);
+        logger.error(
+          "sync.coordination",
+          "Failed to query pending replication_jobs",
+          { error: (error as Error).message }
+        );
         return [];
       }
     },

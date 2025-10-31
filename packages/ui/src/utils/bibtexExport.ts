@@ -4,6 +4,7 @@
  */
 
 import type { Author } from "@deeprecall/core/schemas";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Work interface for BibTeX export (accepts any work-like object)
@@ -324,7 +325,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text);
     return true;
   } catch (error) {
-    console.error("Failed to copy to clipboard:", error);
+    logger.error("ui", "Failed to copy to clipboard", { error });
     // Fallback method
     try {
       const textArea = document.createElement("textarea");
@@ -338,7 +339,9 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       document.body.removeChild(textArea);
       return success;
     } catch (fallbackError) {
-      console.error("Fallback copy failed:", fallbackError);
+      logger.error("ui", "Fallback copy to clipboard failed", {
+        error: fallbackError,
+      });
       return false;
     }
   }

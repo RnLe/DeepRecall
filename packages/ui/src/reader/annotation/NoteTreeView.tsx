@@ -12,6 +12,7 @@ import type { Annotation, Asset } from "@deeprecall/core";
 import { NoteBranch } from "./NoteBranch";
 import type { NoteBranchOperations } from "./NoteBranch";
 import { CreateGroupDialog } from "./CreateGroupDialog";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Operations Interface
@@ -118,7 +119,11 @@ export function NoteTreeView({
       setShowCreateDialog(false);
       operations.onRefreshNeeded();
     } catch (error) {
-      console.error("Failed to create group:", error);
+      logger.error("ui", "Failed to create note group", {
+        error,
+        annotationId: annotation.id,
+        name,
+      });
     }
   };
 
@@ -139,7 +144,11 @@ export function NoteTreeView({
         onNotesChange();
       }
     } catch (error) {
-      console.error("Failed to update group:", error);
+      logger.error("ui", "Failed to update note group", {
+        error,
+        annotationId: annotation.id,
+        groupId,
+      });
       throw error; // Re-throw to allow caller to handle
     }
   };
@@ -150,7 +159,11 @@ export function NoteTreeView({
       onNotesChange();
       operations.onRefreshNeeded();
     } catch (error) {
-      console.error("Failed to delete group:", error);
+      logger.error("ui", "Failed to delete note group", {
+        error,
+        annotationId: annotation.id,
+        groupId,
+      });
     }
   };
 
@@ -177,7 +190,12 @@ export function NoteTreeView({
 
       operations.onRefreshNeeded();
     } catch (error) {
-      console.error("Failed to reorder groups:", error);
+      logger.error("ui", "Failed to reorder note groups", {
+        error,
+        annotationId: annotation.id,
+        draggedId,
+        targetId,
+      });
     }
   };
 
@@ -201,7 +219,11 @@ export function NoteTreeView({
 
       onNotesChange();
     } catch (error) {
-      console.error("Failed to move note:", error);
+      logger.error("ui", "Failed to move note to group", {
+        error,
+        noteId,
+        targetGroupId,
+      });
     }
   };
 

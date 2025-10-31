@@ -12,6 +12,7 @@ import * as boardsMerged from "../repos/boards.merged";
 import * as boardsCleanup from "../repos/boards.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Sync Electric data to Dexie boards table
@@ -32,20 +33,23 @@ async function syncElectricToDexie(electricData: Board[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.boards.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale board(s)`
-      );
+      logger.info("sync.electric", "Deleted stale boards from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.boards.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} board(s)`);
+      logger.info("sync.electric", "Synced boards from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Boards table cleared (0 rows)`);
+      logger.info("sync.electric", "Boards table cleared", { count: 0 });
     }
   });
 }
@@ -74,10 +78,9 @@ export function useBoardsSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useBoardsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync boards to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [
@@ -95,7 +98,9 @@ export function useBoardsSync() {
       const syncedIds = electricResult.data.map((b) => b.id);
       boardsCleanup.cleanupBoardsLocal(syncedIds).catch((error) => {
         if (error.name === "DatabaseClosedError") return;
-        console.error("[useBoardsSync] Cleanup failed:", error);
+        logger.error("db.local", "Failed to cleanup boards", {
+          error: error.message,
+        });
       });
     }
   }, [

@@ -15,6 +15,7 @@ import {
 } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 const buffer = createWriteBuffer();
 
@@ -61,9 +62,12 @@ export async function createAnnotationLocal(
     payload: validated,
   });
 
-  console.log(
-    `[AnnotationsLocal] Created annotation ${annotation.id} (pending sync)`
-  );
+  logger.info("db.local", "Created annotation (pending sync)", {
+    annotationId: annotation.id,
+    sha256: input.sha256.slice(0, 16),
+    page: input.page,
+    type: input.data.type,
+  });
   return validated;
 }
 
@@ -96,9 +100,9 @@ export async function updateAnnotationLocal(
     payload: updated,
   });
 
-  console.log(
-    `[AnnotationsLocal] Updated annotation ${input.id} (pending sync)`
-  );
+  logger.info("db.local", "Updated annotation (pending sync)", {
+    annotationId: input.id,
+  });
 }
 
 /**
@@ -121,5 +125,7 @@ export async function deleteAnnotationLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[AnnotationsLocal] Deleted annotation ${id} (pending sync)`);
+  logger.info("db.local", "Deleted annotation (pending sync)", {
+    annotationId: id,
+  });
 }

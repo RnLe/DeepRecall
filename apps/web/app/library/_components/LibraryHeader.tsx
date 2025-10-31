@@ -4,6 +4,7 @@
  */
 
 "use client";
+import { logger } from "@deeprecall/telemetry";
 
 import {
   LibraryHeader as LibraryHeaderUI,
@@ -47,7 +48,7 @@ export function LibraryHeader({
     ) {
       try {
         // Step 1: Clear local Dexie database FIRST (optimistic - instant UI update)
-        console.log("Clearing local Dexie database (optimistic)...");
+        logger.info("ui", "Clearing local Dexie database (optimistic)...");
         const { db } = await import("@deeprecall/data/db");
 
         await db.transaction(
@@ -107,10 +108,10 @@ export function LibraryHeader({
           }
         );
 
-        console.log("✅ Dexie database cleared (UI updated)");
+        logger.info("ui", "✅ Dexie database cleared (UI updated)");
 
         // Step 2: Force clear React Query cache and reset all queries
-        console.log("Clearing React Query cache...");
+        logger.info("ui", "Clearing React Query cache...");
         queryClient.clear(); // Clear all cached data
 
         // Force refetch all merged queries to show empty state
@@ -128,12 +129,12 @@ export function LibraryHeader({
           queryClient.refetchQueries({ queryKey: ["blobs-meta", "merged"] }),
           queryClient.refetchQueries({ queryKey: ["device-blobs", "merged"] }),
         ]);
-        console.log(
+        logger.info("ui", 
           "✅ React Query cleared and refetched (UI shows empty state)"
         );
 
         // Step 3: Clear Postgres database via API (background sync confirmation)
-        console.log("Clearing Postgres database...");
+        logger.info("ui", "Clearing Postgres database...");
         const pgResponse = await fetch("/api/admin/database", {
           method: "DELETE",
         });
@@ -142,29 +143,29 @@ export function LibraryHeader({
           throw new Error("Failed to clear Postgres database");
         }
 
-        console.log("✅ Postgres database cleared");
+        logger.info("ui", "✅ Postgres database cleared");
 
         // Step 4: Delete blob files from disk
-        console.log("Deleting blob files...");
+        logger.info("ui", "Deleting blob files...");
         try {
           const blobResponse = await fetch("/api/admin/database/blobs", {
             method: "DELETE",
           });
 
           if (blobResponse.ok) {
-            console.log("✅ Blob files deleted");
+            logger.info("ui", "✅ Blob files deleted");
           } else {
-            console.warn("⚠️  Failed to delete blob files (non-critical)");
+            logger.warn("ui", "⚠️  Failed to delete blob files (non-critical)");
           }
         } catch (error) {
-          console.warn("⚠️  Blob deletion error (non-critical):", error);
+          logger.warn("ui", "⚠️  Blob deletion error (non-critical):", error);
         }
 
         alert("✅ All data cleared successfully!");
 
         // UI already shows empty state - no page reload needed! 🚀
       } catch (error) {
-        console.error("Failed to clear database:", error);
+        logger.error("ui", "Failed to clear database:", error);
         alert(
           `Failed to clear database: ${error instanceof Error ? error.message : "Unknown error"}\n\nCheck console for details.`
         );

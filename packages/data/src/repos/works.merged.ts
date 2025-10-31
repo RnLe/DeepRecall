@@ -18,6 +18,7 @@
 
 import { db } from "../db";
 import type { Work } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 import type { LocalWorkChange } from "./works.local";
 
 /**
@@ -179,7 +180,10 @@ export async function getMergedWork(
 
     return merged[0];
   } catch (error) {
-    console.error("[getMergedWork] Error:", error);
+    logger.error("db.local", "Failed to get merged work", {
+      workId: id,
+      error: String(error),
+    });
     return undefined; // Always return valid type
   }
 }
@@ -196,7 +200,9 @@ export async function getAllMergedWorks(): Promise<MergedWork[]> {
 
     return mergeWorks(synced, local);
   } catch (error) {
-    console.error("[getAllMergedWorks] Error:", error);
+    logger.error("db.local", "Failed to get all merged works", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -217,7 +223,10 @@ export async function getMergedWorksByType(
     const merged = mergeWorks(synced, local);
     return merged.filter((w) => w.workType === workType);
   } catch (error) {
-    console.error("[getMergedWorksByType] Error:", error);
+    logger.error("db.local", "Failed to get merged works by type", {
+      workType,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -235,7 +244,9 @@ export async function getMergedFavoriteWorks(): Promise<MergedWork[]> {
     const merged = mergeWorks(synced, local);
     return merged.filter((w) => w.favorite === true);
   } catch (error) {
-    console.error("[getMergedFavoriteWorks] Error:", error);
+    logger.error("db.local", "Failed to get merged favorite works", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -252,7 +263,10 @@ export async function searchMergedWorksByTitle(
 
     return allWorks.filter((w) => w.title.toLowerCase().includes(lowerQuery));
   } catch (error) {
-    console.error("[searchMergedWorksByTitle] Error:", error);
+    logger.error("db.local", "Failed to search merged works by title", {
+      query,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

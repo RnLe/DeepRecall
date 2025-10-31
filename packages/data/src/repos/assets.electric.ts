@@ -6,6 +6,7 @@ import type { Asset } from "@deeprecall/core";
 import { AssetSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 export function useAssets() {
   return useShape<Asset>({ table: "assets" });
@@ -49,7 +50,10 @@ export async function createAsset(
   };
   const validated = AssetSchema.parse(asset);
   await buffer.enqueue({ table: "assets", op: "insert", payload: validated });
-  console.log(`[AssetsRepo] Created asset ${asset.id} (enqueued)`);
+  logger.info("db.postgres", "Created asset (enqueued)", {
+    assetId: asset.id,
+    workId: asset.workId,
+  });
   return validated;
 }
 
@@ -59,10 +63,13 @@ export async function updateAsset(
 ): Promise<void> {
   const updated = { id, ...updates, updatedAt: new Date().toISOString() };
   await buffer.enqueue({ table: "assets", op: "update", payload: updated });
-  console.log(`[AssetsRepo] Updated asset ${id} (enqueued)`);
+  logger.info("db.postgres", "Updated asset (enqueued)", {
+    assetId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 export async function deleteAsset(id: string): Promise<void> {
   await buffer.enqueue({ table: "assets", op: "delete", payload: { id } });
-  console.log(`[AssetsRepo] Deleted asset ${id} (enqueued)`);
+  logger.info("db.postgres", "Deleted asset (enqueued)", { assetId: id });
 }

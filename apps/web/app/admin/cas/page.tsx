@@ -1,4 +1,5 @@
 "use client";
+import { logger } from "@deeprecall/telemetry";
 
 // ========================================
 // PURE UI IMPORTS (from @deeprecall/ui)
@@ -81,7 +82,7 @@ export default function AdminPage() {
 
     clearDatabase: async (): Promise<void> => {
       // Step 1: Clear Dexie first (optimistic - instant UI update)
-      console.log("Clearing local Dexie database (optimistic)...");
+      logger.info("ui", "Clearing local Dexie database (optimistic)...");
       const { db } = await import("@deeprecall/data/db");
 
       await db.transaction(
@@ -140,7 +141,7 @@ export default function AdminPage() {
         }
       );
 
-      console.log("✅ Dexie cleared");
+      logger.info("ui", "✅ Dexie cleared");
 
       // Step 2: Invalidate React Query to show empty state
       queryClient.clear();
@@ -150,13 +151,13 @@ export default function AdminPage() {
         queryClient.refetchQueries({ queryKey: ["device-blobs"] }),
       ]);
 
-      console.log("✅ React Query cleared");
+      logger.info("ui", "✅ React Query cleared");
 
       // Step 3: Clear Postgres (background confirmation)
       const response = await fetch("/api/admin/database", { method: "DELETE" });
       if (!response.ok) throw new Error("Clear failed");
 
-      console.log("✅ Postgres cleared");
+      logger.info("ui", "✅ Postgres cleared");
     },
 
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {

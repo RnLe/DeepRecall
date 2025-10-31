@@ -11,6 +11,7 @@ import type { BlobWithMetadata } from "@deeprecall/core";
 import type { BlobCAS } from "@deeprecall/blob-storage";
 import { MarkdownPreview } from "../components/MarkdownPreview";
 import { BlobStatusBadge } from "./BlobStatusBadge";
+import { logger } from "@deeprecall/telemetry";
 
 export interface FileInboxProps {
   // Data
@@ -208,7 +209,7 @@ export function FileInbox({
       onRefreshBlobs();
       setRenamingBlob(null);
     } catch (error) {
-      console.error("Rename failed:", error);
+      logger.error("ui", "Rename failed", { error, hash });
       alert(
         `Rename failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -224,7 +225,7 @@ export function FileInbox({
       onRefreshBlobs();
       setPendingDelete(null);
     } catch (error) {
-      console.error("Delete failed:", error);
+      logger.error("ui", "Delete failed", { error, hash });
       alert(
         `Delete failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -245,7 +246,11 @@ export function FileInbox({
       const text = await fetchBlobContent(blob.sha256);
       setViewingMarkdown({ blob, content: text });
     } catch (error) {
-      console.error("Failed to load markdown:", error);
+      logger.error("ui", "Failed to load markdown", {
+        error,
+        hash: blob.sha256,
+        filename: blob.filename,
+      });
       alert("Failed to load markdown file");
     }
   };

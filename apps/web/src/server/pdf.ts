@@ -7,13 +7,14 @@ import { PDFParse } from "pdf-parse";
 import { readFile } from "fs/promises";
 import { dirname, join } from "path";
 import { createRequire } from "module";
+import { logger } from "@deeprecall/telemetry";
 
 // Configure worker for Node.js environment
 if (typeof window === "undefined") {
   try {
     // Skip worker configuration during Next.js build phase
     if (process.env.NEXT_PHASE === "phase-production-build") {
-      console.log("[PDF Worker] Skipping worker config during build");
+      logger.debug("pdf", "Skipping worker config during build");
     } else {
       // Use createRequire to resolve pdf-parse location at runtime
       const require = createRequire(import.meta.url);
@@ -24,9 +25,7 @@ if (typeof window === "undefined") {
       } catch {
         // In production, require.resolve might not work
         // Try alternative resolution
-        console.log(
-          "[PDF Worker] Standard resolution failed, trying alternative"
-        );
+        logger.debug("pdf", "Standard resolution failed, trying alternative");
         pdfParsePath = "";
       }
 
@@ -43,23 +42,23 @@ if (typeof window === "undefined") {
           "dist/worker/pdf.worker.mjs"
         );
 
-        console.log(`[PDF Worker] Using worker: ${workerPath}`);
+        logger.debug("pdf", "Using PDF worker", { workerPath });
 
         // Verify it exists
         const fs = require("fs");
         if (fs.existsSync(workerPath)) {
           PDFParse.setWorker(workerPath);
         } else {
-          console.warn(`[PDF Worker] Worker not found at ${workerPath}`);
+          logger.warn("pdf", "Worker not found", { workerPath });
         }
       } else {
-        console.log(
-          "[PDF Worker] Worker resolution skipped in bundled environment"
-        );
+        logger.debug("pdf", "Worker resolution skipped in bundled environment");
       }
     }
   } catch (error) {
-    console.error("[PDF Worker] Failed to configure worker:", error);
+    logger.error("pdf", "Failed to configure worker", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     // Don't throw during build - just log the error
   }
 }
@@ -119,7 +118,10 @@ export async function extractPDFMetadata(
 
     return result;
   } catch (error) {
-    console.error("Failed to extract PDF metadata:", error);
+    logger.error("pdf", "Failed to extract PDF metadata", {
+      filePath,
+      error: error instanceof Error ? error.message : String(error),
+    });
     // Return minimal metadata on error
     return {
       pageCount: 0,

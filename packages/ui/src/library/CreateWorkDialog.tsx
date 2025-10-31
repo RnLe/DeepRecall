@@ -20,6 +20,7 @@ import { PresetFormBuilder } from "./PresetFormBuilder";
 import { BibtexImportModal, type BibtexEntry } from "./BibtexImportModal";
 import { AuthorInput } from "./AuthorInput";
 import { FileCode } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 import {
   parseAuthorList,
   formatAuthorName,
@@ -94,7 +95,7 @@ export function CreateWorkDialog({
     // Find preset by name
     const preset = allPresets.find((p) => p.name === presetName);
     if (!preset) {
-      console.error(`Preset not found: ${presetName}`);
+      logger.error("ui", "Preset not found", { presetName });
       return;
     }
 
@@ -116,7 +117,10 @@ export function CreateWorkDialog({
           });
           newAuthorIds.push(author.id);
         } catch (error) {
-          console.error("Failed to create author:", error);
+          logger.error("ui", "Failed to create author during BibTeX import", {
+            error,
+            parsed,
+          });
         }
       }
 
@@ -136,7 +140,10 @@ export function CreateWorkDialog({
     if (!selectedPreset) return;
 
     try {
-      console.log("Creating work with:", formValues);
+      logger.info("ui", "Creating work", {
+        formValues,
+        presetId: selectedPreset.id,
+      });
 
       // Split form values into core fields and metadata
       const coreFields = { ...formValues };
@@ -181,24 +188,27 @@ export function CreateWorkDialog({
         metadata,
       };
 
-      console.log(
-        "Creating work with preset:",
-        selectedPreset.name,
-        "presetId:",
-        selectedPreset.id
-      );
-      console.log("Work data:", workData);
+      logger.debug("ui", "Creating work with preset", {
+        presetName: selectedPreset.name,
+        presetId: selectedPreset.id,
+        workData,
+      });
 
       await createWorkMutation.mutateAsync({
         work: workData,
         // Asset is optional - not provided for manually created works
       });
 
-      console.log("✅ Work created successfully!");
+      logger.info("ui", "Work created successfully", {
+        workTitle: workData.title,
+      });
       onSuccess();
       handleCancel();
     } catch (error) {
-      console.error("❌ Failed to create work:", error);
+      logger.error("ui", "Failed to create work", {
+        error,
+        presetId: selectedPreset?.id,
+      });
       alert(
         `Failed to create work: ${
           error instanceof Error ? error.message : "Unknown error"

@@ -28,6 +28,7 @@ import type { Annotation } from "@deeprecall/core";
 import { getRelativeTime } from "../../utils/date";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { logger } from "@deeprecall/telemetry";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
@@ -175,7 +176,10 @@ export function AnnotationPreview({
         },
       }));
     } catch (error) {
-      console.error("Failed to update annotation:", error);
+      logger.error("ui", "Failed to update annotation in preview", {
+        error,
+        annotationId: annotation.id,
+      });
     }
   };
 
@@ -209,13 +213,13 @@ export function AnnotationPreview({
   useEffect(() => {
     // Only run on client-side to avoid SSR issues with PDF.js
     if (typeof window === "undefined") {
-      console.log("SSR context, skipping PDF render");
+      logger.debug("pdf", "SSR context, skipping PDF render");
       return;
     }
 
     // Canvas is now always in DOM, so we can start rendering
     if (!canvasRef.current) {
-      console.log("Canvas ref not available yet");
+      logger.debug("pdf", "Canvas ref not available yet");
       return;
     }
 
@@ -223,23 +227,30 @@ export function AnnotationPreview({
 
     const renderCrop = async () => {
       try {
-        console.log("Starting PDF crop render for annotation:", annotation.id);
-        console.log("PDF SHA256:", annotation.sha256);
+        logger.debug("pdf", "Starting PDF crop render for annotation", {
+          annotationId: annotation.id,
+          sha256: annotation.sha256,
+        });
 
         // Load PDF from blob storage using sha256
         const pdfUrl = operations.getBlobUrl(annotation.sha256);
-        console.log("Loading PDF from:", pdfUrl);
 
         const pdfDoc = await operations.loadPDFDocument(pdfUrl);
-        console.log("PDF loaded, pages:", pdfDoc.numPages);
+        logger.debug("pdf", "PDF loaded successfully", {
+          pageCount: pdfDoc.numPages,
+          annotationId: annotation.id,
+        });
 
         if (cancelled) return;
 
         const page = await pdfDoc.getPage(annotation.page);
-        console.log("Page loaded:", annotation.page);
 
         const viewport = page.getViewport({ scale: 2 }); // Higher scale for clarity
-        console.log("Viewport:", viewport.width, "x", viewport.height);
+        logger.debug("pdf", "PDF page rendered", {
+          pageNum: annotation.page,
+          viewportWidth: viewport.width,
+          viewportHeight: viewport.height,
+        });
 
         // Calculate bounding box of annotation
         let minX = 1,
@@ -265,8 +276,6 @@ export function AnnotationPreview({
           });
         }
 
-        console.log("Bounding box (normalized):", { minX, minY, maxX, maxY });
-
         // Add padding (5% on each side)
         const padding = 0.05;
         minX = Math.max(0, minX - padding);
@@ -280,25 +289,16 @@ export function AnnotationPreview({
         const cropWidth = (maxX - minX) * viewport.width;
         const cropHeight = (maxY - minY) * viewport.height;
 
-        console.log("Crop dimensions:", {
-          cropX,
-          cropY,
-          cropWidth,
-          cropHeight,
-        });
-
         // Create temporary canvas for full page
         const tempCanvas = document.createElement("canvas");
         const tempContext = tempCanvas.getContext("2d");
         if (!tempContext) {
-          console.error("Failed to get temp canvas context");
+          logger.error("pdf", "Failed to get temp canvas context");
           return;
         }
 
         tempCanvas.width = viewport.width;
         tempCanvas.height = viewport.height;
-
-        console.log("Rendering full page to temp canvas...");
 
         // Render full page to temp canvas
         await page.render({
@@ -307,14 +307,12 @@ export function AnnotationPreview({
           canvas: tempCanvas,
         }).promise;
 
-        console.log("Full page rendered");
-
         if (cancelled) return;
 
         // Copy cropped region to display canvas
         const canvas = canvasRef.current;
         if (!canvas) {
-          console.error("Canvas ref is null");
+          logger.error("pdf", "Canvas ref is null during crop render");
           return;
         }
 
@@ -322,11 +320,12 @@ export function AnnotationPreview({
         canvas.height = cropHeight;
         const context = canvas.getContext("2d");
         if (!context) {
-          console.error("Failed to get canvas context");
+          logger.error(
+            "pdf",
+            "Failed to get canvas context during crop render"
+          );
           return;
         }
-
-        console.log("Copying crop to display canvas...");
 
         context.drawImage(
           tempCanvas,
@@ -340,14 +339,21 @@ export function AnnotationPreview({
           cropHeight
         );
 
-        console.log("Crop render complete!");
+        logger.debug("pdf", "PDF annotation crop render complete", {
+          annotationId: annotation.id,
+          cropWidth,
+          cropHeight,
+        });
         setPdfLoaded(true);
         setRenderError(null);
 
         // Cleanup
         await pdfDoc.destroy();
       } catch (error) {
-        console.error("Failed to render annotation crop:", error);
+        logger.error("pdf", "Failed to render annotation crop", {
+          error,
+          annotationId: annotation.id,
+        });
         setRenderError(
           error instanceof Error ? error.message : "Unknown error"
         );
@@ -453,7 +459,10 @@ export function AnnotationPreview({
         setModalPdfLoaded(true);
         await pdfDoc.destroy();
       } catch (error) {
-        console.error("Failed to render modal crop:", error);
+        logger.error("pdf", "Failed to render modal crop for annotation", {
+          error,
+          annotationId: annotation.id,
+        });
       }
     };
 

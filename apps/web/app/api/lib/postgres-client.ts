@@ -4,6 +4,7 @@
  */
 
 import { Pool, PoolClient } from "pg";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get a client from the pool with retry logic
@@ -18,21 +19,24 @@ export async function getClientWithRetry(
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(
-        `[PostgresClient] Attempting connection (${attempt}/${retries})...`
-      );
+      logger.debug("db.postgres", "Attempting Postgres connection", {
+        attempt,
+        retries,
+      });
       const client = await pool.connect();
-      console.log(`[PostgresClient] ✓ Connected on attempt ${attempt}`);
+      logger.info("db.postgres", "Postgres client connected", { attempt });
       return client;
     } catch (error) {
       lastError = error as Error;
-      console.error(
-        `[PostgresClient] Connection attempt ${attempt} failed:`,
-        error instanceof Error ? error.message : error
-      );
+      logger.error("db.postgres", "Postgres connection attempt failed", {
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       if (attempt < retries) {
-        console.log(`[PostgresClient] Retrying in ${delay}ms...`);
+        logger.debug("db.postgres", "Retrying Postgres connection", {
+          delayMs: delay,
+        });
         await new Promise((resolve) => setTimeout(resolve, delay));
         delay *= 2; // Exponential backoff
       }

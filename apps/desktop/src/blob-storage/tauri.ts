@@ -11,6 +11,7 @@ import type {
   ScanResult,
   HealthReport,
 } from "@deeprecall/blob-storage";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Tauri-specific BlobCAS implementation
@@ -36,7 +37,7 @@ export class TauriBlobStorage implements BlobCAS {
     try {
       return await invoke<BlobInfo | null>("stat_blob", { sha256 });
     } catch (error) {
-      console.error("Error getting blob stat:", error);
+      logger.error("cas", "Error getting blob stat", { sha256, error });
       return null;
     }
   }
@@ -50,7 +51,10 @@ export class TauriBlobStorage implements BlobCAS {
         orphanedOnly: opts?.orphanedOnly || false,
       });
     } catch (error) {
-      console.error("Error listing blobs:", error);
+      logger.error("cas", "Error listing blobs", {
+        orphanedOnly: opts?.orphanedOnly,
+        error,
+      });
       return [];
     }
   }
@@ -82,15 +86,15 @@ export class TauriBlobStorage implements BlobCAS {
 
       // Coordinate with Electric (background - don't block upload)
       this.coordinateWithElectric(result).catch((error) => {
-        console.error(
-          `[TauriBlobStorage] Failed to coordinate ${result.sha256.slice(0, 16)}... with Electric:`,
-          error
-        );
+        logger.error("cas", "Failed to coordinate blob with Electric", {
+          sha256: result.sha256,
+          error,
+        });
       });
 
       return result;
     } catch (error) {
-      console.error("Error storing blob:", error);
+      logger.error("cas", "Error storing blob", { error });
       throw new Error(`Failed to store blob: ${error}`);
     }
   }
@@ -121,9 +125,9 @@ export class TauriBlobStorage implements BlobCAS {
       blobInfo.path ?? undefined
     );
 
-    console.log(
-      `[TauriBlobStorage] Coordinated ${blobInfo.sha256.slice(0, 16)}... with Electric`
-    );
+    logger.debug("cas", "Coordinated blob with Electric", {
+      sha256: blobInfo.sha256,
+    });
   }
 
   /**
@@ -133,7 +137,7 @@ export class TauriBlobStorage implements BlobCAS {
     try {
       await invoke<void>("delete_blob", { sha256 });
     } catch (error) {
-      console.error("Error deleting blob:", error);
+      logger.error("cas", "Error deleting blob", { sha256, error });
       throw new Error(`Failed to delete blob: ${error}`);
     }
   }
@@ -145,7 +149,7 @@ export class TauriBlobStorage implements BlobCAS {
     try {
       await invoke<void>("rename_blob", { sha256, filename });
     } catch (error) {
-      console.error("Error renaming blob:", error);
+      logger.error("cas", "Error renaming blob", { sha256, filename, error });
       throw new Error(`Failed to rename blob: ${error}`);
     }
   }
@@ -157,7 +161,7 @@ export class TauriBlobStorage implements BlobCAS {
     try {
       return await invoke<ScanResult>("scan_blobs");
     } catch (error) {
-      console.error("Error scanning blobs:", error);
+      logger.error("cas", "Error scanning blobs", { error });
       throw new Error(`Failed to scan blobs: ${error}`);
     }
   }
@@ -169,7 +173,7 @@ export class TauriBlobStorage implements BlobCAS {
     try {
       return await invoke<HealthReport>("health_check");
     } catch (error) {
-      console.error("Error checking blob health:", error);
+      logger.error("cas", "Error checking blob health", { error });
       throw new Error(`Failed to check blob health: ${error}`);
     }
   }
@@ -185,7 +189,7 @@ export class TauriBlobStorage implements BlobCAS {
     try {
       return await invoke("get_blob_stats");
     } catch (error) {
-      console.error("Error getting blob stats:", error);
+      logger.error("cas", "Error getting blob stats", { error });
       throw new Error(`Failed to get blob stats: ${error}`);
     }
   }

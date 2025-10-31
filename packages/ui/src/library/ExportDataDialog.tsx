@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import type { ExportOptions } from "@deeprecall/core";
 import { Download, X, Database, Files, Loader2 } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 // Platform-agnostic export operations interface
 export interface ExportOperations {
@@ -53,7 +54,7 @@ export function ExportDataDialog({
       const size = await exportOps.estimateExportSize(options);
       setEstimatedSize(size);
     } catch (err) {
-      console.error("Failed to estimate size:", err);
+      logger.error("ui", "Failed to estimate size", { error: err, options });
     }
   };
 

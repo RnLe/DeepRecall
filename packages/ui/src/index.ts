@@ -139,6 +139,10 @@ export {
   type DexieGraphVisualizationProps,
 } from "./admin/DexieGraphVisualization";
 export { LogViewerButton, LogViewerDialog } from "./admin/LogViewer";
+export {
+  TelemetryLogViewer,
+  TelemetryLogViewerButton,
+} from "./admin/TelemetryLogViewer";
 
 // Whiteboard components (new architecture)
 export * from "./whiteboard";

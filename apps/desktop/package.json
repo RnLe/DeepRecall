@@ -17,6 +17,7 @@
     "@deeprecall/core": "workspace:*",
     "@deeprecall/data": "workspace:*",
     "@deeprecall/pdf": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
     "@deeprecall/ui": "workspace:*",
     "@tanstack/react-query": "^5.90.3",
     "@tauri-apps/api": "^2",

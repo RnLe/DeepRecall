@@ -5,6 +5,7 @@
 
 "use client";
 
+import { logger } from "@deeprecall/telemetry";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -201,7 +202,7 @@ export default function AnnotationDetailPage() {
       setAnnotation(ann);
       setNotes(annNotes);
     } catch (err) {
-      console.error("Failed to load annotation:", err);
+      logger.error("ui", "Failed to load annotation:", err);
       setError("Failed to load annotation");
     } finally {
       setLoading(false);

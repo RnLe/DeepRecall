@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { logger } from "@deeprecall/telemetry";
 
 const AVATAR_DIR = path.join(process.cwd(), "data", "avatars");
 
@@ -40,7 +41,10 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Failed to serve avatar:", error);
+    logger.error("server.api", "Failed to serve avatar", {
+      filename: (await params).filename,
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to serve avatar" },
       { status: 500 }

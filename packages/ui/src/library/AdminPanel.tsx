@@ -23,6 +23,7 @@ import {
   Network,
 } from "lucide-react";
 import type { BlobWithMetadata } from "@deeprecall/blob-storage";
+import { logger } from "@deeprecall/telemetry";
 
 interface DuplicateGroup {
   hash: string;
@@ -310,7 +311,7 @@ export function AdminPanel({
         onRefresh();
       }
     } catch (error) {
-      console.error("Rescan failed:", error);
+      logger.error("ui", "Blob rescan failed", { error });
       alert(
         "Rescan failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -328,7 +329,7 @@ export function AdminPanel({
       await operations.syncToElectric();
       // No need to show success message or refresh - optimistic updates handle it!
     } catch (error) {
-      console.error("Sync failed:", error);
+      logger.error("ui", "Electric sync failed", { error });
       alert(
         "Sync failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -351,7 +352,7 @@ export function AdminPanel({
       await operations.clearDatabase();
       onRefresh();
     } catch (error) {
-      console.error("Clear failed:", error);
+      logger.error("ui", "Database clear failed", { error });
       alert(
         "Clear failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -378,7 +379,11 @@ export function AdminPanel({
       await operations.deleteBlob(blob.sha256);
       onRefresh();
     } catch (error) {
-      console.error("Delete failed:", error);
+      logger.error("ui", "Blob deletion failed", {
+        error,
+        sha256: blob.sha256,
+        filename: blob.filename,
+      });
       alert(
         "Delete failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -399,11 +404,11 @@ export function AdminPanel({
       return;
     }
 
-    try {
-      // Get the original extension
-      const originalExt = getFileExt(blob.filename);
-      let finalFilename = newFilename.trim();
+    // Get the original extension
+    const originalExt = getFileExt(blob.filename);
+    let finalFilename = newFilename.trim();
 
+    try {
       // If user provided extension, strip it
       if (originalExt && finalFilename.endsWith(originalExt)) {
         finalFilename = finalFilename.substring(
@@ -419,7 +424,12 @@ export function AdminPanel({
       onRefresh();
       setEditingHash(null);
     } catch (error) {
-      console.error("Rename failed:", error);
+      logger.error("ui", "Blob rename failed", {
+        error,
+        sha256: blob.sha256,
+        oldFilename: blob.filename,
+        newFilename: finalFilename,
+      });
       alert(
         "Rename failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -442,7 +452,11 @@ export function AdminPanel({
       setDuplicates([]);
       onRefresh();
     } catch (error) {
-      console.error("Duplicate resolution failed:", error);
+      logger.error("ui", "Duplicate resolution failed", {
+        error,
+        mode,
+        resolutionsCount: resolutions.length,
+      });
       alert(
         "Duplicate resolution failed: " +
           (error instanceof Error ? error.message : "Unknown error")
@@ -464,7 +478,11 @@ export function AdminPanel({
         const content = await operations.fetchBlobContent(blob.sha256);
         setViewingMarkdown({ blob, content });
       } catch (error) {
-        console.error("Failed to load markdown:", error);
+        logger.error("ui", "Failed to load markdown blob", {
+          error,
+          sha256: blob.sha256,
+          filename: blob.filename,
+        });
         alert("Failed to load markdown file");
       }
     }

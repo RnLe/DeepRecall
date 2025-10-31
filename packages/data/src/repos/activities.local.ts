@@ -14,6 +14,7 @@ import { db } from "../db";
 import { ActivitySchema, type Activity } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Local change record with sync metadata
@@ -63,7 +64,10 @@ export async function createActivityLocal(
     payload: activity,
   });
 
-  console.log(`[Local] Created activity ${activity.id} (pending sync)`);
+  logger.info("db.local", "Created activity (pending sync)", {
+    activityId: activity.id,
+    activityType: activity.activityType,
+  });
   return activity;
 }
 
@@ -95,7 +99,10 @@ export async function updateActivityLocal(
     payload: { id, ...updatedData },
   });
 
-  console.log(`[Local] Updated activity ${id} (pending sync)`);
+  logger.info("db.local", "Updated activity (pending sync)", {
+    activityId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -117,7 +124,9 @@ export async function deleteActivityLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[Local] Deleted activity ${id} (pending sync)`);
+  logger.info("db.local", "Deleted activity (pending sync)", {
+    activityId: id,
+  });
 }
 
 /**
@@ -134,7 +143,7 @@ export async function getLocalActivityChanges(): Promise<
  */
 export async function markActivitySynced(id: string): Promise<void> {
   await db.activities_local.where("id").equals(id).delete();
-  console.log(`[Local] Cleaned up synced activity ${id}`);
+  logger.debug("db.local", "Cleaned up synced activity", { activityId: id });
 }
 
 /**
@@ -148,5 +157,5 @@ export async function markActivitySyncFailed(
     _status: "error",
     _error: error,
   });
-  console.warn(`[Local] Activity ${id} sync failed: ${error}`);
+  logger.warn("db.local", "Activity sync failed", { activityId: id, error });
 }

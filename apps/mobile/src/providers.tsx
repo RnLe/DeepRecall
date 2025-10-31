@@ -32,6 +32,7 @@ import {
   initializeDeviceId,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
+import { logger } from "@deeprecall/telemetry";
 
 // Extend Window interface for Capacitor
 declare global {
@@ -50,7 +51,9 @@ configurePdfWorker("/pdf.worker.min.mjs");
 // Initialize device ID from Capacitor Preferences storage
 // This ensures a stable device UUID across app restarts
 initializeDeviceId().catch((err) =>
-  console.error("[Mobile] Failed to initialize device ID:", err)
+  logger.error("sync.coordination", "Failed to initialize device ID", {
+    error: err,
+  })
 );
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -102,30 +105,29 @@ function ElectricInitializer() {
       sourceId: electricSourceId,
       secret: electricSecret,
     });
-    console.log(`[Electric] Mobile app connected to: ${electricUrl}`);
+    logger.info("sync.electric", "Mobile app connected", { electricUrl });
     if (electricSourceId && electricSecret) {
-      console.log(`[Electric] Using Electric Cloud authentication`);
+      logger.debug("sync.electric", "Using Electric Cloud authentication");
     } else {
-      console.log(`[Electric] Using local Electric instance (no auth)`);
+      logger.debug("sync.electric", "Using local Electric instance (no auth)");
     }
 
     // Initialize FlushWorker for mobile
     // Mobile uses HTTP API (same as web app)
     const apiBaseUrl = getApiBaseUrl();
-    console.log("[Mobile] API Base URL:", apiBaseUrl);
-    console.log(
-      "[Mobile] VITE_API_BASE_URL:",
-      import.meta.env.VITE_API_BASE_URL
-    );
-    console.log(
-      "[Mobile] Full API endpoint:",
-      `${apiBaseUrl}/api/writes/batch`
-    );
+    logger.info("sync.writeBuffer", "API configuration", {
+      baseUrl: apiBaseUrl,
+      endpoint: `${apiBaseUrl}/api/writes/batch`,
+      viteApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+    });
 
     const worker = initFlushWorker({
       flushHandler: async (changes) => {
         const endpoint = `${apiBaseUrl}/api/writes/batch`;
-        console.log(`[FlushWorker] Attempting fetch to: ${endpoint}`);
+        logger.debug("sync.writeBuffer", "Attempting flush", {
+          endpoint,
+          count: changes.length,
+        });
         try {
           const response = await fetch(endpoint, {
             method: "POST",
@@ -135,7 +137,11 @@ function ElectricInitializer() {
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(`[FlushWorker] HTTP ${response.status}:`, errorText);
+            logger.error("sync.writeBuffer", "HTTP error", {
+              status: response.status,
+              statusText: response.statusText,
+              errorText,
+            });
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
@@ -147,10 +153,13 @@ function ElectricInitializer() {
         } catch (error) {
           const message =
             error instanceof Error ? error.message : JSON.stringify(error);
-          console.error("[FlushWorker] HTTP API failed:", message);
-          if (error instanceof TypeError && "stack" in error) {
-            console.error("[FlushWorker] Stack:", error.stack);
-          }
+          logger.error("sync.writeBuffer", "HTTP API failed", {
+            error: message,
+            stack:
+              error instanceof Error && "stack" in error
+                ? error.stack
+                : undefined,
+          });
           // Return all changes as failed
           return {
             applied: [],
@@ -168,10 +177,10 @@ function ElectricInitializer() {
     });
     worker.start(5000); // Check every 5 seconds (mobile optimized)
     workerRef.current = worker;
-    console.log("[FlushWorker] Started (interval: 5000ms)");
-    console.log(
-      `[FlushWorker] Using HTTP API for writes: ${apiBaseUrl}/api/writes/batch`
-    );
+    logger.info("sync.writeBuffer", "FlushWorker started", {
+      intervalMs: 5000,
+      endpoint: `${apiBaseUrl}/api/writes/batch`,
+    });
 
     // Expose for debugging
     if (typeof window !== "undefined") {
@@ -179,14 +188,18 @@ function ElectricInitializer() {
       (window as any).__deeprecall_flush_worker = worker;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__deeprecall_buffer = worker.getBuffer();
-      console.log("💡 Mobile debug: window.__deeprecall_flush_worker");
-      console.log("💡 Mobile debug: window.__deeprecall_buffer.getStats()");
+      logger.debug("ui", "Mobile debug tools exposed", {
+        tools: [
+          "window.__deeprecall_flush_worker",
+          "window.__deeprecall_buffer.getStats()",
+        ],
+      });
     }
 
     return () => {
       if (workerRef.current) {
         workerRef.current.stop();
-        console.log("[FlushWorker] Stopped");
+        logger.info("sync.writeBuffer", "FlushWorker stopped");
       }
     };
   }, []);

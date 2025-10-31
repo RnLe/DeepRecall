@@ -9,6 +9,7 @@ import { WorkSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
 import { db } from "../db"; // Still needed for Assets queries temporarily
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * React hook to get all Works (live-synced from Postgres)
@@ -82,7 +83,11 @@ export async function createWork(
     payload: validated,
   });
 
-  console.log(`[WorksRepo] Created work ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Created work (enqueued)", {
+    workId: id,
+    workType: data.workType,
+    title: data.title,
+  });
 
   return validated;
 }
@@ -112,7 +117,10 @@ export async function updateWork(
     payload: updated,
   });
 
-  console.log(`[WorksRepo] Updated work ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Updated work (enqueued)", {
+    workId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -130,7 +138,7 @@ export async function deleteWork(id: string): Promise<void> {
   // TODO: Also delete assets and edges via cascade or explicit deletes
   // For now, rely on Postgres CASCADE DELETE constraints
 
-  console.log(`[WorksRepo] Deleted work ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Deleted work (enqueued)", { workId: id });
 }
 
 /**
@@ -220,11 +228,16 @@ export async function createWorkWithAsset(params: {
       payload: validatedAsset,
     });
 
-    console.log(
-      `[WorksRepo] Created work ${workId} with asset ${assetId} (enqueued for sync)`
-    );
+    logger.info("db.postgres", "Created work with asset (enqueued)", {
+      workId,
+      assetId,
+      workType: params.work.workType,
+    });
   } else {
-    console.log(`[WorksRepo] Created work ${workId} (enqueued for sync)`);
+    logger.info("db.postgres", "Created work (enqueued)", {
+      workId,
+      workType: params.work.workType,
+    });
   }
 
   return { work: validatedWork, asset };

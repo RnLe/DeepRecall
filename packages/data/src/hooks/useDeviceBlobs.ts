@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Sync Electric data to Dexie (replace entire table)
@@ -25,17 +26,28 @@ async function syncElectricToDexie(electricData: DeviceBlob[]): Promise<void> {
 
     if (idsToDelete.length > 0) {
       await db.deviceBlobs.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale device_blobs`
+      logger.info(
+        "sync.coordination",
+        "Deleted stale device_blobs from Dexie",
+        {
+          count: idsToDelete.length,
+          ids: idsToDelete,
+        }
       );
     }
     if (electricData.length > 0) {
       await db.deviceBlobs.bulkPut(electricData);
-      console.log(
-        `[Electric→Dexie] Synced ${electricData.length} device_blobs`
+      logger.info(
+        "sync.coordination",
+        "Synced device_blobs from Electric to Dexie",
+        {
+          count: electricData.length,
+        }
       );
     } else if (idsToDelete.length === 0 && currentIds.size === 0) {
-      console.log(`[Electric→Dexie] device_blobs: empty (no changes)`);
+      logger.info("sync.coordination", "device_blobs table empty", {
+        count: 0,
+      });
     }
   });
 }
@@ -62,9 +74,12 @@ export function useDeviceBlobsSync() {
           queryClient.invalidateQueries({ queryKey: ["device-blobs"] });
         })
         .catch((error) => {
-          console.error(
-            "[useDeviceBlobsSync] Failed to sync device_blobs:",
-            error
+          logger.error(
+            "sync.coordination",
+            "Failed to sync device_blobs to Dexie",
+            {
+              error: error.message,
+            }
           );
         });
     }
@@ -85,7 +100,9 @@ export function useDeviceBlobs() {
         const data = await db.deviceBlobs.toArray();
         return data;
       } catch (error) {
-        console.error("[useDeviceBlobs] Error:", error);
+        logger.error("sync.coordination", "Failed to query device_blobs", {
+          error: (error as Error).message,
+        });
         return []; // Always return array, never undefined
       }
     },
@@ -112,7 +129,11 @@ export function useDeviceBlobsByHash(sha256: string | undefined) {
           .toArray();
         return data;
       } catch (error) {
-        console.error("[useDeviceBlobsByHash] Error:", error);
+        logger.error(
+          "sync.coordination",
+          "Failed to query device_blobs by hash",
+          { sha256, error: (error as Error).message }
+        );
         return [];
       }
     },
@@ -137,7 +158,11 @@ export function useDeviceBlobsByDevice(deviceId: string | undefined) {
           .toArray();
         return data;
       } catch (error) {
-        console.error("[useDeviceBlobsByDevice] Error:", error);
+        logger.error(
+          "sync.coordination",
+          "Failed to query device_blobs by device",
+          { deviceId, error: (error as Error).message }
+        );
         return [];
       }
     },
@@ -159,7 +184,10 @@ export function useDeviceBlob(id: string | undefined) {
         const data = await db.deviceBlobs.get(id);
         return data;
       } catch (error) {
-        console.error("[useDeviceBlob] Error:", error);
+        logger.error("sync.coordination", "Failed to query device_blob by id", {
+          id,
+          error: (error as Error).message,
+        });
         return undefined;
       }
     },

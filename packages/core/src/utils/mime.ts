@@ -10,6 +10,8 @@
  * especially for extension-less files (Mobile storage).
  */
 
+import { logger } from "@deeprecall/telemetry";
+
 /**
  * Supported file types organized by category
  */
@@ -339,7 +341,10 @@ export async function detectMimeFromFile(file: File): Promise<string> {
       return detectedMime;
     }
   } catch (error) {
-    console.warn("Failed to detect MIME from buffer:", error);
+    logger.warn("ui", "Failed to detect MIME from buffer", {
+      error,
+      filename: file.name,
+    });
   }
 
   // 3. Fallback to filename extension

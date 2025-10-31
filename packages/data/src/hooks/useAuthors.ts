@@ -12,6 +12,7 @@ import * as authorsMerged from "../repos/authors.merged";
 import * as authorsCleanup from "../repos/authors.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -39,20 +40,23 @@ async function syncElectricToDexie(electricData: Author[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.authors.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale author(s)`
-      );
+      logger.info("sync.electric", "Deleted stale authors from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.authors.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} author(s)`);
+      logger.info("sync.electric", "Synced authors from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Authors table cleared (0 rows)`);
+      logger.info("sync.electric", "Authors table cleared", { count: 0 });
     }
   });
 }
@@ -85,10 +89,9 @@ export function useAuthorsSync() {
         })
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error(
-            "[useAuthorsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync authors to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -104,7 +107,9 @@ export function useAuthorsSync() {
         .cleanupSyncedAuthors(electricResult.data)
         .catch((error) => {
           if (error.name === "DatabaseClosedError") return;
-          console.error("[useAuthorsSync] Failed to cleanup:", error);
+          logger.error("db.local", "Failed to cleanup authors", {
+            error: error.message,
+          });
         });
     }
   }, [
@@ -190,14 +195,16 @@ export function useCreateAuthor() {
       return authorsLocal.createAuthorLocal(data);
     },
     onSuccess: (newAuthor: Author) => {
-      console.log(
-        `✅ [useCreateAuthor] Created author ${newAuthor.id} (pending sync)`
-      );
+      logger.info("db.local", "Created author locally (pending sync)", {
+        authorId: newAuthor.id,
+      });
       // Invalidate merged queries to show new author immediately
       queryClient.invalidateQueries({ queryKey: ["authors", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useCreateAuthor] Failed to create author:", error);
+      logger.error("db.local", "Failed to create author", {
+        error: error.message,
+      });
     },
   });
 }
@@ -220,12 +227,16 @@ export function useUpdateAuthor() {
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string; updates: Partial<Author> }) => {
-      console.log(`✅ [useUpdateAuthor] Updated author ${id} (pending sync)`);
+      logger.info("db.local", "Updated author locally (pending sync)", {
+        authorId: id,
+      });
       // Invalidate merged queries
       queryClient.invalidateQueries({ queryKey: ["authors", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useUpdateAuthor] Failed to update author:", error);
+      logger.error("db.local", "Failed to update author", {
+        error: error.message,
+      });
     },
   });
 }
@@ -242,12 +253,16 @@ export function useDeleteAuthor() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(`✅ [useDeleteAuthor] Deleted author ${id} (pending sync)`);
+      logger.info("db.local", "Deleted author locally (pending sync)", {
+        authorId: id,
+      });
       // Invalidate merged queries to remove immediately
       queryClient.invalidateQueries({ queryKey: ["authors", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useDeleteAuthor] Failed to delete author:", error);
+      logger.error("db.local", "Failed to delete author", {
+        error: error.message,
+      });
     },
   });
 }
@@ -275,16 +290,17 @@ export function useFindOrCreateAuthor() {
       );
 
       if (existing) {
-        console.log(
-          `[useFindOrCreateAuthor] Found existing author: ${existing.id}`
-        );
+        logger.info("db.local", "Found existing author", {
+          authorId: existing.id,
+        });
         return existing;
       }
 
       // Create new author
-      console.log(
-        `[useFindOrCreateAuthor] Creating new author: ${data.firstName} ${data.lastName}`
-      );
+      logger.info("db.local", "Creating new author", {
+        firstName: data.firstName,
+        lastName: data.lastName,
+      });
       return createAuthor.mutateAsync({
         ...data,
         affiliation: undefined,

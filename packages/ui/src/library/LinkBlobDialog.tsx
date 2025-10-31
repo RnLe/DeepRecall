@@ -28,6 +28,7 @@ import { PresetFormBuilder } from "./PresetFormBuilder";
 import { BibtexImportModal } from "./BibtexImportModal";
 import { AuthorInput } from "./AuthorInput";
 import { PDFPreview } from "../components/PDFPreview";
+import { logger } from "@deeprecall/telemetry";
 
 // Utility imports
 import { parseAuthorList } from "../utils/nameParser";
@@ -130,19 +131,15 @@ export function LinkBlobDialog({
   );
 
   // Debug: Log preset filtering
-  console.log("[LinkBlobDialog] All presets:", allPresets.length);
-  console.log(
-    "[LinkBlobDialog] System presets (work):",
-    systemPresetsFiltered.length
-  );
-  console.log(
-    "[LinkBlobDialog] User presets (work):",
-    userPresetsFiltered.length
-  );
-  console.log(
-    "[LinkBlobDialog] User presets details:",
-    userPresets.map((p) => ({ name: p.name, target: p.targetEntity }))
-  );
+  logger.debug("ui", "LinkBlobDialog presets", {
+    allPresetsCount: allPresets.length,
+    systemPresetsCount: systemPresetsFiltered.length,
+    userPresetsCount: userPresetsFiltered.length,
+    userPresets: userPresets.map((p) => ({
+      name: p.name,
+      target: p.targetEntity,
+    })),
+  });
 
   // Extract initial values from blob pdfMetadata or prefillValues
   const initialValues =
@@ -171,7 +168,7 @@ export function LinkBlobDialog({
     // Find preset by name
     const preset = allPresets.find((p: Preset) => p.name === presetName);
     if (!preset) {
-      console.error(`Preset not found: ${presetName}`);
+      logger.error("ui", "Preset not found", { presetName });
       return;
     }
 
@@ -193,7 +190,10 @@ export function LinkBlobDialog({
           });
           newAuthorIds.push(author.id);
         } catch (error) {
-          console.error("Failed to create author:", error);
+          logger.error("ui", "Failed to create author during BibTeX import", {
+            error,
+            parsed,
+          });
         }
       }
 
@@ -220,16 +220,24 @@ export function LinkBlobDialog({
     if (!selectedPreset) return;
 
     try {
-      console.log("Creating work with:", { coreFields, metadata, blob });
+      logger.info("ui", "Creating work with blob", {
+        coreFields,
+        metadata,
+        blobHash: blob.sha256,
+      });
 
       // STEP 0: Sync blob to Electric first (auto-sync on link)
       // Skip sync if blob is remote (already in Electric from another device)
       if (isLocalBlob) {
-        console.log("🔄 Auto-syncing local blob to Electric...");
+        logger.info("ui", "Auto-syncing local blob to Electric", {
+          hash: blob.sha256,
+        });
         await syncBlobToElectric(blob.sha256);
-        console.log("✅ Blob synced to Electric");
+        logger.info("ui", "Blob synced to Electric", { hash: blob.sha256 });
       } else {
-        console.log("⏭️ Skipping sync - blob is remote (already in Electric)");
+        logger.debug("ui", "Skipping sync - blob is remote", {
+          hash: blob.sha256,
+        });
       }
 
       // Create Work first
@@ -261,10 +269,16 @@ export function LinkBlobDialog({
         favorite: false,
       });
 
-      console.log("✅ Work + Asset created successfully!");
+      logger.info("ui", "Work + Asset created successfully", {
+        workId: work.id,
+        blobHash: blob.sha256,
+      });
       onSuccess();
     } catch (error) {
-      console.error("❌ Failed to create work:", error);
+      logger.error("ui", "Failed to create work", {
+        error,
+        blobHash: blob.sha256,
+      });
       alert(
         `Failed to create work: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -279,9 +293,12 @@ export function LinkBlobDialog({
 
     try {
       // STEP 0: Sync blob to Electric first (auto-sync on link)
-      console.log("🔄 Auto-syncing blob to Electric...");
+      logger.info("ui", "Auto-syncing blob to Electric", {
+        hash: blob.sha256,
+        workId: selectedWorkId,
+      });
       await syncBlobToElectric(blob.sha256);
-      console.log("✅ Blob synced to Electric");
+      logger.info("ui", "Blob synced to Electric", { hash: blob.sha256 });
 
       // Create asset linked directly to the work
       await createAsset.mutateAsync({
@@ -295,10 +312,17 @@ export function LinkBlobDialog({
         favorite: false,
       });
 
-      console.log("✅ Asset linked to work successfully!");
+      logger.info("ui", "Asset linked to work successfully", {
+        workId: selectedWorkId,
+        hash: blob.sha256,
+      });
       onSuccess();
     } catch (error) {
-      console.error("❌ Failed to link asset:", error);
+      logger.error("ui", "Failed to link asset", {
+        error,
+        workId: selectedWorkId,
+        hash: blob.sha256,
+      });
       alert(
         `Failed to link asset: ${
           error instanceof Error ? error.message : "Unknown error"

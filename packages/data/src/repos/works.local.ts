@@ -14,6 +14,7 @@ import { db } from "../db";
 import { WorkSchema, type Work } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Local change record with sync metadata
@@ -63,7 +64,10 @@ export async function createWorkLocal(
     payload: work,
   });
 
-  console.log(`[Local] Created work ${work.id} (pending sync)`);
+  logger.info("db.local", "Created work (pending sync)", {
+    workId: work.id,
+    workType: work.workType,
+  });
   return work;
 }
 
@@ -95,7 +99,10 @@ export async function updateWorkLocal(
     payload: { id, ...updatedData },
   });
 
-  console.log(`[Local] Updated work ${id} (pending sync)`);
+  logger.info("db.local", "Updated work (pending sync)", {
+    workId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -117,7 +124,7 @@ export async function deleteWorkLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[Local] Deleted work ${id} (pending sync)`);
+  logger.info("db.local", "Deleted work (pending sync)", { workId: id });
 }
 
 /**
@@ -132,7 +139,7 @@ export async function getLocalWorkChanges(): Promise<LocalWorkChange[]> {
  */
 export async function markWorkSynced(id: string): Promise<void> {
   await db.works_local.where("id").equals(id).delete();
-  console.log(`[Local] Cleaned up synced work ${id}`);
+  logger.debug("db.local", "Cleaned up synced work", { workId: id });
 }
 
 /**
@@ -146,5 +153,5 @@ export async function markWorkSyncFailed(
     _status: "error",
     _error: error,
   });
-  console.warn(`[Local] Work ${id} sync failed: ${error}`);
+  logger.warn("db.local", "Work sync failed", { workId: id, error });
 }

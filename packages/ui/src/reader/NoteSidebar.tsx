@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 import { NotePreview, type NotePreviewOperations } from "./NotePreview";
 
 export interface NoteSidebarOperations extends NotePreviewOperations {
@@ -83,10 +84,10 @@ export function NoteSidebar({
                   newNotesMap.set(ann.id, notes);
                 }
               } catch (error) {
-                console.error(
-                  `Failed to load notes for annotation ${ann.id}:`,
-                  error
-                );
+                logger.error("ui", "Failed to load notes for annotation", {
+                  error,
+                  annotationId: ann.id,
+                });
               }
             }
           })
@@ -94,7 +95,10 @@ export function NoteSidebar({
 
         setNotesMap(newNotesMap);
       } catch (error) {
-        console.error("Failed to load notes:", error);
+        logger.error("ui", "Failed to load notes", {
+          error,
+          currentPage,
+        });
       } finally {
         setLoading(false);
       }

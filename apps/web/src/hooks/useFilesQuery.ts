@@ -3,7 +3,11 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FilesResponseSchema, type FilesResponse } from "@deeprecall/core/schemas/files";
+import {
+  FilesResponseSchema,
+  type FilesResponse,
+} from "@deeprecall/core/schemas/files";
+import { logger } from "@deeprecall/telemetry";
 
 export function useFilesQuery() {
   return useQuery({
@@ -39,14 +43,31 @@ export function useScanMutation() {
       queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
 
       // Log scan results
-      console.log("Scan completed:", data);
-      if (data.newFiles > 0) console.log(`  ✨ ${data.newFiles} new files`);
-      if (data.editedFiles > 0)
-        console.warn(`  ⚠️  ${data.editedFiles} edited files`);
-      if (data.relocatedFiles > 0)
-        console.log(`  📦 ${data.relocatedFiles} relocated files`);
-      if (data.missingFiles > 0)
-        console.error(`  ❌ ${data.missingFiles} missing files`);
+      logger.info("cas", "File scan completed", {
+        newFiles: data.newFiles,
+        editedFiles: data.editedFiles,
+        relocatedFiles: data.relocatedFiles,
+        missingFiles: data.missingFiles,
+      });
+
+      if (data.newFiles > 0) {
+        logger.info("cas", "New files detected", { count: data.newFiles });
+      }
+      if (data.editedFiles > 0) {
+        logger.warn("cas", "Edited files detected", {
+          count: data.editedFiles,
+        });
+      }
+      if (data.relocatedFiles > 0) {
+        logger.info("cas", "Relocated files detected", {
+          count: data.relocatedFiles,
+        });
+      }
+      if (data.missingFiles > 0) {
+        logger.error("cas", "Missing files detected", {
+          count: data.missingFiles,
+        });
+      }
     },
   });
 }

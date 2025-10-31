@@ -21,6 +21,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Platform-specific operations interface
@@ -58,7 +59,11 @@ export function NotePreview({ asset, onDelete, operations }: NotePreviewProps) {
       const text = await operations.fetchBlobContent(asset.sha256);
       setContent(text);
     } catch (err) {
-      console.error("Failed to load markdown:", err);
+      logger.error("ui", "Failed to load markdown preview", {
+        error: err,
+        assetId: asset.id,
+        sha256: asset.sha256,
+      });
       setError(true);
     } finally {
       setLoading(false);

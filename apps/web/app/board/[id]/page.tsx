@@ -4,6 +4,7 @@
  */
 
 "use client";
+import { logger } from "@deeprecall/telemetry";
 
 import { use, useState } from "react";
 import { useBoard } from "@deeprecall/data";
@@ -29,7 +30,7 @@ export default function BoardPage({
   // Redirect if board not found
   useEffect(() => {
     if (!isLoading && !board && !error) {
-      console.error(`Board ${id} not found`);
+      logger.error("ui", `Board ${id} not found`);
       router.push("/");
     }
   }, [isLoading, board, error, id, router]);

@@ -14,6 +14,7 @@ import { db } from "../db";
 import { PresetSchema, type Preset } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Local change record with sync metadata
@@ -63,7 +64,10 @@ export async function createPresetLocal(
     payload: preset,
   });
 
-  console.log(`[Local] Created preset ${preset.id} (pending sync)`);
+  logger.info("db.local", "Created preset (pending sync)", {
+    presetId: preset.id,
+    name: preset.name,
+  });
   return preset;
 }
 
@@ -97,7 +101,10 @@ export async function updatePresetLocal(
     payload: { id, ...updatedData },
   });
 
-  console.log(`[Local] Updated preset ${id} (pending sync)`);
+  logger.info("db.local", "Updated preset (pending sync)", {
+    presetId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -119,7 +126,7 @@ export async function deletePresetLocal(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[Local] Deleted preset ${id} (pending sync)`);
+  logger.info("db.local", "Deleted preset (pending sync)", { presetId: id });
 }
 
 /**
@@ -134,7 +141,7 @@ export async function getLocalPresetChanges(): Promise<LocalPresetChange[]> {
  */
 export async function markPresetSynced(id: string): Promise<void> {
   await db.presets_local.where("id").equals(id).delete();
-  console.log(`[Local] Cleaned up synced preset ${id}`);
+  logger.debug("db.local", "Cleaned up synced preset", { presetId: id });
 }
 
 /**
@@ -148,7 +155,7 @@ export async function markPresetSyncFailed(
     _status: "error",
     _error: error,
   });
-  console.warn(`[Local] Preset ${id} sync failed: ${error}`);
+  logger.warn("db.local", "Preset sync failed", { presetId: id, error });
 }
 
 /**
@@ -160,6 +167,8 @@ export async function clearSyncedPresets(): Promise<number> {
     .equals("synced")
     .toArray();
   await db.presets_local.where("_status").equals("synced").delete();
-  console.log(`[Local] Cleaned up ${synced.length} synced presets`);
+  logger.info("db.local", "Cleaned up synced presets", {
+    count: synced.length,
+  });
   return synced.length;
 }

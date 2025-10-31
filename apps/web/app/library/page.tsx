@@ -1,4 +1,5 @@
 "use client";
+import { logger } from "@deeprecall/telemetry";
 
 import { useState, useMemo, useEffect } from "react";
 import { BookOpen, Link2 } from "lucide-react";
@@ -158,7 +159,7 @@ export default function LibraryPage() {
         );
       }
     } catch (error) {
-      console.error("Failed to link work to activity:", error);
+      logger.error("ui", "Failed to link work to activity:", error);
       alert("Failed to link work to activity");
     }
   };
@@ -203,7 +204,7 @@ export default function LibraryPage() {
       // Note: unlinkedAssets uses useLiveQuery now, so it updates automatically
       queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
     } catch (error) {
-      console.error("Failed to link blob to activity:", error);
+      logger.error("ui", "Failed to link blob to activity:", error);
       alert("Failed to link file to activity");
     }
   };
@@ -226,7 +227,7 @@ export default function LibraryPage() {
 
       // Note: unlinkedAssets uses useLiveQuery, so it updates automatically when edges change
     } catch (error) {
-      console.error("Failed to link asset to activity:", error);
+      logger.error("ui", "Failed to link asset to activity:", error);
       alert("Failed to link asset to activity");
     }
   };
@@ -286,7 +287,7 @@ export default function LibraryPage() {
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
     } catch (error) {
-      console.error("Failed to upload files to activity:", error);
+      logger.error("ui", "Failed to upload files to activity:", error);
       alert(
         `Failed to upload files: ${error instanceof Error ? error.message : "Unknown error"}`
       );
@@ -311,7 +312,7 @@ export default function LibraryPage() {
         );
       }
     } catch (error) {
-      console.error("Failed to unlink work from activity:", error);
+      logger.error("ui", "Failed to unlink work from activity:", error);
       alert("Failed to unlink work from activity");
     }
   };
@@ -332,7 +333,7 @@ export default function LibraryPage() {
 
       // Note: unlinkedAssets uses useLiveQuery, so it updates automatically when edges are removed
     } catch (error) {
-      console.error("Failed to unlink asset from activity:", error);
+      logger.error("ui", "Failed to unlink asset from activity:", error);
       alert("Failed to unlink file from activity");
     }
   };
@@ -475,7 +476,7 @@ export default function LibraryPage() {
         setLinkingBlob(blob);
         return;
       } catch (error) {
-        console.error("Failed to parse dropped blob:", error);
+        logger.error("ui", "Failed to parse dropped blob:", error);
       }
     }
 
@@ -509,7 +510,7 @@ export default function LibraryPage() {
           // Open dialog with uploaded blob
           setLinkingBlob(result.blob);
         } catch (error) {
-          console.error("File upload failed:", error);
+          logger.error("ui", "File upload failed:", error);
           alert(
             `Upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
           );
@@ -543,7 +544,7 @@ export default function LibraryPage() {
           // Refresh the orphaned blobs list
           queryClient.invalidateQueries({ queryKey: ["orphanedBlobs"] });
         } catch (error) {
-          console.error("File upload failed:", error);
+          logger.error("ui", "File upload failed:", error);
           alert(
             `Upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
           );

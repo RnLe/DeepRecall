@@ -15,6 +15,7 @@ import {
   addCorsHeaders,
 } from "@/app/api/lib/cors";
 import { z } from "zod";
+import { logger } from "@deeprecall/telemetry";
 import {
   WorkSchema,
   AssetSchema,
@@ -354,9 +355,12 @@ async function applyUpdate(
   const clientUpdatedAt = data.updated_at;
 
   if (clientUpdatedAt < serverUpdatedAt) {
-    console.log(
-      `[WritesBatch] Skipping update for ${change.table}/${data.id} - server is newer (server: ${serverUpdatedAt}, client: ${clientUpdatedAt})`
-    );
+    logger.info("sync.writeBuffer", "Skipping stale update (server newer)", {
+      table: change.table,
+      id: data.id,
+      serverTime: serverUpdatedAt.toISOString(),
+      clientTime: clientUpdatedAt.toISOString(),
+    });
     // Return existing record
     const result = await client.query(
       `SELECT * FROM ${change.table} WHERE id = $1`,
@@ -429,7 +433,12 @@ async function applyChange(
 
     return { success: true, response };
   } catch (error) {
-    console.error(`[WritesBatch] Error applying change ${change.id}:`, error);
+    logger.error("sync.writeBuffer", "Failed to apply change", {
+      changeId: change.id,
+      table: change.table,
+      operation: change.op,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -441,7 +450,7 @@ async function applyChange(
  * POST handler
  */
 export async function POST(request: NextRequest) {
-  console.log("[WritesBatch] API endpoint called!");
+  logger.debug("server.api", "Write batch endpoint called");
 
   // Check CORS origin
   const corsError = checkCorsOrigin(request);
@@ -455,7 +464,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { changes } = BatchRequestSchema.parse(body);
 
-    console.log(`[WritesBatch] Processing ${changes.length} changes`);
+    logger.info("sync.writeBuffer", "Processing write batch", {
+      changeCount: changes.length,
+    });
 
     // Sort changes to ensure foreign key dependencies are satisfied
     // blobs_meta must be inserted before device_blobs (foreign key constraint)
@@ -499,17 +510,19 @@ export async function POST(request: NextRequest) {
           }
         } catch (error) {
           // Rollback this change but continue with others
-          console.error(
-            `[WritesBatch] Savepoint error for ${change.id}:`,
-            error
-          );
+          logger.error("sync.writeBuffer", "Savepoint error", {
+            changeId: change.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
           try {
             await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           } catch (rollbackError) {
-            console.error(
-              `[WritesBatch] Failed to rollback savepoint:`,
-              rollbackError
-            );
+            logger.error("db.postgres", "Failed to rollback savepoint", {
+              error:
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : String(rollbackError),
+            });
           }
           errors.push({
             id: change.id,
@@ -519,19 +532,23 @@ export async function POST(request: NextRequest) {
       }
 
       await client.query("COMMIT");
-      console.log(
-        `[WritesBatch] Successfully applied ${appliedIds.length}/${changes.length} changes`
-      );
+      logger.info("sync.writeBuffer", "Write batch completed", {
+        applied: appliedIds.length,
+        total: changes.length,
+        errors: errors.length,
+      });
     } catch (error) {
       // Ensure we rollback even if there's an error
       try {
         await client.query("ROLLBACK");
-        console.log("[WritesBatch] Transaction rolled back due to error");
+        logger.warn("db.postgres", "Transaction rolled back due to error");
       } catch (rollbackError) {
-        console.error(
-          "[WritesBatch] Failed to rollback transaction:",
-          rollbackError
-        );
+        logger.error("db.postgres", "Failed to rollback transaction", {
+          error:
+            rollbackError instanceof Error
+              ? rollbackError.message
+              : String(rollbackError),
+        });
       }
       throw error;
     } finally {
@@ -539,7 +556,12 @@ export async function POST(request: NextRequest) {
       try {
         client.release();
       } catch (releaseError) {
-        console.error("[WritesBatch] Failed to release client:", releaseError);
+        logger.error("db.postgres", "Failed to release client", {
+          error:
+            releaseError instanceof Error
+              ? releaseError.message
+              : String(releaseError),
+        });
       }
     }
 
@@ -552,7 +574,9 @@ export async function POST(request: NextRequest) {
     });
     return addCorsHeaders(response, request);
   } catch (error) {
-    console.error("[WritesBatch] Batch processing failed:", error);
+    logger.error("server.api", "Batch processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const response = NextResponse.json(
       {
         success: false,

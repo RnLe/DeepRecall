@@ -21,6 +21,7 @@ import {
 } from "./tools";
 import { createInkingEngine, type StrokePoint } from "./inking";
 import { GestureFSM } from "./gestures";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Example 1: Basic stroke creation with a pen tool
@@ -81,9 +82,11 @@ export function exampleBasicStroke() {
   // 5. Get final stroke points (smoothed, with computed widths)
   const strokePoints: StrokePoint[] = engine.finalize();
 
-  console.log("Created stroke with", strokePoints.length, "points");
-  console.log("First point:", strokePoints[0]);
-  console.log("Last point:", strokePoints[strokePoints.length - 1]);
+  logger.debug("ink", "Created stroke", {
+    pointCount: strokePoints.length,
+    firstPoint: strokePoints[0],
+    lastPoint: strokePoints[strokePoints.length - 1],
+  });
 
   return strokePoints;
 }
@@ -263,22 +266,22 @@ export class DrawingController {
 
   private renderStrokePreview(points: StrokePoint[]) {
     // TODO: Implement rendering logic
-    console.log("Rendering preview with", points.length, "points");
+    logger.debug("ink", "Rendering preview", { pointCount: points.length });
   }
 
   private clearStrokePreview() {
     // TODO: Implement clear preview logic
-    console.log("Clearing preview");
+    logger.debug("ink", "Clearing preview");
   }
 
   private commitStroke(points: StrokePoint[]) {
     // TODO: Save stroke to database
-    console.log("Committing stroke with", points.length, "points");
+    logger.debug("ink", "Committing stroke", { pointCount: points.length });
     const toolId = this.gestureFSM.getTool();
     const tool = getTool(toolId);
 
     if (isInkingTool(tool)) {
-      console.log("Stroke style:", {
+      logger.debug("ink", "Stroke style", {
         color: tool.visual.color,
         opacity: tool.visual.opacity,
         toolId: tool.id,
@@ -346,11 +349,11 @@ export function exampleCompareSmoothingAlgorithms() {
       }
 
       const points = engine.finalize();
-      console.log(
-        `${tool.name} (${tool.inking.smoothing.algorithm}):`,
-        points.length,
-        "points"
-      );
+      logger.debug("ink", "Tool comparison", {
+        toolName: tool.name,
+        algorithm: tool.inking.smoothing.algorithm,
+        pointCount: points.length,
+      });
     }
   }
 }
@@ -403,6 +406,6 @@ export function exampleCustomTool() {
     customTool.visual.baseWidth
   );
 
-  console.log("Created custom tool:", customTool.name);
+  logger.debug("ink", "Created custom tool", { toolName: customTool.name });
   return engine;
 }

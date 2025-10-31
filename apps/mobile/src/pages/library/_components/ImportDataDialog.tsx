@@ -9,17 +9,18 @@ import {
   ImportDataDialog as ImportDataDialogUI,
   type ImportOperations,
 } from "@deeprecall/ui/library";
+import { logger } from "@deeprecall/telemetry";
 
 // Mobile import operations (stub for now - can be enhanced with Capacitor Filesystem plugin)
 const importOps: ImportOperations = {
   previewImport: async () => {
     // TODO: Implement with Capacitor Filesystem plugin
-    console.warn("Import not yet implemented on mobile");
+    logger.warn("ui", "Import not yet implemented on mobile");
     throw new Error("Import not yet implemented on mobile");
   },
   executeImport: async () => {
     // TODO: Implement with Capacitor Filesystem plugin
-    console.warn("Import not yet implemented on mobile");
+    logger.warn("ui", "Import not yet implemented on mobile");
     throw new Error("Import not yet implemented on mobile");
   },
   formatBytes: (bytes: number) => {

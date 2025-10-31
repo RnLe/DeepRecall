@@ -22,6 +22,7 @@ import type { DuplicateGroup } from "@deeprecall/ui";
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCapacitorBlobStorage } from "../../hooks/useBlobStorage";
+import { logger } from "@deeprecall/telemetry";
 import {
   useBlobsMeta,
   useDeviceBlobs,
@@ -73,7 +74,7 @@ export default function CASAdminPage() {
 
     clearDatabase: async (): Promise<void> => {
       // Step 1: Clear Dexie first (optimistic - instant UI update)
-      console.log("Clearing local Dexie database (optimistic)...");
+      logger.info("cas", "Clearing local Dexie database (optimistic)");
       const { db } = await import("@deeprecall/data/db");
 
       await db.transaction(
@@ -140,13 +141,13 @@ export default function CASAdminPage() {
         }
       );
 
-      console.log("✅ Dexie cleared");
+      logger.info("cas", "Dexie cleared");
 
       // Step 2: Clear all blobs from Capacitor CAS
       const allBlobs = await cas.list();
       await Promise.all(allBlobs.map((blob) => cas.delete(blob.sha256)));
 
-      console.log("✅ CAS cleared");
+      logger.info("cas", "CAS cleared");
 
       // Step 3: Invalidate React Query to show empty state
       queryClient.clear();
@@ -156,7 +157,7 @@ export default function CASAdminPage() {
         queryClient.refetchQueries({ queryKey: ["device-blobs"] }),
       ]);
 
-      console.log("✅ React Query cleared");
+      logger.info("cas", "React Query cleared");
 
       // Step 4: Clear Postgres via HTTP API (background confirmation)
       const apiBaseUrl = getApiBaseUrl();
@@ -166,7 +167,7 @@ export default function CASAdminPage() {
       });
       if (!response.ok) throw new Error("Clear failed");
 
-      console.log("✅ Postgres cleared");
+      logger.info("cas", "Postgres cleared");
     },
 
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
@@ -198,7 +199,10 @@ export default function CASAdminPage() {
             );
             synced++;
           } catch (error) {
-            console.error(`Failed to coordinate ${blob.sha256}:`, error);
+            logger.error("sync.coordination", "Failed to coordinate blob", {
+              sha256: blob.sha256,
+              error,
+            });
             failed++;
           }
         }

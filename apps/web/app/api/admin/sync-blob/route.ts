@@ -13,6 +13,7 @@ import {
   checkCorsOrigin,
   addCorsHeaders,
 } from "@/app/api/lib/cors";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Handle OPTIONS request for CORS preflight
@@ -42,10 +43,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(
-      `[SyncBlob] Sync requested for blob ${sha256.slice(0, 16)}... by device ${deviceId.slice(0, 8)}...`
-    );
-
     // Import server-safe write functions (write directly to Postgres)
     const { createBlobMetaServer, markBlobAvailableServer } = await import(
       "@deeprecall/data/repos/blobs.server"
@@ -61,7 +58,12 @@ export async function POST(request: NextRequest) {
 
     if (blob) {
       // Blob exists in local CAS - sync it to Postgres
-      console.log(`[SyncBlob] Found blob in local CAS, syncing to Postgres...`);
+      logger.info("sync.coordination", "Syncing blob from CAS to Postgres", {
+        sha256: sha256.slice(0, 16),
+        deviceId: deviceId.slice(0, 8),
+        size: blob.size,
+        mime: blob.mime,
+      });
 
       // Get path for local_path info
       const pathRecord = await db
@@ -71,7 +73,6 @@ export async function POST(request: NextRequest) {
         .get();
 
       // Create blobs_meta entry directly in Postgres (idempotent)
-      console.log(`[SyncBlob] Creating blobs_meta entry...`);
       await createBlobMetaServer({
         sha256: blob.hash,
         size: blob.size,
@@ -79,25 +80,26 @@ export async function POST(request: NextRequest) {
         filename: blob.filename,
         // Note: We don't have pageCount etc. stored in old CAS blobs
       });
-      console.log(`[SyncBlob] ✅ Created blobs_meta entry`);
 
       // Mark as available on this device directly in Postgres (idempotent)
       const localPath = pathRecord?.path || null;
-      console.log(`[SyncBlob] Marking blob as available on device...`);
       await markBlobAvailableServer(blob.hash, deviceId, localPath, "healthy");
-      console.log(`[SyncBlob] ✅ Marked blob as available`);
+
+      logger.info("sync.coordination", "Blob synced successfully", {
+        sha256: sha256.slice(0, 16),
+        deviceId: deviceId.slice(0, 8),
+      });
     } else {
       // Blob doesn't exist in local CAS - it's on another device
-      // This is OK! The blob already exists in Postgres (from the other device)
-      // We don't need to do anything - just return success
-      console.log(
-        `[SyncBlob] Blob not in local CAS (exists on another device) - already synced, skipping`
+      logger.debug(
+        "sync.coordination",
+        "Blob not in local CAS, already synced from another device",
+        {
+          sha256: sha256.slice(0, 16),
+          deviceId: deviceId.slice(0, 8),
+        }
       );
     }
-
-    console.log(
-      `[SyncBlob] ✅ Synced blob ${sha256.slice(0, 16)} for device ${deviceId.slice(0, 8)}...`
-    );
 
     const response = NextResponse.json({
       success: true,
@@ -105,7 +107,9 @@ export async function POST(request: NextRequest) {
     });
     return addCorsHeaders(response, request);
   } catch (error) {
-    console.error("[SyncBlob] Error syncing blob:", error);
+    logger.error("sync.coordination", "Failed to sync blob", {
+      error: (error as Error).message,
+    });
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
     const response = NextResponse.json(

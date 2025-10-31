@@ -23,6 +23,7 @@ import {
 import { useCreateEdge, useDeleteEdgesBetween } from "@deeprecall/data/hooks";
 import { WorkCardCompact } from "./WorkCardCompact";
 import { WorkCardList } from "./WorkCardList";
+import { logger } from "@deeprecall/telemetry";
 
 // Extended activity with resolved edges
 interface ActivityExtended extends Activity {
@@ -132,7 +133,12 @@ export function ActivityBanner({ activity, operations }: ActivityBannerProps) {
       if (start) return `From ${start}`;
       if (end) return `Until ${end}`;
     } catch (error) {
-      console.error("Error formatting dates:", error);
+      logger.error("ui", "Error formatting activity dates", {
+        error,
+        activityId: activity.id,
+        startsAt: activity.startsAt,
+        endsAt: activity.endsAt,
+      });
     }
     return null;
   };

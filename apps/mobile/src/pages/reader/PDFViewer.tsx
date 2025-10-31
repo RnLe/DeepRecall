@@ -42,6 +42,7 @@ import {
   hasActiveSelection,
   useReaderUI,
 } from "@deeprecall/data";
+import { logger } from "@deeprecall/telemetry";
 
 export interface PDFViewerProps {
   source: string | Uint8Array | ArrayBuffer;
@@ -288,7 +289,7 @@ export function PDFViewer({ source, sha256, className = "" }: PDFViewerProps) {
       // Switch to pan tool after saving
       annotationUI.setTool("pan");
     } catch (error) {
-      console.error("Failed to save annotation:", error);
+      logger.error("ui", "Failed to save annotation", { sha256, error });
     }
   }, [sha256, annotationUI, createAnnotation]);
 

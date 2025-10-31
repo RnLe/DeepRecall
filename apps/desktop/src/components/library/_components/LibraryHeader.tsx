@@ -11,6 +11,7 @@ import { useBlobStats } from "@deeprecall/data/hooks";
 import { useTauriBlobStorage } from "@/hooks/useBlobStorage";
 import { useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
+import { logger } from "@deeprecall/telemetry";
 
 interface LibraryHeaderProps {
   onCreateWork?: () => void;
@@ -46,7 +47,7 @@ export function LibraryHeader({
     ) {
       try {
         // Step 1: Clear local Dexie database FIRST (optimistic - instant UI update)
-        console.log("Clearing local Dexie database (optimistic)...");
+        logger.info("cas", "Clearing local Dexie database (optimistic)");
         const { db } = await import("@deeprecall/data/db");
 
         await db.transaction(
@@ -105,11 +106,11 @@ export function LibraryHeader({
         );
 
         // Step 2: Clear Postgres database via Rust command
-        console.log("Clearing Postgres database...");
+        logger.info("cas", "Clearing Postgres database");
         await invoke("clear_all_database");
 
         // Step 3: Clear blobs from disk via Rust command
-        console.log("Clearing blob files...");
+        logger.info("cas", "Clearing blob files");
         await invoke("clear_all_blobs");
 
         // Step 4: Invalidate all queries to force refetch
@@ -117,7 +118,7 @@ export function LibraryHeader({
 
         alert("✅ Database and blobs cleared successfully!");
       } catch (error) {
-        console.error("Failed to clear database:", error);
+        logger.error("cas", "Failed to clear database", { error });
         alert(`❌ Failed to clear database: ${error}`);
       }
     }

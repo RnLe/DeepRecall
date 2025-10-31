@@ -27,6 +27,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import type { Annotation } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 import {
   useUpdateAnnotation,
   useDeleteAnnotation,
@@ -145,7 +146,10 @@ export function AnnotationContextMenu({
       setEditingTitle(false);
       onUpdate?.();
     } catch (error) {
-      console.error("Failed to update title:", error);
+      logger.error("ui", "Failed to update annotation title", {
+        error,
+        annotationId: annotation.id,
+      });
     }
   };
 
@@ -160,7 +164,11 @@ export function AnnotationContextMenu({
       });
       onUpdate?.();
     } catch (error) {
-      console.error("Failed to update kind:", error);
+      logger.error("ui", "Failed to update annotation kind", {
+        error,
+        annotationId: annotation.id,
+        kind,
+      });
     }
   };
 
@@ -175,7 +183,11 @@ export function AnnotationContextMenu({
       });
       onUpdate?.();
     } catch (error) {
-      console.error("Failed to update color:", error);
+      logger.error("ui", "Failed to update annotation color", {
+        error,
+        annotationId: annotation.id,
+        color,
+      });
     }
   };
 
@@ -195,7 +207,10 @@ export function AnnotationContextMenu({
       }
       onDelete?.();
     } catch (error) {
-      console.error("Failed to delete annotation:", error);
+      logger.error("ui", "Failed to delete annotation", {
+        error,
+        annotationId: annotation.id,
+      });
       alert(
         `Failed to delete: ${error instanceof Error ? error.message : "Unknown error"}`
       );

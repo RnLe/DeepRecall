@@ -12,6 +12,7 @@ import {
 import type { ActivityExtended } from "@deeprecall/core";
 import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
 import { edges as edgeRepo, assets as assetRepo } from "@deeprecall/data/repos";
+import { logger } from "@deeprecall/telemetry";
 
 interface ActivityBannerProps {
   activity: ActivityExtended;
@@ -24,9 +25,10 @@ export function ActivityBanner({ activity }: ActivityBannerProps) {
     cas,
     onDropFiles: async (activityId: string, files: FileList) => {
       try {
-        console.log(
-          `Uploading ${files.length} files to activity ${activityId}`
-        );
+        logger.info("blob.upload", "Uploading files to activity", {
+          count: files.length,
+          activityId,
+        });
 
         // Upload each file to CAS and create assets
         const uploadPromises = Array.from(files).map(async (file) => {
@@ -60,9 +62,13 @@ export function ActivityBanner({ activity }: ActivityBannerProps) {
 
         await Promise.all(uploadPromises);
 
-        console.log(`Successfully uploaded ${files.length} files to activity`);
+        logger.info("blob.upload", "Successfully uploaded files to activity", {
+          count: files.length,
+        });
       } catch (error) {
-        console.error("Failed to upload files to activity:", error);
+        logger.error("blob.upload", "Failed to upload files to activity", {
+          error,
+        });
         alert("Failed to upload files. Check console for details.");
       }
     },

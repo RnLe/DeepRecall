@@ -5,6 +5,7 @@
 
 // Import pdfjs-dist types only (not runtime code to avoid SSR DOMMatrix error)
 import type * as pdfjsLibType from "pdfjs-dist";
+import { logger } from "@deeprecall/telemetry";
 
 // Configurable worker path (platform-specific)
 let workerPath = "/pdf.worker.min.mjs"; // Default for Web
@@ -101,7 +102,10 @@ export async function loadPDFDocument(
     const pdf = await loadingTask.promise;
     return pdf as unknown as PDFDocumentProxy;
   } catch (error) {
-    console.error("Failed to load PDF:", error);
+    logger.error("pdf", "Failed to load PDF", {
+      error: error instanceof Error ? error.message : String(error),
+      sourceType: typeof source === "string" ? "url" : "buffer",
+    });
     throw new Error(`PDF loading failed: ${error}`);
   }
 }

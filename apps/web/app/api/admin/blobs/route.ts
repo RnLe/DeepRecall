@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { listFilesWithPaths } from "@/src/server/cas";
+import { logger } from "@deeprecall/telemetry";
 
 export async function GET() {
   try {
@@ -12,7 +13,9 @@ export async function GET() {
     const blobs = await listFilesWithPaths();
     return NextResponse.json(blobs);
   } catch (error) {
-    console.error("Error fetching blobs:", error);
+    logger.error("cas", "Failed to fetch blobs list for admin", {
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to fetch blobs" },
       { status: 500 }

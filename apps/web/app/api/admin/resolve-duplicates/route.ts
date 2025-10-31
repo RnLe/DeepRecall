@@ -17,6 +17,7 @@ import {
   checkCorsOrigin,
   addCorsHeaders,
 } from "@/app/api/lib/cors";
+import { logger } from "@deeprecall/telemetry";
 
 interface ResolutionRequest {
   mode: "user-selection" | "auto-resolve";
@@ -42,9 +43,10 @@ export async function POST(request: NextRequest) {
     const body: ResolutionRequest = await request.json();
     const { mode, resolutions } = body;
 
-    console.log(
-      `[Resolution API] Mode: ${mode}, Processing ${resolutions.length} duplicate groups`
-    );
+    logger.info("cas", "Starting duplicate resolution", {
+      mode,
+      groupCount: resolutions.length,
+    });
 
     const db = getDB();
     const results = {
@@ -77,23 +79,21 @@ export async function POST(request: NextRequest) {
           for (const deletePath of deletePaths || []) {
             try {
               await unlink(deletePath);
-              console.log(`✓ Deleted: ${deletePath}`);
               results.deleted++;
 
               // Remove path mapping from database
               await db.delete(paths).where(eq(paths.path, deletePath));
             } catch (error) {
-              console.error(`Failed to delete ${deletePath}:`, error);
+              logger.error("cas", "Failed to delete duplicate file", {
+                path: deletePath,
+                hash: hash.slice(0, 16),
+                error: (error as Error).message,
+              });
               results.errors.push(`Failed to delete ${deletePath}`);
             }
           }
         } else {
           // AUTO-RESOLVE MODE: Don't add ignored files to database at all
-          // They remain on disk but are not tracked - future scans will detect them again
-          // but that's expected behavior (user chose to skip them)
-          console.log(
-            `   Skipping ${deletePaths?.length || 0} ignored duplicates (not added to database)`
-          );
           results.markedDuplicate += deletePaths?.length || 0;
         }
 
@@ -137,26 +137,32 @@ export async function POST(request: NextRequest) {
             set: { hash },
           });
 
-        console.log(
-          `✓ Resolved: ${keepPath} (${hash.slice(0, 16)}...) - Mode: ${mode}`
-        );
-        console.log(
-          `  Created 1 blob entry (health: ${healthStatus}) + 1 path entry`
-        );
-        if (mode === "auto-resolve") {
-          console.log(
-            `  Ignored ${deletePaths?.length || 0} other files (not added to database)`
-          );
-        }
+        logger.info("cas", "Duplicate resolved successfully", {
+          hash: hash.slice(0, 16),
+          keepPath,
+          mode,
+          healthStatus,
+          deletedCount: deletePaths?.length || 0,
+        });
 
         results.resolved++;
       } catch (error) {
-        console.error(`Failed to resolve hash ${hash}:`, error);
+        logger.error("cas", "Failed to resolve duplicate", {
+          hash: hash.slice(0, 16),
+          error: (error as Error).message,
+        });
         results.errors.push(
           `Failed to resolve ${hash.slice(0, 16)}...: ${error instanceof Error ? error.message : "Unknown error"}`
         );
       }
     }
+
+    logger.info("cas", "Duplicate resolution completed", {
+      resolved: results.resolved,
+      deleted: results.deleted,
+      markedDuplicate: results.markedDuplicate,
+      errorCount: results.errors.length,
+    });
 
     const response = NextResponse.json({
       success: true,
@@ -164,7 +170,9 @@ export async function POST(request: NextRequest) {
     });
     return addCorsHeaders(response, request);
   } catch (error) {
-    console.error("Duplicate resolution failed:", error);
+    logger.error("cas", "Duplicate resolution failed", {
+      error: (error as Error).message,
+    });
     const response = NextResponse.json(
       {
         error:

@@ -1,11 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { initConsoleLogger } from "@deeprecall/data";
+import { initTelemetry } from "./telemetry";
+import { logger } from "@deeprecall/telemetry";
 
-// Initialize console logger for debugging (temporary)
-initConsoleLogger();
-console.log("[Desktop] Console logger initialized");
+// Initialize structured telemetry (console + ring buffer in dev)
+initTelemetry();
+logger.info("ui", "Desktop app initialized");
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

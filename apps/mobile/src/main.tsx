@@ -2,12 +2,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./globals.css";
 import App from "./App.tsx";
-import { initConsoleLogger } from "@deeprecall/data";
+import { initTelemetry } from "./telemetry";
+import { logger } from "@deeprecall/telemetry";
 
-// Initialize console logger for mobile debugging
-// NOTE: This is temporary - remove when proper telemetry is implemented
-initConsoleLogger();
-console.log("[Mobile] Console logger initialized");
+// Initialize structured telemetry (console + ring buffer in dev)
+initTelemetry();
+logger.info("ui", "Mobile app initialized");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

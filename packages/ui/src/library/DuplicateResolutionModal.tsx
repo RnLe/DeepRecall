@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, Check, X, FileWarning } from "lucide-react";
+import { logger } from "@deeprecall/telemetry";
 
 interface DuplicateFile {
   path: string;
@@ -83,24 +84,28 @@ export function DuplicateResolutionModal({
   const handleResolveAll = async (mode: "user-selection" | "auto-resolve") => {
     setIsResolving(true);
 
+    const resolutions = duplicates.map((group) => {
+      const keepPath = selections.get(group.hash) || group.files[0].path;
+      const deletePaths = group.files
+        .filter((f) => f.path !== keepPath)
+        .map((f) => f.path);
+
+      return {
+        hash: group.hash,
+        keepPath,
+        deletePaths, // Always include so API knows which files to ignore
+      };
+    });
+
     try {
-      const resolutions = duplicates.map((group) => {
-        const keepPath = selections.get(group.hash) || group.files[0].path;
-        const deletePaths = group.files
-          .filter((f) => f.path !== keepPath)
-          .map((f) => f.path);
-
-        return {
-          hash: group.hash,
-          keepPath,
-          deletePaths, // Always include so API knows which files to ignore
-        };
-      });
-
       await onResolve(mode, resolutions);
       onClose();
     } catch (error) {
-      console.error("Resolution failed:", error);
+      logger.error("ui", "Duplicate resolution failed", {
+        error,
+        mode,
+        resolutionsCount: resolutions.length,
+      });
       alert("Failed to resolve duplicates. Check console for details.");
     } finally {
       setIsResolving(false);

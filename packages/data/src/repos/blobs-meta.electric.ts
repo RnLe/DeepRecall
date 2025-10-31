@@ -9,6 +9,7 @@ import type { BlobMeta } from "@deeprecall/core";
 import { BlobMetaSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get all blob metadata
@@ -57,9 +58,11 @@ export async function createBlobMeta(
     op: "insert",
     payload: validated,
   });
-  console.log(
-    `[BlobsMetaRepo] Created blob meta ${blobMeta.sha256} (enqueued)`
-  );
+  logger.info("sync.coordination", "Created blob meta (enqueued)", {
+    sha256: blobMeta.sha256,
+    mime: blobMeta.mime,
+    size: blobMeta.size,
+  });
   return validated;
 }
 
@@ -72,7 +75,10 @@ export async function updateBlobMeta(
 ): Promise<void> {
   const updated = { sha256, ...updates };
   await buffer.enqueue({ table: "blobs_meta", op: "update", payload: updated });
-  console.log(`[BlobsMetaRepo] Updated blob meta ${sha256} (enqueued)`);
+  logger.info("sync.coordination", "Updated blob meta (enqueued)", {
+    sha256,
+    updates: Object.keys(updates),
+  });
 }
 
 /**
@@ -85,5 +91,5 @@ export async function deleteBlobMeta(sha256: string): Promise<void> {
     op: "delete",
     payload: { sha256 },
   });
-  console.log(`[BlobsMetaRepo] Deleted blob meta ${sha256} (enqueued)`);
+  logger.info("sync.coordination", "Deleted blob meta (enqueued)", { sha256 });
 }

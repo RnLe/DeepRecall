@@ -12,6 +12,7 @@ import * as cardsMerged from "../repos/cards.merged";
 import * as cardsCleanup from "../repos/cards.cleanup";
 import { db } from "../db";
 import { useEffect } from "react";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Helper Functions
@@ -39,20 +40,23 @@ async function syncElectricToDexie(electricData: Card[]): Promise<void> {
     // Delete stale records
     if (idsToDelete.length > 0) {
       await db.cards.bulkDelete(idsToDelete);
-      console.log(
-        `[Electric→Dexie] Deleted ${idsToDelete.length} stale card(s)`
-      );
+      logger.info("sync.electric", "Deleted stale cards from Dexie", {
+        count: idsToDelete.length,
+        ids: idsToDelete,
+      });
     }
 
     // Add/update records from Electric
     if (electricData.length > 0) {
       await db.cards.bulkPut(electricData);
-      console.log(`[Electric→Dexie] Synced ${electricData.length} card(s)`);
+      logger.info("sync.electric", "Synced cards from Electric to Dexie", {
+        count: electricData.length,
+      });
     }
 
     // Log final state
     if (idsToDelete.length === 0 && electricData.length === 0) {
-      console.log(`[Electric→Dexie] Cards table cleared (0 rows)`);
+      logger.info("sync.electric", "Cards table cleared", { count: 0 });
     }
   });
 }
@@ -83,10 +87,9 @@ export function useCardsSync() {
           queryClient.invalidateQueries({ queryKey: ["cards"] });
         })
         .catch((error) => {
-          console.error(
-            "[useCardsSync] Failed to sync Electric data to Dexie:",
-            error
-          );
+          logger.error("sync.electric", "Failed to sync cards to Dexie", {
+            error: error.message,
+          });
         });
     }
   }, [electricResult.data, electricResult.isFreshData, queryClient]);
@@ -201,13 +204,15 @@ export function useCreateCard() {
       return cardsLocal.createCardLocal(data);
     },
     onSuccess: (newCard: Card) => {
-      console.log(
-        `✅ [useCreateCard] Created card ${newCard.id} (pending sync)`
-      );
+      logger.info("db.local", "Created card locally (pending sync)", {
+        cardId: newCard.id,
+      });
       queryClient.invalidateQueries({ queryKey: ["cards", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useCreateCard] Failed to create card:", error);
+      logger.error("db.local", "Failed to create card", {
+        error: error.message,
+      });
     },
   });
 }
@@ -230,11 +235,15 @@ export function useUpdateCard() {
       return { id, updates };
     },
     onSuccess: ({ id }: { id: string }) => {
-      console.log(`✅ [useUpdateCard] Updated card ${id} (pending sync)`);
+      logger.info("db.local", "Updated card locally (pending sync)", {
+        cardId: id,
+      });
       queryClient.invalidateQueries({ queryKey: ["cards", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useUpdateCard] Failed to update card:", error);
+      logger.error("db.local", "Failed to update card", {
+        error: error.message,
+      });
     },
   });
 }
@@ -251,11 +260,15 @@ export function useDeleteCard() {
       return id;
     },
     onSuccess: (id: string) => {
-      console.log(`✅ [useDeleteCard] Deleted card ${id} (pending sync)`);
+      logger.info("db.local", "Deleted card locally (pending sync)", {
+        cardId: id,
+      });
       queryClient.invalidateQueries({ queryKey: ["cards", "merged"] });
     },
     onError: (error: Error) => {
-      console.error("❌ [useDeleteCard] Failed to delete card:", error);
+      logger.error("db.local", "Failed to delete card", {
+        error: error.message,
+      });
     },
   });
 }

@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { listFiles } from "@/src/server/cas";
+import { logger } from "@deeprecall/telemetry";
 
 export async function GET() {
   try {
@@ -22,7 +23,9 @@ export async function GET() {
 
     return NextResponse.json(files);
   } catch (error) {
-    console.error("Error fetching files:", error);
+    logger.error("cas", "Failed to fetch files list", {
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to fetch files" },
       { status: 500 }

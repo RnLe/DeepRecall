@@ -6,6 +6,7 @@
 import { Upload } from "lucide-react";
 import { useState } from "react";
 import { useFileUpload } from "../../../utils/fileUpload";
+import { logger } from "@deeprecall/telemetry";
 
 export function UploadButton() {
   const { uploadFiles } = useFileUpload();
@@ -23,7 +24,7 @@ export function UploadButton() {
       }
 
       if (result.failed > 0) {
-        console.error("Upload errors:", result.errors);
+        logger.error("blob.upload", "Upload errors", { errors: result.errors });
         alert(
           `Failed to upload ${result.failed} file(s). Check console for details.`
         );
@@ -31,10 +32,10 @@ export function UploadButton() {
 
       if (result.success === 0 && result.failed === 0) {
         // User cancelled
-        console.log("Upload cancelled");
+        logger.debug("ui", "Upload cancelled");
       }
     } catch (error) {
-      console.error("Upload error:", error);
+      logger.error("blob.upload", "Upload error", { error });
       alert("Failed to upload files");
     } finally {
       setIsUploading(false);

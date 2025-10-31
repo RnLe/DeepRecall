@@ -9,6 +9,7 @@ import { blobs, paths } from "@/src/server/schema";
 import { eq } from "drizzle-orm";
 import { rename } from "fs/promises";
 import path from "path";
+import { logger } from "@deeprecall/telemetry";
 
 export async function PUT(
   request: NextRequest,
@@ -67,7 +68,12 @@ export async function PUT(
     try {
       await rename(oldPath, newPath);
     } catch (error) {
-      console.error("File rename failed:", error);
+      logger.error("cas", "Failed to rename blob file on disk", {
+        hash: hash.slice(0, 16),
+        oldFilename: path.basename(oldPath),
+        newFilename: filename,
+        error: (error as Error).message,
+      });
       return NextResponse.json(
         { error: "Failed to rename file on disk" },
         { status: 500 }
@@ -76,7 +82,6 @@ export async function PUT(
 
     // Update CAS database records
     await db.update(blobs).set({ filename }).where(eq(blobs.hash, hash));
-
     await db.update(paths).set({ path: newPath }).where(eq(paths.hash, hash));
 
     // Also update Electric coordination (async, non-blocking)
@@ -85,13 +90,18 @@ export async function PUT(
         "@deeprecall/data/repos/blobs.server"
       );
       await updateBlobMetaServer(hash, { filename });
-      console.log(
-        `[RenameAPI] Updated Electric metadata for blob ${hash.slice(0, 16)}...`
-      );
+      logger.info("sync.coordination", "Blob renamed and synced to Electric", {
+        hash: hash.slice(0, 16),
+        filename,
+      });
     } catch (electricError) {
-      console.warn(
-        `[RenameAPI] Failed to update Electric metadata for ${hash.slice(0, 16)}...`,
-        electricError
+      logger.warn(
+        "sync.coordination",
+        "Blob renamed locally but failed to sync to Electric",
+        {
+          hash: hash.slice(0, 16),
+          error: (electricError as Error).message,
+        }
       );
       // Continue anyway - CAS update succeeded
     }
@@ -102,7 +112,10 @@ export async function PUT(
       path: newPath,
     });
   } catch (error) {
-    console.error("Rename failed:", error);
+    logger.error("server.api", "Failed to rename blob", {
+      hash: (await params).hash.slice(0, 16),
+      error: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Failed to rename blob" },
       { status: 500 }

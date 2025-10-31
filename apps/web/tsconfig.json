@@ -12,7 +12,9 @@
       "@deeprecall/blob-storage": ["../../packages/blob-storage/src"],
       "@deeprecall/blob-storage/*": ["../../packages/blob-storage/src/*"],
       "@deeprecall/pdf": ["../../packages/pdf/src"],
-      "@deeprecall/pdf/*": ["../../packages/pdf/src/*"]
+      "@deeprecall/pdf/*": ["../../packages/pdf/src/*"],
+      "@deeprecall/telemetry": ["../../packages/telemetry/src"],
+      "@deeprecall/telemetry/*": ["../../packages/telemetry/src/*"]
     },
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],

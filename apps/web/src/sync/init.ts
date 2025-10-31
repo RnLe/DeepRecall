@@ -5,6 +5,7 @@
 
 import { initElectric } from "@deeprecall/data/electric";
 import { initFlushWorker } from "@deeprecall/data/writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 let initialized = false;
 
@@ -14,16 +15,16 @@ let initialized = false;
  */
 export function initSync() {
   if (initialized) {
-    console.log("[Sync] Already initialized");
+    logger.info("sync.electric", "Sync already initialized");
     return;
   }
 
   if (typeof window === "undefined") {
-    console.warn("[Sync] Cannot initialize on server");
+    logger.warn("sync.electric", "Cannot initialize sync on server");
     return;
   }
 
-  console.log("[Sync] Initializing Electric and FlushWorker...");
+  logger.info("sync.electric", "Initializing Electric and FlushWorker");
 
   try {
     // Initialize Electric for read-path (shapes)
@@ -33,7 +34,7 @@ export function initSync() {
       url: electricUrl,
       // TODO: Add auth token when implementing authentication
     });
-    console.log(`[Sync] Electric initialized (${electricUrl})`);
+    logger.info("sync.electric", "Electric initialized", { electricUrl });
 
     // Initialize FlushWorker for write-path
     const apiBase = process.env.NEXT_PUBLIC_API_BASE || window.location.origin;
@@ -45,12 +46,14 @@ export function initSync() {
 
     // Start the flush worker (checks every 5 seconds)
     flushWorker.start(5000);
-    console.log(`[Sync] FlushWorker started (${apiBase}/api/writes/batch)`);
+    logger.info("sync.writeBuffer", "FlushWorker started", {
+      endpoint: `${apiBase}/api/writes/batch`,
+    });
 
     initialized = true;
-    console.log("[Sync] ✓ Initialization complete");
+    logger.info("sync.electric", "Sync initialization complete");
   } catch (error) {
-    console.error("[Sync] Initialization failed:", error);
+    logger.error("sync.electric", "Sync initialization failed", { error });
     throw error;
   }
 }

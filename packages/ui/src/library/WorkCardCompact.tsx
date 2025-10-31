@@ -23,6 +23,7 @@ import { BibtexExportModal } from "./BibtexExportModal";
 import { SimplePDFViewer } from "../components/SimplePDFViewer";
 import { PDFThumbnail } from "./PDFThumbnail";
 import { BlobStatusBadge } from "./BlobStatusBadge";
+import { logger } from "@deeprecall/telemetry";
 
 // Platform-specific operations interface (minimal)
 export interface WorkCardCompactOperations {
@@ -92,9 +93,13 @@ export function WorkCardCompact({
   const handleDropAsset = async (assetId: string) => {
     try {
       await assetsElectric.updateAsset(assetId, { workId: work.id });
-      console.log("✅ Asset linked to work successfully!");
+      logger.info("ui", "Asset linked to work", { assetId, workId: work.id });
     } catch (error) {
-      console.error("Failed to link asset to work:", error);
+      logger.error("ui", "Failed to link asset to work", {
+        error,
+        assetId,
+        workId: work.id,
+      });
       alert("Failed to link asset to work");
     }
   };
@@ -139,7 +144,10 @@ export function WorkCardCompact({
         const blob = JSON.parse(blobData) as BlobWithMetadata;
         setDroppedBlob(blob);
       } catch (error) {
-        console.error("Failed to parse dropped blob data:", error);
+        logger.error("ui", "Failed to parse dropped blob data", {
+          error,
+          workId: work.id,
+        });
       }
     }
   };

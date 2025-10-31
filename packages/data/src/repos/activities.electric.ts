@@ -9,6 +9,7 @@ import { ActivitySchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
 import { db } from "../db"; // Temporary for edges/extended queries
+import { logger } from "@deeprecall/telemetry";
 
 /**
  * React hook to get all Activities (live-synced from Postgres)
@@ -74,7 +75,10 @@ export async function createActivity(
     payload: validated,
   });
 
-  console.log(`[ActivitiesRepo] Created activity ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Created activity (enqueued)", {
+    activityId: id,
+    activityType: data.activityType,
+  });
   return validated;
 }
 
@@ -97,7 +101,10 @@ export async function updateActivity(
     payload: updated,
   });
 
-  console.log(`[ActivitiesRepo] Updated activity ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Updated activity (enqueued)", {
+    activityId: id,
+    fields: Object.keys(updates),
+  });
 }
 
 /**
@@ -110,7 +117,7 @@ export async function deleteActivity(id: string): Promise<void> {
     payload: { id },
   });
 
-  console.log(`[ActivitiesRepo] Deleted activity ${id} (enqueued for sync)`);
+  logger.info("db.postgres", "Deleted activity (enqueued)", { activityId: id });
 }
 
 /**

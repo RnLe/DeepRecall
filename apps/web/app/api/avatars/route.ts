@@ -16,6 +16,7 @@ import {
   checkCorsOrigin,
   addCorsHeaders,
 } from "@/app/api/lib/cors";
+import { logger } from "@deeprecall/telemetry";
 
 // Avatar storage directory (relative to project root)
 const AVATAR_DIR = path.join(process.cwd(), "data", "avatars");
@@ -73,6 +74,12 @@ export async function POST(request: NextRequest) {
     await writeFile(originalPath, originalBuffer);
     await writeFile(displayPath, displayBuffer);
 
+    logger.info("server.api", "Avatar uploaded successfully", {
+      authorId,
+      originalFilename,
+      displayFilename,
+    });
+
     const response = NextResponse.json({
       success: true,
       paths: {
@@ -83,7 +90,9 @@ export async function POST(request: NextRequest) {
     });
     return addCorsHeaders(response, request);
   } catch (error) {
-    console.error("Failed to upload avatar:", error);
+    logger.error("server.api", "Failed to upload avatar", {
+      error: (error as Error).message,
+    });
     const response = NextResponse.json(
       { error: "Failed to upload avatar" },
       { status: 500 }
@@ -122,12 +131,15 @@ export async function DELETE(request: NextRequest) {
     // Check if file exists
     if (existsSync(fullPath)) {
       await unlink(fullPath);
+      logger.info("server.api", "Avatar deleted successfully", { filename });
     }
 
     const response = NextResponse.json({ success: true });
     return addCorsHeaders(response, request);
   } catch (error) {
-    console.error("Failed to delete avatar:", error);
+    logger.error("server.api", "Failed to delete avatar", {
+      error: (error as Error).message,
+    });
     const response = NextResponse.json(
       { error: "Failed to delete avatar" },
       { status: 500 }

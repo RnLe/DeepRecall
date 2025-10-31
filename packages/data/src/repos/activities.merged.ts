@@ -18,6 +18,7 @@
 
 import { db } from "../db";
 import type { Activity } from "@deeprecall/core";
+import { logger } from "@deeprecall/telemetry";
 import type { LocalActivityChange } from "./activities.local";
 
 /**
@@ -173,7 +174,10 @@ export async function getMergedActivity(
 
     return merged[0];
   } catch (error) {
-    console.error("[getMergedActivity] Error:", error);
+    logger.error("db.local", "Failed to get merged activity", {
+      activityId: id,
+      error: String(error),
+    });
     return undefined;
   }
 }
@@ -190,7 +194,9 @@ export async function getAllMergedActivities(): Promise<MergedActivity[]> {
 
     return mergeActivities(synced, local);
   } catch (error) {
-    console.error("[getAllMergedActivities] Error:", error);
+    logger.error("db.local", "Failed to get all merged activities", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -211,7 +217,10 @@ export async function getMergedActivitiesByType(
     const merged = mergeActivities(synced, local);
     return merged.filter((a) => a.activityType === activityType);
   } catch (error) {
-    console.error("[getMergedActivitiesByType] Error:", error);
+    logger.error("db.local", "Failed to get merged activities by type", {
+      activityType,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -230,7 +239,10 @@ export async function searchMergedActivitiesByTitle(
       a.title.toLowerCase().includes(lowerQuery)
     );
   } catch (error) {
-    console.error("[searchMergedActivitiesByTitle] Error:", error);
+    logger.error("db.local", "Failed to search merged activities by title", {
+      query,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -255,7 +267,11 @@ export async function getMergedActivitiesInRange(
       return activityStart <= endDate && activityEnd >= startDate;
     });
   } catch (error) {
-    console.error("[getMergedActivitiesInRange] Error:", error);
+    logger.error("db.local", "Failed to get merged activities in range", {
+      startDate,
+      endDate,
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

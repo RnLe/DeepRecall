@@ -23,6 +23,7 @@ import {
 import { useReaderUI } from "@deeprecall/data/stores";
 import { assetsElectric } from "@deeprecall/data/repos";
 import { getPrimaryAuthors, getDisplayYear } from "../utils/library";
+import { logger } from "@deeprecall/telemetry";
 import { WorkContextMenu } from "./WorkContextMenu";
 import { EditWorkDialog } from "./EditWorkDialog";
 import { BibtexExportModal } from "./BibtexExportModal";
@@ -99,9 +100,13 @@ export function WorkCardDetailed({
   const handleDropAsset = async (assetId: string) => {
     try {
       await assetsElectric.updateAsset(assetId, { workId: work.id });
-      console.log("✅ Asset linked to work successfully!");
+      logger.info("ui", "Asset linked to work", { assetId, workId: work.id });
     } catch (error) {
-      console.error("Failed to link asset to work:", error);
+      logger.error("ui", "Failed to link asset to work", {
+        error,
+        assetId,
+        workId: work.id,
+      });
       alert("Failed to link asset to work");
     }
   };
@@ -146,7 +151,10 @@ export function WorkCardDetailed({
         const blob = JSON.parse(blobData) as BlobWithMetadata;
         setDroppedBlob(blob);
       } catch (error) {
-        console.error("Failed to parse dropped blob data:", error);
+        logger.error("ui", "Failed to parse dropped blob data", {
+          error,
+          workId: work.id,
+        });
       }
     }
   };

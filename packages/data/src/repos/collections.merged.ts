@@ -6,6 +6,7 @@
 
 import type { Collection } from "@deeprecall/core";
 import { db } from "../db";
+import { logger } from "@deeprecall/telemetry";
 
 export interface MergedCollection extends Collection {
   _local?: {
@@ -141,7 +142,9 @@ export async function getAllMergedCollections(): Promise<MergedCollection[]> {
     const local = await db.collections_local.toArray();
     return mergeCollections(synced, local);
   } catch (error) {
-    console.error("[getAllMergedCollections] Error:", error);
+    logger.error("db.local", "Failed to get all merged collections", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }
@@ -165,7 +168,10 @@ export async function getMergedCollection(
     const merged = await mergeCollections(allCollections, local);
     return merged[0];
   } catch (error) {
-    console.error("[getMergedCollection] Error:", error);
+    logger.error("db.local", "Failed to get merged collection", {
+      collectionId: id,
+      error: String(error),
+    });
     return undefined;
   }
 }
@@ -180,7 +186,9 @@ export async function getMergedPublicCollections(): Promise<
     const allCollections = await getAllMergedCollections();
     return allCollections.filter((c) => !c.isPrivate);
   } catch (error) {
-    console.error("[getMergedPublicCollections] Error:", error);
+    logger.error("db.local", "Failed to get merged public collections", {
+      error: String(error),
+    });
     return []; // Always return array, never undefined
   }
 }

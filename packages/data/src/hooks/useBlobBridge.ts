@@ -15,6 +15,7 @@ import { useAssets } from "./useAssets";
 import { useDuplicateAssets } from "./useAssets";
 import { useBlobsMeta } from "./useBlobsMeta";
 import { useDeviceBlobs } from "./useDeviceBlobs";
+import { logger } from "@deeprecall/telemetry";
 
 // ============================================================================
 // Bridge Hooks: Combining CAS + Electric
@@ -60,7 +61,7 @@ export function useOrphanedBlobsFromElectric(currentDeviceId: string) {
           .map((db: DeviceBlob) => db.sha256)
       );
 
-      console.log("[useOrphanedBlobsFromElectric] Debug:", {
+      logger.debug("cas", "Computing orphaned blobs from Electric", {
         currentDeviceId,
         blobsMetaCount: blobsMeta.length,
         allDeviceBlobsCount: allDeviceBlobs.length,

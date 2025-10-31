@@ -6,6 +6,7 @@ import type { Edge, Relation } from "@deeprecall/core";
 import { EdgeSchema } from "@deeprecall/core";
 import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
+import { logger } from "@deeprecall/telemetry";
 
 export function useEdges() {
   return useShape<Edge>({ table: "edges" });
@@ -59,7 +60,10 @@ export async function createEdge(
   };
   const validated = EdgeSchema.parse(edge);
   await buffer.enqueue({ table: "edges", op: "insert", payload: validated });
-  console.log(`[EdgesRepo] Created edge ${edge.id} (enqueued)`);
+  logger.info("db.local", "Created edge (enqueued)", {
+    edgeId: edge.id,
+    relation,
+  });
   return validated;
 }
 
@@ -72,12 +76,12 @@ export async function updateEdge(
     op: "update",
     payload: { id, ...updates },
   });
-  console.log(`[EdgesRepo] Updated edge ${id} (enqueued)`);
+  logger.info("db.local", "Updated edge (enqueued)", { edgeId: id });
 }
 
 export async function deleteEdge(id: string): Promise<void> {
   await buffer.enqueue({ table: "edges", op: "delete", payload: { id } });
-  console.log(`[EdgesRepo] Deleted edge ${id} (enqueued)`);
+  logger.info("db.local", "Deleted edge (enqueued)", { edgeId: id });
 }
 
 export async function deleteEdgesBetween(
@@ -86,5 +90,8 @@ export async function deleteEdgesBetween(
 ): Promise<void> {
   // This would need a batch delete or server-side logic
   // For now, we'll need to get edges first then delete individually
-  console.warn("[EdgesRepo] deleteEdgesBetween requires fetching edges first");
+  logger.warn("db.local", "deleteEdgesBetween requires fetching edges first", {
+    fromId,
+    toId,
+  });
 }
