@@ -143,16 +143,19 @@ async function upsertUser(params: {
 }) {
   const pool = getPostgresPool();
 
+  // Create composite ID: "provider:userId" (e.g., "google:123456789")
+  const id = `${params.provider}:${params.userId}`;
+
   await pool.query(
     `
-    INSERT INTO app_users (id, provider, email, name, created_at)
-    VALUES ($1, $2, $3, $4, NOW())
+    INSERT INTO app_users (id, provider, user_id, email, name, created_at)
+    VALUES ($1, $2, $3, $4, $5, NOW())
     ON CONFLICT (id) DO UPDATE
     SET 
       email = COALESCE(EXCLUDED.email, app_users.email),
       name = COALESCE(EXCLUDED.name, app_users.name),
       updated_at = NOW()
     `,
-    [params.userId, params.provider, params.email, params.name]
+    [id, params.provider, params.userId, params.email, params.name]
   );
 }
