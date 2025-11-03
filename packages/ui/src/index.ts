@@ -7,6 +7,10 @@
 export { UserMenu } from "./auth/UserMenu";
 export type { UserSession, UserMenuProps } from "./auth/UserMenu";
 
+// System components
+export { ConnectionStatusIndicator } from "./system/ConnectionStatusIndicator";
+export type { ConnectionStatusIndicatorProps } from "./system/ConnectionStatusIndicator";
+
 // Library components
 export {
   ActivityBanner,

@@ -19,6 +19,9 @@ export * from "./useBlobsMeta";
 export * from "./useDeviceBlobs";
 export * from "./useReplicationJobs";
 
+// System monitoring hooks
+export * from "./useSystemMonitoring";
+
 // Boards and strokes (note-taking canvas)
 export * from "./useBoards";
 export * from "./useStrokes";

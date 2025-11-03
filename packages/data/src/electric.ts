@@ -279,6 +279,15 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
     useState<ShapeResult<T>["syncStatus"]>("connecting");
   const [isFreshData, setIsFreshData] = useState(false); // Track if data is fresh from network
 
+  // Update system store when Electric connection status changes
+  useEffect(() => {
+    // Lazy import to avoid circular dependencies
+    import("./stores/systemStore").then(({ useSystemStore }) => {
+      const connected = syncStatus === "synced" || syncStatus === "syncing";
+      useSystemStore.getState().setElectricConnected(connected);
+    });
+  }, [syncStatus]);
+
   const streamRef = useRef<ShapeStream | null>(null);
   const shapeRef = useRef<Shape | null>(null);
 

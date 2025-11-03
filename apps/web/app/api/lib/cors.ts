@@ -6,11 +6,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Allowed origins for CORS (mobile + web + local dev)
+ * Allowed origins for CORS (mobile + web + desktop + local dev)
  */
 export const ALLOW_ORIGINS = new Set([
   "capacitor://localhost", // Mobile iOS (Capacitor)
   "ionic://localhost", // Mobile iOS (Ionic alternative)
+  "tauri://localhost", // Desktop (Tauri) - production build
+  "http://tauri.localhost", // Desktop (Tauri) - alternative scheme
   "http://localhost", // Generic localhost
   "http://localhost:3000", // Web dev (Next.js)
   "http://localhost:5173", // Mobile dev (Vite dev server)

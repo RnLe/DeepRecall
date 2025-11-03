@@ -27,14 +27,21 @@
    - [ ] Freeze schema changes during Phases 2–4
 
 2. **Identity (Auth.js)**
-   - [x] Add Google + GitHub providers
+   - [x] Add Google + GitHub providers to web app
    - [x] Harden cookies (sameSite, secure), JWT strategy
    - [x] Session helper for App Router + API routes
    - [x] Split auth into server/client entry points (prevent Node code in browser)
-   - [x] Desktop: Configure Tauri to load web app URL (localhost:3000 dev, Railway production for prod builds)
-   - [x] Desktop: Remove all NextAuth dependencies from desktop build (loads web app only)
-   - [ ] Mobile: Configure Capacitor to load web app URL
-   - [ ] Mobile: Verify auth cookies work in Capacitor WKWebView
+   - [ ] **Desktop: Native OAuth (offline-first)**
+     - [ ] Google: OAuth Code + PKCE with loopback (127.0.0.1)
+     - [ ] GitHub: Device Code flow
+     - [ ] Auth Broker: `/api/auth/exchange/{google,github}` endpoints
+     - [ ] Token exchange: provider token → app JWT
+     - [ ] Secure storage: OS keychain for tokens
+   - [ ] **Mobile: Native OAuth (offline-first)**
+     - [ ] Google: OAuth Code + PKCE with custom URL scheme
+     - [ ] GitHub: Device Code flow
+     - [ ] Same Auth Broker endpoints as desktop
+     - [ ] Secure storage: iOS Keychain / Android Keystore
 
 3. **Users & RLS**
    - [ ] Create `app_users` table (`id` = OIDC `sub`)

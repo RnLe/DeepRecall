@@ -2,10 +2,13 @@ import { Link, useLocation } from "react-router-dom";
 import { GPUIndicator } from "./indicators/GPUIndicator";
 import { PostgresIndicator } from "./indicators/PostgresIndicator";
 import { ElectricIndicator } from "./indicators/ElectricIndicator";
-import { LogViewerButton } from "@deeprecall/ui";
+import { LogViewerButton, ConnectionStatusIndicator } from "@deeprecall/ui";
+import { UserMenu } from "./UserMenu";
+import { useConnectionStatus } from "@deeprecall/data/hooks";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const connectionStatus = useConnectionStatus();
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path);
@@ -113,9 +116,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Status Indicators */}
         <div className="flex items-center gap-2 px-4 border-l border-gray-800 [app-region:no-drag]">
           <LogViewerButton />
+          <ConnectionStatusIndicator status={connectionStatus} />
           <ElectricIndicator />
           <PostgresIndicator />
           <GPUIndicator />
+          <div className="h-6 w-px bg-gray-700 mx-2"></div>
+          <UserMenu />
         </div>
       </nav>
       <main className="flex-1 overflow-hidden bg-gray-950">{children}</main>

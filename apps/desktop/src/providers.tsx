@@ -5,6 +5,7 @@ import {
   initElectric,
   initFlushWorker,
   initializeDeviceId,
+  useSystemMonitoring,
   usePresetsSync,
   useActivitiesSync,
   useAnnotationsSync,
@@ -52,6 +53,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <DevToolsShortcut />
+      <SystemMonitoringProvider />
       <ElectricInitializer />
       <SyncManager />
       {children}
@@ -60,28 +62,107 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Initialize system monitoring for desktop app
+ * Monitors web server reachability (Railway in prod, localhost in dev)
+ */
+function SystemMonitoringProvider() {
+  // Desktop monitors the web server URL for OAuth and other web features
+  const webServerUrl =
+    import.meta.env.MODE === "production"
+      ? "https://deeprecall-production.up.railway.app"
+      : "http://localhost:3000";
+
+  useSystemMonitoring({ webServerUrl });
+
+  return null;
+}
+
+/**
  * Initialize Electric sync and WriteBuffer flush worker
  * Connects to shared Docker Electric instance (same as web app)
+ *
+ * In production: Uses authenticated Electric tokens from Auth Broker
+ * In development: Falls back to sourceId/secret for unauthenticated sync
  */
 function ElectricInitializer() {
   const workerRef = useRef<ReturnType<typeof initFlushWorker> | null>(null);
+  const [electricToken, setElectricToken] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Get Electric token if authenticated
+  useEffect(() => {
+    async function loadElectricToken() {
+      try {
+        // Check if user is authenticated
+        const { initializeSession, getElectricToken } = await import("./auth");
+        const session = await initializeSession();
+
+        if (session.status === "authenticated") {
+          logger.info(
+            "sync.electric",
+            "User authenticated, getting Electric token"
+          );
+          const token = await getElectricToken();
+          if (token) {
+            setElectricToken(token);
+            logger.info("sync.electric", "Got Electric replication token");
+          } else {
+            logger.warn(
+              "sync.electric",
+              "Failed to get Electric token, using unauthenticated sync"
+            );
+          }
+        } else {
+          logger.info(
+            "sync.electric",
+            "User not authenticated, using unauthenticated sync"
+          );
+        }
+      } catch (error) {
+        logger.error("sync.electric", "Failed to load Electric token", {
+          error,
+        });
+      }
+    }
+
+    loadElectricToken();
+  }, []);
 
   useEffect(() => {
+    if (isInitialized) return; // Only initialize once
+
     // Initialize Electric connection
     const electricUrl =
       import.meta.env.VITE_ELECTRIC_URL || "http://localhost:5133";
     const electricSourceId = import.meta.env.VITE_ELECTRIC_SOURCE_ID;
     const electricSecret = import.meta.env.VITE_ELECTRIC_SOURCE_SECRET;
 
-    initElectric({
-      url: electricUrl,
-      sourceId: electricSourceId, // Electric Cloud source ID
-      secret: electricSecret, // Electric Cloud source secret
-    });
-    logger.info("sync.electric", "Desktop app connected", { electricUrl });
-    if (electricSourceId && electricSecret) {
-      logger.debug("sync.electric", "Using Electric Cloud authentication");
+    // Use Electric token if available (authenticated), otherwise fall back to sourceId/secret
+    if (electricToken) {
+      initElectric({
+        url: electricUrl,
+        token: electricToken, // Authenticated token with userId for RLS
+      });
+      logger.info("sync.electric", "Desktop app connected (authenticated)", {
+        electricUrl,
+        hasToken: true,
+      });
+    } else {
+      initElectric({
+        url: electricUrl,
+        sourceId: electricSourceId, // Electric Cloud source ID
+        secret: electricSecret, // Electric Cloud source secret
+      });
+      logger.info("sync.electric", "Desktop app connected (unauthenticated)", {
+        electricUrl,
+        hasSourceId: !!electricSourceId,
+      });
+      if (electricSourceId && electricSecret) {
+        logger.debug("sync.electric", "Using Electric Cloud authentication");
+      }
     }
+
+    setIsInitialized(true);
 
     // Initialize FlushWorker for desktop
     // Desktop uses Tauri commands for direct Postgres writes

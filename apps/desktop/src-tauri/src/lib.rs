@@ -3,7 +3,7 @@ mod commands;
 mod db;
 mod logger;
 
-use commands::{avatars, blobs, database, devtools};
+use commands::{auth, avatars, blobs, database, devtools, oauth_server};
 use tauri::Manager;
 
 // Load environment variables from .env.local
@@ -89,6 +89,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             logger::get_log_path,
+            // Auth commands
+            auth::open_auth_window,
+            auth::save_auth_session,
+            auth::get_auth_session,
+            auth::clear_auth_session,
+            // OAuth loopback server commands
+            oauth_server::start_oauth_loopback,
+            oauth_server::stop_oauth_loopback,
             // DevTools commands
             devtools::open_devtools,
             devtools::close_devtools,
