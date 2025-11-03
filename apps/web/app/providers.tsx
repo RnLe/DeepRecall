@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SessionProvider } from "@/src/auth/client";
 import { useEffect, useRef, useState } from "react";
 import {
   initElectric,
@@ -70,19 +71,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [electricReady, setElectricReady] = useState(false);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ElectricInitializer onReady={() => setElectricReady(true)} />
-      {electricReady ? (
-        <>
-          <SyncManager />
-          {children}
-        </>
-      ) : (
-        <div style={{ padding: "2rem", textAlign: "center" }}>
-          <p>Initializing Electric sync...</p>
-        </div>
-      )}
-    </QueryClientProvider>
+    <SessionProvider>
+      <QueryClientProvider client={queryClient}>
+        <ElectricInitializer onReady={() => setElectricReady(true)} />
+        {electricReady ? (
+          <>
+            <SyncManager />
+            {children}
+          </>
+        ) : (
+          <div style={{ padding: "2rem", textAlign: "center" }}>
+            <p>Initializing Electric sync...</p>
+          </div>
+        )}
+      </QueryClientProvider>
+    </SessionProvider>
   );
 }
 

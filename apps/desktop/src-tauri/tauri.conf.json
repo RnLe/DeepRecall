@@ -4,15 +4,16 @@
   "version": "0.1.0",
   "identifier": "com.renlephy.deeprecall",
   "build": {
-    "beforeDevCommand": "pnpm dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": "echo 'Desktop app loads web app URL - no local dev server needed'",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "echo 'Desktop app loads web app URL - no build needed'",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
         "title": "DeepRecall",
+        "url": "https://deeprecall-production.up.railway.app",
         "width": 1400,
         "height": 900,
         "minWidth": 1024,

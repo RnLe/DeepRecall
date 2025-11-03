@@ -3,6 +3,10 @@
  * Platform-agnostic UI components for DeepRecall
  */
 
+// Auth components
+export { UserMenu } from "./auth/UserMenu";
+export type { UserSession, UserMenuProps } from "./auth/UserMenu";
+
 // Library components
 export {
   ActivityBanner,

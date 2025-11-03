@@ -1,8 +1,6 @@
 name: iOS → TestFlight
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

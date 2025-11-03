@@ -6,6 +6,7 @@ import { GPUIndicator } from "./components/GPUIndicator";
 import { ElectricIndicator } from "./components/ElectricIndicator";
 import { PostgresIndicator } from "./components/PostgresIndicator";
 import { LogViewerButton } from "@deeprecall/ui";
+import { UserMenu } from "./components/UserMenu";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -64,11 +65,13 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 Postgres
               </Link>
             </div>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-3">
               <LogViewerButton />
               <ElectricIndicator />
               <PostgresIndicator />
               <GPUIndicator />
+              <div className="h-6 w-px bg-gray-700"></div>
+              <UserMenu />
             </div>
           </div>
         </nav>

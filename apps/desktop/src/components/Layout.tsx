@@ -111,7 +111,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         {/* Status Indicators */}
-        <div className="flex items-center gap-1 px-4 border-l border-gray-800 [app-region:no-drag]">
+        <div className="flex items-center gap-2 px-4 border-l border-gray-800 [app-region:no-drag]">
           <LogViewerButton />
           <ElectricIndicator />
           <PostgresIndicator />
