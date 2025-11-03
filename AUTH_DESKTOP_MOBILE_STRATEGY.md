@@ -1,6 +1,39 @@
-# Desktop & Mobile Authentication Strategy# Desktop & Mobile Authentication Strategy
+# Desktop & Mobile Authentication Strategy
 
-## 🎯 Recommended Approach: Native OAuth (Offline-First)## 🎯 Recommended Approach: Web-Domain SSO (Centralized)
+## 🎉 Implementation Status: Desktop Native OAuth COMPLETE ✅
+
+**Completed: November 2025**
+
+The desktop app now has **fully functional native OAuth authentication** using the recommended Native OAuth approach:
+
+### ✅ What's Working
+
+- **Google OAuth**: PKCE flow with loopback server (127.0.0.1)
+- **GitHub OAuth**: Device Code flow (implemented, pending testing)
+- **Auth Broker**: Backend token exchange endpoints with CORS support
+- **Secure Storage**: Windows Credential Manager integration via Tauri
+- **Session Persistence**: JWT stored in OS keychain, persists across restarts
+- **User Profile Display**: Name, email, and profile initial shown in UI
+- **Production Build**: Windows .exe tested and working end-to-end
+
+### 🔧 Key Implementation Learnings
+
+1. **Google requires client_secret**: Even Desktop apps with PKCE need `client_secret` (not considered sensitive for native apps)
+2. **CORS for Tauri**: Backend must allow `tauri://localhost` and `http://tauri.localhost` origins
+3. **JWT Parsing**: Parse JWT directly after sign-in to avoid keychain read race conditions
+4. **Database Schema**: Created `app_users` table with composite ID `provider:userId`
+5. **SessionInfo Extension**: Added email/name fields for UI display
+
+### 📋 Remaining Work
+
+- [ ] Test GitHub Device Code flow in production
+- [ ] Implement offline-first data sync with auth
+- [ ] Add Phase 3 RLS for multi-tenant data isolation
+- [ ] Mobile OAuth (iOS/Android) - same pattern as desktop
+
+---
+
+## 🎯 Recommended Approach: Native OAuth (Offline-First)
 
 **Desktop and Mobile apps run as TRUE LOCAL APPLICATIONS** with full offline capability. They use **native OAuth flows** (no WebView, no NextAuth) and exchange provider tokens for app JWTs when online.Based on the AUTH_MIGRATION_GUIDE and best practices, **use the hosted web domain for authentication** on both Desktop (Tauri) and Mobile (Capacitor).
 
@@ -705,25 +738,42 @@ Electric proxy verifies the replication token and sets `app.user_id` GUC on the 
 
 ## ✅ Implementation Checklist
 
-### Backend (Auth Broker)
+### Backend (Auth Broker) ✅ **COMPLETE (November 2025)**
 
 - [x] `/api/auth/exchange/google` - Verify Google ID token, return app JWT
 - [x] `/api/auth/exchange/github` - Verify GitHub access token, return app JWT
 - [x] `/api/replication/token` - Exchange app JWT for Electric token
 - [x] JWT signing/verification utils (`apps/web/src/auth/jwt.ts`)
 - [x] User upsert in exchange endpoints
+- [x] CORS configuration for Tauri origins (`tauri://localhost`, `http://tauri.localhost`)
+- [x] Database migration for `app_users` table (006_app_users_auth.sql)
 
-### Desktop App
+### Desktop App ✅ **COMPLETE (November 2025)**
 
 - [x] Separate Vite+React entry (already exists)
 - [x] Google PKCE loopback flow (`auth/google.ts`)
+  - [x] Includes client_secret (required by Google even for Desktop apps)
+  - [x] System browser OAuth flow
+  - [x] Loopback server receives authorization code
 - [x] GitHub device code flow (`auth/github.ts`)
+  - [x] Device code generation and polling
+  - [x] User verification in browser
+  - [x] Access token exchange
 - [x] Loopback HTTP server (`src-tauri/src/commands/oauth_server.rs`)
 - [x] OS keychain integration (Tauri commands with `keyring` crate)
+  - [x] Windows Credential Manager support
+  - [x] JWT persistence across restarts
 - [x] Secure store wrapper (`auth/secure-store.ts`)
 - [x] Session management (`auth/session.ts` - init/refresh/clear)
+  - [x] SessionInfo includes email and name
+  - [x] Direct JWT parsing (no race conditions)
 - [x] UserMenu component integration (native OAuth)
+  - [x] Sign in with Google/GitHub
+  - [x] User name and email display
+  - [x] Profile circle with first initial
+  - [x] Sign out functionality
 - [x] Electric integration with auth tokens
+- [x] Production Windows build tested and working
 
 ### Mobile App
 
@@ -734,8 +784,13 @@ Electric proxy verifies the replication token and sets `app.user_id` GUC on the 
 
 ### Testing
 
+- [x] Desktop: Sign in with Google OAuth - **WORKING** ✅
+- [x] Desktop: JWT persistence across app restarts - **WORKING** ✅
+- [x] Desktop: User name/email display in UI - **WORKING** ✅
+- [x] Desktop: Sign out functionality - **WORKING** ✅
 - [ ] Desktop: Sign in offline → work locally → reconnect → sync
-- [ ] Desktop: Sign out → data isolation verified
+- [ ] Desktop: Sign out → data isolation verified (requires Phase 3 RLS)
+- [ ] Desktop: GitHub OAuth flow (implemented but not tested)
 - [ ] Mobile: Same flows as desktop
 - [ ] Cross-platform: Desktop + Mobile + Web all sync to same user
 
@@ -743,18 +798,85 @@ Electric proxy verifies the replication token and sets `app.user_id` GUC on the 
 
 ## 🚀 Migration Path
 
-### From Current (Incorrect WebView approach) → Native OAuth
+### ~~From Current (Incorrect WebView approach) → Native OAuth~~ ✅ **COMPLETE**
 
-1. **Keep web app unchanged** (already works with Auth.js)
-2. **Revert Tauri config** to load local Vite server (port 5173), not Railway URL
-3. **Implement Auth Broker** endpoints on backend
-4. **Implement native OAuth** flows in desktop app
-5. **Test offline → online → sync** flows
-6. **Mobile follows same pattern** (custom URL scheme for Google, device code for GitHub)
+1. ✅ **Keep web app unchanged** (already works with Auth.js)
+2. ✅ **Revert Tauri config** to load local Vite server (port 5173), not Railway URL
+3. ✅ **Implement Auth Broker** endpoints on backend
+4. ✅ **Implement native OAuth** flows in desktop app
+5. ✅ **Test authentication flow** (Google OAuth working)
+6. [ ] **Mobile follows same pattern** (custom URL scheme for Google, device code for GitHub)
 
 ---
 
-## 📚 References
+## � Implementation Summary (Desktop - November 2025)
+
+### Files Created/Modified
+
+**Backend (apps/web/app/api/):**
+- `api/lib/cors.ts` - Added Tauri origins to ALLOW_ORIGINS
+- `api/auth/exchange/google/route.ts` - CORS support, fixed upsertUser SQL
+- `api/auth/exchange/github/route.ts` - CORS support, fixed upsertUser SQL
+- `api/replication/token/route.ts` - CORS support for Electric tokens
+
+**Database:**
+- `migrations/006_app_users_auth.sql` - Created app_users table with composite IDs
+
+**Desktop (apps/desktop/src/):**
+- `auth/google.ts` (280+ lines) - Complete Google PKCE flow with loopback
+- `auth/github.ts` (280+ lines) - Complete GitHub Device Code flow
+- `auth/session.ts` - Extended SessionInfo with email/name
+- `auth/secure-store.ts` - OS keychain wrapper
+- `auth/oauth-utils.ts` - PKCE generation utilities
+- `components/UserMenu.tsx` - Native OAuth integration with profile display
+- `providers.tsx` - Electric integration with auth-aware token loading
+
+**Rust (apps/desktop/src-tauri/src/):**
+- `commands/oauth_server.rs` - HTTP loopback server for OAuth callbacks
+- `commands/secure_store.rs` - Keychain integration (keyring crate)
+
+### Environment Variables Added
+```bash
+# Auth Broker
+VITE_API_URL=https://deeprecall-production.up.railway.app
+
+# Google OAuth
+VITE_GOOGLE_DESKTOP_CLIENT_ID=193717154963-t1idfsda9tt92ngbm4n9mcvbr73ktbpa.apps.googleusercontent.com
+VITE_GOOGLE_DESKTOP_CLIENT_SECRET=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
+
+# GitHub OAuth
+VITE_GITHUB_DESKTOP_CLIENT_ID=Ov23lii9PjHnRsAhhP3S
+```
+
+### Authentication Flow (as implemented)
+
+1. User clicks "Sign in with Google" in desktop app
+2. Desktop generates PKCE code_verifier/challenge
+3. Loopback HTTP server starts on random port (e.g., 127.0.0.1:52341)
+4. System browser opens to Google OAuth consent page
+5. User approves permissions
+6. Google redirects to `http://127.0.0.1:52341/oauth2/callback?code=...`
+7. Desktop exchanges code with Google (PKCE + client_secret) → gets id_token
+8. Desktop sends id_token to Auth Broker `/api/auth/exchange/google`
+9. Backend verifies Google ID token, upserts user, returns app JWT
+10. Desktop saves JWT to Windows Credential Manager
+11. Desktop parses JWT to extract user info (email, name)
+12. SessionInfo updated with user data
+13. UI displays user name and profile initial
+14. On restart: JWT loaded from keychain, session restored
+
+### Key Challenges Solved
+
+1. **Google Client Secret**: Discovered Desktop apps need `client_secret` despite PKCE
+2. **CORS Blocking**: Backend needed Tauri-specific origins in allow list
+3. **Missing Database Table**: Created migration for app_users table
+4. **SQL INSERT Bug**: Fixed upsertUser to include all required columns
+5. **JWT Persistence Race**: Parse JWT directly instead of re-reading from keychain
+6. **User Display**: Extended SessionInfo and UserMenu to show profile data
+
+---
+
+## �📚 References
 
 - **PKCE:** RFC 7636 (Proof Key for Code Exchange)
 - **Device Code:** RFC 8628 (OAuth 2.0 Device Authorization Grant)
@@ -764,5 +886,5 @@ Electric proxy verifies the replication token and sets `app.user_id` GUC on the 
 
 ---
 
-**Status:** Ready to implement native OAuth flows for true offline-first desktop/mobile apps ✅
+**Status:** Desktop Native OAuth ✅ COMPLETE | Mobile OAuth 🔜 NEXT | Phase 3 RLS 📋 PENDING
 ````

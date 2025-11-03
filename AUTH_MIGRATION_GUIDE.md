@@ -31,12 +31,15 @@
    - [x] Harden cookies (sameSite, secure), JWT strategy
    - [x] Session helper for App Router + API routes
    - [x] Split auth into server/client entry points (prevent Node code in browser)
-   - [ ] **Desktop: Native OAuth (offline-first)**
-     - [ ] Google: OAuth Code + PKCE with loopback (127.0.0.1)
-     - [ ] GitHub: Device Code flow
-     - [ ] Auth Broker: `/api/auth/exchange/{google,github}` endpoints
-     - [ ] Token exchange: provider token → app JWT
-     - [ ] Secure storage: OS keychain for tokens
+   - [x] **Desktop: Native OAuth (offline-first)** ✅ **COMPLETE**
+     - [x] Google: OAuth Code + PKCE with loopback (127.0.0.1)
+     - [x] GitHub: Device Code flow
+     - [x] Auth Broker: `/api/auth/exchange/{google,github}` endpoints
+     - [x] Token exchange: provider token → app JWT
+     - [x] Secure storage: Windows Credential Manager (OS keychain)
+     - [x] Session persistence with user profile display
+     - [x] UserMenu integration with native OAuth flows
+     - [x] Electric integration with auth-aware token loading
    - [ ] **Mobile: Native OAuth (offline-first)**
      - [ ] Google: OAuth Code + PKCE with custom URL scheme
      - [ ] GitHub: Device Code flow

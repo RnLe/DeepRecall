@@ -5,9 +5,11 @@
 
 import { tokens as secureTokens } from "./secure-store";
 
-const GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code";
-const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
-const GITHUB_USER_API = "https://api.github.com/user";
+// Auth Broker URL for proxying GitHub requests (CORS workaround)
+const AUTH_BROKER_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const GITHUB_DEVICE_CODE_URL = `${AUTH_BROKER_URL}/api/auth/github/device-code`;
+const GITHUB_TOKEN_URL = `${AUTH_BROKER_URL}/api/auth/github/device-token`;
+const GITHUB_USER_API = "https://api.github.com/user"; // Still needed for token validation
 
 // Get from environment variables
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_DESKTOP_CLIENT_ID;

@@ -12,6 +12,8 @@ export interface SessionInfo {
   deviceId?: string;
   provider?: "google" | "github";
   appJWT?: string;
+  email?: string;
+  name?: string;
 }
 
 /**
