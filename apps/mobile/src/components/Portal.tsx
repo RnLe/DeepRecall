@@ -3,7 +3,7 @@
  * Ensures modals and overlays are drawn on top of all other content
  */
 
-import { useEffect, useRef, ReactNode } from "react";
+import { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 interface PortalProps {
@@ -11,15 +11,11 @@ interface PortalProps {
 }
 
 export function Portal({ children }: PortalProps) {
-  const modalRoot = useRef<HTMLElement | null>(null);
+  const modalRoot = document.getElementById("modal-root");
 
-  useEffect(() => {
-    modalRoot.current = document.getElementById("modal-root");
-  }, []);
-
-  if (!modalRoot.current) {
+  if (!modalRoot) {
     return null;
   }
 
-  return createPortal(children, modalRoot.current);
+  return createPortal(children, modalRoot);
 }
