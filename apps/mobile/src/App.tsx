@@ -11,6 +11,7 @@ import CASAdminPage from "./pages/admin/CASAdminPage";
 import DexieAdminPage from "./pages/admin/DexieAdminPage";
 import ElectricAdminPage from "./pages/admin/ElectricAdminPage";
 import PostgresAdminPage from "./pages/admin/PostgresAdminPage";
+import LogsAdminPage from "./pages/admin/LogsAdminPage";
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
             <Route path="admin/dexie" element={<DexieAdminPage />} />
             <Route path="admin/electric" element={<ElectricAdminPage />} />
             <Route path="admin/postgres" element={<PostgresAdminPage />} />
+            <Route path="admin/logs" element={<LogsAdminPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
