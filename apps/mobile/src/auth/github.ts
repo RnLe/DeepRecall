@@ -33,6 +33,8 @@ export async function signInWithGitHub(
   deviceId: string,
   onCodeReady: (data: GitHubDeviceCodeResponse) => void
 ): Promise<GitHubAuthResult> {
+  console.log("[GitHub] Starting device code flow for device:", deviceId);
+
   // Step 1: Request device code
   const deviceCodeResponse = await fetch(
     `${AUTH_BROKER_URL}/api/auth/github/device-code`,
@@ -47,59 +49,121 @@ export async function signInWithGitHub(
   );
 
   if (!deviceCodeResponse.ok) {
+    const error = await deviceCodeResponse.text();
+    console.error("[GitHub] Failed to get device code:", error);
     throw new Error("Failed to get device code");
   }
 
   const deviceData: GitHubDeviceCodeResponse = await deviceCodeResponse.json();
+  console.log("[GitHub] Device code received:", deviceData.user_code);
 
-  // Notify caller with the device code info
+  // Notify caller with the device code info (don't open browser yet)
   onCodeReady(deviceData);
 
-  // Step 2: Poll for authorization
+  // Step 2: Poll for access token from GitHub
+  console.log("[GitHub] Polling for access token...");
+  const accessToken = await pollForGitHubToken(
+    deviceData.device_code,
+    deviceData.interval,
+    deviceData.expires_in
+  );
+  console.log("[GitHub] Access token received");
+
+  // Step 3: Exchange access token with Auth Broker for app JWT
+  console.log("[GitHub] Exchanging access token with Auth Broker...");
+  const brokerResponse = await fetch(
+    `${AUTH_BROKER_URL}/api/auth/exchange/github`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        access_token: accessToken,
+        device_id: deviceId,
+      }),
+    }
+  );
+
+  if (!brokerResponse.ok) {
+    const error = await brokerResponse.text();
+    console.error("[GitHub] Auth Broker exchange failed:", error);
+    throw new Error(`Failed to exchange token with Auth Broker: ${error}`);
+  }
+
+  const result: GitHubAuthResult = await brokerResponse.json();
+  console.log("[GitHub] App JWT received, user:", result.user.email);
+
+  return result;
+}
+
+/**
+ * Poll GitHub for access token
+ */
+async function pollForGitHubToken(
+  deviceCode: string,
+  intervalSeconds: number,
+  expiresIn: number
+): Promise<string> {
   const startTime = Date.now();
-  const expiresAt = startTime + deviceData.expires_in * 1000;
-  const pollInterval = (deviceData.interval || 5) * 1000;
+  const expiresAt = startTime + expiresIn * 1000;
+  let currentInterval = intervalSeconds * 1000;
 
   while (Date.now() < expiresAt) {
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    // Wait for the specified interval
+    await new Promise((resolve) => setTimeout(resolve, currentInterval));
 
     try {
-      const pollResponse = await fetch(
-        `${AUTH_BROKER_URL}/api/auth/github/mobile`,
+      const response = await fetch(
+        `${AUTH_BROKER_URL}/api/auth/github/device-token`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
           body: JSON.stringify({
-            device_code: deviceData.device_code,
-            device_id: deviceId,
+            client_id: GITHUB_CLIENT_ID,
+            device_code: deviceCode,
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
           }),
         }
       );
 
-      if (pollResponse.ok) {
-        const result: GitHubAuthResult = await pollResponse.json();
-        return result;
+      if (!response.ok) {
+        console.warn("[GitHub] Poll request failed:", response.status);
+        continue;
       }
 
-      if (pollResponse.status === 400) {
-        const error = await pollResponse.json();
-        if (error.error === "authorization_pending") {
-          continue; // Keep polling
-        } else if (error.error === "slow_down") {
-          // Wait longer
-          await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      const data = await response.json();
+
+      // Check for errors
+      if (data.error) {
+        if (data.error === "authorization_pending") {
+          console.log("[GitHub] Waiting for user authorization...");
           continue;
-        } else if (error.error === "access_denied") {
+        } else if (data.error === "slow_down") {
+          console.log("[GitHub] Slowing down polling...");
+          currentInterval += 5000; // Add 5 seconds
+          continue;
+        } else if (data.error === "expired_token") {
+          throw new Error("Device code expired. Please try again.");
+        } else if (data.error === "access_denied") {
           throw new Error("User denied authorization");
-        } else if (error.error === "expired_token") {
-          throw new Error("Device code expired");
+        } else {
+          throw new Error(
+            `GitHub error: ${data.error_description || data.error}`
+          );
         }
       }
+
+      // Success! We have the access token
+      if (data.access_token) {
+        return data.access_token;
+      }
     } catch (err) {
-      if (err instanceof Error && err.message.includes("denied")) {
+      // Only throw if it's not a network error
+      if (err instanceof Error && !err.message.includes("fetch")) {
         throw err;
       }
-      // Continue polling on network errors
       console.warn("[GitHub] Poll error:", err);
     }
   }

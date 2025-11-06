@@ -88,7 +88,7 @@ export function UserMenu() {
       } else {
         logger.info("ui", "UserMenu: Initiating GitHub OAuth");
         console.log(`[UserMenu] Initiating GitHub Device Code flow...`);
-        // GitHub Device Code flow
+        // GitHub Device Code flow - don't open browser yet, let user do it manually
         const result = await signInWithGitHub(deviceId, (data) => {
           logger.info("ui", "UserMenu: GitHub device code received", {
             userCode: data.user_code,
@@ -96,13 +96,15 @@ export function UserMenu() {
           console.log(`[UserMenu] GitHub device code received:`, data);
           setGitHubDeviceCode(data);
           setShowGitHubCodeModal(true);
-          // Open browser to verification page
-          openGitHubVerification(data.verification_uri);
+          // Don't open browser automatically - let user click the button
         });
         logger.info("ui", "UserMenu: GitHub OAuth completed", {
           userEmail: result.user.email,
         });
         console.log(`[UserMenu] GitHub OAuth result received:`, result);
+        // Close modal and browser on success
+        setShowGitHubCodeModal(false);
+        await closeBrowser();
         await handleSignInSuccess(result);
       }
     } catch (err: unknown) {
@@ -308,7 +310,7 @@ export function UserMenu() {
                 </h2>
 
                 <p className="mb-4 text-sm text-gray-300">
-                  Enter this code on GitHub to authorize:
+                  Copy this code, then click "Open GitHub" to authorize:
                 </p>
 
                 <div className="mb-4 flex items-center justify-between rounded-lg bg-gray-900 p-4">
@@ -324,16 +326,27 @@ export function UserMenu() {
                 </div>
 
                 <p className="mb-4 text-xs text-gray-400">
-                  The browser will open to GitHub. Paste the code and authorize
-                  the app.
+                  After authorizing on GitHub, you can close the browser. We'll
+                  automatically complete the sign-in.
                 </p>
 
-                <button
-                  onClick={handleCancelGitHub}
-                  className="w-full rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
-                >
-                  Cancel
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() =>
+                      openGitHubVerification(githubDeviceCode.verification_uri)
+                    }
+                    className="w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white hover:bg-green-700"
+                  >
+                    Open GitHub
+                  </button>
+
+                  <button
+                    onClick={handleCancelGitHub}
+                    className="w-full rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </Portal>
