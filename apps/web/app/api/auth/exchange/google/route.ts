@@ -46,7 +46,7 @@ function parseGoogleIdToken(idToken: string) {
     process.env.GOOGLE_DESKTOP_CLIENT_ID,
     process.env.GOOGLE_MOBILE_CLIENT_ID,
   ].filter(Boolean);
-  
+
   if (!validClientIds.includes(payload.aud)) {
     throw new Error("Invalid audience");
   }
