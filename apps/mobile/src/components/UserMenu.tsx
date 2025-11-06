@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { logger } from "@deeprecall/telemetry";
+import { Portal } from "./Portal";
 import {
   signInWithGoogle,
   signInWithGitHub,
@@ -228,8 +229,9 @@ export function UserMenu() {
 
         {/* Sign In Modal */}
         {showSignInModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 pt-20 pb-8">
-            <div className="w-full max-w-sm rounded-lg bg-gray-800 p-6 shadow-xl">
+          <Portal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 pt-20 pb-8">
+              <div className="w-full max-w-sm rounded-lg bg-gray-800 p-6 shadow-xl">
               <h2 className="mb-4 text-xl font-semibold text-white">Sign In</h2>
 
               {error && (
@@ -291,10 +293,12 @@ export function UserMenu() {
               </button>
             </div>
           </div>
+          </Portal>
         )}
 
         {/* GitHub Device Code Modal */}
         {showGitHubCodeModal && githubDeviceCode && (
+          <Portal>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 pt-20 pb-8">
             <div className="w-full max-w-sm rounded-lg bg-gray-800 p-6 shadow-xl">
               <h2 className="mb-4 text-xl font-semibold text-white">
@@ -330,6 +334,7 @@ export function UserMenu() {
               </button>
             </div>
           </div>
+          </Portal>
         )}
       </>
     );

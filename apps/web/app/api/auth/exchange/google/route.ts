@@ -41,8 +41,13 @@ function parseGoogleIdToken(idToken: string) {
     throw new Error("Invalid issuer");
   }
 
-  // Verify audience matches our client ID
-  if (payload.aud !== process.env.GOOGLE_DESKTOP_CLIENT_ID) {
+  // Verify audience matches one of our client IDs (desktop or mobile)
+  const validClientIds = [
+    process.env.GOOGLE_DESKTOP_CLIENT_ID,
+    process.env.GOOGLE_MOBILE_CLIENT_ID,
+  ].filter(Boolean);
+  
+  if (!validClientIds.includes(payload.aud)) {
     throw new Error("Invalid audience");
   }
 
