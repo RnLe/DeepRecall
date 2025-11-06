@@ -62,30 +62,37 @@ export function UserMenu() {
 
     try {
       const deviceId = await getOrCreateDeviceId();
+      console.log(`[UserMenu] Device ID: ${deviceId}`);
 
       if (provider === "google") {
+        console.log(`[UserMenu] Initiating Google OAuth...`);
         const result = await signInWithGoogle(deviceId);
+        console.log(`[UserMenu] Google OAuth result received:`, result);
         await handleSignInSuccess(result);
       } else {
+        console.log(`[UserMenu] Initiating GitHub Device Code flow...`);
         // GitHub Device Code flow
         const result = await signInWithGitHub(deviceId, (data) => {
+          console.log(`[UserMenu] GitHub device code received:`, data);
           setGitHubDeviceCode(data);
           setShowGitHubCodeModal(true);
           // Open browser to verification page
           openGitHubVerification(data.verification_uri);
         });
+        console.log(`[UserMenu] GitHub OAuth result received:`, result);
         await handleSignInSuccess(result);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       // Detect if user cancelled
       const isCancellation =
-        err?.message?.includes("cancelled") ||
-        err?.message?.includes("timed out") ||
-        err?.message?.includes("denied");
+        error?.message?.includes("cancelled") ||
+        error?.message?.includes("timed out") ||
+        error?.message?.includes("denied");
 
       if (!isCancellation) {
-        console.error("[UserMenu] Sign-in failed:", err);
-        setError(`Sign-in failed: ${err?.message || "Unknown error"}`);
+        console.error("[UserMenu] Sign-in failed:", error);
+        setError(`Sign-in failed: ${error?.message || "Unknown error"}`);
       } else {
         console.log("[UserMenu] Sign-in cancelled by user");
       }
@@ -94,28 +101,42 @@ export function UserMenu() {
     }
   };
 
-  const handleSignInSuccess = async (result: any) => {
-    console.log("[UserMenu] Sign-in successful");
+  const handleSignInSuccess = async (result: {
+    app_jwt: string;
+    user: { id: string; email: string; name: string };
+  }) => {
+    console.log("[UserMenu] Sign-in successful, processing result...");
 
-    // Save JWT token
-    await saveSession(result.app_jwt);
+    try {
+      // Save JWT token
+      await saveSession(result.app_jwt);
+      console.log("[UserMenu] JWT saved to secure storage");
 
-    // Parse JWT to get user info
-    const payload = parseJWTUnsafe(result.app_jwt);
+      // Parse JWT to get user info
+      const payload = parseJWTUnsafe(result.app_jwt);
+      console.log("[UserMenu] JWT payload:", payload);
 
-    // Update session state
-    setSessionInfo({
-      userId: payload.user_id || payload.sub,
-      email: result.user.email,
-      name: result.user.name,
-      deviceId: payload.device_id,
-      iat: payload.iat,
-      exp: payload.exp,
-    });
-    setStatus("authenticated");
+      // Update session state
+      const newSessionInfo: SessionInfo = {
+        userId: payload.user_id || payload.sub,
+        email: result.user.email,
+        name: result.user.name,
+        deviceId: payload.device_id,
+        iat: payload.iat,
+        exp: payload.exp,
+      };
 
-    // Close GitHub code modal if open
-    setShowGitHubCodeModal(false);
+      console.log("[UserMenu] Setting session info:", newSessionInfo);
+      setSessionInfo(newSessionInfo);
+      setStatus("authenticated");
+      console.log("[UserMenu] Status set to authenticated");
+
+      // Close GitHub code modal if open
+      setShowGitHubCodeModal(false);
+    } catch (err) {
+      console.error("[UserMenu] Error in handleSignInSuccess:", err);
+      throw err;
+    }
   };
 
   const handleSignOut = async () => {
@@ -161,8 +182,8 @@ export function UserMenu() {
 
         {/* Sign In Modal */}
         {showSignInModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="w-full max-w-sm rounded-lg bg-gray-800 p-6 shadow-xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="w-full max-w-sm rounded-lg bg-gray-800 p-6 shadow-xl mx-4">
               <h2 className="mb-4 text-xl font-semibold text-white">Sign In</h2>
 
               {error && (
@@ -228,8 +249,8 @@ export function UserMenu() {
 
         {/* GitHub Device Code Modal */}
         {showGitHubCodeModal && githubDeviceCode && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="w-full max-w-sm rounded-lg bg-gray-800 p-6 shadow-xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="w-full max-w-sm rounded-lg bg-gray-800 p-6 shadow-xl mx-4">
               <h2 className="mb-4 text-xl font-semibold text-white">
                 GitHub Authorization
               </h2>

@@ -115,7 +115,7 @@ export async function openGitHubVerification(
 ): Promise<void> {
   await Browser.open({
     url: verificationUri,
-    presentationStyle: "popover",
+    presentationStyle: "fullscreen",
   });
 }
 

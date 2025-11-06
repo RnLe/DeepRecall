@@ -136,11 +136,25 @@
       - Test Google OAuth (Safari → OAuth → deep link back)
       - Test GitHub Device Code (Safari → paste code → authorize)
       - Verify session persists across app restarts
-      - Check profile displays in UserMenu
-   3. **Local Development Setup** (Optional, for faster iteration):
+      - Check profile displays in UserMenu (email + name + sign out button)
+      - **Check Safari console logs** for detailed OAuth flow debugging
+   3. **Recent Fixes Applied:**
+      - ✅ Modal positioning fixed (centered with padding)
+      - ✅ Browser presentation changed to fullscreen
+      - ✅ Extensive logging added to OAuth flow for debugging
+      - ✅ All logs enabled (debug level, verbose mode, OTLP shipping)
+      - ✅ TypeScript type safety improved
+   4. **Local Development Setup** (Optional, for faster iteration):
       - Configure local dev environment to proxy OAuth
       - Test in iOS Simulator via `pnpm dev:mobile`
       - Requires: Local backend at localhost:3000 + Electric at localhost:5133
+
+   **Debugging Mobile OAuth:**
+   - All logs now ship to OTel backend: `https://opentelemetry-collector-contrib-production-700b.up.railway.app`
+   - View in Grafana: `https://grafana-production-aca8.up.railway.app`
+   - Local logs visible in mobile app's log viewer (nav bar button)
+   - Safari Web Inspector (for iOS Simulator): Develop → Simulator → App
+   - Console will show detailed OAuth flow: PKCE generation, deep links, token exchange
 
 3. **Users & RLS**
    - [ ] Create `app_users` table (`id` = OIDC `sub`)
