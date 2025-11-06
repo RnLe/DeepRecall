@@ -5,11 +5,13 @@
 import { Browser } from "@capacitor/browser";
 import { App, URLOpenListenerEvent } from "@capacitor/app";
 import { generatePKCE, generateState } from "./oauth-utils";
+import { secureStore } from "./secure-store";
 
 const GOOGLE_CLIENT_ID =
   "193717154963-uvolmq1rfotinfg6g9se6p9ae5ur9q09.apps.googleusercontent.com";
 const REDIRECT_URI =
   "com.googleusercontent.apps.193717154963-uvolmq1rfotinfg6g9se6p9ae5ur9q09:/oauth2redirect";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const AUTH_BROKER_URL =
   import.meta.env.VITE_AUTH_BROKER_URL ||
   "https://deeprecall-production.up.railway.app";
@@ -134,39 +136,92 @@ export async function signInWithGoogle(
 
                 // Exchange code for tokens via our auth broker
                 console.log(
-                  "[Google] Exchanging authorization code for tokens..."
+                  "[Google] Exchanging authorization code with Google..."
                 );
-                const response = await fetch(
-                  `${AUTH_BROKER_URL}/api/auth/google/mobile`,
+                const googleResponse = await fetch(GOOGLE_TOKEN_URL, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                  },
+                  body: new URLSearchParams({
+                    client_id: GOOGLE_CLIENT_ID,
+                    code,
+                    code_verifier: storedVerifier,
+                    redirect_uri: REDIRECT_URI,
+                    grant_type: "authorization_code",
+                  }),
+                });
+
+                console.log(
+                  "[Google] Google token response status:",
+                  googleResponse.status
+                );
+
+                if (!googleResponse.ok) {
+                  const errorText = await googleResponse.text();
+                  console.error(
+                    "[Google] Google token exchange failed:",
+                    errorText
+                  );
+                  reject(
+                    new Error(
+                      `Failed to exchange code with Google: ${errorText || googleResponse.statusText}`
+                    )
+                  );
+                  return;
+                }
+
+                const tokens = await googleResponse.json();
+                console.log("[Google] Received tokens from Google");
+
+                if (tokens.refresh_token) {
+                  await secureStore.saveGoogleRefreshToken(
+                    tokens.refresh_token
+                  );
+                  console.log("[Google] Saved refresh token to secure store");
+                }
+
+                if (!tokens.id_token) {
+                  console.error("[Google] No ID token returned by Google");
+                  reject(new Error("Google token response missing id_token"));
+                  return;
+                }
+
+                console.log(
+                  "[Google] Exchanging ID token with Auth Broker for app JWT..."
+                );
+                const brokerResponse = await fetch(
+                  `${AUTH_BROKER_URL}/api/auth/exchange/google`,
                   {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                      code,
-                      code_verifier: storedVerifier,
-                      redirect_uri: REDIRECT_URI,
+                      id_token: tokens.id_token,
                       device_id: deviceId,
                     }),
                   }
                 );
 
                 console.log(
-                  "[Google] Token exchange response status:",
-                  response.status
+                  "[Google] Auth Broker response status:",
+                  brokerResponse.status
                 );
 
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  console.error("[Google] Token exchange failed:", errorData);
+                if (!brokerResponse.ok) {
+                  const errorText = await brokerResponse.text();
+                  console.error(
+                    "[Google] Auth Broker exchange failed:",
+                    errorText
+                  );
                   reject(
                     new Error(
-                      `Token exchange failed: ${errorData.error || response.statusText}`
+                      `Failed to exchange token with Auth Broker: ${errorText || brokerResponse.statusText}`
                     )
                   );
                   return;
                 }
 
-                const data = await response.json();
+                const data = await brokerResponse.json();
                 console.log(
                   "[Google] Token exchange successful, user:",
                   data.user?.email
@@ -200,6 +255,8 @@ export async function signInWithGoogle(
         authUrl.searchParams.set("code_challenge", codeChallenge);
         authUrl.searchParams.set("code_challenge_method", "S256");
         authUrl.searchParams.set("state", state);
+        authUrl.searchParams.set("access_type", "offline");
+        authUrl.searchParams.set("prompt", "consent");
 
         console.log("[Google] Opening browser for OAuth consent...");
         console.log("[Google] Redirect URI:", REDIRECT_URI);

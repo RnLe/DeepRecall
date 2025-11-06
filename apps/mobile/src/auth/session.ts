@@ -91,6 +91,7 @@ export async function saveSession(jwt: string): Promise<void> {
  */
 export async function clearSession(): Promise<void> {
   await secureStore.removeAppJWT();
+  await secureStore.removeGoogleRefreshToken();
 }
 
 /**

@@ -8,6 +8,7 @@ import { Preferences } from "@capacitor/preferences";
 const KEYS = {
   APP_JWT: "app_jwt",
   DEVICE_ID: "device_id",
+  GOOGLE_REFRESH_TOKEN: "google_refresh_token",
 } as const;
 
 export const secureStore = {
@@ -34,6 +35,24 @@ export const secureStore = {
    */
   async removeAppJWT(): Promise<void> {
     await Preferences.remove({ key: KEYS.APP_JWT });
+  },
+
+  async saveGoogleRefreshToken(refreshToken: string): Promise<void> {
+    await Preferences.set({
+      key: KEYS.GOOGLE_REFRESH_TOKEN,
+      value: refreshToken,
+    });
+  },
+
+  async getGoogleRefreshToken(): Promise<string | null> {
+    const { value } = await Preferences.get({
+      key: KEYS.GOOGLE_REFRESH_TOKEN,
+    });
+    return value;
+  },
+
+  async removeGoogleRefreshToken(): Promise<void> {
+    await Preferences.remove({ key: KEYS.GOOGLE_REFRESH_TOKEN });
   },
 
   /**

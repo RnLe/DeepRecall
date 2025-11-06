@@ -59,16 +59,16 @@ export function log(e: LogEvent) {
 // Convenience helpers
 export const logger = {
   debug(domain: Domain, msg: string, data?: Record<string, unknown>) {
-    /*#__PURE__*/ log({ ts: Date.now(), level: "debug", domain, msg, data });
+    log({ ts: Date.now(), level: "debug", domain, msg, data });
   },
   info(domain: Domain, msg: string, data?: Record<string, unknown>) {
-    /*#__PURE__*/ log({ ts: Date.now(), level: "info", domain, msg, data });
+    log({ ts: Date.now(), level: "info", domain, msg, data });
   },
   warn(domain: Domain, msg: string, data?: Record<string, unknown>) {
-    /*#__PURE__*/ log({ ts: Date.now(), level: "warn", domain, msg, data });
+    log({ ts: Date.now(), level: "warn", domain, msg, data });
   },
   error(domain: Domain, msg: string, data?: Record<string, unknown>) {
-    /*#__PURE__*/ log({ ts: Date.now(), level: "error", domain, msg, data });
+    log({ ts: Date.now(), level: "error", domain, msg, data });
   },
 };
 
