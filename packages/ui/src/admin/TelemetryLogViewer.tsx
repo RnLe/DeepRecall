@@ -15,7 +15,7 @@
  * - Responsive design
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import type { LogEvent, Level, Domain } from "@deeprecall/telemetry";
 import { logger } from "@deeprecall/telemetry";
 
@@ -27,6 +27,17 @@ interface TelemetryLogViewerProps {
 }
 
 export function TelemetryLogViewer({ getRingBuffer }: TelemetryLogViewerProps) {
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  // Refresh logs on an interval so new entries appear in the table
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setRefreshToken((prev) => prev + 1);
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
   // Filters
   const [query, setQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<Level | "all">("all");
@@ -49,7 +60,7 @@ export function TelemetryLogViewer({ getRingBuffer }: TelemetryLogViewerProps) {
       });
       return [];
     }
-  }, [getRingBuffer]);
+  }, [getRingBuffer, refreshToken]);
 
   // Extract unique domains for filter dropdown
   const domains = useMemo(() => {

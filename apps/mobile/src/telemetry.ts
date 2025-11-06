@@ -4,7 +4,7 @@
  * Dev: Console + Ring Buffer (4000 events)
  * Prod: Ring Buffer only (silent unless OTLP enabled via env)
  */
-import { registerSinks, type Sink } from "@deeprecall/telemetry";
+import { registerSinks, hijackConsole, type Sink } from "@deeprecall/telemetry";
 import {
   makeRingBufferSink,
   makeConsoleSink,
@@ -68,6 +68,11 @@ export function initTelemetry() {
   }
 
   registerSinks(...sinks);
+
+  // Mirror console output into telemetry logs for easier debugging
+  if (typeof window !== "undefined") {
+    hijackConsole("ui");
+  }
 }
 
 export function getRingBuffer(): RingBufferSink {

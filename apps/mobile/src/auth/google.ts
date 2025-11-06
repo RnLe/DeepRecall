@@ -66,11 +66,14 @@ export async function signInWithGoogle(
                 await Browser.close();
                 console.log("[Google] Browser closed");
 
-                // Parse URL parameters
-                const urlObj = new URL(url);
-                const code = urlObj.searchParams.get("code");
-                const returnedState = urlObj.searchParams.get("state");
-                const error = urlObj.searchParams.get("error");
+                // Parse URL parameters (custom scheme workaround)
+                const queryIndex = url.indexOf("?");
+                const queryString =
+                  queryIndex >= 0 ? url.slice(queryIndex + 1) : "";
+                const params = new URLSearchParams(queryString);
+                const code = params.get("code");
+                const returnedState = params.get("state");
+                const error = params.get("error");
                 console.log(
                   "[Google] URL params - code:",
                   !!code,
