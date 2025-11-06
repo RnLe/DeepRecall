@@ -73,62 +73,38 @@ export function UserMenu() {
   const handleSignIn = async (provider: "google" | "github") => {
     setError(null);
 
-    try {
-      console.log(`[UserMenu] Starting ${provider} OAuth flow...`);
+    // Close modal immediately - OAuth happens in background
+    setShowSignInModal(false);
 
+    // Show notification that browser is opening
+    console.log(`[UserMenu] Opening browser for ${provider} sign-in...`);
+
+    try {
       // Get or create device ID
       const deviceId = await getOrCreateDeviceId();
       console.log("[UserMenu] Device ID:", deviceId);
 
-      // Sign in with selected provider
-      let result;
+      // Start OAuth flow (non-blocking)
       if (provider === "google") {
-        result = await signInWithGoogle(deviceId);
+        // Google PKCE flow - browser will open
+        const result = await signInWithGoogle(deviceId);
+        await handleSignInSuccess(result);
       } else {
-        // GitHub uses device code flow - show modal
-        result = await signInWithGitHub(deviceId, (data) => {
+        // GitHub Device Code flow - show modal with code
+        await signInWithGitHub(deviceId, (data) => {
           console.log("[UserMenu] GitHub device code received:", data);
           setGitHubDeviceCode(data);
           setShowGitHubCodeModal(true);
-          setShowSignInModal(false); // Close provider selection modal
 
           // Auto-open browser
           window.open(data.verification_uri, "_blank");
-        });
+        }).then(handleSignInSuccess);
       }
-
-      console.log(`[UserMenu] ${provider} sign in successful:`, result.user);
-
-      // Save app JWT to keychain (CRITICAL: needed for session persistence!)
-      const { tokens } = await import("../auth/secure-store");
-      await tokens.saveAppJWT(result.app_jwt);
-      console.log("[UserMenu] Saved app JWT to keychain");
-
-      // Parse JWT to get session info (avoid race condition with keychain)
-      const { parseJWTUnsafe } = await import("../auth/session");
-      const payload = parseJWTUnsafe(result.app_jwt);
-
-      // Set session directly from result (faster than reloading from keychain)
-      const session = {
-        status: "authenticated" as const,
-        userId: payload.userId,
-        deviceId: payload.deviceId,
-        provider: payload.provider as "google" | "github",
-        appJWT: result.app_jwt,
-        email: result.user.email,
-        name: result.user.name,
-      };
-
-      setSessionInfo(session);
-      setStatus("authenticated");
-      setShowSignInModal(false); // Close modals on success
-      setShowGitHubCodeModal(false);
     } catch (err) {
       console.error(`[UserMenu] ${provider} sign in failed:`, err);
 
-      // User closed browser or cancelled - not an error, just reset to unauthenticated
+      // Check if user cancelled
       if (err instanceof Error) {
-        // Check for common cancellation patterns
         const isCancellation =
           err.message.includes("User closed") ||
           err.message.includes("cancelled") ||
@@ -136,21 +112,47 @@ export function UserMenu() {
           err.message.includes("timeout") ||
           err.message.includes("access_denied");
 
-        if (isCancellation) {
-          console.log("[UserMenu] User cancelled sign-in, no error shown");
-          setShowSignInModal(false); // Close modals, return to unauthenticated state
-          setShowGitHubCodeModal(false);
-        } else {
+        if (!isCancellation) {
           // Real error - show to user
-          setError(err.message);
+          setError(`Sign-in failed: ${err.message}`);
+        } else {
+          console.log("[UserMenu] User cancelled sign-in");
         }
-      } else {
-        setError("Sign in failed");
       }
 
       setStatus("unauthenticated");
-      throw err; // Re-throw so modal knows sign-in failed
     }
+  };
+
+  const handleSignInSuccess = async (result: {
+    app_jwt: string;
+    user: { id: string; provider: string; email: string; name: string };
+  }) => {
+    console.log("[UserMenu] Sign in successful:", result.user);
+
+    // Save app JWT to keychain
+    const { tokens } = await import("../auth/secure-store");
+    await tokens.saveAppJWT(result.app_jwt);
+    console.log("[UserMenu] Saved app JWT to keychain");
+
+    // Parse JWT to get session info
+    const { parseJWTUnsafe } = await import("../auth/session");
+    const payload = parseJWTUnsafe(result.app_jwt);
+
+    // Set session
+    const session = {
+      status: "authenticated" as const,
+      userId: payload.userId,
+      deviceId: payload.deviceId,
+      provider: payload.provider as "google" | "github",
+      appJWT: result.app_jwt,
+      email: result.user.email,
+      name: result.user.name,
+    };
+
+    setSessionInfo(session);
+    setStatus("authenticated");
+    setShowGitHubCodeModal(false); // Close GitHub modal if open
   };
 
   const handleCancelGitHub = () => {

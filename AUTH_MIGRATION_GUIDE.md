@@ -26,25 +26,121 @@
    - [ ] Snapshot Postgres, export Dexie schemas for sanity checks
    - [ ] Freeze schema changes during Phases 2–4
 
-2. **Identity (Auth.js)**
-   - [x] Add Google + GitHub providers to web app
-   - [x] Harden cookies (sameSite, secure), JWT strategy
-   - [x] Session helper for App Router + API routes
-   - [x] Split auth into server/client entry points (prevent Node code in browser)
-   - [x] **Desktop: Native OAuth (offline-first)** ✅ **COMPLETE**
-     - [x] Google: OAuth Code + PKCE with loopback (127.0.0.1)
-     - [x] GitHub: Device Code flow
-     - [x] Auth Broker: `/api/auth/exchange/{google,github}` endpoints
-     - [x] Token exchange: provider token → app JWT
-     - [x] Secure storage: Windows Credential Manager (OS keychain)
-     - [x] Session persistence with user profile display
-     - [x] UserMenu integration with native OAuth flows
-     - [x] Electric integration with auth-aware token loading
-   - [ ] **Mobile: Native OAuth (offline-first)**
-     - [ ] Google: OAuth Code + PKCE with custom URL scheme
-     - [ ] GitHub: Device Code flow
-     - [ ] Same Auth Broker endpoints as desktop
-     - [ ] Secure storage: iOS Keychain / Android Keystore
+2. **Identity (Auth.js)** - **4/6 PLATFORMS COMPLETE** ✅
+
+   **Platform Matrix:**
+   | Platform | Google OAuth | GitHub OAuth | Status |
+   |----------|--------------|--------------|--------|
+   | Web (Local) | ✅ WORKING | ✅ WORKING | **COMPLETE** |
+   | Web (Railway) | ✅ WORKING | ✅ WORKING | **COMPLETE** |
+   | Desktop | ✅ WORKING | ✅ WORKING | **COMPLETE** |
+   | Mobile (iOS) | 🔧 IMPL | 🔧 IMPL | **AWAITING TEST** |
+
+   **Web (Auth.js) - COMPLETE ✅**
+   - [x] Google + GitHub providers configured
+   - [x] Session management with JWT strategy
+   - [x] Protected routes via middleware
+   - [x] Local development tested and working
+   - [x] Production (Railway) tested and working
+   - [x] User profile dropdown with proper z-index
+   - [x] Located: `apps/web/src/auth/server.ts`
+
+   **Desktop (Native OAuth) - COMPLETE ✅**
+   - [x] **Google OAuth** ✅
+     - Method: PKCE + loopback (127.0.0.1:random-port)
+     - Client: Desktop app (requires `client_secret`)
+     - Tokens: `VITE_GOOGLE_DESKTOP_CLIENT_ID`, `VITE_GOOGLE_DESKTOP_CLIENT_SECRET`
+     - Get tokens: https://console.cloud.google.com/apis/credentials
+     - Code: `apps/desktop/src/auth/google.ts` (280 lines)
+     - Storage: Windows Credential Manager via Tauri
+     - Status: ✅ Sign-in working, session persists, profile displays
+   - [x] **GitHub OAuth** ✅
+     - Method: Device Code flow (RFC 8628)
+     - Client: OAuth App (NOT GitHub App)
+     - Token: `VITE_GITHUB_DESKTOP_CLIENT_ID`
+     - Get token: https://github.com/settings/developers
+     - Code: `apps/desktop/src/auth/github.ts` (274 lines)
+     - Backend proxy: `/api/auth/github/device-code`, `/api/auth/github/device-token`
+     - Status: ✅ Sign-in working with device code modal
+
+   **Backend (Auth Broker) - COMPLETE ✅**
+   - [x] Token exchange endpoints with CORS support
+     - `/api/auth/exchange/google` - verify Google ID token → app JWT
+     - `/api/auth/exchange/github` - verify GitHub token → app JWT
+     - `/api/replication/token` - app JWT → Electric token
+   - [x] GitHub Device Code proxy endpoints (CORS workaround)
+     - `/api/auth/github/device-code` - proxy to GitHub
+     - `/api/auth/github/device-token` - proxy token polling
+     - Status: ✅ Deployed and working
+   - [x] Database: `migrations/006_app_users_auth.sql`
+   - [x] CORS: Tauri origins (`tauri://localhost`, `http://tauri.localhost`)
+
+   **Key Issues Resolved:**
+   1. ✅ Google requires `client_secret` even for Desktop apps with PKCE
+   2. ✅ Tauri WebView blocks GitHub API - solved with backend proxy
+   3. ✅ Auth.js needs `NEXTAUTH_URL` for production OAuth callbacks
+   4. ✅ Environment variables: Use `AUTH_*` prefix (Auth.js v5 convention)
+   5. ✅ User dropdown z-index fixed (nav needs `z-50`)
+   6. ✅ Interrupted sign-in handling (timeout + cancel button)
+
+   **User Experience Improvements:**
+   - **Interrupted Sign-Ins:** Desktop app handles abandoned OAuth gracefully
+     - 5-minute timeout if user closes browser without completing OAuth
+     - Cancel button on GitHub device code modal
+     - No error shown for cancellations - just returns to sign-in button
+     - Loading states automatically clear on timeout or cancel
+   - **Error Handling:** Real errors displayed to user, cancellations ignored
+   - **Session Persistence:** JWT stored in OS keychain, survives app restart
+
+   **Mobile iOS (Native OAuth) - IMPLEMENTED, AWAITING TEST 🔧**
+   - [x] **Google OAuth** 🔧
+     - Method: PKCE + custom URL scheme (no loopback)
+     - Client: iOS application (Bundle ID: `com.renlephy.deeprecall`)
+     - Tokens: `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_REDIRECT_URI`
+     - URL Scheme: `com.googleusercontent.apps.193717154963-uvolmq1rfotinfg6g9se6p9ae5ur9q09`
+     - Code: `apps/mobile/src/auth/google.ts` (180 lines)
+     - Storage: iOS Keychain via Capacitor Preferences
+     - Status: ✅ Implemented, awaiting TestFlight deployment
+   - [x] **GitHub OAuth** 🔧
+     - Method: Device Code flow (same as desktop)
+     - Client: Same OAuth App as desktop
+     - Token: `VITE_GITHUB_CLIENT_ID`
+     - Code: `apps/mobile/src/auth/github.ts` (110 lines)
+     - Backend proxy: Same endpoints as desktop (CORS configured)
+     - Status: ✅ Implemented, awaiting TestFlight deployment
+   - [x] **iOS Configuration**
+     - Capacitor Plugins: `@capacitor/browser`, `@capacitor/app`, `@capacitor/preferences`
+     - Info.plist: Google URL scheme added for OAuth redirects
+     - Deep links: App handles OAuth callbacks via custom URL scheme
+   - [x] **UI Components**
+     - UserMenu: Mobile-optimized sign-in/sign-out UI
+     - Location: `apps/mobile/src/components/UserMenu.tsx`
+     - Layout integration: Added to navigation bar
+     - Modals: Sign-in providers, GitHub device code display
+   - [x] **Environment Variables** (`.env.local`)
+     - `VITE_AUTH_BROKER_URL` - Backend for token exchange
+     - `VITE_GOOGLE_CLIENT_ID` - iOS OAuth client
+     - `VITE_GOOGLE_REDIRECT_URI` - Custom URL scheme
+     - `VITE_GITHUB_CLIENT_ID` - Device code client
+
+   **Next Steps for Mobile:**
+   1. **Build & Deploy to TestFlight:**
+      ```bash
+      cd apps/mobile
+      pnpm run build:ios
+      pnpm run cap:sync
+      git push  # Triggers workflow
+      ```
+   2. **Test on TestFlight:**
+      - Install TestFlight build on iOS device
+      - Test Google OAuth (Safari → OAuth → deep link back)
+      - Test GitHub Device Code (Safari → paste code → authorize)
+      - Verify session persists across app restarts
+      - Check profile displays in UserMenu
+   3. **Local Development Setup** (Optional, for faster iteration):
+      - Configure local dev environment to proxy OAuth
+      - Test in iOS Simulator via `pnpm dev:mobile`
+      - Requires: Local backend at localhost:3000 + Electric at localhost:5133
 
 3. **Users & RLS**
    - [ ] Create `app_users` table (`id` = OIDC `sub`)
@@ -92,10 +188,14 @@
 
 ## Phase 2 — Identity (Auth.js / NextAuth)
 
-### 2.1 Install & Configure
+### 2.1 Web Configuration (COMPLETE ✅)
+
+**Status:** Both local and production working
+
+Located: `apps/web/src/auth/server.ts`
 
 ```ts
-// apps/web/src/auth/config.ts
+// apps/web/src/auth/server.ts
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
@@ -104,69 +204,235 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 }, // 7 days
   providers: [
-    GitHub({ allowDangerousEmailAccountLinking: false }),
-    Google({ allowDangerousEmailAccountLinking: false }),
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID!,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      authorization: {
+        params: { prompt: "select_account" }, // Force account selection
+      },
+    }),
+    GitHub({
+      clientId: process.env.AUTH_GITHUB_ID!,
+      clientSecret: process.env.AUTH_GITHUB_SECRET!,
+    }),
   ],
   callbacks: {
     async jwt({ token, account, profile }) {
-      // token.sub comes from the provider; stable per user per provider
-      // Optionally store provider id for actor_uid derivation later
-      if (account?.provider) token.provider = account.provider;
+      if (account && profile) {
+        token.provider = account.provider;
+        token.sub = profile.sub || account.providerAccountId;
+      }
       return token;
     },
     async session({ session, token }) {
-      // Expose `sub` (subject) and provider to server/client
-      // Avoid exposing email/PII in your app logic
-      (session as any).user = {
-        sub: token.sub,
-        provider: (token as any).provider,
-      };
+      if (session.user) {
+        session.user.id = token.sub as string;
+        session.user.provider = token.provider as string;
+      }
       return session;
     },
   },
-  cookies: {
-    // defaults are fine; ensure HTTPS in production
+  pages: {
+    signIn: "/auth/signin",
+    error: "/auth/error",
   },
 });
 ```
 
-```ts
-// apps/web/app/api/auth/[...nextauth]/route.ts
-export const { GET, POST } = handlers;
+**Environment Variables (Local `.env.local`):**
+
+```bash
+# Base URL for OAuth callbacks
+NEXTAUTH_URL=http://localhost:3000
+
+# Generate with: openssl rand -base64 32
+AUTH_SECRET=your-secret-here
+
+# Google OAuth (Web application)
+AUTH_GOOGLE_ID=your-google-client-id
+AUTH_GOOGLE_SECRET=your-google-client-secret
+
+# GitHub OAuth (OAuth App)
+AUTH_GITHUB_ID=your-github-app-id
+AUTH_GITHUB_SECRET=your-github-app-secret
 ```
 
-```ts
-// apps/web/middleware.ts (protect app/api & replication endpoints)
+**Environment Variables (Railway Production):**
+
+```bash
+# Required for OAuth redirects
+NEXTAUTH_URL=https://deeprecall-production.up.railway.app
+
+# Same secrets as local (but with production OAuth clients)
+AUTH_SECRET=<same-as-local>
+AUTH_GOOGLE_ID=<production-google-client-id>
+AUTH_GOOGLE_SECRET=<production-google-client-secret>
+AUTH_GITHUB_ID=<production-github-app-id>
+AUTH_GITHUB_SECRET=<production-github-app-secret>
+```
+
+**Environment Variables (Railway):**
+
+- `AUTH_SECRET` - NextAuth secret (generate: `openssl rand -base64 32`)
+- `AUTH_GOOGLE_ID` - Web OAuth client ID (from Google Console)
+- `AUTH_GOOGLE_SECRET` - Web OAuth client secret
+- `AUTH_GITHUB_ID` - GitHub OAuth app ID (from GitHub Settings)
+- `AUTH_GITHUB_SECRET` - GitHub OAuth app secret
+
+**Get Web OAuth Credentials:**
+
+Google (Web application):
+
+1. https://console.cloud.google.com/apis/credentials
+2. Create OAuth 2.0 Client ID → Web application
+3. Authorized redirect: `https://your-domain.com/api/auth/callback/google`
+
+GitHub (OAuth App):
+
+1. https://github.com/settings/developers
+2. Create OAuth App
+3. Callback URL: `https://your-domain.com/api/auth/callback/github`
+
+**Note:** Use separate OAuth clients for web (needs secret) vs desktop (PKCE)
+
+### 2.2 Desktop Native OAuth (1/2 COMPLETE)
+
+**Why Native OAuth?** Tauri WebView blocks cross-origin requests to GitHub/Google APIs. Native flows use system browser for OAuth, then exchange tokens via backend.
+
+**Google OAuth (COMPLETE ✅)**
+
+Location: `apps/desktop/src/auth/google.ts`
+
+Flow:
+
+1. Desktop generates PKCE verifier/challenge
+2. Starts loopback HTTP server on `127.0.0.1:random-port`
+3. Opens system browser to Google consent page
+4. User approves → Google redirects to loopback
+5. Desktop exchanges code with Google (PKCE + secret) → gets `id_token`
+6. Desktop sends `id_token` to Auth Broker `/api/auth/exchange/google`
+7. Backend verifies token, upserts user, returns app JWT
+8. Desktop stores JWT in Windows Credential Manager
+9. Session persists across restarts
+
+**Desktop Environment Variables:**
+
+```bash
+VITE_API_URL=https://deeprecall-production.up.railway.app
+VITE_GOOGLE_DESKTOP_CLIENT_ID=193717154963-...apps.googleusercontent.com
+VITE_GOOGLE_DESKTOP_CLIENT_SECRET=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
+```
+
+Get credentials: https://console.cloud.google.com/apis/credentials
+
+- Create "Desktop app" OAuth 2.0 Client ID
+- Note: Desktop apps DO require `client_secret` (not sensitive for native apps)
+
+**GitHub OAuth (IN PROGRESS 🔧)**
+
+Location: `apps/desktop/src/auth/github.ts`
+
+Issue: Direct GitHub API calls blocked by CORS in Tauri WebView
+
+```
+Access to fetch at 'https://github.com/login/device/code' from origin
+'http://tauri.localhost' has been blocked by CORS policy
+```
+
+**Solution: Backend Proxy Endpoints**
+
+Created proxy endpoints to route GitHub requests through backend:
+
+- `/api/auth/github/device-code` - proxies device code request
+- `/api/auth/github/device-token` - proxies token polling
+
+Desktop code updated to use:
+
+```typescript
+const AUTH_BROKER_URL = import.meta.env.VITE_API_URL;
+const GITHUB_DEVICE_CODE_URL = `${AUTH_BROKER_URL}/api/auth/github/device-code`;
+const GITHUB_TOKEN_URL = `${AUTH_BROKER_URL}/api/auth/github/device-token`;
+```
+
+**Desktop Environment Variable:**
+
+```bash
+VITE_GITHUB_DESKTOP_CLIENT_ID=Ov23lii9PjHnRsAhhP3S
+```
+
+Get credential: https://github.com/settings/developers
+
+- Create OAuth App (NOT GitHub App)
+- Enable Device Flow
+- No secret needed for device flow
+
+**Status:** Proxy endpoints created, need deployment + rebuild
+
+### 2.3 Backend Auth Broker
+
+**Token Exchange Endpoints (COMPLETE ✅)**
+
+Located: `apps/web/app/api/auth/exchange/`
+
+- `google/route.ts` - Verify Google ID token → app JWT
+- `github/route.ts` - Verify GitHub access token → app JWT
+- Both have CORS support for Tauri origins
+
+**GitHub Device Code Proxy (CREATED, AWAITING DEPLOY)**
+
+Located: `apps/web/app/api/auth/github/`
+
+- `device-code/route.ts` - Proxy to `https://github.com/login/device/code`
+- `device-token/route.ts` - Proxy to `https://github.com/login/oauth/access_token`
+
+Why needed: Tauri WebView blocks direct GitHub API calls due to CORS
+
+**CORS Configuration**
+
+Located: `apps/web/app/api/lib/cors.ts`
+
+Allowed origins:
+
+- `capacitor://localhost` (Mobile iOS)
+- `tauri://localhost` (Desktop production)
+- `http://tauri.localhost` (Desktop alternative)
+- `http://localhost:3000` (Web dev)
+- Production web domain
+
+### 2.4 Middleware Protection
+
+Located: `apps/web/middleware.ts`
 import { auth } from "@/src/auth/config";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
-  const session = await auth();
-  const url = req.nextUrl;
+const session = await auth();
+const url = req.nextUrl;
 
-  // Public assets and auth endpoints pass through
-  if (
-    url.pathname.startsWith("/api/public") ||
-    url.pathname.startsWith("/auth")
-  ) {
-    return NextResponse.next();
-  }
+// Public assets and auth endpoints pass through
+if (
+url.pathname.startsWith("/api/public") ||
+url.pathname.startsWith("/auth")
+) {
+return NextResponse.next();
+}
 
-  // Protect server-side write/sync endpoints
-  if (
-    url.pathname.startsWith("/api/writes") ||
-    url.pathname.startsWith("/api/library") ||
-    url.pathname.startsWith("/electric-proxy")
-  ) {
-    if (!session)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+// Protect server-side write/sync endpoints
+if (
+url.pathname.startsWith("/api/writes") ||
+url.pathname.startsWith("/api/library") ||
+url.pathname.startsWith("/electric-proxy")
+) {
+if (!session)
+return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
 
-  return NextResponse.next();
+return NextResponse.next();
 }
 export const config = { matcher: ["/api/:path*", "/electric-proxy/:path*"] };
-```
+
+````
 
 > **Desktop (Tauri) & Mobile (Capacitor):** Prefer using the hosted web domain so Auth.js cookies work inside the WebView. If a platform blocks third-party cookies, implement a **device-link login**: open the system browser to your `/auth/link` route → after OAuth, redirect to a custom URL scheme with a short-lived code; the app exchanges it for session/JWT and stores it in secure storage. (Most setups won’t need this if you run everything on the same first-party domain.)
 
@@ -199,7 +465,7 @@ ALTER TABLE works ENABLE ROW LEVEL SECURITY;
 CREATE POLICY works_isolation ON works
   USING  (owner_id = current_setting('app.user_id', true))
   WITH CHECK (owner_id = current_setting('app.user_id', true));
-```
+````
 
 > Repeat for **all** user-owned tables: `assets`, `annotations`, `cards`, `blobs_meta`, `device_blobs`, etc. (Shared/global tables can remain public or use looser policies if truly non-sensitive.)
 

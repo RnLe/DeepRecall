@@ -62,5 +62,24 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>DeepRecall App</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>deeprecall</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Google OAuth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.193717154963-uvolmq1rfotinfg6g9se6p9ae5ur9q09</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

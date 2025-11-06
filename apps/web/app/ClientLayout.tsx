@@ -15,7 +15,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     <Providers>
       <SystemMonitoringProvider>
         <div className="h-screen bg-gray-950 text-gray-100 flex flex-col overflow-hidden">
-          <nav className="shrink-0 border-b border-gray-800 bg-gray-900/50 backdrop-blur">
+          <nav className="shrink-0 border-b border-gray-800 bg-gray-900/50 backdrop-blur relative z-50">
             <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
               <Link
                 href="/"

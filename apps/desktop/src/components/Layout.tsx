@@ -17,7 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col h-screen w-full bg-gray-950 text-gray-100 overflow-hidden">
       {/* Desktop-style navigation bar */}
-      <nav className="flex items-center bg-linear-to-brom-gray-900 to-gray-950 border-b border-gray-800 h-14 shrink-0 select-none [app-region:drag]">
+      <nav className="flex items-center bg-linear-to-brom-gray-900 to-gray-950 border-b border-gray-800 h-14 shrink-0 select-none [app-region:drag] relative z-50">
         <div className="flex items-center gap-2.5 px-5 h-full border-r border-gray-800 [app-region:no-drag]">
           <img src="/favicon.ico" alt="" className="w-7 h-7" />
           <span className="font-semibold text-[15px] text-white tracking-tight">
