@@ -104,7 +104,12 @@ export function UserMenu() {
         console.log(`[UserMenu] GitHub OAuth result received:`, result);
         // Close modal and browser on success
         setShowGitHubCodeModal(false);
-        await closeBrowser();
+        try {
+          await closeBrowser();
+        } catch {
+          // Ignore error if browser already closed
+          console.log("[UserMenu] Browser already closed");
+        }
         await handleSignInSuccess(result);
       }
     } catch (err: unknown) {
@@ -133,10 +138,10 @@ export function UserMenu() {
 
   const handleSignInSuccess = async (result: {
     app_jwt: string;
-    user: { id: string; email: string; name: string };
+    user: { id: string; email: string | null; name: string };
   }) => {
     logger.info("ui", "UserMenu: Processing sign-in success", {
-      userEmail: result.user.email,
+      userEmail: result.user.email || result.user.name,
     });
     console.log("[UserMenu] Sign-in successful, processing result...");
 
@@ -149,16 +154,16 @@ export function UserMenu() {
       // Parse JWT to get user info
       const payload = parseJWTUnsafe(result.app_jwt);
       logger.info("ui", "UserMenu: JWT parsed", {
-        userId: payload.user_id || payload.sub,
+        userId: payload.userId || payload.user_id || payload.sub,
       });
       console.log("[UserMenu] JWT payload:", payload);
 
       // Update session state
       const newSessionInfo: SessionInfo = {
-        userId: payload.user_id || payload.sub,
+        userId: payload.userId || payload.user_id || payload.sub,
         email: result.user.email,
         name: result.user.name,
-        deviceId: payload.device_id,
+        deviceId: payload.deviceId || payload.device_id,
         iat: payload.iat,
         exp: payload.exp,
       };
@@ -364,7 +369,14 @@ export function UserMenu() {
             {sessionInfo.name}
           </span>
         )}
-        <span className="text-xs text-gray-400">{sessionInfo?.email}</span>
+        {sessionInfo?.email && (
+          <span className="text-xs text-gray-400">{sessionInfo.email}</span>
+        )}
+        {!sessionInfo?.email && sessionInfo?.userId && (
+          <span className="text-xs text-gray-400">
+            ID: {sessionInfo.userId}
+          </span>
+        )}
       </div>
       <button
         onClick={handleSignOut}

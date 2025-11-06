@@ -6,7 +6,7 @@ import { secureStore } from "./secure-store";
 
 export interface SessionInfo {
   userId: string;
-  email: string;
+  email: string | null;
   name?: string;
   deviceId: string;
   iat?: number;
@@ -66,10 +66,10 @@ export async function loadSession(): Promise<SessionInfo | null> {
     if (!payload) return null;
 
     return {
-      userId: payload.user_id || payload.sub,
-      email: payload.email,
+      userId: payload.userId || payload.user_id || payload.sub,
+      email: payload.email || null,
       name: payload.name,
-      deviceId: payload.device_id,
+      deviceId: payload.deviceId || payload.device_id,
       iat: payload.iat,
       exp: payload.exp,
     };
