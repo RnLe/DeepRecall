@@ -15,6 +15,7 @@ import { WorkSchema, type Work } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 /**
  * Local change record with sync metadata
@@ -38,7 +39,7 @@ const buffer = createWriteBuffer();
  * Writes to local Dexie immediately, enqueues for sync
  */
 export async function createWorkLocal(
-  data: Omit<Work, "id" | "kind" | "createdAt" | "updatedAt">
+  data: Omit<Work, "id" | "kind" | "createdAt" | "updatedAt">,
 ): Promise<Work> {
   const work: Work = WorkSchema.parse({
     ...data,
@@ -57,16 +58,19 @@ export async function createWorkLocal(
     data: work,
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "works",
-    op: "insert",
-    payload: work,
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "works",
+      op: "insert",
+      payload: work,
+    });
+  }
 
   logger.info("db.local", "Created work (pending sync)", {
     workId: work.id,
     workType: work.workType,
+    willSync: isAuthenticated(),
   });
   return work;
 }
@@ -76,7 +80,7 @@ export async function createWorkLocal(
  */
 export async function updateWorkLocal(
   id: string,
-  updates: Partial<Work>
+  updates: Partial<Work>,
 ): Promise<void> {
   const updatedData = {
     ...updates,
@@ -92,16 +96,19 @@ export async function updateWorkLocal(
     data: updatedData as any, // Partial data for update
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "works",
-    op: "update",
-    payload: { id, ...updatedData },
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "works",
+      op: "update",
+      payload: { id, ...updatedData },
+    });
+  }
 
   logger.info("db.local", "Updated work (pending sync)", {
     workId: id,
     fields: Object.keys(updates),
+    willSync: isAuthenticated(),
   });
 }
 
@@ -117,14 +124,19 @@ export async function deleteWorkLocal(id: string): Promise<void> {
     _timestamp: Date.now(),
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "works",
-    op: "delete",
-    payload: { id },
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "works",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
-  logger.info("db.local", "Deleted work (pending sync)", { workId: id });
+  logger.info("db.local", "Deleted work (pending sync)", {
+    workId: id,
+    willSync: isAuthenticated(),
+  });
 }
 
 /**
@@ -147,7 +159,7 @@ export async function markWorkSynced(id: string): Promise<void> {
  */
 export async function markWorkSyncFailed(
   id: string,
-  error: string
+  error: string,
 ): Promise<void> {
   await db.works_local.where("id").equals(id).modify({
     _status: "error",

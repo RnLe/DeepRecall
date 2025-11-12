@@ -15,6 +15,7 @@ import { ActivitySchema, type Activity } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 /**
  * Local change record with sync metadata
@@ -57,16 +58,20 @@ export async function createActivityLocal(
     data: activity,
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "activities",
-    op: "insert",
-    payload: activity,
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "activities",
+      op: "insert",
+      payload: activity,
+    });
+  }
 
   logger.info("db.local", "Created activity (pending sync)", {
     activityId: activity.id,
     activityType: activity.activityType,
+    willSync: isAuthenticated(),
   });
   return activity;
 }
@@ -92,16 +97,20 @@ export async function updateActivityLocal(
     data: updatedData as any, // Partial data for update
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "activities",
-    op: "update",
-    payload: { id, ...updatedData },
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "activities",
+      op: "update",
+      payload: { id, ...updatedData },
+    });
+  }
 
   logger.info("db.local", "Updated activity (pending sync)", {
     activityId: id,
     fields: Object.keys(updates),
+    willSync: isAuthenticated(),
   });
 }
 
@@ -117,15 +126,19 @@ export async function deleteActivityLocal(id: string): Promise<void> {
     _timestamp: Date.now(),
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "activities",
-    op: "delete",
-    payload: { id },
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "activities",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
   logger.info("db.local", "Deleted activity (pending sync)", {
     activityId: id,
+    willSync: isAuthenticated(),
   });
 }
 
@@ -143,7 +156,10 @@ export async function getLocalActivityChanges(): Promise<
  */
 export async function markActivitySynced(id: string): Promise<void> {
   await db.activities_local.where("id").equals(id).delete();
-  logger.debug("db.local", "Cleaned up synced activity", { activityId: id });
+  logger.debug("db.local", "Cleaned up synced activity", {
+    activityId: id,
+    willSync: isAuthenticated(),
+  });
 }
 
 /**

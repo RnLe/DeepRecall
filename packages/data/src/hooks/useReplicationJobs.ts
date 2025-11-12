@@ -7,6 +7,7 @@ import type { ReplicationJob, ReplicationStatus } from "@deeprecall/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
+import * as replicationJobsElectric from "../repos/replication-jobs.electric";
 import { db } from "../db";
 import { logger } from "@deeprecall/telemetry";
 
@@ -52,11 +53,10 @@ async function syncElectricToDexie(
  * Internal sync hook - subscribes to Electric and syncs to Dexie
  * MUST be called exactly once by SyncManager to avoid race conditions
  * DO NOT call from components - use useReplicationJobs() instead
+ * @param userId - Owner filter for multi-tenant isolation
  */
-export function useReplicationJobsSync() {
-  const electricResult = useShape<ReplicationJob>({
-    table: "replication_jobs",
-  });
+export function useReplicationJobsSync(userId?: string) {
+  const electricResult = replicationJobsElectric.useReplicationJobs(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric → Dexie

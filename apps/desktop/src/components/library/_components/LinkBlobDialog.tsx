@@ -31,8 +31,16 @@ export function LinkBlobDialog({
         `~/Documents/DeepRecall/blobs/${sha256.substring(0, 2)}/${sha256}`
       ),
     syncBlobToElectric: async (sha256: string) => {
+      // Check authentication status
+      const { isAuthenticated, getDeviceId } = await import("@deeprecall/data");
+
+      // Guests don't sync to Electric - they work purely locally
+      if (!isAuthenticated()) {
+        console.log("[LinkBlobDialog] Skipping sync for guest mode");
+        return;
+      }
+
       // Sync blob metadata to Postgres via Rust command
-      const { getDeviceId } = await import("@deeprecall/data");
       const deviceId = getDeviceId();
       await invoke("sync_blob_to_electric", { sha256, deviceId });
     },

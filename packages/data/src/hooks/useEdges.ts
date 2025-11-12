@@ -69,9 +69,10 @@ async function syncElectricToDexie(electricData: Edge[]): Promise<void> {
  * Internal sync hook - subscribes to Electric and syncs to Dexie
  * MUST be called exactly once by SyncManager to avoid race conditions
  * DO NOT call from components - use useEdges() instead
+ * @param userId - Filter edges by owner_id (multi-tenant isolation)
  */
-export function useEdgesSync() {
-  const electricResult = edgesElectric.useEdges();
+export function useEdgesSync(userId?: string) {
+  const electricResult = edgesElectric.useEdges(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie

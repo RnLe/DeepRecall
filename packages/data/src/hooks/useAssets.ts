@@ -72,9 +72,10 @@ async function syncElectricToDexie(electricData: Asset[]): Promise<void> {
  * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
  *
  * DO NOT call this from components! Use useAssets() instead.
+ * @param userId - Filter assets by owner_id (multi-tenant isolation)
  */
-export function useAssetsSync() {
-  const electricResult = assetsElectric.useAssets();
+export function useAssetsSync(userId?: string) {
+  const electricResult = assetsElectric.useAssets(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie assets table (for merge layer)

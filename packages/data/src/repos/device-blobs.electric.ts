@@ -12,9 +12,15 @@ import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get all device blob records
+ * @param userId - Owner filter for multi-tenant isolation (undefined = skip sync for guests)
  */
-export function useDeviceBlobs() {
-  return useShape<DeviceBlob>({ table: "device_blobs" });
+export function useDeviceBlobs(userId?: string) {
+  // SECURITY: Don't subscribe to Electric for guests (no userId)
+  // Guests work with local CAS only, no server coordination
+  return useShape<DeviceBlob>({
+    table: "device_blobs",
+    where: userId ? `owner_id = '${userId}'` : "1 = 0", // Never match for guests
+  });
 }
 
 /**
@@ -112,6 +118,7 @@ export async function deleteDeviceBlob(id: string): Promise<void> {
 
 /**
  * Convenience: Mark a blob as available on a device
+ * ownerId will be set by server via RLS when flushed
  */
 export async function markBlobAvailable(
   sha256: string,
@@ -122,6 +129,7 @@ export async function markBlobAvailable(
   return createDeviceBlob({
     sha256,
     deviceId,
+    // ownerId omitted - server will assign via RLS
     present: true,
     localPath,
     health,

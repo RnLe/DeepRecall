@@ -22,6 +22,7 @@ export type Domain =
   | "cas"
   | "blob.upload"
   | "blob.download"
+  | "blob.bridge"
   | "server.api"
   | "pdf"
   | "ink"

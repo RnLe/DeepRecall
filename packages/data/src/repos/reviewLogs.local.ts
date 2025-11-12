@@ -8,6 +8,7 @@ import { ReviewLogSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 const buffer = createWriteBuffer();
 
@@ -28,15 +29,19 @@ export async function createReviewLogLocal(log: ReviewLog): Promise<ReviewLog> {
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "review_logs",
-    op: "insert",
-    payload: validated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "review_logs",
+      op: "insert",
+      payload: validated,
+    });
+  }
 
   logger.info("srs", "Created review log (pending sync)", {
     reviewLogId: log.id,
     cardId: log.card_id,
+
+    willSync: isAuthenticated(),
   });
   return validated;
 }
@@ -56,11 +61,16 @@ export async function deleteReviewLogLocal(id: string): Promise<void> {
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "review_logs",
-    op: "delete",
-    payload: { id },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "review_logs",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
-  logger.info("srs", "Deleted review log (pending sync)", { reviewLogId: id });
+  logger.info("srs", "Deleted review log (pending sync)", {
+    reviewLogId: id,
+    willSync: isAuthenticated(),
+  });
 }

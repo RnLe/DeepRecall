@@ -205,8 +205,8 @@ class DeepRecallDB extends Dexie {
   cards!: EntityTable<Card, "id">;
   reviewLogs!: EntityTable<ReviewLog, "id">;
 
-  constructor() {
-    super("DeepRecallDB");
+  constructor(dbName?: string) {
+    super(dbName || "DeepRecallDB");
     this.version(1).stores({
       // Library tables
       works: "id, workType, title, favorite, createdAt, updatedAt",
@@ -1124,7 +1124,12 @@ class DeepRecallDB extends Dexie {
   }
 }
 
-export const db = new DeepRecallDB();
+import { getDatabaseName } from "./naming";
+
+// Initialize database with dynamic name based on auth state
+// Guest: deeprecall_guest_<deviceId>
+// User: deeprecall_<userId>_<deviceId>
+export const db = new DeepRecallDB(getDatabaseName());
 
 // Add error handling for database opening
 db.on("versionchange", () => {
@@ -1184,4 +1189,41 @@ export async function clearAllDexieData(): Promise<void> {
     logger.error("db.local", "[Dexie] Failed to clear data", { error });
     throw error;
   }
+}
+
+/**
+ * Switch to a different database (guest → user or user → guest)
+ *
+ * This function closes the current database and returns a new instance
+ * with the appropriate name based on the current auth state.
+ *
+ * Call this after auth state changes (sign in / sign out).
+ *
+ * @returns New DeepRecallDB instance with updated name
+ *
+ * @example
+ * // After sign in
+ * const newDb = await switchDatabase();
+ * // Update all Electric shapes with new db instance
+ */
+export async function switchDatabase(): Promise<DeepRecallDB> {
+  const currentName = db.name;
+  const newName = getDatabaseName();
+
+  logger.info("db.local", "Switching database", {
+    from: currentName,
+    to: newName,
+  });
+
+  // Close current database
+  await db.close();
+
+  // Create new database instance with new name
+  const newDb = new DeepRecallDB(newName);
+
+  logger.info("db.local", "Database switched successfully", {
+    name: newName,
+  });
+
+  return newDb;
 }

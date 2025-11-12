@@ -61,9 +61,10 @@ async function syncElectricToDexie(electricData: Board[]): Promise<void> {
 /**
  * Internal sync hook: Subscribes to Electric and syncs to Dexie
  * CRITICAL: Must only be called ONCE by SyncManager
+ * @param userId - Filter boards by owner_id (multi-tenant isolation)
  */
-export function useBoardsSync() {
-  const electricResult = boardsElectric.useBoards();
+export function useBoardsSync(userId?: string) {
+  const electricResult = boardsElectric.useBoards(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie

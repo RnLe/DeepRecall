@@ -5,6 +5,7 @@ import { ElectricIndicator } from "./indicators/ElectricIndicator";
 import { LogViewerButton, ConnectionStatusIndicator } from "@deeprecall/ui";
 import { UserMenu } from "./UserMenu";
 import { useConnectionStatus } from "@deeprecall/data/hooks";
+import { GuestBannerWrapper } from "./GuestBannerWrapper";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -124,6 +125,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <UserMenu />
         </div>
       </nav>
+      <GuestBannerWrapper />
       <main className="flex-1 overflow-hidden bg-gray-950">{children}</main>
     </div>
   );

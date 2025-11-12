@@ -16,6 +16,7 @@ import {
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 const buffer = createWriteBuffer();
 
@@ -24,7 +25,7 @@ const buffer = createWriteBuffer();
  * Uses deterministic ID generation for idempotency
  */
 export async function createAnnotationLocal(
-  input: CreateAnnotationInput
+  input: CreateAnnotationInput,
 ): Promise<Annotation> {
   const now = Date.now();
 
@@ -34,7 +35,7 @@ export async function createAnnotationLocal(
     input.sha256,
     input.page,
     input.data.type,
-    coords
+    coords,
   );
 
   const annotation: Annotation = {
@@ -55,18 +56,21 @@ export async function createAnnotationLocal(
     data: validated,
   });
 
-  // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "annotations",
-    op: "insert",
-    payload: validated,
-  });
+  // Enqueue for server sync (background, only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "annotations",
+      op: "insert",
+      payload: validated,
+    });
+  }
 
   logger.info("db.local", "Created annotation (pending sync)", {
     annotationId: annotation.id,
     sha256: input.sha256.slice(0, 16),
     page: input.page,
     type: input.data.type,
+    willSync: isAuthenticated(),
   });
   return validated;
 }
@@ -76,7 +80,7 @@ export async function createAnnotationLocal(
  * Only metadata can be updated; geometry changes create a new annotation
  */
 export async function updateAnnotationLocal(
-  input: UpdateAnnotationInput
+  input: UpdateAnnotationInput,
 ): Promise<void> {
   const now = Date.now();
   const updated = {
@@ -93,15 +97,18 @@ export async function updateAnnotationLocal(
     data: updated as any, // Partial update data
   });
 
-  // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "annotations",
-    op: "update",
-    payload: updated,
-  });
+  // Enqueue for server sync (background, only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "annotations",
+      op: "update",
+      payload: updated,
+    });
+  }
 
   logger.info("db.local", "Updated annotation (pending sync)", {
     annotationId: input.id,
+    willSync: isAuthenticated(),
   });
 }
 
@@ -118,14 +125,17 @@ export async function deleteAnnotationLocal(id: string): Promise<void> {
     data: { id } as any, // Delete only needs ID
   });
 
-  // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "annotations",
-    op: "delete",
-    payload: { id },
-  });
+  // Enqueue for server sync (background, only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "annotations",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
   logger.info("db.local", "Deleted annotation (pending sync)", {
     annotationId: id,
+    willSync: isAuthenticated(),
   });
 }

@@ -25,6 +25,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ table: string }> }
 ) {
+  // Require authentication
+  const { requireAuth } = await import("@/app/api/lib/auth-helpers");
+  try {
+    await requireAuth(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 }
+    );
+  }
+
   const pool = getPostgresPool();
   let client;
 

@@ -8,6 +8,7 @@ import { EdgeSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 const buffer = createWriteBuffer();
 
@@ -19,7 +20,7 @@ export async function createEdgeLocal(
   fromId: string,
   toId: string,
   relation: Relation,
-  options?: { order?: number; metadata?: string }
+  options?: { order?: number; metadata?: string },
 ): Promise<Edge> {
   const edge: Edge = {
     id: crypto.randomUUID(),
@@ -43,15 +44,19 @@ export async function createEdgeLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "edges",
-    op: "insert",
-    payload: validated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "edges",
+      op: "insert",
+      payload: validated,
+    });
+  }
 
   logger.info("db.local", "Created edge (pending sync)", {
     edgeId: edge.id,
     relation,
+
+    willSync: isAuthenticated(),
   });
   return validated;
 }
@@ -61,7 +66,7 @@ export async function createEdgeLocal(
  */
 export async function updateEdgeLocal(
   id: string,
-  updates: Partial<Omit<Edge, "id" | "createdAt">>
+  updates: Partial<Omit<Edge, "id" | "createdAt">>,
 ): Promise<void> {
   const updated = { id, ...updates };
 
@@ -75,13 +80,18 @@ export async function updateEdgeLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "edges",
-    op: "update",
-    payload: updated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "edges",
+      op: "update",
+      payload: updated,
+    });
+  }
 
-  logger.info("db.local", "Updated edge (pending sync)", { edgeId: id });
+  logger.info("db.local", "Updated edge (pending sync)", {
+    edgeId: id,
+    willSync: isAuthenticated(),
+  });
 }
 
 /**
@@ -98,11 +108,16 @@ export async function deleteEdgeLocal(id: string): Promise<void> {
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "edges",
-    op: "delete",
-    payload: { id },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "edges",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
-  logger.info("db.local", "Deleted edge (pending sync)", { edgeId: id });
+  logger.info("db.local", "Deleted edge (pending sync)", {
+    edgeId: id,
+    willSync: isAuthenticated(),
+  });
 }

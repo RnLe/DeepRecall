@@ -61,13 +61,19 @@ export function BlobStatusBadge({
   const currentDeviceId = getDeviceId();
 
   useEffect(() => {
-    // Use device_blobs table as the source of truth
-    // No need to verify with CAS - trust the coordinated database
-    const deviceHasBlob = deviceBlobs.some(
-      (d) => d.deviceId === currentDeviceId && d.present
+    // Check if current device has this blob
+    const currentDevice = deviceBlobs.find(
+      (d) => d.deviceId === currentDeviceId
     );
 
-    setIsLocal(deviceHasBlob);
+    // Check if blob is present AND localPath is not null (file exists)
+    // If localPath is null, it means the metadata exists but file is missing
+    const deviceHasBlob =
+      currentDevice &&
+      currentDevice.present &&
+      currentDevice.localPath !== null;
+
+    setIsLocal(!!deviceHasBlob);
 
     // Wait 500ms after data changes to consider it "stable"
     // This prevents flashing during Electric's initial sync burst
@@ -78,6 +84,11 @@ export function BlobStatusBadge({
 
   const deviceCount = deviceBlobs.filter((d) => d.present).length;
 
+  // Check if current device has metadata but file is missing
+  const currentDevice = deviceBlobs.find((d) => d.deviceId === currentDeviceId);
+  const isMissing =
+    currentDevice && currentDevice.present && currentDevice.localPath === null;
+
   // Show loading state while:
   // 1. Electric is syncing OR
   // 2. Data is still settling (prevents flash during initial sync burst)
@@ -85,6 +96,15 @@ export function BlobStatusBadge({
     return (
       <span className={`text-xs text-muted-foreground ${className}`}>
         ⏳ Loading...
+      </span>
+    );
+  }
+
+  // File is missing locally (metadata exists but file was deleted)
+  if (isMissing) {
+    return (
+      <span className={`text-xs text-red-600 dark:text-red-400 ${className}`}>
+        ⚠️ Missing • {deviceCount} device{deviceCount !== 1 ? "s" : ""}
       </span>
     );
   }

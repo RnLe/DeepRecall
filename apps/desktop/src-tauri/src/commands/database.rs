@@ -639,12 +639,25 @@ async fn apply_delete(client: &Client, change: &WriteChange) -> Result<Value, St
 
 /**
  * Flush writes - apply batched write changes to Postgres
+ * 
+ * IMPORTANT: For RLS (Row-Level Security) to work, we must set app.user_id
+ * before any writes. The user_id should be obtained from the authenticated session.
  */
 #[tauri::command]
-pub async fn flush_writes(changes: Vec<WriteChange>) -> Result<Vec<WriteResult>, String> {
+pub async fn flush_writes(changes: Vec<WriteChange>, user_id: Option<String>) -> Result<Vec<WriteResult>, String> {
     println!("[FlushWrites] Starting flush of {} changes", changes.len());
     
     let client = get_pg_client().await?;
+    
+    // Set RLS context if user_id is provided
+    if let Some(uid) = user_id {
+        println!("[FlushWrites] Setting RLS context: app.user_id = {}", uid);
+        client.execute("SET LOCAL app.user_id = $1", &[&uid])
+            .await
+            .map_err(|e| format!("Failed to set RLS context: {}", e))?;
+    } else {
+        println!("[FlushWrites] WARNING: No user_id provided - writes may fail due to RLS policies!");
+    }
     
     let mut results = Vec::new();
     

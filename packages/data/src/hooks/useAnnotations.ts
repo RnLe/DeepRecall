@@ -80,9 +80,10 @@ async function syncElectricToDexie(electricData: Annotation[]): Promise<void> {
  * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
  *
  * DO NOT call this from components! Use useAnnotations() or usePDFAnnotations() instead.
+ * @param userId - Filter annotations by owner_id (multi-tenant isolation)
  */
-export function useAnnotationsSync() {
-  const electricResult = annotationsElectric.useAnnotations();
+export function useAnnotationsSync(userId?: string) {
+  const electricResult = annotationsElectric.useAnnotations(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie annotations table (for merge layer)

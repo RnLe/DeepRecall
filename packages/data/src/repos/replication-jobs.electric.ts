@@ -12,9 +12,13 @@ import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get all replication jobs
+ * @param userId - Owner filter for multi-tenant isolation
  */
-export function useReplicationJobs() {
-  return useShape<ReplicationJob>({ table: "replication_jobs" });
+export function useReplicationJobs(userId?: string) {
+  return useShape<ReplicationJob>({
+    table: "replication_jobs",
+    where: userId ? `owner_id = '${userId}'` : undefined,
+  });
 }
 
 /**

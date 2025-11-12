@@ -14,6 +14,7 @@ import {
   updateAssetLocal,
 } from "@deeprecall/data/repos/assets.local";
 import { attachAssetToAnnotation } from "@deeprecall/data/repos/annotations";
+import { getDeviceId } from "@deeprecall/data/utils/deviceId";
 
 interface AnnotationEditorProps {
   sha256: string;
@@ -36,10 +37,11 @@ export function AnnotationEditor(props: AnnotationEditorProps) {
 
     // Markdown creation
     createMarkdown: async ({ content, title, annotationId }) => {
+      const deviceId = getDeviceId();
       const response = await fetch("/api/library/create-markdown", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, title, annotationId }),
+        body: JSON.stringify({ content, title, annotationId, deviceId }),
       });
 
       if (!response.ok) {

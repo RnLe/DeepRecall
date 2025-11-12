@@ -72,9 +72,10 @@ async function syncElectricToDexie(electricData: Activity[]): Promise<void> {
  * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
  *
  * DO NOT call this from components! Use useActivities() instead.
+ * @param userId - Filter activities by owner_id (multi-tenant isolation)
  */
-export function useActivitiesSync() {
-  const electricResult = activitiesElectric.useActivities();
+export function useActivitiesSync(userId?: string) {
+  const electricResult = activitiesElectric.useActivities(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie activities table (for merge layer)

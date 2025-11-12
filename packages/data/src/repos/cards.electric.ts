@@ -8,8 +8,11 @@ import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
 
-export function useCards() {
-  return useShape<Card>({ table: "cards" });
+export function useCards(userId?: string) {
+  return useShape<Card>({
+    table: "cards",
+    where: userId ? `owner_id = '${userId}'` : undefined,
+  });
 }
 
 export function useCard(id: string | undefined) {
@@ -83,6 +86,17 @@ export async function createReviewLog(log: ReviewLog): Promise<ReviewLog> {
   });
   logger.info("db.local", "Created review log", { logId: log.id });
   return validated;
+}
+
+/**
+ * Get all review logs (filtered by owner)
+ * @param userId - Owner filter for multi-tenant isolation
+ */
+export function useReviewLogs(userId?: string) {
+  return useShape<ReviewLog>({
+    table: "review_logs",
+    where: userId ? `owner_id = '${userId}'` : undefined,
+  });
 }
 
 export function useReviewLogsByCard(cardId: string) {

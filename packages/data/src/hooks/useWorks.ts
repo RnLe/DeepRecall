@@ -69,9 +69,10 @@ async function syncElectricToDexie(electricData: Work[]): Promise<void> {
  * Internal sync hook - subscribes to Electric and syncs to Dexie
  * MUST be called exactly once by SyncManager to avoid race conditions
  * DO NOT call from components - use useWorks() instead
+ * @param userId - Filter works by owner_id (multi-tenant isolation)
  */
-export function useWorksSync() {
-  const electricResult = worksElectric.useWorks();
+export function useWorksSync(userId?: string) {
+  const electricResult = worksElectric.useWorks(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie

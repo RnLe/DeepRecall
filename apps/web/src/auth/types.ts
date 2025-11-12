@@ -10,7 +10,7 @@ import "next-auth/jwt";
 declare module "next-auth" {
   interface Session {
     user: {
-      id: string;
+      id: string; // Canonical user_id (UUID)
       provider: string; // "google" | "github"
       name?: string | null;
       email?: string | null;
@@ -25,6 +25,8 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT {
+    userId?: string; // Canonical user_id (UUID)
     provider?: string;
+    sub?: string; // Provider-specific user ID (for logging)
   }
 }

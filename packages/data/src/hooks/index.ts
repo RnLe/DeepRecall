@@ -28,3 +28,6 @@ export * from "./useStrokes";
 
 // Library bridge hooks (combines CAS + Electric)
 export * from "./useBlobBridge";
+
+// Entitlements and feature gating
+export * from "./useEntitlements";

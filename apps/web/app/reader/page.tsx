@@ -28,6 +28,7 @@ import {
   createAssetLocal,
   updateAssetLocal,
 } from "@deeprecall/data/repos/assets.local";
+import { getDeviceId } from "@deeprecall/data/utils/deviceId";
 import { attachAssetToAnnotation } from "@deeprecall/data/repos/annotations";
 import { PDFViewer } from "./PDFViewer";
 
@@ -53,10 +54,11 @@ function WebAnnotationEditor(props: AnnotationEditorComponentProps) {
 
     // Markdown creation
     createMarkdown: async ({ content, title, annotationId }) => {
+      const deviceId = getDeviceId();
       const response = await fetch("/api/library/create-markdown", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, title, annotationId }),
+        body: JSON.stringify({ content, title, annotationId, deviceId }),
       });
 
       if (!response.ok) {

@@ -71,9 +71,10 @@ async function syncElectricToDexie(electricData: Preset[]): Promise<void> {
  * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
  *
  * DO NOT call this from components! Use usePresets() instead.
+ * @param userId - Filter presets by owner_id (multi-tenant isolation)
  */
-export function usePresetsSync() {
-  const electricResult = presetsElectric.usePresets();
+export function usePresetsSync(userId?: string) {
+  const electricResult = presetsElectric.usePresets(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie presets table (for merge layer)

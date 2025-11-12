@@ -57,10 +57,12 @@ export function useAnnotation(id: string | undefined) {
 
 /**
  * React hook to get all annotations (use sparingly, prefer filtered queries)
+ * @param userId - Owner filter for multi-tenant isolation
  */
-export function useAnnotations() {
+export function useAnnotations(userId?: string) {
   return useShape<Annotation>({
     table: "annotations",
+    where: userId ? `owner_id = '${userId}'` : undefined,
   });
 }
 

@@ -8,6 +8,7 @@ import { CardSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 const buffer = createWriteBuffer();
 
@@ -16,7 +17,7 @@ const buffer = createWriteBuffer();
  * Writes to Dexie immediately, enqueues for server sync
  */
 export async function createCardLocal(
-  data: Omit<Card, "id" | "created_ms">
+  data: Omit<Card, "id" | "created_ms">,
 ): Promise<Card> {
   const card: Card = {
     ...data,
@@ -36,13 +37,18 @@ export async function createCardLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "cards",
-    op: "insert",
-    payload: validated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "cards",
+      op: "insert",
+      payload: validated,
+    });
+  }
 
-  logger.info("db.local", "Created card (optimistic)", { cardId: card.id });
+  logger.info("db.local", "Created card (optimistic)", {
+    cardId: card.id,
+    willSync: isAuthenticated(),
+  });
   return validated;
 }
 
@@ -51,7 +57,7 @@ export async function createCardLocal(
  */
 export async function updateCardLocal(
   id: string,
-  updates: Partial<Omit<Card, "id" | "created_ms">>
+  updates: Partial<Omit<Card, "id" | "created_ms">>,
 ): Promise<void> {
   const updated = { id, ...updates };
 
@@ -65,13 +71,18 @@ export async function updateCardLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "cards",
-    op: "update",
-    payload: updated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "cards",
+      op: "update",
+      payload: updated,
+    });
+  }
 
-  logger.info("db.local", "Updated card (optimistic)", { cardId: id });
+  logger.info("db.local", "Updated card (optimistic)", {
+    cardId: id,
+    willSync: isAuthenticated(),
+  });
 }
 
 /**
@@ -88,11 +99,16 @@ export async function deleteCardLocal(id: string): Promise<void> {
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "cards",
-    op: "delete",
-    payload: { id },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "cards",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
-  logger.info("db.local", "Deleted card (optimistic)", { cardId: id });
+  logger.info("db.local", "Deleted card (optimistic)", {
+    cardId: id,
+    willSync: isAuthenticated(),
+  });
 }

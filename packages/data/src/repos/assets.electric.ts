@@ -8,8 +8,11 @@ import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
 
-export function useAssets() {
-  return useShape<Asset>({ table: "assets" });
+export function useAssets(userId?: string) {
+  return useShape<Asset>({
+    table: "assets",
+    where: userId ? `owner_id = '${userId}'` : undefined,
+  });
 }
 
 export function useAsset(id: string | undefined) {

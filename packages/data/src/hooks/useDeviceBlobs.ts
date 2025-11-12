@@ -7,6 +7,7 @@ import type { DeviceBlob } from "@deeprecall/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
+import * as deviceBlobsElectric from "../repos/device-blobs.electric";
 import { db } from "../db";
 import { logger } from "@deeprecall/telemetry";
 
@@ -56,13 +57,21 @@ async function syncElectricToDexie(electricData: DeviceBlob[]): Promise<void> {
  * Internal sync hook - subscribes to Electric and syncs to Dexie
  * MUST be called exactly once by SyncManager to avoid race conditions
  * DO NOT call from components - use useDeviceBlobs() instead
+ * @param userId - Owner filter for multi-tenant isolation (undefined = guest, skip sync)
  */
-export function useDeviceBlobsSync() {
-  const electricResult = useShape<DeviceBlob>({ table: "device_blobs" });
+export function useDeviceBlobsSync(userId?: string) {
+  // SECURITY: Skip Electric sync for guests (userId undefined)
+  // Guests work with local CAS only, no blob metadata coordination
+  const electricResult = deviceBlobsElectric.useDeviceBlobs(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric → Dexie only when fresh data is available
   useEffect(() => {
+    // Skip sync if no userId (guest mode)
+    if (!userId) {
+      return;
+    }
+
     if (
       !electricResult.isLoading &&
       electricResult.data !== undefined
@@ -83,7 +92,7 @@ export function useDeviceBlobsSync() {
           );
         });
     }
-  }, [electricResult.data, electricResult.isFreshData, queryClient]);
+  }, [userId, electricResult.data, electricResult.isFreshData, queryClient]);
 
   return null;
 }

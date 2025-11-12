@@ -37,6 +37,7 @@ export interface CreateBlobMetaInput {
   sha256: string;
   size: number;
   mime: string;
+  ownerId: string; // UUID - required for RLS
   filename?: string | null;
   pageCount?: number;
   imageWidth?: number;
@@ -55,8 +56,8 @@ export async function createBlobMetaServer(
     const now = Date.now();
 
     await client.query(
-      `INSERT INTO blobs_meta (sha256, size, mime, filename, page_count, image_width, image_height, line_count, created_ms)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO blobs_meta (sha256, size, mime, owner_id, filename, page_count, image_width, image_height, line_count, created_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (sha256) DO UPDATE SET
          size = EXCLUDED.size,
          mime = EXCLUDED.mime,
@@ -69,6 +70,7 @@ export async function createBlobMetaServer(
         input.sha256,
         input.size,
         input.mime,
+        input.ownerId,
         input.filename ?? null,
         input.pageCount ?? null,
         input.imageWidth ?? null,
@@ -94,6 +96,7 @@ export async function createBlobMetaServer(
 export async function markBlobAvailableServer(
   sha256: string,
   deviceId: string,
+  ownerId: string, // UUID - required for RLS
   localPath: string | null,
   health: "healthy" | "missing" | "modified" | "relocated" = "healthy"
 ): Promise<void> {
@@ -104,14 +107,14 @@ export async function markBlobAvailableServer(
     const id = randomUUID();
 
     await client.query(
-      `INSERT INTO device_blobs (id, device_id, sha256, present, local_path, health, mtime_ms, created_ms)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO device_blobs (id, device_id, sha256, owner_id, present, local_path, health, mtime_ms, created_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (device_id, sha256) DO UPDATE SET
          present = EXCLUDED.present,
          local_path = EXCLUDED.local_path,
          health = EXCLUDED.health,
          mtime_ms = EXCLUDED.mtime_ms`,
-      [id, deviceId, sha256, true, localPath, health, now, now]
+      [id, deviceId, sha256, ownerId, true, localPath, health, now, now]
     );
 
     logger.info("server.api", "Marked blob available in Postgres", {

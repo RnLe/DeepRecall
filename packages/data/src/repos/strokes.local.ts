@@ -10,6 +10,7 @@ import { StrokeSchema, type Stroke } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 export interface LocalStrokeChange {
   _localId?: number;
@@ -27,7 +28,7 @@ const buffer = createWriteBuffer();
  * Create a new stroke locally (optimistic)
  */
 export async function createStrokeLocal(
-  data: Omit<Stroke, "id" | "kind" | "createdAt" | "updatedAt">
+  data: Omit<Stroke, "id" | "kind" | "createdAt" | "updatedAt">,
 ): Promise<Stroke> {
   const stroke: Stroke = StrokeSchema.parse({
     ...data,
@@ -50,14 +51,18 @@ export async function createStrokeLocal(
   logger.info("ink", "Created stroke locally", {
     strokeId: stroke.id,
     boardId: stroke.boardId,
+    willSync: isAuthenticated(),
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "strokes",
-    op: "insert",
-    payload: stroke,
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "strokes",
+      op: "insert",
+      payload: stroke,
+    });
+  }
 
   return stroke;
 }
@@ -76,14 +81,20 @@ export async function deleteStrokeLocal(id: string): Promise<void> {
   };
 
   await db.strokes_local.add(change);
-  logger.info("ink", "Deleted stroke locally", { strokeId: id });
-
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "strokes",
-    op: "delete",
-    payload: { id },
+  logger.info("ink", "Deleted stroke locally", {
+    strokeId: id,
+    willSync: isAuthenticated(),
   });
+
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "strokes",
+      op: "delete",
+      payload: { id },
+    });
+  }
 }
 
 /**
@@ -101,7 +112,10 @@ export async function deleteStrokesLocal(ids: string[]): Promise<void> {
   }));
 
   await db.strokes_local.bulkAdd(changes);
-  logger.info("ink", "Batch deleted strokes locally", { count: ids.length });
+  logger.info("ink", "Batch deleted strokes locally", {
+    count: ids.length,
+    willSync: isAuthenticated(),
+  });
 
   // 2. Enqueue for background sync
   for (const id of ids) {

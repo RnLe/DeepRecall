@@ -9,6 +9,7 @@ import { LogViewerButton } from "@deeprecall/ui";
 import { UserMenu } from "./components/UserMenu";
 import { SystemMonitoringProvider } from "./components/SystemMonitoringProvider";
 import { WebConnectionStatus } from "./components/WebConnectionStatus";
+import { GuestBannerWrapper } from "./components/GuestBannerWrapper";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -79,6 +80,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </nav>
+          <GuestBannerWrapper />
           <div className="flex-1 overflow-hidden">{children}</div>
         </div>
       </SystemMonitoringProvider>

@@ -8,8 +8,11 @@ import { useShape } from "../electric";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
 
-export function useEdges() {
-  return useShape<Edge>({ table: "edges" });
+export function useEdges(userId?: string) {
+  return useShape<Edge>({
+    table: "edges",
+    where: userId ? `owner_id = '${userId}'` : undefined,
+  });
 }
 
 export function useEdge(id: string | undefined) {

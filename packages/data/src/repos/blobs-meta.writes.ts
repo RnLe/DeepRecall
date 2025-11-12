@@ -5,6 +5,7 @@
 
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 const buffer = createWriteBuffer();
 
@@ -27,22 +28,24 @@ export async function createBlobMeta(
 ): Promise<void> {
   const now = new Date().toISOString();
 
-  await buffer.enqueue({
-    table: "blobs_meta",
-    op: "insert",
-    payload: {
-      sha256: input.sha256,
-      size: input.size,
-      mime: input.mime,
-      filename: input.filename ?? null,
-      // Only include optional fields if they have actual values (not null/undefined)
-      ...(input.pageCount != null && { pageCount: input.pageCount }),
-      ...(input.imageWidth != null && { imageWidth: input.imageWidth }),
-      ...(input.imageHeight != null && { imageHeight: input.imageHeight }),
-      ...(input.lineCount != null && { lineCount: input.lineCount }),
-      createdAt: now,
-    },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "blobs_meta",
+      op: "insert",
+      payload: {
+        sha256: input.sha256,
+        size: input.size,
+        mime: input.mime,
+        filename: input.filename ?? null,
+        // Only include optional fields if they have actual values (not null/undefined)
+        ...(input.pageCount != null && { pageCount: input.pageCount }),
+        ...(input.imageWidth != null && { imageWidth: input.imageWidth }),
+        ...(input.imageHeight != null && { imageHeight: input.imageHeight }),
+        ...(input.lineCount != null && { lineCount: input.lineCount }),
+        createdAt: now,
+      },
+    });
+  }
 
   logger.info("cas", "Created blob meta (enqueued)", {
     sha256: input.sha256.slice(0, 16),
@@ -66,24 +69,30 @@ export async function updateBlobMeta(
     lineCount?: number;
   }
 ): Promise<void> {
-  await buffer.enqueue({
-    table: "blobs_meta",
-    op: "update",
-    payload: {
-      sha256,
-      ...(updates.size !== undefined && { size: updates.size }),
-      ...(updates.mime !== undefined && { mime: updates.mime }),
-      ...(updates.filename !== undefined && { filename: updates.filename }),
-      ...(updates.pageCount !== undefined && { pageCount: updates.pageCount }),
-      ...(updates.imageWidth !== undefined && {
-        imageWidth: updates.imageWidth,
-      }),
-      ...(updates.imageHeight !== undefined && {
-        imageHeight: updates.imageHeight,
-      }),
-      ...(updates.lineCount !== undefined && { lineCount: updates.lineCount }),
-    },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "blobs_meta",
+      op: "update",
+      payload: {
+        sha256,
+        ...(updates.size !== undefined && { size: updates.size }),
+        ...(updates.mime !== undefined && { mime: updates.mime }),
+        ...(updates.filename !== undefined && { filename: updates.filename }),
+        ...(updates.pageCount !== undefined && {
+          pageCount: updates.pageCount,
+        }),
+        ...(updates.imageWidth !== undefined && {
+          imageWidth: updates.imageWidth,
+        }),
+        ...(updates.imageHeight !== undefined && {
+          imageHeight: updates.imageHeight,
+        }),
+        ...(updates.lineCount !== undefined && {
+          lineCount: updates.lineCount,
+        }),
+      },
+    });
+  }
 
   logger.info("cas", "Updated blob meta (enqueued)", {
     sha256: sha256.slice(0, 16),
@@ -95,11 +104,13 @@ export async function updateBlobMeta(
  * Delete blob metadata
  */
 export async function deleteBlobMeta(sha256: string): Promise<void> {
-  await buffer.enqueue({
-    table: "blobs_meta",
-    op: "delete",
-    payload: { sha256 },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "blobs_meta",
+      op: "delete",
+      payload: { sha256 },
+    });
+  }
 
   logger.info("cas", "Deleted blob meta (enqueued)", {
     sha256: sha256.slice(0, 16),
@@ -109,6 +120,10 @@ export async function deleteBlobMeta(sha256: string): Promise<void> {
 /**
  * Universal blob coordination after upload
  * Call this from all platforms (Web, Desktop, Mobile) after storing file locally
+ *
+ * Pattern:
+ * - Guest mode: Write directly to Dexie (no server sync)
+ * - Authenticated: Write through buffer to sync with server
  *
  * @param sha256 - Content hash of the blob
  * @param metadata - File metadata (filename, mime, size, etc.)
@@ -129,18 +144,36 @@ export async function coordinateBlobUpload(
   deviceId: string,
   localPath?: string | null
 ): Promise<void> {
-  // 1. Create blob metadata (global)
-  await createBlobMeta(metadata);
+  // Check if user is authenticated
+  if (isAuthenticated()) {
+    // Authenticated: Use write buffer (will sync to server)
+    // 1. Create blob metadata (global)
+    await createBlobMeta(metadata);
 
-  // 2. Mark as present on this device
-  const { markBlobAvailable } = await import("./device-blobs.writes");
-  await markBlobAvailable(sha256, deviceId, localPath ?? null, "healthy");
+    // 2. Mark as present on this device
+    const { markBlobAvailable } = await import("./device-blobs.writes");
+    await markBlobAvailable(sha256, deviceId, localPath ?? null, "healthy");
 
-  logger.info("sync.coordination", "Coordinated blob upload", {
-    sha256: sha256.slice(0, 16),
-    deviceId,
-    hasLocalPath: !!localPath,
-  });
+    logger.info(
+      "sync.coordination",
+      "Coordinated blob upload (authenticated)",
+      {
+        sha256: sha256.slice(0, 16),
+        deviceId: deviceId.slice(0, 8),
+        hasLocalPath: !!localPath,
+      }
+    );
+  } else {
+    // Guest: Write directly to Dexie (local-only, no server sync)
+    const { coordinateBlobUploadLocal } = await import("./blobs-meta.local");
+    await coordinateBlobUploadLocal(sha256, metadata, deviceId, localPath);
+
+    logger.info("sync.coordination", "Coordinated blob upload (guest mode)", {
+      sha256: sha256.slice(0, 16),
+      deviceId: deviceId.slice(0, 8),
+      hasLocalPath: !!localPath,
+    });
+  }
 }
 
 /**

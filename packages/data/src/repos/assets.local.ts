@@ -15,6 +15,7 @@ import { AssetSchema, type Asset } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 /**
  * Local change record with sync metadata
@@ -38,7 +39,7 @@ const buffer = createWriteBuffer();
  * Writes to local Dexie immediately, enqueues for sync
  */
 export async function createAssetLocal(
-  data: Omit<Asset, "id" | "kind" | "createdAt" | "updatedAt">
+  data: Omit<Asset, "id" | "kind" | "createdAt" | "updatedAt">,
 ): Promise<Asset> {
   const asset: Asset = AssetSchema.parse({
     ...data,
@@ -57,16 +58,19 @@ export async function createAssetLocal(
     data: asset,
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "assets",
-    op: "insert",
-    payload: asset,
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "assets",
+      op: "insert",
+      payload: asset,
+    });
+  }
 
   logger.info("db.local", "Created asset (pending sync)", {
     assetId: asset.id,
     workId: asset.workId,
+    willSync: isAuthenticated(),
   });
   return asset;
 }
@@ -76,7 +80,7 @@ export async function createAssetLocal(
  */
 export async function updateAssetLocal(
   id: string,
-  updates: Partial<Asset>
+  updates: Partial<Asset>,
 ): Promise<void> {
   const updatedData = {
     ...updates,
@@ -92,16 +96,19 @@ export async function updateAssetLocal(
     data: updatedData as any, // Partial data for update
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "assets",
-    op: "update",
-    payload: { id, ...updatedData },
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "assets",
+      op: "update",
+      payload: { id, ...updatedData },
+    });
+  }
 
   logger.info("db.local", "Updated asset (pending sync)", {
     assetId: id,
     fields: Object.keys(updates),
+    willSync: isAuthenticated(),
   });
 }
 
@@ -117,14 +124,19 @@ export async function deleteAssetLocal(id: string): Promise<void> {
     _timestamp: Date.now(),
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "assets",
-    op: "delete",
-    payload: { id },
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "assets",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
-  logger.info("db.local", "Deleted asset (pending sync)", { assetId: id });
+  logger.info("db.local", "Deleted asset (pending sync)", {
+    assetId: id,
+    willSync: isAuthenticated(),
+  });
 }
 
 /**
@@ -139,7 +151,10 @@ export async function getLocalAssetChanges(): Promise<LocalAssetChange[]> {
  */
 export async function markAssetSynced(id: string): Promise<void> {
   await db.assets_local.where("id").equals(id).delete();
-  logger.debug("db.local", "Cleaned up synced asset", { assetId: id });
+  logger.debug("db.local", "Cleaned up synced asset", {
+    assetId: id,
+    willSync: isAuthenticated(),
+  });
 }
 
 /**
@@ -147,7 +162,7 @@ export async function markAssetSynced(id: string): Promise<void> {
  */
 export async function markAssetSyncFailed(
   id: string,
-  error: string
+  error: string,
 ): Promise<void> {
   await db.assets_local.where("id").equals(id).modify({
     _status: "error",

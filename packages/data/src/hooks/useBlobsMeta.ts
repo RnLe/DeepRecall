@@ -7,6 +7,7 @@ import type { BlobMeta } from "@deeprecall/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useShape } from "../electric";
+import * as blobsMetaElectric from "../repos/blobs-meta.electric";
 import { db } from "../db";
 import { logger } from "@deeprecall/telemetry";
 
@@ -51,13 +52,21 @@ async function syncElectricToDexie(electricData: BlobMeta[]): Promise<void> {
  * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
  *
  * DO NOT call this from components! Use useBlobsMeta() instead.
+ * @param userId - Owner filter for multi-tenant isolation (undefined = guest, skip sync)
  */
-export function useBlobsMetaSync() {
-  const electricResult = useShape<BlobMeta>({ table: "blobs_meta" });
+export function useBlobsMetaSync(userId?: string) {
+  // SECURITY: Skip Electric sync for guests (userId undefined)
+  // Guests work with local CAS only, no blob metadata coordination
+  const electricResult = blobsMetaElectric.useBlobsMeta(userId);
   const queryClient = useQueryClient();
 
-  // Sync Electric data to Dexie
+  // Sync Electric data to Dexie (only when authenticated)
   useEffect(() => {
+    // Skip sync if no userId (guest mode)
+    if (!userId) {
+      return;
+    }
+
     if (
       !electricResult.isLoading &&
       electricResult.data !== undefined
@@ -75,7 +84,7 @@ export function useBlobsMetaSync() {
           });
         });
     }
-  }, [electricResult.data, electricResult.isFreshData, queryClient]);
+  }, [userId, electricResult.data, electricResult.isFreshData, queryClient]);
 
   return null;
 }

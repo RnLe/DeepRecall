@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { db } from "@deeprecall/data/db";
+import { useSession } from "@/src/auth/client";
+import { LogIn } from "lucide-react";
 
 // Electric only syncs these tables (no _local variants)
 const ELECTRIC_TABLES = [
@@ -27,15 +29,21 @@ export default function ElectricPage() {
   const [tableCounts, setTableCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { data: session, status } = useSession();
+  const isGuest = status !== "loading" && !session;
 
   // Load all table counts on mount
   useEffect(() => {
-    loadAllCounts();
-  }, []);
+    if (!isGuest) {
+      loadAllCounts();
+    }
+  }, [isGuest]);
 
   useEffect(() => {
-    loadTableData(activeTab);
-  }, [activeTab]);
+    if (!isGuest) {
+      loadTableData(activeTab);
+    }
+  }, [activeTab, isGuest]);
 
   const loadAllCounts = async () => {
     const counts: Record<string, number> = {};
@@ -78,9 +86,34 @@ export default function ElectricPage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-950 text-gray-100">
+    <div className="h-full flex flex-col bg-gray-950 text-gray-100 relative">
+      {/* Guest Overlay */}
+      {isGuest && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-gray-950/80 backdrop-blur-sm">
+          <div className="text-center space-y-4 px-6">
+            <LogIn className="w-16 h-16 mx-auto text-gray-400" />
+            <div>
+              <h2 className="text-2xl font-bold text-gray-200 mb-2">
+                Sign in to see your data
+              </h2>
+              <p className="text-gray-400 text-sm">
+                Electric data is only accessible to authenticated users
+              </p>
+            </div>
+            <a
+              href="/auth/signin"
+              className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            >
+              Sign In
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Header + Tabs Combined */}
-      <div className="shrink-0 border-b border-gray-800 bg-gray-900/30">
+      <div
+        className={`shrink-0 border-b border-gray-800 bg-gray-900/30 ${isGuest ? "blur-sm pointer-events-none" : ""}`}
+      >
         <div className="w-[95%] mx-auto px-6 py-3">
           <div className="flex gap-6 items-start">
             {/* Left: Title and Buttons */}
@@ -134,7 +167,9 @@ export default function ElectricPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div
+        className={`flex-1 overflow-auto ${isGuest ? "blur-sm pointer-events-none" : ""}`}
+      >
         <div className="w-[95%] mx-auto px-6 py-6">
           {isLoading && (
             <div className="text-center text-gray-400 py-8">Loading...</div>

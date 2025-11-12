@@ -13,10 +13,12 @@ import { logger } from "@deeprecall/telemetry";
 
 /**
  * React hook to get all Works (live-synced from Postgres)
+ * Filtered by owner_id for multi-tenant isolation
  */
-export function useWorks() {
+export function useWorks(userId?: string) {
   return useShape<Work>({
     table: "works",
+    where: userId ? `owner_id = '${userId}'` : undefined,
   });
 }
 

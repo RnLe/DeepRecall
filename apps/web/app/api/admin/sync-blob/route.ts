@@ -26,6 +26,19 @@ export async function POST(request: NextRequest) {
   // Check CORS origin
   const corsError = checkCorsOrigin(request);
   if (corsError) return corsError;
+
+  // Require authentication
+  const { requireAuth } = await import("@/app/api/lib/auth-helpers");
+  let userContext;
+  try {
+    userContext = await requireAuth(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 }
+    );
+  }
+
   try {
     const { sha256, deviceId } = await request.json();
 
@@ -63,6 +76,7 @@ export async function POST(request: NextRequest) {
         deviceId: deviceId.slice(0, 8),
         size: blob.size,
         mime: blob.mime,
+        ownerId: userContext.userId.slice(0, 8),
       });
 
       // Get path for local_path info
@@ -77,13 +91,20 @@ export async function POST(request: NextRequest) {
         sha256: blob.hash,
         size: blob.size,
         mime: blob.mime,
+        ownerId: userContext.userId, // Set owner from authenticated user
         filename: blob.filename,
         // Note: We don't have pageCount etc. stored in old CAS blobs
       });
 
       // Mark as available on this device directly in Postgres (idempotent)
       const localPath = pathRecord?.path || null;
-      await markBlobAvailableServer(blob.hash, deviceId, localPath, "healthy");
+      await markBlobAvailableServer(
+        blob.hash,
+        deviceId,
+        userContext.userId, // Set owner from authenticated user
+        localPath,
+        "healthy"
+      );
 
       logger.info("sync.coordination", "Blob synced successfully", {
         sha256: sha256.slice(0, 16),

@@ -7,6 +7,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReviewLog } from "@deeprecall/core";
 import { useShape } from "../electric";
+import * as cardsElectric from "../repos/cards.electric";
 import * as reviewLogsLocal from "../repos/reviewLogs.local";
 import * as reviewLogsMerged from "../repos/reviewLogs.merged";
 import * as reviewLogsCleanup from "../repos/reviewLogs.cleanup";
@@ -75,9 +76,10 @@ async function syncElectricToDexie(electricData: ReviewLog[]): Promise<void> {
  * Internal sync hook - subscribes to Electric and syncs to Dexie
  * MUST be called exactly once by SyncManager to avoid race conditions
  * DO NOT call from components - use useReviewLogsByCard() instead
+ * @param userId - Owner filter for multi-tenant isolation
  */
-export function useReviewLogsSync() {
-  const electricResult = useShape<ReviewLog>({ table: "review_logs" });
+export function useReviewLogsSync(userId?: string) {
+  const electricResult = cardsElectric.useReviewLogs(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie

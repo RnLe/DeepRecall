@@ -29,6 +29,17 @@ export function LinkBlobDialog({
   const operations: LinkBlobDialogOperations = {
     getBlobUrl: (sha256: string) => `/api/blob/${sha256}`,
     syncBlobToElectric: async (sha256: string) => {
+      // Check authentication status
+      const { isAuthenticated } = await import("@deeprecall/data");
+
+      // Guests don't sync to Electric - they work purely locally
+      if (!isAuthenticated()) {
+        logger.info("ui", "[LinkBlobDialog] Skipping sync for guest mode", {
+          sha256: sha256.slice(0, 16),
+        });
+        return;
+      }
+
       // Get device ID from client
       const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
       const deviceId = getDeviceId();
@@ -55,19 +66,24 @@ export function LinkBlobDialog({
         } catch (parseError) {
           // Response is not JSON, get text
           const text = await response.text();
-          logger.error("ui", "[LinkBlobDialog] Sync failed (non-JSON response):", {
-            status: response.status,
-            statusText: response.statusText,
-            responseText: text,
-            sha256,
-            deviceId,
-          });
+          logger.error(
+            "ui",
+            "[LinkBlobDialog] Sync failed (non-JSON response):",
+            {
+              status: response.status,
+              statusText: response.statusText,
+              responseText: text,
+              sha256,
+              deviceId,
+            }
+          );
           errorMessage = `${response.status} ${response.statusText}: ${text}`;
         }
         throw new Error(errorMessage);
       }
 
-      logger.info("ui", 
+      logger.info(
+        "ui",
         `[LinkBlobDialog] Successfully synced blob ${sha256.slice(0, 16)}...`
       );
     },

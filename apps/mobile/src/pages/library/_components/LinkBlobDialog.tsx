@@ -31,8 +31,16 @@ export function LinkBlobDialog({
   const operations: LinkBlobDialogOperations = {
     getBlobUrl: (sha256: string) => cas.getUrl(sha256),
     syncBlobToElectric: async (sha256: string) => {
+      // Check authentication status
+      const { isAuthenticated, getDeviceId } = await import("@deeprecall/data");
+
+      // Guests don't sync to Electric - they work purely locally
+      if (!isAuthenticated()) {
+        console.log("[LinkBlobDialog] Skipping sync for guest mode");
+        return;
+      }
+
       // Get device ID from client
-      const { getDeviceId } = await import("@deeprecall/data");
       const deviceId = getDeviceId();
 
       // For mobile, sync via HTTP API (same as web app)

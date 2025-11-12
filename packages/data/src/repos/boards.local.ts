@@ -10,6 +10,7 @@ import { BoardSchema, type Board } from "@deeprecall/core";
 import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 export interface LocalBoardChange {
   _localId?: number;
@@ -27,7 +28,7 @@ const buffer = createWriteBuffer();
  * Create a new board locally (optimistic)
  */
 export async function createBoardLocal(
-  data: Omit<Board, "id" | "kind" | "createdAt" | "updatedAt">
+  data: Omit<Board, "id" | "kind" | "createdAt" | "updatedAt">,
 ): Promise<Board> {
   const board: Board = BoardSchema.parse({
     ...data,
@@ -47,14 +48,20 @@ export async function createBoardLocal(
   };
 
   await db.boards_local.add(change);
-  logger.info("whiteboard", "Created board locally", { boardId: board.id });
-
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "boards",
-    op: "insert",
-    payload: board,
+  logger.info("whiteboard", "Created board locally", {
+    boardId: board.id,
+    willSync: isAuthenticated(),
   });
+
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "boards",
+      op: "insert",
+      payload: board,
+    });
+  }
 
   return board;
 }
@@ -64,7 +71,7 @@ export async function createBoardLocal(
  */
 export async function updateBoardLocal(
   id: string,
-  updates: Partial<Omit<Board, "id" | "kind" | "createdAt">>
+  updates: Partial<Omit<Board, "id" | "kind" | "createdAt">>,
 ): Promise<void> {
   // Get existing board (check both synced and local)
   const syncedBoard = await db.boards.get(id);
@@ -99,14 +106,18 @@ export async function updateBoardLocal(
   logger.info("whiteboard", "Updated board locally", {
     boardId: id,
     fields: Object.keys(updates),
+    willSync: isAuthenticated(),
   });
 
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "boards",
-    op: "update",
-    payload: updatedBoard,
-  });
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "boards",
+      op: "update",
+      payload: updatedBoard,
+    });
+  }
 }
 
 /**
@@ -122,12 +133,18 @@ export async function deleteBoardLocal(id: string): Promise<void> {
   };
 
   await db.boards_local.add(change);
-  logger.info("whiteboard", "Deleted board locally", { boardId: id });
-
-  // 2. Enqueue for background sync
-  await buffer.enqueue({
-    table: "boards",
-    op: "delete",
-    payload: { id },
+  logger.info("whiteboard", "Deleted board locally", {
+    boardId: id,
+    willSync: isAuthenticated(),
   });
+
+  // 2. Enqueue for background sync (only if authenticated)
+
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "boards",
+      op: "delete",
+      payload: { id },
+    });
+  }
 }

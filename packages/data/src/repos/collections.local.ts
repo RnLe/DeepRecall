@@ -8,6 +8,7 @@ import { CollectionSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 const buffer = createWriteBuffer();
 
@@ -16,7 +17,7 @@ const buffer = createWriteBuffer();
  * Writes to Dexie immediately, enqueues for server sync
  */
 export async function createCollectionLocal(
-  data: Omit<Collection, "id" | "kind" | "createdAt" | "updatedAt">
+  data: Omit<Collection, "id" | "kind" | "createdAt" | "updatedAt">,
 ): Promise<Collection> {
   const now = new Date().toISOString();
   const collection: Collection = {
@@ -39,15 +40,19 @@ export async function createCollectionLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "collections",
-    op: "insert",
-    payload: validated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "collections",
+      op: "insert",
+      payload: validated,
+    });
+  }
 
   logger.info("db.local", "Created collection (pending sync)", {
     collectionId: collection.id,
     name: collection.name,
+
+    willSync: isAuthenticated(),
   });
   return validated;
 }
@@ -57,7 +62,7 @@ export async function createCollectionLocal(
  */
 export async function updateCollectionLocal(
   id: string,
-  updates: Partial<Omit<Collection, "id" | "kind" | "createdAt">>
+  updates: Partial<Omit<Collection, "id" | "kind" | "createdAt">>,
 ): Promise<void> {
   const now = new Date().toISOString();
   const updated = { id, ...updates, updatedAt: now };
@@ -72,15 +77,19 @@ export async function updateCollectionLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "collections",
-    op: "update",
-    payload: updated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "collections",
+      op: "update",
+      payload: updated,
+    });
+  }
 
   logger.info("db.local", "Updated collection (pending sync)", {
     collectionId: id,
     fields: Object.keys(updates),
+
+    willSync: isAuthenticated(),
   });
 }
 
@@ -98,13 +107,17 @@ export async function deleteCollectionLocal(id: string): Promise<void> {
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "collections",
-    op: "delete",
-    payload: { id },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "collections",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
   logger.info("db.local", "Deleted collection (pending sync)", {
     collectionId: id,
+
+    willSync: isAuthenticated(),
   });
 }

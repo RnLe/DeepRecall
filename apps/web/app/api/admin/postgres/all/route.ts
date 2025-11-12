@@ -41,6 +41,18 @@ export async function GET(request: NextRequest) {
   // Check CORS origin
   const corsError = checkCorsOrigin(request);
   if (corsError) return corsError;
+
+  // Require authentication
+  const { requireAuth } = await import("@/app/api/lib/auth-helpers");
+  try {
+    await requireAuth(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 }
+    );
+  }
+
   const pool = getPostgresPool();
   let client;
 

@@ -59,10 +59,16 @@ export function LibraryLeftSidebar() {
       }
     },
     uploadFiles: async (files: FileList) => {
+      const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
+      const { coordinateSingleBlob } = await import(
+        "@deeprecall/data/utils/coordinateLocalBlobs"
+      );
+      const deviceId = getDeviceId();
+
       const uploadPromises = Array.from(files).map(async (file) => {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("metadata", JSON.stringify({ role: "main" }));
+        formData.append("metadata", JSON.stringify({ role: "main", deviceId }));
 
         const response = await fetch("/api/library/upload", {
           method: "POST",
@@ -74,7 +80,12 @@ export function LibraryLeftSidebar() {
           throw new Error(error.error || "Upload failed");
         }
 
-        return response.json();
+        const result = await response.json();
+
+        // Coordinate blob metadata after upload
+        await coordinateSingleBlob(result.blob, deviceId);
+
+        return result;
       });
 
       await Promise.all(uploadPromises);

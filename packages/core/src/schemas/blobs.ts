@@ -102,6 +102,10 @@ export const BlobMetaSchema = z.object({
   mime: z.string(),
   filename: z.string().nullable(),
 
+  // Ownership (multi-tenant isolation)
+  // Optional on client - server assigns via RLS/session
+  ownerId: z.string().optional(),
+
   // Creation timestamp
   createdAt: ISODate,
 
@@ -137,6 +141,10 @@ export const DeviceBlobSchema = z.object({
   // Device and blob reference
   deviceId: z.string(),
   sha256: z.string().min(64).max(64),
+
+  // Ownership (multi-tenant isolation)
+  // Optional on client - server assigns via RLS/session
+  ownerId: z.string().optional(),
 
   // Presence tracking
   present: z.boolean().default(false),

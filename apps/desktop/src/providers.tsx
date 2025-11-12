@@ -5,6 +5,10 @@ import {
   initElectric,
   initFlushWorker,
   initializeDeviceId,
+  setAuthState,
+  getDeviceId,
+  upgradeGuestToUser,
+  hasGuestData,
   useSystemMonitoring,
   usePresetsSync,
   useActivitiesSync,
@@ -25,6 +29,7 @@ import {
 import { configurePdfWorker } from "@deeprecall/pdf";
 import { DevToolsShortcut } from "./components/DevToolsShortcut";
 import { logger } from "@deeprecall/telemetry";
+import { TauriBlobStorage } from "./blob-storage/tauri";
 
 // Configure PDF.js worker for Tauri platform
 // Tauri serves static assets from public/ directory
@@ -36,6 +41,139 @@ initializeDeviceId().catch((error) => {
     error,
   });
 });
+
+/**
+ * AuthStateManager: Syncs Tauri session with global auth state
+ * Handles guest→user upgrade after sign-in
+ */
+function AuthStateManager({ children }: { children: React.ReactNode }) {
+  const hasUpgradedRef = useRef(false);
+  const [session, setSession] = useState<any>(null);
+
+  useEffect(() => {
+    const deviceId = getDeviceId();
+
+    // Initialize session on mount
+    async function initSession() {
+      try {
+        const { initializeSession } = await import("./auth");
+        const sessionInfo = await initializeSession();
+        setSession(sessionInfo);
+
+        if (sessionInfo.status === "authenticated" && sessionInfo.userId) {
+          logger.info(
+            "auth",
+            "Desktop user authenticated, updating auth state",
+            {
+              userId: sessionInfo.userId,
+              deviceId,
+            }
+          );
+
+          setAuthState(true, sessionInfo.userId, deviceId);
+
+          // Perform guest→user upgrade once per session
+          if (!hasUpgradedRef.current) {
+            hasUpgradedRef.current = true;
+
+            const hasData = await hasGuestData(deviceId);
+            if (hasData) {
+              logger.info(
+                "auth",
+                "Guest data detected, checking account status",
+                {
+                  userId: sessionInfo.userId.slice(0, 8),
+                }
+              );
+
+              try {
+                const { isNewAccount, wipeGuestData } = await import(
+                  "@deeprecall/data"
+                );
+                const apiBaseUrl =
+                  import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+                const accountIsNew = await isNewAccount(
+                  sessionInfo.userId,
+                  apiBaseUrl
+                );
+
+                logger.info("auth", "Account status determined", {
+                  userId: sessionInfo.userId.slice(0, 8),
+                  isNew: accountIsNew,
+                  hasGuestData: true,
+                });
+
+                if (accountIsNew) {
+                  // NEW account: Upgrade guest data
+                  logger.info(
+                    "auth",
+                    "NEW account detected - upgrading guest data",
+                    {
+                      userId: sessionInfo.userId.slice(0, 8),
+                    }
+                  );
+
+                  const cas = new TauriBlobStorage();
+                  const result = await upgradeGuestToUser(
+                    sessionInfo.userId,
+                    deviceId,
+                    cas,
+                    apiBaseUrl
+                  );
+
+                  logger.info("auth", "✅ Guest data UPGRADED successfully", {
+                    userId: sessionInfo.userId.slice(0, 8),
+                    synced: result.synced,
+                  });
+                } else {
+                  // EXISTING account: Wipe guest data
+                  logger.info(
+                    "auth",
+                    "EXISTING account detected - wiping guest data",
+                    {
+                      userId: sessionInfo.userId.slice(0, 8),
+                    }
+                  );
+
+                  await wipeGuestData();
+
+                  logger.info("auth", "✅ Guest data WIPED successfully", {
+                    userId: sessionInfo.userId.slice(0, 8),
+                  });
+                }
+              } catch (error) {
+                logger.error("auth", "❌ Guest data handling failed", {
+                  error: error instanceof Error ? error.message : String(error),
+                  userId: sessionInfo.userId.slice(0, 8),
+                });
+              }
+            } else {
+              logger.info("auth", "No guest data found - starting fresh", {
+                userId: sessionInfo.userId.slice(0, 8),
+              });
+            }
+          }
+        } else {
+          // Guest mode
+          logger.info("auth", "Desktop user not authenticated, guest mode", {
+            deviceId,
+          });
+          setAuthState(false, null, deviceId);
+          hasUpgradedRef.current = false;
+        }
+      } catch (error) {
+        logger.error("auth", "Failed to initialize session", { error });
+        // Default to guest mode on error
+        setAuthState(false, null, deviceId);
+      }
+    }
+
+    initSession();
+  }, []);
+
+  return <>{children}</>;
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -53,10 +191,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <DevToolsShortcut />
-      <SystemMonitoringProvider />
-      <ElectricInitializer />
-      <SyncManager />
-      {children}
+      <AuthStateManager>
+        <SystemMonitoringProvider />
+        <ElectricInitializer />
+        <SyncManager />
+        {children}
+      </AuthStateManager>
     </QueryClientProvider>
   );
 }
@@ -169,9 +309,23 @@ function ElectricInitializer() {
     const worker = initFlushWorker({
       flushHandler: async (changes) => {
         try {
+          // Get current user ID from session
+          const { initializeSession } = await import("./auth");
+          const session = await initializeSession();
+
+          const userId =
+            session.status === "authenticated" ? session.userId : null;
+
+          if (!userId) {
+            logger.warn(
+              "sync.writeBuffer",
+              "No authenticated user - writes may fail due to RLS"
+            );
+          }
+
           const results = await invoke<
             Array<{ id: string; success: boolean; error?: string }>
-          >("flush_writes", { changes });
+          >("flush_writes", { changes, userId });
 
           // Transform Rust results to FlushWorker format
           const applied: string[] = [];

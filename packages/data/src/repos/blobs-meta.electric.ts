@@ -13,9 +13,15 @@ import { logger } from "@deeprecall/telemetry";
 
 /**
  * Get all blob metadata
+ * @param userId - Owner filter for multi-tenant isolation (undefined = skip sync for guests)
  */
-export function useBlobsMeta() {
-  return useShape<BlobMeta>({ table: "blobs_meta" });
+export function useBlobsMeta(userId?: string) {
+  // SECURITY: Don't subscribe to Electric for guests (no userId)
+  // Guests work with local CAS only, no server coordination
+  return useShape<BlobMeta>({
+    table: "blobs_meta",
+    where: userId ? `owner_id = '${userId}'` : "1 = 0", // Never match for guests
+  });
 }
 
 /**

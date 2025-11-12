@@ -9,10 +9,12 @@ import { type Board } from "@deeprecall/core";
 
 /**
  * Subscribe to boards shape from Electric
+ * @param userId - Owner filter for multi-tenant isolation
  */
-export function useBoards() {
+export function useBoards(userId?: string) {
   return useShape<Board>({
     table: "boards",
+    where: userId ? `owner_id = '${userId}'` : undefined,
   });
 }
 

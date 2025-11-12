@@ -7,6 +7,10 @@
 export { UserMenu } from "./auth/UserMenu";
 export type { UserSession, UserMenuProps } from "./auth/UserMenu";
 
+// Guest mode components
+export { GuestBanner, GuestBannerCompact } from "./components/GuestBanner";
+export type { GuestBannerProps } from "./components/GuestBanner";
+
 // System components
 export { ConnectionStatusIndicator } from "./system/ConnectionStatusIndicator";
 export type { ConnectionStatusIndicatorProps } from "./system/ConnectionStatusIndicator";

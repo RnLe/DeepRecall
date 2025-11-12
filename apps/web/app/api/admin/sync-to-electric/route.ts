@@ -4,12 +4,24 @@
  * This creates blobs_meta and device_blobs entries for all blobs that don't have them
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/src/server/db";
 import { blobs, paths } from "@/src/server/schema";
 import { logger } from "@deeprecall/telemetry";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  // Require authentication and get user context
+  const { requireAuth } = await import("@/app/api/lib/auth-helpers");
+  let userContext;
+  try {
+    userContext = await requireAuth(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 }
+    );
+  }
+
   try {
     // Get device ID from client
     const body = await request.json().catch(() => ({}));
@@ -70,6 +82,7 @@ export async function POST(request: Request) {
           size: blob.size,
           mime: blob.mime,
           filename: blob.filename || `${blob.hash.slice(0, 16)}.bin`,
+          ownerId: userContext.userId, // Add owner_id for RLS
           createdAt: new Date(blob.created_ms || now).toISOString(), // Schema expects ISO date string
         },
         created_at: now,
@@ -89,6 +102,7 @@ export async function POST(request: Request) {
           present: true,
           localPath: localPath, // camelCase
           health: "healthy",
+          ownerId: userContext.userId, // Add owner_id for RLS
           createdAt: nowISO, // ISO date string
           updatedAt: nowISO, // ISO date string
         },
@@ -105,7 +119,11 @@ export async function POST(request: Request) {
     try {
       const response = await fetch(`${apiBaseUrl}/api/writes/batch`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Forward cookies from the original request for authentication
+          Cookie: request.headers.get("cookie") || "",
+        },
         body: JSON.stringify({ changes }),
       });
 

@@ -14,6 +14,7 @@ import {
   checkCorsOrigin,
   addCorsHeaders,
 } from "@/app/api/lib/cors";
+import { requireAuth } from "@/app/api/lib/auth-helpers";
 import { z } from "zod";
 import { logger } from "@deeprecall/telemetry";
 import {
@@ -456,16 +457,36 @@ export async function POST(request: NextRequest) {
   const corsError = checkCorsOrigin(request);
   if (corsError) return corsError;
 
+  // Require authentication
+  let userContext;
+  try {
+    userContext = await requireAuth(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 }
+    );
+  }
+
   const { getPostgresPool } = await import("@/app/api/lib/postgres");
   const pool = getPostgresPool();
+
+  console.log("[BATCH] Got pool, starting processing...");
 
   try {
     // Parse and validate request body
     const body = await request.json();
+    console.log("[BATCH] Body parsed, changes count:", body?.changes?.length);
     const { changes } = BatchRequestSchema.parse(body);
 
+    console.log(
+      "[BATCH] Validation passed, processing",
+      changes.length,
+      "changes"
+    );
     logger.info("sync.writeBuffer", "Processing write batch", {
       changeCount: changes.length,
+      userId: userContext.userId,
     });
 
     // Sort changes to ensure foreign key dependencies are satisfied
@@ -488,6 +509,10 @@ export async function POST(request: NextRequest) {
 
     try {
       await client.query("BEGIN");
+
+      // Set user context for RLS (must use string interpolation - SET LOCAL doesn't support $1 params)
+      // Safe because userContext.userId is validated as UUID format
+      await client.query(`SET LOCAL app.user_id = '${userContext.userId}'`);
 
       for (const change of sortedChanges) {
         // Use savepoint for each change to isolate errors
@@ -574,8 +599,14 @@ export async function POST(request: NextRequest) {
     });
     return addCorsHeaders(response, request);
   } catch (error) {
+    console.error("[BATCH ERROR]", error);
+    console.error(
+      "[BATCH ERROR] Stack:",
+      error instanceof Error ? error.stack : "No stack"
+    );
     logger.error("server.api", "Batch processing failed", {
       error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
     const response = NextResponse.json(
       {

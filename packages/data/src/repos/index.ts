@@ -32,6 +32,7 @@ export * as replicationJobsElectric from "./replication-jobs.electric";
 // Export blob write operations (client-safe, no server dependencies)
 export * from "./blobs-meta.writes";
 export * from "./device-blobs.writes";
+export * from "./blobs-meta.local"; // Local-only blob operations (guest mode)
 
 // NOTE: blobs.server.ts is NOT exported here because it contains Node.js-only code (pg library)
 // Import it directly in server-side code: import { ... } from "@deeprecall/data/repos/blobs.server"

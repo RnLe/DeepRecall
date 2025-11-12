@@ -3,11 +3,22 @@
  * Returns raw blob records from database with paths (admin/debug only)
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { listFilesWithPaths } from "@/src/server/cas";
 import { logger } from "@deeprecall/telemetry";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Require authentication
+  const { requireAuth } = await import("@/app/api/lib/auth-helpers");
+  try {
+    await requireAuth(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 }
+    );
+  }
+
   try {
     // Return blobs with their filesystem paths
     const blobs = await listFilesWithPaths();

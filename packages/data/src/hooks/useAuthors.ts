@@ -70,9 +70,10 @@ async function syncElectricToDexie(electricData: Author[]): Promise<void> {
  * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
  *
  * DO NOT call this from components! Use useAuthors() instead.
+ * @param userId - Filter authors by owner_id (multi-tenant isolation)
  */
-export function useAuthorsSync() {
-  const electricResult = authorsElectric.useAuthors();
+export function useAuthorsSync(userId?: string) {
+  const electricResult = authorsElectric.useAuthors(userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie authors table (for merge layer)

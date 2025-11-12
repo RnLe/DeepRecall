@@ -647,14 +647,14 @@ export async function clearDatabase(): Promise<void> {
  * @param buffer - File content as Buffer
  * @param filename - Original filename (for extension)
  * @param role - Asset role for organization (default: "main")
- * @param deviceId - Client's unique device ID (optional, defaults to "server" if not provided)
+ * @param deviceId - Client's unique persistent device UUID (REQUIRED - never use placeholders)
  * @returns Object with hash, path, and size
  */
 export async function storeBlob(
   buffer: Buffer,
   filename: string,
   role: string = "main",
-  deviceId?: string
+  deviceId: string
 ): Promise<{ hash: string; path: string; size: number }> {
   const hash = hashBuffer(buffer);
   const mime = getMimeType(filename);
@@ -795,12 +795,9 @@ async function createBlobCoordination(
     imageHeight?: number;
     lineCount?: number;
   },
-  deviceId?: string
+  deviceId: string
 ): Promise<void> {
   try {
-    // Use provided device ID from client, or fallback to "server" for server-side operations
-    const finalDeviceId = deviceId || "server";
-
     // Call the blob coordination API route (avoids importing React hooks on server)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(`${baseUrl}/api/writes/blobs`, {
@@ -814,7 +811,7 @@ async function createBlobCoordination(
         mime,
         filename,
         localPath,
-        deviceId: finalDeviceId,
+        deviceId,
         pageCount: metadata.pageCount,
         imageWidth: metadata.imageWidth,
         imageHeight: metadata.imageHeight,
@@ -829,7 +826,7 @@ async function createBlobCoordination(
 
     logger.info("sync.coordination", "Electric coordination created", {
       hashPrefix: sha256.slice(0, 16),
-      deviceIdPrefix: finalDeviceId.slice(0, 8),
+      deviceIdPrefix: deviceId.slice(0, 8),
     });
   } catch (error) {
     logger.error("sync.coordination", "Electric coordination failed", {
@@ -850,12 +847,9 @@ async function ensureBlobCoordination(
   mime: string,
   filename: string,
   localPath: string,
-  deviceId?: string
+  deviceId: string
 ): Promise<void> {
   try {
-    // Use provided device ID from client, or fallback to "server" for server-side operations
-    const finalDeviceId = deviceId || "server";
-
     // Call the blob coordination API route
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(`${baseUrl}/api/writes/blobs`, {
@@ -869,7 +863,7 @@ async function ensureBlobCoordination(
         mime,
         filename,
         localPath,
-        deviceId: finalDeviceId,
+        deviceId,
       }),
     });
 
@@ -888,7 +882,7 @@ async function ensureBlobCoordination(
 
     logger.debug("sync.coordination", "Electric coordination ensured", {
       hashPrefix: sha256.slice(0, 16),
-      deviceIdPrefix: finalDeviceId.slice(0, 8),
+      deviceIdPrefix: deviceId.slice(0, 8),
     });
   } catch (error) {
     // Silently fail - this is a best-effort operation
@@ -903,14 +897,16 @@ async function ensureBlobCoordination(
  * Create a markdown file blob from text content
  * @param content - Markdown text content
  * @param filename - Filename for the markdown file
+ * @param deviceId - Client's unique persistent device UUID
  * @returns Object with hash, path, and size
  */
 export async function createMarkdownBlob(
   content: string,
-  filename: string
+  filename: string,
+  deviceId: string
 ): Promise<{ hash: string; path: string; size: number }> {
   const buffer = Buffer.from(content, "utf-8");
-  return storeBlob(buffer, filename, "notes");
+  return storeBlob(buffer, filename, "notes", deviceId);
 }
 
 /**

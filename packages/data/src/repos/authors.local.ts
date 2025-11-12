@@ -8,6 +8,7 @@ import { AuthorSchema } from "@deeprecall/core";
 import { db } from "../db";
 import { createWriteBuffer } from "../writeBuffer";
 import { logger } from "@deeprecall/telemetry";
+import { isAuthenticated } from "../auth";
 
 const buffer = createWriteBuffer();
 
@@ -39,14 +40,17 @@ export async function createAuthorLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "authors",
-    op: "insert",
-    payload: validated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "authors",
+      op: "insert",
+      payload: validated,
+    });
+  }
 
   logger.info("db.local", "Created author (pending sync)", {
     authorId: author.id,
+    willSync: isAuthenticated(),
   });
   return validated;
 }
@@ -71,13 +75,18 @@ export async function updateAuthorLocal(
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "authors",
-    op: "update",
-    payload: updated,
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "authors",
+      op: "update",
+      payload: updated,
+    });
+  }
 
-  logger.info("db.local", "Updated author (pending sync)", { authorId: id });
+  logger.info("db.local", "Updated author (pending sync)", {
+    authorId: id,
+    willSync: isAuthenticated(),
+  });
 }
 
 /**
@@ -94,11 +103,16 @@ export async function deleteAuthorLocal(id: string): Promise<void> {
   });
 
   // Enqueue for server sync (background)
-  await buffer.enqueue({
-    table: "authors",
-    op: "delete",
-    payload: { id },
-  });
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "authors",
+      op: "delete",
+      payload: { id },
+    });
+  }
 
-  logger.info("db.local", "Deleted author (pending sync)", { authorId: id });
+  logger.info("db.local", "Deleted author (pending sync)", {
+    authorId: id,
+    willSync: isAuthenticated(),
+  });
 }

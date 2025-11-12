@@ -1,0 +1,193 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Clear DeepRecall Dexie Database</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        margin-top: 0;
+      }
+      button {
+        background: #dc2626;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        margin-top: 20px;
+      }
+      button:hover {
+        background: #b91c1c;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .status {
+        margin-top: 20px;
+        padding: 12px;
+        border-radius: 4px;
+        display: none;
+      }
+      .status.success {
+        background: #d1fae5;
+        color: #065f46;
+        display: block;
+      }
+      .status.error {
+        background: #fee2e2;
+        color: #991b1b;
+        display: block;
+      }
+      .info {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+      }
+      ul {
+        margin: 10px 0;
+        padding-left: 20px;
+      }
+      li {
+        margin: 5px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🗑️ Clear DeepRecall Dexie Database</h1>
+
+      <div class="info">
+        <strong>⚠️ Warning:</strong> This will delete ALL local data from
+        IndexedDB (Dexie). Use this if:
+        <ul>
+          <li>You're getting schema mismatch errors</li>
+          <li>Migration 008 was run and you need to clear old data</li>
+          <li>You want a fresh start in development</li>
+        </ul>
+        <strong>This action cannot be undone!</strong>
+      </div>
+
+      <button id="clearBtn" onclick="clearAllDatabases()">
+        Clear All DeepRecall Databases
+      </button>
+
+      <div id="status" class="status"></div>
+    </div>
+
+    <script>
+      async function clearAllDatabases() {
+        const btn = document.getElementById("clearBtn");
+        const status = document.getElementById("status");
+
+        btn.disabled = true;
+        btn.textContent = "Clearing...";
+        status.className = "status";
+        status.style.display = "none";
+
+        try {
+          // Get all IndexedDB databases
+          const databases = await indexedDB.databases();
+
+          console.log("Found databases:", databases);
+
+          // Filter for DeepRecall databases
+          const deepRecallDbs = databases.filter(
+            (db) =>
+              db.name &&
+              (db.name.startsWith("deeprecall_") ||
+                db.name === "deeprecall" ||
+                db.name.includes("guest"))
+          );
+
+          if (deepRecallDbs.length === 0) {
+            status.className = "status success";
+            status.textContent =
+              "✓ No DeepRecall databases found. Already clean!";
+            status.style.display = "block";
+            btn.disabled = false;
+            btn.textContent = "Clear All DeepRecall Databases";
+            return;
+          }
+
+          console.log("DeepRecall databases to delete:", deepRecallDbs);
+
+          // Delete each database
+          const deletePromises = deepRecallDbs.map((db) => {
+            return new Promise((resolve, reject) => {
+              const request = indexedDB.deleteDatabase(db.name);
+              request.onsuccess = () => {
+                console.log(`✓ Deleted: ${db.name}`);
+                resolve(db.name);
+              };
+              request.onerror = (e) => {
+                console.error(`✗ Failed to delete: ${db.name}`, e);
+                reject(e);
+              };
+              request.onblocked = () => {
+                console.warn(
+                  `⚠ Blocked: ${db.name} (close all tabs and retry)`
+                );
+              };
+            });
+          });
+
+          await Promise.all(deletePromises);
+
+          status.className = "status success";
+          status.textContent = `✓ Successfully deleted ${deepRecallDbs.length} database(s):\n${deepRecallDbs.map((db) => db.name).join("\n")}`;
+          status.style.display = "block";
+
+          console.log("All databases cleared! You can now refresh the app.");
+        } catch (error) {
+          console.error("Error clearing databases:", error);
+          status.className = "status error";
+          status.textContent = `✗ Error: ${error.message}\n\nCheck console for details. You may need to close all DeepRecall tabs and try again.`;
+          status.style.display = "block";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Clear All DeepRecall Databases";
+        }
+      }
+
+      // Show current databases on load
+      window.addEventListener("load", async () => {
+        const databases = await indexedDB.databases();
+        console.log("Current IndexedDB databases:", databases);
+
+        const deepRecallDbs = databases.filter(
+          (db) =>
+            db.name &&
+            (db.name.startsWith("deeprecall_") ||
+              db.name === "deeprecall" ||
+              db.name.includes("guest"))
+        );
+
+        if (deepRecallDbs.length > 0) {
+          console.log("DeepRecall databases found:", deepRecallDbs);
+        } else {
+          console.log("No DeepRecall databases found");
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -63,9 +63,10 @@ async function syncElectricToDexie(electricData: Stroke[]): Promise<void> {
  * CRITICAL: Must only be called ONCE by SyncManager
  *
  * Note: Subscribes to ALL strokes, filtering by board is done on read
+ * @param userId - Owner filter for multi-tenant isolation
  */
-export function useStrokesSync() {
-  const electricResult = strokesElectric.useStrokes(undefined);
+export function useStrokesSync(userId?: string) {
+  const electricResult = strokesElectric.useStrokes(undefined, userId);
   const queryClient = useQueryClient();
 
   // Sync Electric data to Dexie

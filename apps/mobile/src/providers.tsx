@@ -14,6 +14,10 @@ import { getApiBaseUrl } from "./config/api";
 import {
   initElectric,
   initFlushWorker,
+  setAuthState,
+  getDeviceId,
+  upgradeGuestToUser,
+  hasGuestData,
   usePresetsSync,
   useActivitiesSync,
   useAnnotationsSync,
@@ -33,6 +37,7 @@ import {
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 import { logger } from "@deeprecall/telemetry";
+import { CapacitorBlobStorage } from "./blob-storage/capacitor";
 
 // Extend Window interface for Capacitor
 declare global {
@@ -56,6 +61,137 @@ initializeDeviceId().catch((err) =>
   })
 );
 
+/**
+ * AuthStateManager: Syncs mobile session with global auth state
+ * Handles guest→user upgrade after sign-in
+ */
+function AuthStateManager({ children }: { children: React.ReactNode }) {
+  const hasUpgradedRef = useRef(false);
+
+  useEffect(() => {
+    const deviceId = getDeviceId();
+
+    // Initialize session on mount
+    async function initSession() {
+      try {
+        const { loadSession } = await import("./auth/session");
+        const sessionInfo = await loadSession();
+
+        if (sessionInfo && sessionInfo.userId) {
+          // User authenticated
+          const userId = sessionInfo.userId;
+
+          logger.info(
+            "auth",
+            "Mobile user authenticated, updating auth state",
+            {
+              userId,
+              deviceId,
+            }
+          );
+
+          setAuthState(true, userId, deviceId);
+
+          // Perform guest→user upgrade once per session
+          if (!hasUpgradedRef.current) {
+            hasUpgradedRef.current = true;
+
+            const hasData = await hasGuestData(deviceId);
+            if (hasData) {
+              logger.info(
+                "auth",
+                "Guest data detected, checking account status",
+                {
+                  userId: userId.slice(0, 8),
+                }
+              );
+
+              try {
+                const { isNewAccount, wipeGuestData } = await import(
+                  "@deeprecall/data"
+                );
+                const apiBaseUrl = getApiBaseUrl();
+
+                const accountIsNew = await isNewAccount(userId, apiBaseUrl);
+
+                logger.info("auth", "Account status determined", {
+                  userId: userId.slice(0, 8),
+                  isNew: accountIsNew,
+                  hasGuestData: true,
+                });
+
+                if (accountIsNew) {
+                  // NEW account: Upgrade guest data
+                  logger.info(
+                    "auth",
+                    "NEW account detected - upgrading guest data",
+                    {
+                      userId: userId.slice(0, 8),
+                    }
+                  );
+
+                  const cas = new CapacitorBlobStorage();
+                  const result = await upgradeGuestToUser(
+                    userId,
+                    deviceId,
+                    cas,
+                    apiBaseUrl
+                  );
+
+                  logger.info("auth", "✅ Guest data UPGRADED successfully", {
+                    userId: userId.slice(0, 8),
+                    synced: result.synced,
+                  });
+                } else {
+                  // EXISTING account: Wipe guest data
+                  logger.info(
+                    "auth",
+                    "EXISTING account detected - wiping guest data",
+                    {
+                      userId: userId.slice(0, 8),
+                    }
+                  );
+
+                  await wipeGuestData();
+
+                  logger.info("auth", "✅ Guest data WIPED successfully", {
+                    userId: userId.slice(0, 8),
+                  });
+                }
+              } catch (error) {
+                logger.error("auth", "❌ Guest data handling failed", {
+                  error: error instanceof Error ? error.message : String(error),
+                  userId: userId.slice(0, 8),
+                });
+              }
+            } else {
+              logger.info("auth", "No guest data found - starting fresh", {
+                userId: userId.slice(0, 8),
+              });
+            }
+          }
+        } else {
+          // Guest mode (no session)
+          logger.info("auth", "Mobile user not authenticated, guest mode", {
+            deviceId,
+          });
+          setAuthState(false, null, deviceId);
+          hasUpgradedRef.current = false;
+        }
+      } catch (error) {
+        logger.error("auth", "Failed to load session", { error });
+        // Default to guest mode on error
+        const deviceId = getDeviceId();
+        setAuthState(false, null, deviceId);
+      }
+    }
+
+    initSession();
+  }, []);
+
+  return <>{children}</>;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -71,9 +207,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ElectricInitializer />
-      <SyncManager />
-      {children}
+      <AuthStateManager>
+        <ElectricInitializer />
+        <SyncManager />
+        {children}
+      </AuthStateManager>
     </QueryClientProvider>
   );
 }

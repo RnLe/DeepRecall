@@ -12,6 +12,7 @@ import {
 } from "@deeprecall/ui/reader/CreateNoteDialog";
 import * as annotationRepo from "@deeprecall/data/repos/annotations";
 import * as assetRepo from "@deeprecall/data/repos/assets";
+import { getDeviceId } from "@deeprecall/data/utils/deviceId";
 
 /** Web-specific props (operations auto-injected) */
 export type CreateNoteDialogProps = Omit<BaseProps, "operations">;
@@ -22,10 +23,11 @@ export type CreateNoteDialogProps = Omit<BaseProps, "operations">;
 export function CreateNoteDialog(props: CreateNoteDialogProps) {
   const operations: CreateNoteDialogOperations = {
     createMarkdown: async ({ content, title, annotationId }) => {
+      const deviceId = getDeviceId();
       const response = await fetch("/api/library/create-markdown", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, title, annotationId }),
+        body: JSON.stringify({ content, title, annotationId, deviceId }),
       });
 
       if (!response.ok) {

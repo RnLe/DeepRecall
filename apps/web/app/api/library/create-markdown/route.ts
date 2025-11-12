@@ -15,6 +15,7 @@ const CreateMarkdownSchema = z.object({
   annotationId: z.string().optional(),
   workId: z.string().uuid().optional(),
   tags: z.array(z.string()).optional(),
+  deviceId: z.string().min(1), // Required: client's persistent device UUID
 });
 
 export async function POST(request: NextRequest) {
@@ -26,7 +27,11 @@ export async function POST(request: NextRequest) {
     const filename = `${input.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.md`;
 
     // Create markdown blob
-    const { hash, size } = await createMarkdownBlob(input.content, filename);
+    const { hash, size } = await createMarkdownBlob(
+      input.content,
+      filename,
+      input.deviceId
+    );
 
     logger.info("blob.upload", "Markdown note created", {
       filename,

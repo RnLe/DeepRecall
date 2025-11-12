@@ -12,10 +12,12 @@ import { logger } from "@deeprecall/telemetry";
 
 /**
  * React hook to get all Presets (live-synced from Postgres)
+ * @param userId - Owner filter for multi-tenant isolation
  */
-export function usePresets() {
+export function usePresets(userId?: string) {
   return useShape<Preset>({
     table: "presets",
+    where: userId ? `owner_id = '${userId}'` : undefined,
   });
 }
 
