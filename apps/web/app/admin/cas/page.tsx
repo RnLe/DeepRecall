@@ -75,9 +75,47 @@ export default function AdminPage() {
     },
 
     scanBlobs: async (): Promise<{ duplicates?: DuplicateGroup[] }> => {
-      const response = await fetch("/api/scan", { method: "POST" });
-      if (!response.ok) throw new Error("Rescan failed");
-      return response.json();
+      // Step 1: Scan filesystem and rebuild SQLite index (server-side)
+      logger.info(
+        "cas",
+        "Step 1: Scanning filesystem (rebuilding SQLite index)"
+      );
+      const scanResponse = await fetch("/api/scan", { method: "POST" });
+      if (!scanResponse.ok) throw new Error("Filesystem scan failed");
+      const scanResult = await scanResponse.json();
+
+      logger.info("cas", "Filesystem scan complete", {
+        scanned: scanResult.scanned,
+        processed: scanResult.processed,
+      });
+
+      // Step 2: Coordinate blobs to Electric/Dexie and create Assets (client-side)
+      logger.info("cas", "Step 2: Coordinating blobs and creating Assets");
+      const { scanAndCheckCAS } = await import(
+        "@deeprecall/data/utils/casIntegrityCheck"
+      );
+      const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
+
+      const deviceId = getDeviceId();
+      // Skip integrity check during admin scan - we trust CAS.list() results
+      const coordResult = await scanAndCheckCAS(cas, deviceId, true);
+
+      logger.info("cas", "Coordination complete", {
+        scanned: coordResult.scan.scanned,
+        coordinated: coordResult.scan.coordinated,
+        skipped: coordResult.scan.skipped,
+      });
+
+      // Invalidate queries to refresh UI
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["blobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["blobs-meta"] }),
+        queryClient.invalidateQueries({ queryKey: ["device-blobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["assets"] }),
+      ]);
+
+      // Return duplicates from server scan
+      return { duplicates: scanResult.duplicates || [] };
     },
 
     clearDatabase: async (): Promise<void> => {
@@ -160,42 +198,14 @@ export default function AdminPage() {
       logger.info("ui", "✅ Postgres cleared");
     },
 
+    // DEPRECATED: Sync to Electric is now automatic during scan
+    // This button is kept for backward compatibility but does nothing
     syncToElectric: async (): Promise<{ synced: number; failed: number }> => {
-      setIsSyncing(true);
-      try {
-        // Get device ID from client
-        const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
-        const deviceId = getDeviceId();
-
-        // Trigger the sync - Electric will propagate changes automatically
-        const response = await fetch("/api/admin/sync-to-electric", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deviceId }),
-        });
-        if (!response.ok) throw new Error("Sync failed");
-        const result = await response.json();
-
-        // Invalidate Electric queries to trigger refetch
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["blobs-meta"] }),
-          queryClient.invalidateQueries({ queryKey: ["device-blobs"] }),
-        ]);
-
-        // Wait a bit for Electric to sync to Dexie
-        // Electric syncs in background, give it time to propagate
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // Force refetch to show updated data
-        await Promise.all([
-          queryClient.refetchQueries({ queryKey: ["blobs-meta"] }),
-          queryClient.refetchQueries({ queryKey: ["device-blobs"] }),
-        ]);
-
-        return result;
-      } finally {
-        setIsSyncing(false);
-      }
+      logger.info(
+        "cas",
+        "Sync to Electric button clicked (no-op - automatic now)"
+      );
+      return { synced: 0, failed: 0 };
     },
 
     resolveDuplicates: async (

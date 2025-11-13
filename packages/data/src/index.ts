@@ -23,6 +23,13 @@ export { isNewAccount, wipeGuestData } from "./auth/accountStatus";
 export { handleSignIn, handleSignOut, debugAccountStatus } from "./auth/flows";
 export type { SignInResult } from "./auth/flows";
 
+// Export auth cleanup and initialization utilities
+export {
+  clearAllUserData,
+  clearCASStorage,
+  initializeGuestMode,
+} from "./auth/cleanupAndInit";
+
 // Export CAS integrity checking
 export {
   checkCASIntegrity,
@@ -30,3 +37,6 @@ export {
   scanAndCheckCAS,
 } from "./utils/casIntegrityCheck";
 export type { IntegrityCheckResult } from "./utils/casIntegrityCheck";
+
+// Export preset initialization
+export { initializePresets } from "./repos/presets.init";

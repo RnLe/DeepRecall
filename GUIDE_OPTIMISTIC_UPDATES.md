@@ -10,26 +10,32 @@
 
 **Problem**: 2-3 second delay from user action → Postgres → Electric → UI update
 
-**Solution**: Two-layer architecture
+**Solution**: Four-layer architecture with guest mode support
 
 ```
 User Action → [INSTANT] Local Dexie → [INSTANT] UI
-            ↓ (background)
+            ↓ (background, only if authenticated)
             WriteBuffer → Postgres → Electric → Cleanup
 ```
+
+**Guest Mode**: When not authenticated, writes stay local-only (no WriteBuffer enqueue).  
+**Authenticated Mode**: Full sync pipeline with background WriteBuffer flush to server.
 
 ## 📁 File Structure (per entity)
 
 ```
 packages/data/src/
+├── auth.ts                        # Global auth state (guest vs authenticated)
 ├── repos/
-│   ├── annotations.local.ts      # Instant writes to Dexie + WriteBuffer
+│   ├── annotations.local.ts      # Instant writes to Dexie + WriteBuffer (if auth)
 │   ├── annotations.electric.ts   # Electric shapes (background sync)
 │   ├── annotations.merged.ts     # Merge synced + local data
 │   └── annotations.cleanup.ts    # Remove local after sync confirmation
 └── hooks/
     └── useAnnotations.ts          # React hooks returning merged data
 ```
+
+**Key Addition**: `auth.ts` manages global authentication state, used by all local repos to conditionally enqueue server writes.
 
 ## ⚠️ Critical Patterns (MUST FOLLOW)
 
@@ -243,10 +249,12 @@ annotations_local: "id, _op, _status, _timestamp, data";
 ### 2. Local Repository (`annotations.local.ts`)
 
 ```typescript
+import { isAuthenticated } from "../auth";
+
 export async function createAnnotationLocal(input: CreateAnnotationInput) {
   const annotation = { ...input, createdAt: Date.now(), updatedAt: Date.now() };
 
-  // Write to local table (instant UI)
+  // Write to local table (instant UI - works for both guest and authenticated)
   await db.annotations_local.add({
     id: annotation.id,
     _op: "insert",
@@ -255,16 +263,25 @@ export async function createAnnotationLocal(input: CreateAnnotationInput) {
     data: annotation,
   });
 
-  // Enqueue for background sync
-  await buffer.enqueue({
-    table: "annotations",
-    op: "insert",
-    payload: annotation,
+  // Enqueue for background sync (only if authenticated)
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "annotations",
+      op: "insert",
+      payload: annotation,
+    });
+  }
+
+  logger.info("db.local", "Created annotation (pending sync)", {
+    annotationId: annotation.id,
+    willSync: isAuthenticated(),
   });
 
   return annotation;
 }
 ```
+
+**Critical**: Check `isAuthenticated()` before enqueuing to WriteBuffer. Guests get full local functionality without server dependency.
 
 ### 3. Merge Repository (`annotations.merged.ts`)
 
@@ -287,18 +304,57 @@ export async function getMergedPDFAnnotations(sha256: string) {
 
 ### 4. React Hook (`useAnnotations.ts`)
 
+**IMPORTANT**: All `use*Sync()` hooks MUST be called exactly once by the centralized `SyncManager` component. Never call sync hooks directly from multiple components - this causes race conditions and duplicate Electric connections.
+
 ```typescript
-export function usePDFAnnotations(sha256: string) {
-  const electricResult = annotationsElectric.usePDFAnnotations(sha256);
+// ============================================================================
+// Sync Hooks (Internal - Called by SyncManager ONLY)
+// ============================================================================
+
+/**
+ * Internal sync hook: Subscribes to Electric and syncs to Dexie
+ * CRITICAL: Must only be called ONCE by SyncManager to prevent race conditions
+ *
+ * DO NOT call this from components! Use usePDFAnnotations() instead.
+ * @param userId - Filter annotations by owner_id (multi-tenant isolation)
+ */
+export function useAnnotationsSync(userId?: string) {
+  const electricResult = annotationsElectric.useAnnotations(userId);
+  const queryClient = useQueryClient();
 
   // CRITICAL: Check isLoading before syncing
   useEffect(() => {
     if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data).catch(console.error);
+      syncElectricToDexie(electricResult.data)
+        .then(() => {
+          // Invalidate to trigger cross-device updates
+          queryClient.invalidateQueries({ queryKey: ["annotations"] });
+        })
+        .catch(console.error);
     }
   }, [electricResult.isLoading, electricResult.data]);
 
-  // Query merged data
+  // Cleanup after sync
+  useEffect(() => {
+    if (!electricResult.isLoading && electricResult.data) {
+      annotationsCleanup
+        .cleanupSyncedAnnotations(electricResult.data)
+        .catch(console.error);
+    }
+  }, [electricResult.isLoading, electricResult.data]);
+
+  return electricResult;
+}
+
+// ============================================================================
+// Public Hooks (Use these in components)
+// ============================================================================
+
+/**
+ * Get merged annotations for a PDF (synced + local changes)
+ * Sync is handled by useAnnotationsSync() in SyncManager.
+ */
+export function usePDFAnnotations(sha256: string) {
   const mergedQuery = useQuery({
     queryKey: ["annotations", "merged", "pdf", sha256],
     queryFn: () => annotationsMerged.getMergedPDFAnnotations(sha256),
@@ -306,23 +362,33 @@ export function usePDFAnnotations(sha256: string) {
     placeholderData: [], // Prevent loading flicker on navigation
   });
 
-  // Cleanup after sync
-  // CRITICAL: Check isLoading to avoid cleanup on initial undefined state
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      annotationsCleanup
-        .cleanupSyncedAnnotations(electricResult.data)
-        .then(() => mergedQuery.refetch());
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return {
-    ...mergedQuery,
-    isLoading: mergedQuery.isLoading, // Only merged query (not Electric!)
-    isSyncing: electricResult.isLoading,
-  };
+  return mergedQuery;
 }
 ```
+
+**SyncManager Pattern**: Centralized component that calls all `use*Sync()` hooks exactly once:
+
+```typescript
+// apps/web/app/providers.tsx (or mobile/desktop equivalent)
+function SyncManager({ userId }: { userId?: string }) {
+  // Call ALL sync hooks once - prevents duplicate Electric connections
+  useWorksSync(userId);
+  useAssetsSync(userId);
+  useActivitiesSync(userId);
+  useAnnotationsSync(userId);
+  useCardsSync(userId);
+  // ... all entities
+
+  return null; // No UI, just sync orchestration
+}
+```
+
+**Why This Matters**:
+
+- ✅ Each entity syncs exactly once
+- ✅ No race conditions from multiple Electric connections
+- ✅ Clean separation: sync hooks (internal) vs. query hooks (public)
+- ✅ Guest mode: `SyncManager` only renders when authenticated
 
 ### 5. Mutation Hook
 
@@ -493,7 +559,98 @@ const handlePointerUp = () => {
 
 ---
 
-## 📊 Data Flow Diagram
+## � Guest Mode vs Authenticated Mode
+
+### Guest Mode (Not Authenticated)
+
+```
+User Action → Local Dexie (annotations_local) → [INSTANT] UI
+                    ↓
+              Merge Layer (synced + local)
+                    ↓
+              React Query → Component
+
+⚠️ WriteBuffer: SKIPPED (no server sync)
+⚠️ Electric: No sync (userId = undefined)
+✅ Full local functionality preserved
+```
+
+### Authenticated Mode (Signed In)
+
+```
+User Action → Local Dexie (annotations_local) → [INSTANT] UI
+                    ↓                    ↓
+              Merge Layer          WriteBuffer (enqueue)
+                    ↓                    ↓
+              React Query          POST /api/writes/batch
+                    ↓                    ↓
+              Component            Postgres (LWW)
+                                        ↓
+                                   Electric Sync
+                                        ↓
+                                   useShape() (filtered by userId)
+                                        ↓
+                                   syncElectricToDexie()
+                                        ↓
+                              annotations (synced) → Cleanup
+```
+
+### Auth State Management
+
+**File**: `packages/data/src/auth.ts`
+
+```typescript
+// Global auth state (set by app providers)
+let _isAuthenticated = false;
+let _userId: string | null = null;
+
+export function setAuthState(
+  authenticated: boolean,
+  userId: string | null,
+  deviceId: string | null = null
+): void {
+  _isAuthenticated = authenticated;
+  _userId = userId;
+  // Triggers cleanup/scan logic as needed
+}
+
+export function isAuthenticated(): boolean {
+  return _isAuthenticated;
+}
+
+export function getUserId(): string | null {
+  return _userId;
+}
+```
+
+**Usage in App Providers**:
+
+```typescript
+// apps/web/app/providers.tsx
+function AuthStateManager({ children }) {
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (status === "authenticated" && session) {
+      setAuthState(true, session.user.id, deviceId);
+    } else if (status === "unauthenticated") {
+      setAuthState(false, null, deviceId);
+    }
+  }, [session, status]);
+
+  return <>{children}</>;
+}
+```
+
+**Guest Upgrade Flow**:
+
+1. Guest creates data locally (Dexie only)
+2. User signs in → `setAuthState(true, userId, deviceId)`
+3. Local data gets `owner_id` updated to `userId`
+4. WriteBuffer starts flushing pending changes
+5. Electric syncs with new user filter
+
+## �📊 Data Flow Diagram (Authenticated Mode)
 
 ```
 ┌─────────────┐
@@ -502,32 +659,41 @@ const handlePointerUp = () => {
        │
        ▼
 ┌──────────────────┐      ┌─────────────────┐
-│ Local Repository │─────▶│ WriteBuffer     │
-│ (*.local.ts)     │      │ (enqueue)       │
+│ Local Repository │─────▶│ isAuthenticated │
+│ (*.local.ts)     │      │ check           │
 └────────┬─────────┘      └────────┬────────┘
-         │                         │
-         │ Write to                │ Background
-         │ Dexie                   │ Flush
-         ▼                         ▼
-┌──────────────────┐      ┌─────────────────┐
-│ annotations_     │      │ POST /api/      │
-│   local          │      │   writes/batch  │
-└────────┬─────────┘      └────────┬────────┘
+         │                         │ YES
+         │ Write to                │
+         │ Dexie                   ▼
+         │                ┌─────────────────┐
+         ▼                │ WriteBuffer     │
+┌──────────────────┐      │ (enqueue)       │
+│ annotations_     │      └────────┬────────┘
+│   local          │               │ Background
+└────────┬─────────┘               │ Flush
+         │                         ▼
+         │                ┌─────────────────┐
+         │                │ POST /api/      │
+         │                │   writes/batch  │
+         │                └────────┬────────┘
          │                         │
          │                         ▼
          │                ┌─────────────────┐
          │                │ Postgres INSERT │
+         │                │ (LWW resolution)│
          │                └────────┬────────┘
          │                         │
          │                         ▼
          │                ┌─────────────────┐
          │                │ Electric Sync   │
+         │                │ (SSE stream)    │
          │                └────────┬────────┘
          │                         │
          │                         ▼
          │                ┌─────────────────┐
-         │                │ useShape()      │
-         │                │ (React state)   │
+         │                │ useAnnotations  │
+         │                │ Sync(userId)    │
+         │                │ (SyncManager)   │
          │                └────────┬────────┘
          │                         │
          │                         ▼
@@ -563,9 +729,109 @@ const handlePointerUp = () => {
 
 ---
 
+## 🌐 Production Environment Setup
+
+### Current Deployment Architecture
+
+| Platform    | Environment     | Postgres | Electric             | Deployment   |
+| ----------- | --------------- | -------- | -------------------- | ------------ |
+| **Web**     | Dev + Prod      | Neon DB  | Electric Cloud (SSE) | Railway      |
+| **Mobile**  | Dev + Prod      | Neon DB  | Electric Cloud (SSE) | TestFlight   |
+| **Desktop** | Production only | Neon DB  | Electric Cloud (SSE) | Local binary |
+
+**Key Architecture Decisions**:
+
+1. **Shared Neon Database**: All environments (dev + prod) use the same Neon Postgres instance
+
+   - ✅ True multi-device testing in development
+   - ✅ No schema drift between dev and prod
+   - ✅ RLS (Row-Level Security) provides user isolation
+   - ⚠️ Dev writes go to production database (acceptable with proper RLS filtering by `owner_id`)
+
+2. **Electric Cloud**: All apps connect to Electric Cloud service
+
+   - ✅ Managed SSE streaming (no self-hosting needed)
+   - ✅ Consistent sync behavior across platforms
+   - ✅ Authentication via `sourceId` and `secret`
+
+3. **No Docker in Dev**: Direct connection to production services
+   - ✅ Simplified local development setup
+   - ✅ Instant sync testing across devices
+   - ✅ Realistic network conditions (not localhost)
+
+### Electric Sync Configuration
+
+**File**: `packages/data/src/electric.ts`
+
+```typescript
+/**
+ * Sync mode configuration
+ *
+ * IMPORTANT: The SYNC_MODE setting appears to be legacy API.
+ * Regardless of the value ("development" or "production"), Electric
+ * actually uses SSE (Server-Sent Events) streaming by default.
+ *
+ * The "development" mode (10s polling) setting does NOT actually poll.
+ * It still uses SSE streaming, which is the correct behavior.
+ *
+ * We keep this setting for potential future API changes, but in practice,
+ * Electric Cloud always uses SSE for real-time updates.
+ */
+const SYNC_MODE: "development" | "production" = "development";
+```
+
+**Runtime Configuration** (loaded from server):
+
+```typescript
+// Apps fetch Electric config from /api/config at startup
+const response = await fetch("/api/config");
+const config = await response.json();
+
+initElectric({
+  url: config.electricUrl, // Electric Cloud URL
+  sourceId: config.electricSourceId, // Electric Cloud source ID
+  secret: config.electricSecret, // Electric Cloud source secret
+});
+```
+
+**Why SSE Matters**:
+
+- ✅ Real-time updates (no polling delay)
+- ✅ Efficient (server pushes only when data changes)
+- ✅ Battery-friendly (no constant HTTP requests)
+- ✅ Works across all platforms (web, mobile, desktop)
+
+**Electric Cloud Authentication**:
+
+- Production: Uses `sourceId` and `secret` from environment variables
+- Development: Same credentials (shared database approach)
+- Guest Mode: Electric initialized but no shapes synced (`userId = undefined`)
+
+### Multi-Tenant Security (RLS)
+
+All Electric shapes are filtered by `owner_id`:
+
+```typescript
+export function useWorks(userId?: string) {
+  return useShape<Work>({
+    table: "works",
+    where: userId ? `owner_id = '${userId}'` : undefined,
+  });
+}
+```
+
+**Security Guarantees**:
+
+- ✅ Guests: No Electric sync (local-only, `userId = undefined`)
+- ✅ Authenticated: Only see their own data (`owner_id = userId`)
+- ✅ Multi-tenant: Postgres RLS enforced at database level
+- ✅ Cross-device: Same user sees same data on all devices
+
 ## ✅ Verification Checklist
 
 After implementing optimistic updates:
+
+### Local Functionality
 
 - [ ] Create item → appears instantly
 - [ ] Update item → changes instantly
@@ -573,12 +839,30 @@ After implementing optimistic updates:
 - [ ] Create + rapid updates (title, color, etc.) → all apply
 - [ ] Page refresh → data persists (doesn't disappear)
 - [ ] Navigate between pages → no loading spinner (cached data shows)
+- [ ] Clear database → UI shows empty state immediately (no refresh needed)
+
+### Guest Mode
+
+- [ ] Guest: Create/update/delete works locally
+- [ ] Guest: No WriteBuffer enqueue (check console logs)
+- [ ] Guest: No Electric sync (network tab shows no shape requests)
+- [ ] Guest: Data persists across page refreshes (Dexie only)
+- [ ] Guest: Sign in → data migrates to user account
+
+### Authenticated Mode
+
 - [ ] Check DevTools → WriteBuffer flushes in background
 - [ ] Check Postgres logs → INSERT/UPDATE appears within 2s
 - [ ] Wait 1 min → local changes cleaned up
 - [ ] Network disconnect → changes queue locally
 - [ ] Network reconnect → changes sync automatically
-- [ ] Clear database → UI shows empty state immediately (no refresh needed)
+
+### Multi-Device Sync
+
+- [ ] Edit on device A → appears on device B within 2s
+- [ ] Create on mobile → appears on web immediately
+- [ ] Delete on desktop → disappears on mobile
+- [ ] Concurrent edits → last-write-wins (check timestamps)
 
 ---
 

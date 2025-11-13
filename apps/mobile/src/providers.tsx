@@ -90,9 +90,9 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
             }
           );
 
-          setAuthState(true, userId, deviceId);
-
           // Perform guest→user upgrade once per session
+          // IMPORTANT: This must complete BEFORE setAuthState to prevent race conditions
+          // with Electric sync (which triggers when userId is set)
           if (!hasUpgradedRef.current) {
             hasUpgradedRef.current = true;
 
@@ -169,6 +169,13 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
                 userId: userId.slice(0, 8),
               });
             }
+
+            // Set auth state AFTER guest data handling completes
+            // This ensures wipeGuestData() finishes before Electric starts syncing
+            setAuthState(true, userId, deviceId);
+          } else {
+            // Already upgraded, just set auth state
+            setAuthState(true, userId, deviceId);
           }
         } else {
           // Guest mode (no session)
@@ -177,6 +184,9 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
           });
           setAuthState(false, null, deviceId);
           hasUpgradedRef.current = false;
+
+          // Note: Guest mode initialization (presets + CAS scan) is handled
+          // by a separate component to ensure proper coordination
         }
       } catch (error) {
         logger.error("auth", "Failed to load session", { error });
@@ -208,12 +218,80 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthStateManager>
+        <GuestModeInitializer />
         <ElectricInitializer />
         <SyncManager />
         {children}
       </AuthStateManager>
     </QueryClientProvider>
   );
+}
+
+/**
+ * Initialize guest mode when user is not authenticated
+ * Handles presets initialization and CAS scan
+ */
+function GuestModeInitializer() {
+  const hasInitializedRef = useRef(false);
+
+  useEffect(() => {
+    async function checkAndInitialize() {
+      // Check if user is authenticated
+      const { loadSession } = await import("./auth/session");
+      const sessionInfo = await loadSession();
+
+      const isGuest = !sessionInfo || !sessionInfo.userId;
+
+      if (isGuest && !hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+
+        const { getDeviceId } = await import("@deeprecall/data");
+        const deviceId = getDeviceId();
+
+        // Check if blob tables are empty (need initialization)
+        const { db } = await import("@deeprecall/data/db");
+        const [blobsMetaCount, deviceBlobsCount] = await Promise.all([
+          db.blobsMeta.count(),
+          db.deviceBlobs.count(),
+        ]);
+
+        if (blobsMetaCount === 0 && deviceBlobsCount === 0) {
+          logger.info(
+            "auth",
+            "Mobile guest mode: Initializing (presets + CAS scan)"
+          );
+
+          const { initializeGuestMode } = await import("@deeprecall/data");
+          const { CapacitorBlobStorage } = await import(
+            "./blob-storage/capacitor"
+          );
+          const cas = new CapacitorBlobStorage();
+
+          try {
+            const result = await initializeGuestMode(cas, deviceId);
+            logger.info("auth", "✅ Mobile guest mode initialized", {
+              presetsInitialized: result.presetsInitialized,
+              blobsScanned: result.blobsScanned,
+              blobsCoordinated: result.blobsCoordinated,
+            });
+          } catch (error) {
+            logger.error("auth", "Failed to initialize mobile guest mode", {
+              error,
+            });
+          }
+        } else {
+          logger.debug("auth", "Mobile guest mode: Data already initialized", {
+            blobsMetaCount,
+            deviceBlobsCount,
+          });
+        }
+      }
+    }
+
+    checkAndInitialize();
+  }, []);
+
+  return null;
 }
 
 /**

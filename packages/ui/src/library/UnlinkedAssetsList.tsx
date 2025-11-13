@@ -5,65 +5,88 @@
  */
 
 import { useState, useMemo } from "react";
-import { Package, Link, ChevronDown, ChevronUp } from "lucide-react";
-import type { Asset } from "@deeprecall/core";
-import { useAssets, useEdges } from "@deeprecall/data/hooks";
+import {
+  Package,
+  Link,
+  ChevronDown,
+  ChevronUp,
+  Monitor,
+  Cloud,
+  CloudOff,
+} from "lucide-react";
+import type { Asset, BlobWithMetadata } from "@deeprecall/core";
+import { useAssets, useEdges, useDeviceBlobs } from "@deeprecall/data/hooks";
 import { assetsElectric } from "@deeprecall/data/repos";
+import { getDeviceId } from "@deeprecall/data/utils/deviceId";
 import { MarkdownPreview } from "../components/MarkdownPreview";
+import { SimplePDFViewer } from "../components/SimplePDFViewer";
 import { logger } from "@deeprecall/telemetry";
 
 // Platform-specific operations interface (minimal)
 export interface UnlinkedAssetsListOperations {
-  // Blob operations (server-specific)
+  // Asset/blob operations
   renameBlob: (hash: string, filename: string) => Promise<void>;
   fetchBlobContent: (hash: string) => Promise<string>;
+  deleteAsset: (assetId: string) => Promise<void>;
 }
 
 interface UnlinkedAssetsListProps {
   operations: UnlinkedAssetsListOperations;
-  onLinkAsset: (asset: Asset) => void;
   onViewAsset: (asset: Asset) => void;
-  onMoveToInbox: (assetId: string) => void;
+  LinkBlobDialog: React.ComponentType<{
+    blob: BlobWithMetadata;
+    onSuccess: () => void;
+    onCancel: () => void;
+  }>;
+  getBlobUrl: (sha256: string) => string;
 }
 
 export function UnlinkedAssetsList({
   operations,
-  onLinkAsset,
   onViewAsset,
-  onMoveToInbox,
+  LinkBlobDialog,
+  getBlobUrl,
 }: UnlinkedAssetsListProps) {
-  const { renameBlob, fetchBlobContent } = operations;
+  const { renameBlob, fetchBlobContent, deleteAsset } = operations;
 
   // Fetch data using Electric hooks
   const { data: allAssets = [] } = useAssets();
   const { data: allEdges = [] } = useEdges();
+  const { data: deviceBlobs = [] } = useDeviceBlobs();
+  const currentDeviceId = getDeviceId();
 
   // Compute unlinked assets (inline useUnlinkedAssets logic)
   const unlinkedAssets = useMemo(() => {
-    // Get all standalone assets (no workId)
-    const standaloneAssets = allAssets.filter((asset) => !asset.workId);
+    // Asset IDs that should be excluded (linked to works)
+    const linkedAssetIds = new Set<string>();
 
-    // Get asset IDs that are linked via "contains" relation
-    const assetIds = new Set(allAssets.map((a) => a.id));
-    const linkedAssetIds = new Set(
-      allEdges
-        .filter(
-          (edge) => edge.relation === "contains" && assetIds.has(edge.toId)
-        )
-        .map((edge) => edge.toId)
-    );
-
-    // Filter to only assets that are NOT in any edges
-    const unlinkedMap = new Map<string, Asset>();
-    for (const asset of standaloneAssets) {
-      if (!linkedAssetIds.has(asset.id)) {
-        unlinkedMap.set(asset.id, asset);
+    // 1. Exclude assets with direct workId link
+    allAssets.forEach((asset) => {
+      if (asset.workId) {
+        linkedAssetIds.add(asset.id);
       }
-    }
+    });
 
-    return Array.from(unlinkedMap.values());
+    // 2. Exclude assets that are targets of "contains" edges
+    const assetIds = new Set(allAssets.map((a) => a.id));
+    allEdges.forEach((edge) => {
+      if (edge.relation === "contains" && assetIds.has(edge.toId)) {
+        linkedAssetIds.add(edge.toId);
+      }
+    });
+
+    // 3. Exclude assets that are sources of edges (pointing to other entities)
+    allEdges.forEach((edge) => {
+      if (assetIds.has(edge.fromId)) {
+        linkedAssetIds.add(edge.fromId);
+      }
+    });
+
+    // Return only truly unlinked assets
+    return allAssets.filter((asset) => !linkedAssetIds.has(asset.id));
   }, [allAssets, allEdges]);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [linkingAsset, setLinkingAsset] = useState<Asset | null>(null);
   const [assetContextMenu, setAssetContextMenu] = useState<{
     x: number;
     y: number;
@@ -78,6 +101,38 @@ export function UnlinkedAssetsList({
   } | null>(null);
 
   const hasUnlinkedAssets = unlinkedAssets && unlinkedAssets.length > 0;
+
+  // Helper to get availability status for an asset
+  const getAvailabilityStatus = (sha256: string) => {
+    const blobsForHash = deviceBlobs.filter((db) => db.sha256 === sha256);
+    const isOnCurrentDevice = blobsForHash.some(
+      (db) =>
+        db.deviceId === currentDeviceId &&
+        db.present === true &&
+        db.health === "healthy"
+    );
+    const isOnOtherDevices = blobsForHash.some(
+      (db) => db.deviceId !== currentDeviceId && db.present === true
+    );
+    const deviceNames = blobsForHash
+      .filter((db) => db.present === true)
+      .map((db) => db.deviceId.split("-")[0]) // Get first part of device ID
+      .filter((name, index, self) => self.indexOf(name) === index); // Unique names
+
+    if (
+      !blobsForHash.length ||
+      !blobsForHash.some((db) => db.present === true)
+    ) {
+      return { status: "missing" as const, deviceNames: [] };
+    }
+    if (isOnCurrentDevice) {
+      return { status: "local" as const, deviceNames };
+    }
+    if (isOnOtherDevices) {
+      return { status: "remote" as const, deviceNames };
+    }
+    return { status: "missing" as const, deviceNames: [] };
+  };
 
   // Helper to get filename without extension for display
   const getDisplayName = (filename: string | null) => {
@@ -228,27 +283,12 @@ export function UnlinkedAssetsList({
   };
 
   // Handle asset delete
-  const handleAssetDelete = async (assetId: string, hash: string) => {
+  const handleAssetDelete = async (assetId: string) => {
     try {
-      // Delete asset (Electric-synced)
-      await assetsElectric.deleteAsset(assetId);
-
-      // Also delete blob from server (best effort)
-      try {
-        // Note: We pass the hash to a platform-specific blob delete endpoint
-        // This is handled by the wrapper, not by the renameBlob operation
-        // For now, we'll just delete the asset; blob cleanup can be done separately
-      } catch (blobError) {
-        logger.warn(
-          "ui",
-          "Failed to delete blob from server, but asset was removed",
-          { error: blobError, hash, assetId }
-        );
-      }
-
+      await deleteAsset(assetId);
       setPendingDelete(null);
     } catch (error) {
-      logger.error("ui", "Delete failed", { error, hash, assetId });
+      logger.error("ui", "Delete failed", { error, assetId });
       alert(
         `Delete failed: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -467,18 +507,48 @@ export function UnlinkedAssetsList({
                     </div>
                   )}
 
-                  {/* Link button */}
+                  {/* Availability status icon + Link button */}
                   {!isRenaming && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onLinkAsset(asset);
-                      }}
-                      className="shrink-0 p-1.5 text-blue-500 hover:bg-blue-500/10 rounded transition-colors"
-                      title="Link to work"
-                    >
-                      <Link className="w-4 h-4" />
-                    </button>
+                    <div className="shrink-0 flex items-center gap-1">
+                      {(() => {
+                        const availability = getAvailabilityStatus(
+                          asset.sha256
+                        );
+                        const tooltipText =
+                          availability.status === "local"
+                            ? `Available locally${availability.deviceNames.length > 1 ? ` (and on: ${availability.deviceNames.filter((n) => !n.includes(currentDeviceId.split("-")[0])).join(", ")})` : ""}`
+                            : availability.status === "remote"
+                              ? `Available on: ${availability.deviceNames.join(", ")}`
+                              : "Missing from all devices";
+
+                        return (
+                          <div
+                            title={tooltipText}
+                            className="p-1.5 rounded transition-colors"
+                          >
+                            {availability.status === "local" && (
+                              <Monitor className="w-4 h-4 text-green-500" />
+                            )}
+                            {availability.status === "remote" && (
+                              <Cloud className="w-4 h-4 text-blue-500" />
+                            )}
+                            {availability.status === "missing" && (
+                              <CloudOff className="w-4 h-4 text-red-500" />
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLinkingAsset(asset);
+                        }}
+                        className="p-1.5 text-blue-500 hover:bg-blue-500/10 rounded transition-colors"
+                        title="Link to work"
+                      >
+                        <Link className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -510,20 +580,8 @@ export function UnlinkedAssetsList({
             </button>
             <button
               onClick={() => {
-                onMoveToInbox(assetContextMenu.asset.id);
-                setAssetContextMenu(null);
-              }}
-              className="w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-neutral-700 transition-colors"
-            >
-              Move to inbox
-            </button>
-            <button
-              onClick={() => {
                 if (pendingDelete === assetContextMenu.asset.id) {
-                  handleAssetDelete(
-                    assetContextMenu.asset.id,
-                    assetContextMenu.asset.sha256
-                  );
+                  handleAssetDelete(assetContextMenu.asset.id);
                   setAssetContextMenu(null);
                 } else {
                   setPendingDelete(assetContextMenu.asset.id);
@@ -541,6 +599,26 @@ export function UnlinkedAssetsList({
             </button>
           </div>
         </>
+      )}
+
+      {/* Link Blob Dialog */}
+      {linkingAsset && (
+        <LinkBlobDialog
+          blob={{
+            sha256: linkingAsset.sha256,
+            size: Number(linkingAsset.bytes),
+            mime: linkingAsset.mime,
+            filename: linkingAsset.filename,
+            pageCount: linkingAsset.pageCount
+              ? Number(linkingAsset.pageCount)
+              : undefined,
+            path: null,
+            mtime_ms: Date.now(),
+            created_ms: Date.now(),
+          }}
+          onSuccess={() => setLinkingAsset(null)}
+          onCancel={() => setLinkingAsset(null)}
+        />
       )}
 
       {/* Markdown Viewer */}

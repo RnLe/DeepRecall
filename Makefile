@@ -64,6 +64,10 @@ clean:
 	@echo "Cleaning python..."
 	sudo rm -rf python/__pycache__
 	sudo rm -rf python/**/__pycache__
+	@echo "Cleaning any node_modules..."
+	sudo rm -rf **/node_modules
+	@echo "Cleaning any Rust build files..."
+	sudo rm -rf apps/*/src-tauri/target
 	@echo "✅ Clean complete!"
 
 # Build Windows desktop app from WSL2

@@ -119,6 +119,39 @@ export async function updateBlobHealth(
 }
 
 /**
+ * Update device blob status (present + health + localPath)
+ * Used during scans to restore missing blobs
+ */
+export async function updateDeviceBlobStatus(
+  sha256: string,
+  deviceId: string,
+  present: boolean,
+  health: BlobHealth,
+  localPath: string | null
+): Promise<void> {
+  if (isAuthenticated()) {
+    await buffer.enqueue({
+      table: "device_blobs",
+      op: "update",
+      payload: {
+        sha256,
+        deviceId,
+        present,
+        health,
+        localPath,
+      },
+    });
+  }
+
+  logger.info("sync.coordination", "Updated device blob status (enqueued)", {
+    sha256: sha256.slice(0, 16),
+    deviceId,
+    present,
+    health,
+  });
+}
+
+/**
  * Delete device blob entry
  */
 export async function deleteDeviceBlob(

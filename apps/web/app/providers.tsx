@@ -80,7 +80,7 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
     }
 
     if (status === "authenticated" && session?.user) {
-      // User signed in - update auth state
+      // User signed in - handle auth state and upgrade/wipe flow
       const userId = session.user.id || session.user.email || "unknown";
 
       logger.info("auth", "User authenticated, updating auth state", {
@@ -88,9 +88,9 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
         deviceId,
       });
 
-      setAuthState(true, userId, deviceId);
-
       // Perform guest→user upgrade once per session using centralized flow
+      // IMPORTANT: This must complete BEFORE setAuthState to prevent race conditions
+      // with Electric sync (which triggers when userId is set)
       if (!hasUpgradedRef.current) {
         hasUpgradedRef.current = true;
 
@@ -129,80 +129,16 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
               userId: userId.slice(0, 8),
             });
           }
+
+          // Note: setAuthState is now called INSIDE handleSignIn (after wipe, before CAS rescan)
+          // This ensures isAuthenticated() returns true during CAS coordination
         })();
       }
+      // Note: Don't call setAuthState here - handleSignIn calls it internally
+      // at the right time (after wipe, before CAS rescan) to ensure proper coordination.
     } else {
       // User signed out or no session - guest mode
       logger.info("auth", "User not authenticated, guest mode", { deviceId });
-
-      // If transitioning from authenticated → unauthenticated, clear blob metadata
-      // This prevents guest users from seeing previous user's blob metadata
-      if (
-        prevStatusRef.current === "authenticated" &&
-        status === "unauthenticated"
-      ) {
-        logger.info("auth", "Sign-out detected, clearing data");
-
-        // First, clear the write buffer to prevent 401 errors
-        import("@deeprecall/data").then(({ getFlushWorker }) => {
-          const flushWorker = getFlushWorker();
-          if (flushWorker) {
-            const buffer = flushWorker.getBuffer();
-            buffer
-              .clear()
-              .then(() => {
-                logger.info("auth", "Write buffer cleared");
-              })
-              .catch((error) => {
-                logger.error("auth", "Failed to clear write buffer", {
-                  error,
-                });
-              });
-          }
-        });
-
-        // Then clear blob metadata and local tables
-        import("@deeprecall/data/db").then(({ db }) => {
-          Promise.all([
-            db.blobsMeta.clear(),
-            db.deviceBlobs.clear(),
-            db.replicationJobs.clear(),
-          ])
-            .then(() => {
-              logger.info(
-                "auth",
-                "Blob metadata cleared, rescanning local CAS"
-              );
-
-              // After clearing, rescan CAS to repopulate metadata for guest mode
-              import("@deeprecall/data/utils/coordinateLocalBlobs").then(
-                ({ coordinateAllLocalBlobs }) => {
-                  import("@/src/blob-storage/web").then(
-                    ({ getWebBlobStorage }) => {
-                      const cas = getWebBlobStorage();
-                      coordinateAllLocalBlobs(cas, deviceId)
-                        .then((result) => {
-                          logger.info("auth", "CAS rescan complete", result);
-                        })
-                        .catch((error) => {
-                          logger.error("auth", "CAS rescan failed", { error });
-                        });
-                    }
-                  );
-                }
-              );
-            })
-            .catch((error) => {
-              logger.error(
-                "auth",
-                "Failed to clear blob metadata on sign-out",
-                {
-                  error,
-                }
-              );
-            });
-        });
-      }
 
       setAuthState(false, null, deviceId);
 
@@ -261,97 +197,109 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
 /**
  * Wrapper that conditionally renders SyncManager based on auth
- * Also handles initial CAS scan for guests
+ * Also handles guest mode initialization (presets + CAS scan)
  */
 function ConditionalSyncManager() {
   const { data: session, status } = useSession();
   const isGuest = status !== "loading" && !session;
-  const userId = session?.user?.id;
-  const hasScannedRef = useRef(false);
 
-  // Initial CAS scan for guests when tables are empty
+  // CRITICAL: Use global auth state userId, NOT session.user.id
+  // The session loads immediately on page refresh, but handleSignIn() must complete
+  // BEFORE we start syncing (to allow wipeGuestData() to finish first).
+  // The global userId is only set AFTER handleSignIn() completes.
+  const [authUserId, setAuthUserId] = useState<string | undefined>(undefined);
+  const hasInitializedGuestRef = useRef(false);
+  const previousIsGuestRef = useRef<boolean | null>(null);
+
+  // Subscribe to global auth state changes
   useEffect(() => {
-    if (isGuest && !hasScannedRef.current) {
-      const deviceId = getDeviceId();
+    import("@deeprecall/data").then(({ getUserId, subscribeToAuthState }) => {
+      // Set initial value
+      const userId = getUserId();
+      setAuthUserId(userId || undefined);
 
-      // Check if blob tables are empty
-      import("@deeprecall/data/db").then(({ db }) => {
-        Promise.all([db.blobsMeta.count(), db.deviceBlobs.count()])
-          .then(([blobsMetaCount, deviceBlobsCount]) => {
-            if (blobsMetaCount === 0 && deviceBlobsCount === 0) {
-              logger.info(
-                "auth",
-                "Guest mode: Blob tables empty, scanning CAS"
-              );
-
-              // Use scanAndCheckCAS for both scan and integrity check in one pass
-              import("@deeprecall/data").then(({ scanAndCheckCAS }) => {
-                import("@/src/blob-storage/web").then(
-                  ({ getWebBlobStorage }) => {
-                    const cas = getWebBlobStorage();
-                    scanAndCheckCAS(cas, deviceId)
-                      .then((result) => {
-                        logger.info("auth", "Initial CAS scan complete", {
-                          scanned: result.scan.scanned,
-                          coordinated: result.scan.coordinated,
-                          skipped: result.scan.skipped,
-                        });
-
-                        if (result.integrity.hasIssues) {
-                          logger.warn(
-                            "auth",
-                            "CAS integrity check found missing files on startup",
-                            {
-                              totalChecked: result.integrity.totalChecked,
-                              missing: result.integrity.missing,
-                            }
-                          );
-                        } else {
-                          logger.info(
-                            "auth",
-                            "CAS integrity check passed on startup",
-                            {
-                              totalChecked: result.integrity.totalChecked,
-                            }
-                          );
-                        }
-
-                        hasScannedRef.current = true;
-                      })
-                      .catch((error) => {
-                        logger.error("auth", "Initial CAS scan failed", {
-                          error,
-                        });
-                      });
-                  }
-                );
-              });
-            } else {
-              logger.debug(
-                "auth",
-                "Guest mode: Blob tables have data, skipping scan",
-                {
-                  blobsMetaCount,
-                  deviceBlobsCount,
-                }
-              );
-              hasScannedRef.current = true;
-            }
-          })
-          .catch((error) => {
-            logger.error("auth", "Failed to check blob table counts", {
-              error,
-            });
-          });
+      // Subscribe to changes
+      const unsubscribe = subscribeToAuthState(() => {
+        const newUserId = getUserId();
+        setAuthUserId(newUserId || undefined);
       });
-    }
-  }, [isGuest]);
+
+      return unsubscribe;
+    });
+  }, []); // Only run once on mount
+
+  // Initialize guest mode when transitioning to guest state
+  useEffect(() => {
+    // Skip if still loading
+    if (status === "loading") return;
+
+    // Check if we transitioned to guest mode (or first time in guest mode)
+    const wasNotGuest = previousIsGuestRef.current === false;
+    const isFirstCheck = previousIsGuestRef.current === null;
+    const shouldInitialize =
+      isGuest &&
+      !hasInitializedGuestRef.current &&
+      (wasNotGuest || isFirstCheck);
+
+    previousIsGuestRef.current = isGuest;
+
+    if (!shouldInitialize) return;
+
+    hasInitializedGuestRef.current = true;
+    const deviceId = getDeviceId();
+
+    // Check if blob tables are empty (need initialization)
+    import("@deeprecall/data/db").then(({ db }) => {
+      Promise.all([db.blobsMeta.count(), db.deviceBlobs.count()])
+        .then(([blobsMetaCount, deviceBlobsCount]) => {
+          if (blobsMetaCount === 0 && deviceBlobsCount === 0) {
+            logger.info(
+              "auth",
+              "Guest mode: Initializing (presets + CAS scan)"
+            );
+
+            // Use centralized initializeGuestMode for sequential execution
+            import("@deeprecall/data").then(({ initializeGuestMode }) => {
+              import("@/src/blob-storage/web").then(({ getWebBlobStorage }) => {
+                const cas = getWebBlobStorage();
+
+                initializeGuestMode(cas, deviceId)
+                  .then((result) => {
+                    logger.info("auth", "✅ Guest mode initialized", {
+                      presetsInitialized: result.presetsInitialized,
+                      blobsScanned: result.blobsScanned,
+                      blobsCoordinated: result.blobsCoordinated,
+                    });
+                  })
+                  .catch((error) => {
+                    logger.error("auth", "Failed to initialize guest mode", {
+                      error,
+                    });
+                  });
+              });
+            });
+          } else {
+            logger.debug(
+              "auth",
+              "Guest mode: Blob tables have data, skipping initialization",
+              {
+                blobsMetaCount,
+                deviceBlobsCount,
+              }
+            );
+          }
+        })
+        .catch((error) => {
+          logger.error("auth", "Failed to check blob tables", { error });
+        });
+    });
+  }, [isGuest, status]);
 
   // SECURITY: Only pass userId when authenticated to enable multi-tenant filtering
   // When userId is undefined, the hooks will skip Electric sync (guest mode)
   // This prevents guests from seeing other users' blob metadata
-  useBlobsMetaSync(userId);
-  useDeviceBlobsSync(userId);
+  useBlobsMetaSync(authUserId);
+  useDeviceBlobsSync(authUserId);
 
   // Note: We DO NOT run automatic integrity checks here.
   // Integrity checks should only be run manually by the user or on specific triggers
@@ -365,7 +313,7 @@ function ConditionalSyncManager() {
     return null;
   }
 
-  return <SyncManager userId={userId} />;
+  return <SyncManager userId={authUserId} />;
 }
 
 /**

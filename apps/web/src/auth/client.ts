@@ -14,113 +14,29 @@ import { signOut as nextAuthSignOut } from "next-auth/react";
 /**
  * Custom sign-out that clears all user data from Dexie
  *
- * Clears both Electric-synced tables and blob metadata to prevent
- * guest users from seeing the previous user's data.
+ * Clears Dexie tables to prevent data leakage between users.
+ * Does NOT delete blob files from CAS - they will be rescanned in guest mode.
+ *
+ * Uses centralized cleanup utilities for robust, sequential execution.
  */
 export async function signOut(options?: { callbackUrl?: string }) {
   console.log("[Auth] Starting sign-out process...");
 
   try {
-    // Import Dexie database
-    const { db } = await import("@deeprecall/data/db/dexie");
+    // Clear all Dexie tables and Electric databases
+    // This is fast because it's all client-side IndexedDB operations
+    const { clearAllUserData } = await import("@deeprecall/data");
+    await clearAllUserData();
+    console.log("[Auth] ✅ All user data cleared");
 
-    // Clear all user data tables synchronously
-    console.log("[Auth] Clearing Dexie tables...");
+    // Note: We do NOT delete blob files from CAS storage here because:
+    // 1. It's slow (500ms+ per blob via API)
+    // 2. Guest mode will rescan CAS and recreate metadata anyway
+    // 3. Blobs are content-addressed, so they're safe to reuse
 
-    await Promise.all([
-      // Electric-synced content tables
-      db.works.clear(),
-      db.assets.clear(),
-      db.authors.clear(),
-      db.annotations.clear(),
-      db.cards.clear(),
-      db.reviewLogs.clear(),
-      db.collections.clear(),
-      db.edges.clear(),
-      db.presets.clear(),
-      db.activities.clear(),
-      db.boards.clear(),
-      db.strokes.clear(),
-
-      // Blob coordination tables (MUST clear to prevent data leakage)
-      db.blobsMeta.clear(),
-      db.deviceBlobs.clear(),
-      db.replicationJobs.clear(),
-
-      // Local optimistic tables
-      db.works_local.clear(),
-      db.assets_local.clear(),
-      db.authors_local.clear(),
-      db.annotations_local.clear(),
-      db.cards_local.clear(),
-      db.reviewLogs_local.clear(),
-      db.collections_local.clear(),
-      db.edges_local.clear(),
-      db.presets_local.clear(),
-      db.activities_local.clear(),
-      db.boards_local.clear(),
-      db.strokes_local.clear(),
-    ]);
-
-    console.log("[Auth] ✅ All Dexie tables cleared successfully");
-
-    // Delete Electric's own IndexedDB databases
-    if (typeof indexedDB !== "undefined") {
-      console.log("[Auth] Deleting Electric IndexedDB databases...");
-      const databases = await indexedDB.databases();
-
-      const deletePromises = databases
-        .filter((dbInfo) => dbInfo.name?.startsWith("electric-"))
-        .map(
-          (dbInfo) =>
-            new Promise<void>((resolve) => {
-              const deleteRequest = indexedDB.deleteDatabase(dbInfo.name!);
-              deleteRequest.onsuccess = () => {
-                console.log(
-                  `[Auth] ✅ Deleted Electric database: ${dbInfo.name}`
-                );
-                resolve();
-              };
-              deleteRequest.onerror = () => {
-                console.warn(
-                  `[Auth] ⚠️  Failed to delete ${dbInfo.name}:`,
-                  deleteRequest.error
-                );
-                resolve(); // Continue anyway
-              };
-              deleteRequest.onblocked = () => {
-                console.warn(`[Auth] ⚠️  Deletion of ${dbInfo.name} blocked`);
-                resolve(); // Continue anyway
-              };
-            })
-        );
-
-      await Promise.all(deletePromises);
-      console.log("[Auth] ✅ Electric databases cleanup complete");
-    }
-
-    console.log("[Auth] ✅ Sign-out data cleanup complete");
-
-    // Rescan CAS to populate guest metadata
-    console.log("[Auth] Rescanning CAS for guest mode...");
-    const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
-    const { coordinateAllLocalBlobs } = await import(
-      "@deeprecall/data/utils/coordinateLocalBlobs"
-    );
-    const { getWebBlobStorage } = await import("@/src/blob-storage/web");
-
-    const deviceId = getDeviceId();
-    const cas = getWebBlobStorage();
-
-    coordinateAllLocalBlobs(cas, deviceId)
-      .then((result) => {
-        console.log("[Auth] ✅ CAS rescan complete", result);
-      })
-      .catch((error) => {
-        console.error("[Auth] ⚠️  CAS rescan failed:", error);
-      });
+    console.log("[Auth] ✅ Sign-out cleanup complete");
   } catch (error) {
-    console.error("[Auth] ❌ Failed to clear IndexedDB on sign-out:", error);
+    console.error("[Auth] ❌ Failed to clear data on sign-out:", error);
     // Continue with sign-out even if cleanup fails
   }
 

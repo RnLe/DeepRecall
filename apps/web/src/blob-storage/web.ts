@@ -16,6 +16,56 @@ import type {
  * Uses Next.js API routes backed by better-sqlite3
  */
 export class WebBlobStorage implements BlobCAS {
+  private static readonly LIST_CACHE_TTL_MS = 5000;
+  private listCachePromise: Promise<BlobWithMetadata[]> | null = null;
+  private listCacheTimestamp = 0;
+
+  private invalidateListCache() {
+    this.listCachePromise = null;
+    this.listCacheTimestamp = 0;
+  }
+
+  private isListCacheExpired(): boolean {
+    if (!this.listCachePromise) {
+      return true;
+    }
+    if (this.listCacheTimestamp === 0) {
+      // Cache is in-flight; let callers reuse the pending promise.
+      return false;
+    }
+    return (
+      Date.now() - this.listCacheTimestamp > WebBlobStorage.LIST_CACHE_TTL_MS
+    );
+  }
+
+  private getCachedList(): Promise<BlobWithMetadata[]> {
+    if (this.listCachePromise && !this.isListCacheExpired()) {
+      return this.listCachePromise;
+    }
+
+    const fetchPromise = this.fetchBlobsFromServer()
+      .then((data) => {
+        this.listCacheTimestamp = Date.now();
+        return data;
+      })
+      .catch((error) => {
+        this.invalidateListCache();
+        throw error;
+      });
+
+    this.listCachePromise = fetchPromise;
+    this.listCacheTimestamp = 0;
+    return fetchPromise;
+  }
+
+  private async fetchBlobsFromServer(): Promise<BlobWithMetadata[]> {
+    const response = await fetch("/api/library/blobs");
+    if (!response.ok) {
+      throw new Error(`Failed to list blobs: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
   /**
    * Check if blob exists locally
    */
@@ -44,11 +94,8 @@ export class WebBlobStorage implements BlobCAS {
    * List all blobs with metadata
    */
   async list(opts?: { orphanedOnly?: boolean }): Promise<BlobWithMetadata[]> {
-    const response = await fetch("/api/library/blobs");
-    if (!response.ok) {
-      throw new Error(`Failed to list blobs: ${response.statusText}`);
-    }
-    return response.json();
+    const blobs = await this.getCachedList();
+    return blobs;
   }
 
   /**
@@ -99,7 +146,9 @@ export class WebBlobStorage implements BlobCAS {
       throw new Error(error.error || "Upload failed");
     }
 
-    return response.json();
+    const result = await response.json();
+    this.invalidateListCache();
+    return result;
   }
 
   /**
@@ -116,6 +165,8 @@ export class WebBlobStorage implements BlobCAS {
         .catch(() => ({ error: "Delete failed" }));
       throw new Error(error.error || "Delete failed");
     }
+
+    this.invalidateListCache();
   }
 
   /**
@@ -134,6 +185,8 @@ export class WebBlobStorage implements BlobCAS {
         .catch(() => ({ error: "Rename failed" }));
       throw new Error(error.error || "Rename failed");
     }
+
+    this.invalidateListCache();
   }
 
   /**
@@ -150,7 +203,9 @@ export class WebBlobStorage implements BlobCAS {
       throw new Error(`Scan failed: ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    this.invalidateListCache();
+    return result;
   }
 
   /**

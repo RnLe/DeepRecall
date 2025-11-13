@@ -5,28 +5,19 @@
  */
 
 import React, { useState } from "react";
-import type { BlobWithMetadata } from "@deeprecall/core";
 import type { Asset } from "@deeprecall/core";
-import type { BlobCAS } from "@deeprecall/blob-storage";
-import { assetsElectric } from "@deeprecall/data/repos";
-import { FileInbox } from "./FileInbox";
 import { UnlinkedAssetsList } from "./UnlinkedAssetsList";
 import { SimplePDFViewer } from "../components/SimplePDFViewer";
-import { MarkdownPreview } from "../components/MarkdownPreview";
 import { logger } from "@deeprecall/telemetry";
 
 // Platform-specific operations interface (minimal)
 export interface LibraryLeftSidebarOperations {
-  // Blob operations (require server CAS access)
-  fetchOrphanedBlobs: () => Promise<BlobWithMetadata[]>;
-  orphanedBlobs: BlobWithMetadata[];
-  isLoadingBlobs: boolean;
+  // Asset/blob operations
   fetchBlobContent: (sha256: string) => Promise<string>;
   renameBlob: (hash: string, filename: string) => Promise<void>;
-  deleteBlob: (hash: string) => Promise<void>;
+  deleteAsset: (assetId: string) => Promise<void>;
   uploadFiles: (files: FileList) => Promise<void>;
   getBlobUrl: (sha256: string) => string;
-  cas: BlobCAS;
 }
 
 interface LibraryLeftSidebarProps {
@@ -43,89 +34,19 @@ export function LibraryLeftSidebar({
   operations,
   LinkBlobDialog,
 }: LibraryLeftSidebarProps) {
-  const {
-    orphanedBlobs,
-    isLoadingBlobs,
-    fetchOrphanedBlobs,
-    fetchBlobContent,
-    renameBlob,
-    deleteBlob,
-    uploadFiles,
-    getBlobUrl,
-  } = operations;
+  const { fetchBlobContent, renameBlob, deleteAsset, uploadFiles, getBlobUrl } =
+    operations;
 
-  const [linkingBlob, setLinkingBlob] = useState<BlobWithMetadata | null>(null);
-  const [viewingBlob, setViewingBlob] = useState<BlobWithMetadata | null>(null);
   const [viewingAsset, setViewingAsset] = useState<Asset | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
-
-  // Refetch function for when blobs are modified
-  const refreshOrphanedBlobs = async () => {
-    try {
-      await fetchOrphanedBlobs();
-    } catch (error) {
-      logger.error("ui", "Failed to refresh orphaned blobs", { error });
-    }
-  };
-
-  // Handle converting blob to asset when dropped on unlinked assets section
-  const handleConvertBlobToAsset = async (blob: BlobWithMetadata) => {
-    try {
-      // Create asset from blob using Electric
-      await assetsElectric.createAsset({
-        kind: "asset",
-        sha256: blob.sha256,
-        filename: blob.filename || "Untitled",
-        bytes: blob.size,
-        mime: blob.mime,
-        pageCount: blob.pageCount,
-        role: "main",
-        favorite: false,
-      });
-
-      // Refresh data - blob will now appear as unlinked asset
-      await refreshOrphanedBlobs();
-    } catch (error) {
-      logger.error("ui", "Convert to asset failed", {
-        error,
-        hash: blob.sha256,
-        filename: blob.filename,
-      });
-      alert(
-        `Convert to asset failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  };
-
-  // Handle move asset to inbox (remove from Electric, becomes orphaned blob)
-  const handleMoveToInbox = async (assetId: string) => {
-    try {
-      await assetsElectric.deleteAsset(assetId);
-
-      // Refresh data - asset will now appear as orphaned blob
-      await refreshOrphanedBlobs();
-    } catch (error) {
-      logger.error("ui", "Move to inbox failed", { error, assetId });
-      alert(
-        `Move to inbox failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  };
 
   // Handle file uploads
   const handleFileUpload = async (files: FileList) => {
     setIsUploading(true);
     try {
       await uploadFiles(files);
-
-      // Refresh the orphaned blobs list
-      await refreshOrphanedBlobs();
     } catch (error) {
       logger.error("ui", "File upload failed", {
         error,
@@ -217,65 +138,19 @@ export function LibraryLeftSidebar({
         )}
 
         <div className="p-3 space-y-4">
-          {/* New Files (Inbox) Section */}
-          <FileInbox
-            newFiles={orphanedBlobs}
-            onLinkBlob={(blob: BlobWithMetadata) => setLinkingBlob(blob)}
-            onViewBlob={(blob: BlobWithMetadata) => setViewingBlob(blob)}
-            onRenameBlob={renameBlob}
-            onDeleteBlob={deleteBlob}
-            onRefreshBlobs={refreshOrphanedBlobs}
-            fetchBlobContent={fetchBlobContent}
-            cas={operations.cas}
-          />
-
           {/* Unlinked Assets Section */}
           <UnlinkedAssetsList
             operations={{
               renameBlob,
               fetchBlobContent,
-            }}
-            onLinkAsset={(asset: Asset) => {
-              // Convert asset to blob format for LinkBlobDialog
-              const blobData: BlobWithMetadata = {
-                sha256: asset.sha256,
-                size: asset.bytes,
-                mime: asset.mime,
-                filename: asset.filename,
-                pageCount: asset.pageCount,
-                path: null,
-                mtime_ms: Date.now(),
-                created_ms: Date.now(),
-              };
-              setLinkingBlob(blobData);
+              deleteAsset,
             }}
             onViewAsset={(asset: Asset) => setViewingAsset(asset)}
-            onMoveToInbox={handleMoveToInbox}
+            LinkBlobDialog={LinkBlobDialog}
+            getBlobUrl={getBlobUrl}
           />
         </div>
       </div>
-
-      {/* Link dialog */}
-      {linkingBlob && (
-        <LinkBlobDialog
-          blob={linkingBlob}
-          onSuccess={() => {
-            setLinkingBlob(null);
-            refreshOrphanedBlobs();
-          }}
-          onCancel={() => setLinkingBlob(null)}
-        />
-      )}
-
-      {/* PDF Viewer for blobs */}
-      {viewingBlob && (
-        <SimplePDFViewer
-          sha256={viewingBlob.sha256}
-          title={viewingBlob.filename || "Untitled"}
-          onClose={() => setViewingBlob(null)}
-          getBlobUrl={getBlobUrl}
-        />
-      )}
 
       {/* PDF Viewer for assets */}
       {viewingAsset && (

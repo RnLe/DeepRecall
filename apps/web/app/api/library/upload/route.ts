@@ -1,7 +1,7 @@
 /**
  * POST /api/library/upload
  * Upload a file and return blob metadata
- * Client will create Asset in Dexie
+ * Asset creation happens client-side via coordinateSingleBlob()
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -91,7 +91,8 @@ export async function POST(request: NextRequest) {
       mime: mimeType,
     });
 
-    // Return blob metadata (client will create Asset in Dexie)
+    // Return blob metadata
+    // Asset creation happens client-side via coordinateSingleBlob()
     return NextResponse.json({
       blob: {
         sha256: hash,

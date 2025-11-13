@@ -21,6 +21,24 @@ let _userId: string | null = null;
 let _deviceId: string | null = null;
 
 /**
+ * Auth state change listeners
+ * Used by React components to re-render when auth state changes
+ */
+type AuthStateListener = () => void;
+const _listeners = new Set<AuthStateListener>();
+
+/**
+ * Subscribe to auth state changes
+ *
+ * @param listener - Function to call when auth state changes
+ * @returns Unsubscribe function
+ */
+export function subscribeToAuthState(listener: AuthStateListener): () => void {
+  _listeners.add(listener);
+  return () => _listeners.delete(listener);
+}
+
+/**
  * Set the global authentication state
  *
  * Called by app providers (web/desktop/mobile) on:
@@ -48,6 +66,9 @@ export function setAuthState(
     deviceId: deviceId ? "***" : null,
     transition: wasAuthenticated !== authenticated,
   });
+
+  // Notify all listeners of the change
+  _listeners.forEach((listener) => listener());
 }
 
 /**

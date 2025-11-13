@@ -1,6 +1,6 @@
 /**
  * LibraryLeftSidebar Component (Next.js wrapper)
- * Container for new files (inbox) and unlinked assets sections
+ * Container for unlinked assets section
  */
 
 "use client";
@@ -10,27 +10,15 @@ import {
   type LibraryLeftSidebarOperations,
 } from "@deeprecall/ui";
 import { LinkBlobDialog } from "./LinkBlobDialog";
-import { useOrphanedBlobsFromElectric } from "@deeprecall/data/hooks";
 import { useWebBlobStorage } from "@/src/hooks/useBlobStorage";
 import { getDeviceId } from "@deeprecall/data";
+import { assetsElectric } from "@deeprecall/data/repos";
 
 export function LibraryLeftSidebar() {
   const cas = useWebBlobStorage();
-  const currentDeviceId = getDeviceId();
-  const orphanedBlobsQuery = useOrphanedBlobsFromElectric(currentDeviceId);
 
-  // Platform-specific blob operations
+  // Platform-specific operations
   const operations: LibraryLeftSidebarOperations = {
-    fetchOrphanedBlobs: async () => {
-      // Return cached data or refetch
-      if (orphanedBlobsQuery.data) {
-        return orphanedBlobsQuery.data;
-      }
-      await orphanedBlobsQuery.refetch();
-      return orphanedBlobsQuery.data || [];
-    },
-    orphanedBlobs: orphanedBlobsQuery.data || [],
-    isLoadingBlobs: orphanedBlobsQuery.isLoading,
     fetchBlobContent: async (sha256: string) => {
       const response = await fetch(`/api/blob/${sha256}`);
       if (!response.ok) throw new Error("Failed to fetch blob content");
@@ -47,22 +35,12 @@ export function LibraryLeftSidebar() {
         throw new Error(error.error || "Rename failed");
       }
     },
-    deleteBlob: async (hash: string) => {
-      const response = await fetch(`/api/library/blobs/${hash}/delete`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deleteFile: true }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Delete failed");
-      }
+    deleteAsset: async (assetId: string) => {
+      // Delete asset from Electric (blob remains in CAS)
+      await assetsElectric.deleteAsset(assetId);
     },
     uploadFiles: async (files: FileList) => {
       const { getDeviceId } = await import("@deeprecall/data/utils/deviceId");
-      const { coordinateSingleBlob } = await import(
-        "@deeprecall/data/utils/coordinateLocalBlobs"
-      );
       const deviceId = getDeviceId();
 
       const uploadPromises = Array.from(files).map(async (file) => {
@@ -80,18 +58,12 @@ export function LibraryLeftSidebar() {
           throw new Error(error.error || "Upload failed");
         }
 
-        const result = await response.json();
-
-        // Coordinate blob metadata after upload
-        await coordinateSingleBlob(result.blob, deviceId);
-
-        return result;
+        return response.json();
       });
 
       await Promise.all(uploadPromises);
     },
     getBlobUrl: (sha256: string) => `/api/blob/${sha256}`,
-    cas,
   };
 
   return (

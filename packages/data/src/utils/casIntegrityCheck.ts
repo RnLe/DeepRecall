@@ -149,25 +149,41 @@ export async function getMissingBlobs(deviceId: string): Promise<string[]> {
  *
  * @param cas - CAS instance
  * @param deviceId - Current device ID
+ * @param skipIntegrityCheck - Skip integrity check (useful for admin scans where we trust CAS)
  * @returns Promise with scan and integrity results
  */
 export async function scanAndCheckCAS(
   cas: BlobCAS,
-  deviceId: string
+  deviceId: string,
+  skipIntegrityCheck = false
 ): Promise<{
   scan: { scanned: number; coordinated: number; skipped: number };
   integrity: IntegrityCheckResult;
 }> {
   logger.info("cas", "Starting CAS scan + integrity check", {
     deviceId: deviceId.slice(0, 8),
+    skipIntegrityCheck,
   });
 
   // First, scan CAS for new blobs
   const { coordinateAllLocalBlobs } = await import("./coordinateLocalBlobs");
   const scanResult = await coordinateAllLocalBlobs(cas, deviceId);
 
-  // Then, check integrity of existing claims
-  const integrityResult = await checkCASIntegrity(cas, deviceId);
+  // Then, check integrity of existing claims (unless skipped)
+  let integrityResult: IntegrityCheckResult;
+
+  if (skipIntegrityCheck) {
+    logger.info("cas", "Skipping integrity check (admin scan)");
+    integrityResult = {
+      totalChecked: scanResult.scanned,
+      available: scanResult.scanned,
+      missing: 0,
+      missingHashes: [],
+      hasIssues: false,
+    };
+  } else {
+    integrityResult = await checkCASIntegrity(cas, deviceId);
+  }
 
   logger.info("cas", "CAS scan + integrity check complete", {
     scanned: scanResult.scanned,

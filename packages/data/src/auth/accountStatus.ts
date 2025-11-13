@@ -74,9 +74,18 @@ export async function isNewAccount(
  * Prevents mixing guest data with server data.
  * Clears both entity tables AND blob metadata tables.
  * Invalidates React Query caches to update UI immediately.
+ *
+ * IMPORTANT: This must run BEFORE Electric sync starts to avoid race conditions.
  */
 export async function wipeGuestData(): Promise<void> {
   logger.info("auth", "Wiping guest data (existing account detected)");
+
+  // Invalidate React Query caches BEFORE wipe to clear UI immediately
+  if (typeof window !== "undefined" && (window as any).__queryClient) {
+    const queryClient = (window as any).__queryClient;
+    await queryClient.invalidateQueries();
+    logger.info("auth", "UI caches invalidated BEFORE wipe");
+  }
 
   const { db } = await import("../db");
 

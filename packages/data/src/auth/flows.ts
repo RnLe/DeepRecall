@@ -124,25 +124,73 @@ export async function handleSignIn(
         userId: userId.slice(0, 8),
       });
 
-      // Check CAS integrity after wipe (detect missing files)
-      const { checkCASIntegrity } = await import("../utils/casIntegrityCheck");
-      const integrityResult = await checkCASIntegrity(blobStorage, deviceId);
+      // Set auth state BEFORE CAS rescan so isAuthenticated() returns true
+      // This ensures CAS coordination uses write buffer (not local-only)
+      const { setAuthState } = await import("../auth");
+      setAuthState(true, userId, deviceId);
 
-      if (integrityResult.hasIssues) {
+      logger.info("auth", "Auth state set before CAS rescan", {
+        userId: userId.slice(0, 8),
+      });
+
+      // Wait for Electric to sync blob metadata from server to Dexie
+      // This prevents CAS rescan from creating duplicates
+      logger.info("auth", "Waiting for Electric to sync blob metadata...", {
+        userId: userId.slice(0, 8),
+      });
+
+      const { db } = await import("../db");
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+
+      while (attempts < maxAttempts) {
+        const blobsMetaCount = await db.blobsMeta.count();
+        const deviceBlobsCount = await db.deviceBlobs.count();
+
+        if (blobsMetaCount > 0 && deviceBlobsCount > 0) {
+          logger.info("auth", "Electric blob sync detected", {
+            userId: userId.slice(0, 8),
+            blobsMetaCount,
+            deviceBlobsCount,
+          });
+          // Wait a bit more to ensure Dexie transaction is fully committed
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          break;
+        }
+
+        attempts++;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      if (attempts >= maxAttempts) {
         logger.warn(
           "auth",
-          "CAS integrity check found missing files after wipe",
-          {
-            totalChecked: integrityResult.totalChecked,
-            missing: integrityResult.missing,
-            missingCount: integrityResult.missingHashes.length,
-          }
+          "Electric blob sync timeout - proceeding with CAS rescan anyway",
+          { userId: userId.slice(0, 8) }
         );
-      } else {
-        logger.info("auth", "CAS integrity check passed after wipe", {
-          totalChecked: integrityResult.totalChecked,
-        });
       }
+
+      // Rescan CAS to find local files and coordinate with server
+      // Any new local files will be uploaded via write buffer
+      logger.info("auth", "Starting CAS rescan after Electric sync", {
+        userId: userId.slice(0, 8),
+      });
+
+      const { coordinateAllLocalBlobs } = await import(
+        "../utils/coordinateLocalBlobs"
+      );
+      const scanResult = await coordinateAllLocalBlobs(
+        blobStorage,
+        deviceId,
+        userId
+      );
+
+      logger.info("auth", "CAS rescan complete", {
+        userId: userId.slice(0, 8),
+        scanned: scanResult.scanned,
+        coordinated: scanResult.coordinated,
+        skipped: scanResult.skipped,
+      });
 
       return {
         action: "wipe",

@@ -1,446 +1,626 @@
 # Data Architecture Guide
 
-> **How DeepRecall handles data across Web, Desktop, and Mobile platforms**
-
-## Core Philosophy
-
-DeepRecall uses a **two-layer architecture** to separate platform-specific storage from cross-platform coordination:
-
-- **Layer 1 (Platform-Local)**: Files on disk, platform-specific APIs (Next.js routes, Tauri Rust, Capacitor plugins)
-- **Layer 2 (Electric Sync)**: Small metadata tables synced across devices via Postgres + ElectricSQL
-- **Bridge Layer**: Platform-agnostic hooks that combine both layers
-
-This pattern applies to **all data types**: blobs (files), annotations, cards, works, etc. The key insight: **large/platform-specific data stays local; small metadata syncs everywhere.**
+> **Complete reference for data storage, sync, and platform abstraction in DeepRecall**
+>
+> **Companion to**: `GUIDE_OPTIMISTIC_UPDATES.md` (implementation patterns)
 
 ---
 
-## Architecture Layers
+## 🎯 Core Philosophy
+
+DeepRecall's data architecture solves a fundamental challenge: **enable instant offline-first UX across Web, Desktop, and Mobile while keeping data synced.**
+
+The solution uses **two distinct data patterns** depending on data characteristics:
+
+1. **Standard Entities** (works, assets, annotations, cards, etc.) → Full optimistic update pattern with local changes
+2. **Blob Coordination** (blobs_meta, device_blobs) → Metadata-only sync without optimistic merge
+
+Both patterns share the same underlying layers but differ in how local changes are handled.
+
+---
+
+## 📊 What Data Exists?
+
+### User Content Entities (Optimistic Pattern)
+
+**Library Entities** - Core academic organization:
+
+- `works` - Abstract intellectual works (books, papers)
+- `assets` - Concrete files linked to works (PDFs, EPUBs)
+- `authors` - Researchers and writers
+- `activities` - Courses and projects
+- `collections` - Curated groupings
+- `edges` - Typed relationships between entities
+- `presets` - Study deck templates
+
+**Annotation Entities** - Reading and note-taking:
+
+- `annotations` - PDF highlights, comments, notes
+
+**Study Entities** - Spaced repetition system:
+
+- `cards` - Flashcards (extracted from annotations)
+- `reviewLogs` - Study session history
+
+**Whiteboard Entities** - Infinite canvas:
+
+- `boards` - Whiteboard documents
+- `strokes` - Ink strokes and shapes
+
+### Blob Coordination Tables (Special Pattern)
+
+**Purpose**: Coordinate file presence across devices without storing actual bytes.
+
+- `blobs_meta` - Authoritative metadata for all blobs globally (sha256 PK, size, mime, pageCount, etc.)
+- `device_blobs` - Tracks which device has which blob (device_id, sha256, present, health)
+- `replication_jobs` - Future: P2P/cloud sync tasks
+
+**Key Difference**: Blob files remain platform-local (too large to sync via Electric). Only small metadata syncs.
+
+---
+
+## 🏗️ Architecture Layers
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    APPLICATION (apps/web)                     │
-│  Page Components + Platform-Specific Wrappers                │
-│                                                               │
-│  const cas = useWebBlobStorage();  // Platform injection     │
-│  const stats = useBlobStats(cas);   // Platform-agnostic!    │
-└───────────────────────────────────────────────────────────────┘
-                           ▲
-                           │
-┌──────────────────────────────────────────────────────────────┐
-│              BRIDGE LAYER (@deeprecall/data/hooks)            │
-│  Platform-agnostic hooks accepting injected adapters         │
-│                                                               │
-│  • useOrphanedBlobs(cas: BlobCAS)    - Combine CAS + Assets │
-│  • useBlobStats(cas: BlobCAS)        - Cross-layer stats    │
-│  • useAssets() / useWorks()          - Pure Electric        │
-└──────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                             │
+│  React Components (Web, Desktop, Mobile)                         │
+│                                                                   │
+│  • Use platform-agnostic hooks (useWorks, useAssets)            │
+│  • Inject platform-specific adapters (BlobCAS)                  │
+└─────────────────────────────────────────────────────────────────┘
+                                 ▲
+                                 │
+┌─────────────────────────────────────────────────────────────────┐
+│                BRIDGE LAYER (@deeprecall/data/hooks)             │
+│  Platform-agnostic React hooks                                   │
+│                                                                   │
+│  • useWorks() → queries merged data from Dexie                  │
+│  • useOrphanedBlobs(cas) → combines CAS + Assets                │
+│  • useBlobStats(cas) → cross-layer statistics                   │
+└─────────────────────────────────────────────────────────────────┘
            ▲                                      ▲
            │                                      │
-  ┌────────┴───────────┐               ┌─────────┴────────────┐
-  │  LAYER 1: CAS      │               │  LAYER 2: ELECTRIC   │
-  │  (Local Storage)   │               │  (Metadata Sync)     │
-  │                    │               │                      │
-  │  Platform-specific │               │  • useBlobsMeta()    │
-  │  implementations:  │               │  • useDeviceBlobs()  │
-  │                    │               │  • useAssets()       │
-  │  • Web: SQLite +   │               │  • useAnnotations()  │
-  │    API routes      │               │                      │
-  │  • Desktop: Rust + │               │  Postgres + Electric │
-  │    filesystem      │               │  (synced tables)     │
-  │  • Mobile: Native  │               │                      │
-  │    FS plugins      │               │                      │
-  └────────────────────┘               └──────────────────────┘
+┌──────────┴──────────┐               ┌──────────┴────────────────┐
+│  LAYER 1: LOCAL     │               │  LAYER 2: ELECTRIC SYNC   │
+│  (Platform-Specific)│               │  (Platform-Agnostic)      │
+│                     │               │                           │
+│  • Dexie (IndexedDB)│               │  • Postgres (Neon DB)     │
+│    - Synced tables  │◄──────────────┤  • Electric SQL (SSE)     │
+│    - Local tables   │   Electric    │  • Multi-tenant RLS       │
+│  • CAS (Files)      │   Sync        │  • Owner filtering        │
+│    - Web: FS+SQLite │               │                           │
+│    - Desktop: Rust  │               │                           │
+│    - Mobile: Native │               │                           │
+└─────────────────────┘               └───────────────────────────┘
 ```
 
-### Layer 1: Platform-Local Storage (CAS)
+### Layer 1: Local Storage (Platform-Specific)
 
-**Purpose**: Store actual bytes on disk (too large/specific to sync)
+**Dexie (IndexedDB)** - Browser-side database:
 
-**Interface** (`@deeprecall/blob-storage`):
+- **Synced tables**: `works`, `assets`, `annotations`, `blobsMeta`, etc. (← from Electric)
+- **Local tables**: `works_local`, `assets_local`, etc. (← pending optimistic changes)
+- **Schema**: packages/data/src/db/dexie.ts (v3, 1230 lines)
+
+**CAS (Content-Addressed Storage)** - Platform-local files:
+
+- **Web**: Filesystem + better-sqlite3 (apps/web/src/server/cas.ts)
+- **Desktop**: Rust filesystem commands (apps/desktop/src-tauri/src/commands/blobs.rs)
+- **Mobile**: Capacitor Filesystem plugin (apps/mobile/src/blob-storage/capacitor.ts)
+- **Interface**: `BlobCAS` in packages/blob-storage/src/index.ts
+
+### Layer 2: Electric Sync (Platform-Agnostic)
+
+**Postgres** - Source of truth:
+
+- **Neon DB** (shared across dev + prod)
+- **RLS (Row-Level Security)**: Filters by `owner_id` for multi-tenancy
+- **Migrations**: migrations/\*.sql
+
+**Electric SQL** - Real-time sync:
+
+- **SSE streaming** (regardless of config setting - see GUIDE_OPTIMISTIC_UPDATES.md)
+- **Electric Cloud** (managed service)
+- **Shape subscriptions**: Filtered by `owner_id` via Electric hooks
+
+### Layer 3: Bridge Hooks (Platform-Agnostic)
+
+**Purpose**: Combine Layer 1 + Layer 2 for useful cross-platform queries.
+
+**Examples**:
+
+- `useOrphanedBlobs(cas)` - Blobs in CAS without Asset metadata
+- `useBlobStats(cas)` - Storage statistics across layers
+- `useWorks()` - Merged works (synced + local changes)
+
+**Pattern**: Accept platform-specific adapters (like `BlobCAS`) as parameters, enabling reuse across Web/Desktop/Mobile.
+
+---
+
+## 🔄 Two Data Patterns
+
+### Pattern 1: Standard Entities (Full Optimistic Updates)
+
+**Applies to**: works, assets, annotations, cards, reviewLogs, boards, strokes, authors, activities, collections, edges, presets
+
+**4-File Repository Structure** (per entity):
+
+```
+packages/data/src/repos/
+├── works.local.ts      # Instant writes to Dexie + WriteBuffer enqueue
+├── works.electric.ts   # Electric shape subscriptions (background sync)
+├── works.merged.ts     # Merge synced + local for UI queries
+└── works.cleanup.ts    # Remove local changes after sync confirmation
+```
+
+**Data Flow** (see GUIDE_OPTIMISTIC_UPDATES.md for full details):
+
+```
+1. User Action → works.local.ts
+   ↓
+2. Write to works_local (Dexie) → [INSTANT] UI update
+   ↓
+3. Enqueue to WriteBuffer (if authenticated)
+   ↓
+4. Background flush to /api/writes/batch → Postgres
+   ↓
+5. Electric syncs back → useWorksSync() → works (Dexie)
+   ↓
+6. Cleanup: Remove from works_local
+   ↓
+7. UI queries works.merged.ts → combines works + works_local
+```
+
+**Guest Mode**: Steps 3-5 skipped (local-only, no WriteBuffer enqueue).
+
+**Hooks**:
+
+- **Sync Hook** (internal): `useWorksSync(userId)` - Called once by SyncManager
+- **Query Hook** (public): `useWorks()` - Called by components, returns merged data
+
+### Pattern 2: Blob Coordination (Metadata-Only Sync)
+
+**Applies to**: blobs_meta, device_blobs, replication_jobs
+
+**2-File Repository Structure** (no merge/cleanup):
+
+```
+packages/data/src/repos/
+├── blobs-meta.local.ts    # Guest mode: Direct Dexie writes
+├── blobs-meta.writes.ts   # Authenticated: WriteBuffer enqueue
+└── blobs-meta.electric.ts # Electric shape subscriptions
+
+├── device-blobs.writes.ts   # WriteBuffer enqueue (no local file)
+└── device-blobs.electric.ts # Electric shape subscriptions
+```
+
+**Why Different?**
+
+- No user-facing optimistic updates needed (coordination happens server-side)
+- File upload is atomic operation (not incremental like editing a work title)
+- CAS already provides instant feedback (file exists locally)
+- Metadata sync is secondary confirmation, not primary UX
+
+**Data Flow**:
+
+```
+1. User uploads file → cas.put(file)
+   ↓
+2. CAS stores to disk (platform-specific) → [INSTANT] file available
+   ↓
+3. coordinateBlobUpload() → WriteBuffer enqueue (if authenticated)
+   ↓
+4. Background flush to /api/writes/batch → Postgres
+   ↓
+5. Electric syncs back → useBlobsMetaSync() → blobsMeta (Dexie)
+   ↓
+6. UI queries useBlobsMeta() → reads directly from blobsMeta (no merge)
+```
+
+**Guest Mode**: Step 3-5 skipped. Guest uses blobs-meta.local.ts for direct Dexie writes (local tracking only).
+
+**Hooks**:
+
+- **Sync Hook** (internal): `useBlobsMetaSync(userId)` - Called once by ConditionalSyncManager
+- **Query Hook** (public): `useBlobsMeta()` - Reads directly from Dexie blobsMeta table
+
+---
+
+## 👤 Guest vs Authenticated Mode
+
+### Guest Mode (Not Signed In)
+
+**Behavior**:
+
+- ✅ Full local functionality (works, assets, annotations, cards, blobs)
+- ✅ Instant UI updates (Dexie writes)
+- ❌ No Electric sync (`userId = undefined` → filters out all data)
+- ❌ No WriteBuffer enqueue (`isAuthenticated()` checks prevent server writes)
+
+**Implementation**:
+
+- `isAuthenticated()` checks in all \*.local.ts repos
+- Electric shape subscriptions use `where: userId ? 'owner_id = ...' : '1 = 0'` (never matches)
+- Guest data stored in Dexie only
+
+**Data Flow**:
+
+```
+User Action → Local Dexie (works_local, blobsMeta) → [INSTANT] UI
+                    ↓
+              Merge Layer (synced + local)
+                    ↓
+              React Query → Component
+```
+
+### Authenticated Mode (Signed In)
+
+**Behavior**:
+
+- ✅ Full local functionality (instant UI)
+- ✅ Electric sync (real-time across devices)
+- ✅ WriteBuffer enqueue (background server sync)
+- ✅ Multi-tenant isolation (`owner_id` filtering)
+
+**Implementation**:
+
+- `isAuthenticated()` returns true → WriteBuffer enqueue enabled
+- Electric shape subscriptions filter by `owner_id = '${userId}'`
+- `SyncManager` calls all sync hooks once with userId parameter
+
+**Data Flow**:
+
+```
+User Action → Local Dexie (works_local) → [INSTANT] UI
+                    ↓                    ↓
+              Merge Layer          WriteBuffer (enqueue)
+                    ↓                    ↓
+              React Query          POST /api/writes/batch
+                    ↓                    ↓
+              Component            Postgres (LWW)
+                                        ↓
+                                   Electric Sync (SSE)
+                                        ↓
+                                   useWorksSync(userId)
+                                        ↓
+                              works (synced) → Cleanup works_local
+```
+
+### Guest Upgrade Flow
+
+When user signs in after using app as guest:
+
+1. **Auth state updates**: `setAuthState(true, userId, deviceId)`
+2. **handleSignIn()** checks for guest data: `hasGuestData()`
+3. **If guest data exists**: `upgradeGuestToUser(userId, cas, apiBaseUrl)`
+   - Updates `owner_id` on all local entities
+   - Flushes pending WriteBuffer changes
+   - Syncs blobs to server coordination tables
+4. **Electric sync starts**: SyncManager calls all sync hooks with userId
+5. **Result**: Guest data becomes part of user's synced library
+
+📎 See `GUIDE_GUEST_SIGN_IN.md` for the precise ordering of `handleSignIn`/`handleSignOut`, polling windows, and CAS coordination steps shared across platforms.
+
+---
+
+## 🔌 Platform Injection Pattern
+
+### Problem
+
+UI components need to access blobs, but blob storage is platform-specific:
+
+- Web: API routes + server filesystem
+- Desktop: Tauri Rust commands
+- Mobile: Capacitor Filesystem plugin
+
+### Solution: Inject Platform-Specific Adapters
+
+**1. Define Platform-Agnostic Interface**
 
 ```typescript
-interface BlobCAS {
+// packages/blob-storage/src/index.ts
+export interface BlobCAS {
   has(sha256: string): Promise<boolean>;
   stat(sha256: string): Promise<BlobInfo | null>;
   list(): Promise<BlobWithMetadata[]>;
   getUrl(sha256: string): string;
-  put(file: any): Promise<BlobWithMetadata>;
+  put(source: any, opts?: any): Promise<BlobWithMetadata>;
   delete(sha256: string): Promise<void>;
+  scan(): Promise<ScanResult>;
 }
 ```
 
-**Implementations**:
-
-- **Web**: `apps/web/src/blob-storage/web.ts` → Wraps Next.js API routes
-- **Desktop** (future): `apps/desktop/src/blob-storage/tauri.ts` → Rust commands
-- **Mobile** (future): `apps/mobile/src/blob-storage/capacitor.ts` → Native plugins
-
-### Layer 2: Electric Coordination
-
-**Purpose**: Small metadata tables synced across all devices
-
-**Tables** (Postgres):
-
-- `blobs_meta` (sha256, size, mime, created_at) - Authoritative metadata
-- `device_blobs` (device_id, sha256, present, health) - Inventory
-- `assets`, `works`, `annotations`, `cards`, etc. - Domain entities
-
-**Repos** (`packages/data/src/repos/`):
+**2. Implement Per-Platform**
 
 ```typescript
-// Electric read shapes
-export const blobsMetaElectric = {
-  useAllBlobsMeta: () => useShape({ url, table: "blobs_meta" }),
-  useBlobMeta: (sha256: string) => useShape({ where: `sha256='${sha256}'` }),
-};
+// apps/web/src/blob-storage/web.ts
+export class WebBlobStorage implements BlobCAS {
+  async list() {
+    const response = await fetch("/api/library/blobs");
+    return response.json();
+  }
+  getUrl(sha256: string) {
+    return `/api/blob/${sha256}`;
+  }
+  // ... other methods wrap API routes
+}
 
-// Local writes (optimistic)
-export const blobsMetaLocal = {
-  create: async (meta) => {
-    await db.blobs_meta_local.add({ ...meta, _op: "insert" });
-    await buffer.enqueue({
-      table: "blobs_meta",
-      operation: "insert",
-      payload: meta,
-    });
-  },
-};
-
-// Merged view (combines synced + local)
-export const blobsMetaMerged = {
-  getAll: async () =>
-    mergeBlobsMeta(
-      await db.blobs_meta.toArray(),
-      await db.blobs_meta_local.toArray()
-    ),
-};
+// apps/desktop/src/blob-storage/tauri.ts
+export class TauriBlobStorage implements BlobCAS {
+  async list() {
+    return invoke<BlobWithMetadata[]>("list_blobs");
+  }
+  getUrl(sha256: string) {
+    return `asset://blobs/${sha256}`;
+  }
+  // ... other methods call Tauri commands
+}
 ```
 
-### Bridge Layer: Platform-Agnostic Hooks
-
-**Purpose**: Combine Layer 1 + Layer 2 for useful cross-platform queries
-
-**Example** (`packages/data/src/hooks/useLibrary.ts`):
+**3. Provide Platform Hook**
 
 ```typescript
-import type { BlobCAS } from "@deeprecall/blob-storage";
-import { useAssets } from "./useAssets";
+// apps/web/src/hooks/useBlobStorage.ts
+export function useWebBlobStorage(): BlobCAS {
+  return useMemo(() => getWebBlobStorage(), []);
+}
 
-/**
- * Orphaned blobs = CAS blobs without Asset metadata
- * Platform-agnostic by accepting CAS adapter
- */
+// apps/desktop/src/hooks/useBlobStorage.ts
+export function useTauriBlobStorage(): BlobCAS {
+  return useMemo(() => getTauriBlobStorage(), []);
+}
+```
+
+**4. Create Platform-Agnostic Bridge Hooks**
+
+```typescript
+// packages/data/src/hooks/useBlobBridge.ts
 export function useOrphanedBlobs(cas: BlobCAS) {
-  const { data: assets = [] } = useAssets(); // Layer 2: Electric
-
-  return useQuery({
-    queryKey: ["orphanedBlobs", assets.length],
-    queryFn: async () => {
-      const blobs = await cas.list(); // Layer 1: Platform-specific
-      const assetHashes = new Set(assets.map((a) => a.sha256));
-      return blobs.filter((b) => !assetHashes.has(b.hash));
-    },
+  const { data: assets } = useAssets(); // Layer 2: Electric
+  const { data: casBlobs } = useQuery({
+    queryKey: ["blobs", "cas", "all"],
+    queryFn: () => cas.list(), // Layer 1: Platform CAS
   });
-}
 
-// Usage in Web app:
-import { useWebBlobStorage } from "@/hooks/useBlobStorage";
-const cas = useWebBlobStorage(); // Platform injection
-const orphans = useOrphanedBlobs(cas); // Platform-agnostic!
+  // Combine: Blobs in CAS without Asset metadata
+  return casBlobs?.filter(
+    (blob) => !assets?.some((a) => a.sha256 === blob.sha256)
+  );
+}
 ```
+
+**5. Use in Components**
+
+```typescript
+// apps/web/app/library/page.tsx
+export default function LibraryPage() {
+  const cas = useWebBlobStorage(); // Platform injection
+  const orphans = useOrphanedBlobs(cas); // Platform-agnostic!
+
+  return <OrphanedBlobsList orphans={orphans} />;
+}
+```
+
+**Benefits**:
+
+- ✅ UI components are platform-agnostic
+- ✅ CAS implementation can change without affecting UI
+- ✅ Easy to add new platforms (just implement BlobCAS)
+- ✅ Testing: Mock CAS adapter in tests
 
 ---
 
-## Folder Structure
+## 🎛️ SyncManager Pattern
+
+### Problem
+
+Multiple components subscribing to Electric shapes → multiple writers to same Dexie table → **race conditions**.
+
+### Solution: Centralize Sync Logic
+
+**One Component Calls All Sync Hooks**:
+
+```typescript
+// apps/web/app/providers.tsx
+function SyncManager({ userId }: { userId?: string }) {
+  // Call ALL sync hooks exactly once
+  useWorksSync(userId);
+  useAssetsSync(userId);
+  useActivitiesSync(userId);
+  useAnnotationsSync(userId);
+  useCardsSync(userId);
+  useReviewLogsSync(userId);
+  useBoardsSync(userId);
+  useStrokesSync(userId);
+  useAuthorsSync(userId);
+  useCollectionsSync(userId);
+  useEdgesSync(userId);
+  usePresetsSync(userId);
+  useReplicationJobsSync(userId);
+  // Blob coordination syncs in ConditionalSyncManager (see below)
+
+  return null; // No UI, just sync orchestration
+}
+
+// Special case: Blob syncs run even for guests (needed for CAS coordination)
+function ConditionalSyncManager() {
+  const { data: session, status } = useSession();
+  const userId = status === "authenticated" ? session?.user?.id : undefined;
+
+  // Always sync blob metadata (even for guests, but filtered by userId)
+  useBlobsMetaSync(userId);
+  useDeviceBlobsSync(userId);
+
+  // Only sync user entities when authenticated
+  if (userId) {
+    return <SyncManager userId={userId} />;
+  }
+  return null;
+}
+```
+
+**Components Use Read-Only Hooks**:
+
+```typescript
+// apps/web/app/library/page.tsx
+export default function LibraryPage() {
+  const { data: works } = useWorks(); // ✅ Read-only, no side effects
+  const { data: assets } = useAssets(); // ✅ Safe to call from many components
+
+  return <WorksList works={works} />;
+}
+```
+
+**Why This Works**:
+
+- ✅ Each entity syncs exactly once (SyncManager)
+- ✅ No race conditions from multiple Electric connections
+- ✅ Clean separation: sync hooks (internal) vs. query hooks (public)
+- ✅ Guest mode: SyncManager only renders when authenticated
+
+**See Also**: `GUIDE_SYNC_ARCHITECTURE.md` for detailed rationale.
+
+---
+
+## 📦 Folder Structure & File Counts
 
 ### Monorepo Layout
 
 ```
 packages/
-├── core/                      # Zod schemas, types, utilities
-│   └── src/schemas/           # Asset, Work, Annotation, Card schemas
-├── data/                      # Data layer (Dexie + Electric + WriteBuffer)
+├── core/                        # Zod schemas, types, utilities
+│   └── src/schemas/             # Entity schemas (20+ files)
+├── data/                        # Data layer (platform-agnostic)
 │   ├── src/
-│   │   ├── db/                # Dexie setup + migrations
-│   │   ├── repos/             # *.local, *.electric, *.merged, *.cleanup
-│   │   ├── hooks/             # Platform-agnostic React hooks
-│   │   ├── utils/             # merge logic, deviceId
-│   │   ├── electric.ts        # Electric client + shape hook
-│   │   └── writeBuffer.ts     # Background sync queue
-├── blob-storage/              # CAS interface (platform-agnostic)
-│   └── src/index.ts           # BlobCAS interface + types
-├── ui/                        # Shared components (library, reader, study)
-│   └── src/
-│       ├── library/           # WorkCard, OrphanedBlobs, LibraryHeader
-│       ├── reader/            # PDF viewer, annotations overlay
-│       └── study/             # SRS session, card review
-└── pdf/                       # PDF.js utilities (platform-agnostic)
+│   │   ├── db/dexie.ts          # Dexie schema (v3, 1230 lines)
+│   │   ├── repos/               # 60+ files (4 per entity typically)
+│   │   │   ├── works.local.ts
+│   │   │   ├── works.electric.ts
+│   │   │   ├── works.merged.ts
+│   │   │   ├── works.cleanup.ts
+│   │   │   ├── blobs-meta.local.ts
+│   │   │   ├── blobs-meta.electric.ts
+│   │   │   ├── blobs-meta.writes.ts   # No merged/cleanup!
+│   │   │   └── ...
+│   │   ├── hooks/               # 20+ React hooks
+│   │   │   ├── useWorks.ts
+│   │   │   ├── useBlobsMeta.ts
+│   │   │   └── useBlobBridge.ts
+│   │   ├── utils/               # deviceId, merge logic
+│   │   ├── auth.ts              # Global auth state
+│   │   ├── electric.ts          # Electric client (542 lines)
+│   │   └── writeBuffer.ts       # Background sync queue (582 lines)
+├── blob-storage/                # CAS interface (platform-agnostic)
+│   └── src/index.ts             # BlobCAS interface + types
+└── ui/                          # Shared components
 
 apps/
-├── web/                       # Next.js (Web platform)
-│   ├── app/                   # Pages + API routes
-│   │   ├── api/
-│   │   │   ├── blob/          # Layer 1: Stream files
-│   │   │   ├── library/       # Layer 1: List blobs
-│   │   │   └── writes/        # Layer 2: Write buffer flush
-│   │   ├── library/           # UI: Uses @deeprecall/ui components
-│   │   └── admin/             # UI: Platform-agnostic AdminPanel
+├── web/                         # Next.js (Web platform)
+│   ├── app/                     # Pages + API routes
+│   │   └── api/
+│   │       ├── blob/[sha256]/route.ts    # Stream blobs
+│   │       ├── library/blobs/route.ts    # List blobs
+│   │       └── writes/batch/route.ts     # WriteBuffer flush
+│   └── src/
+│       ├── blob-storage/web.ts           # Web CAS implementation
+│       ├── hooks/
+│       │   └── useBlobStorage.ts         # useWebBlobStorage()
+│       └── server/
+│           ├── cas.ts                    # File scanning, hashing, storage
+│           └── db.ts                     # Drizzle ORM (SQLite for blobs)
+├── desktop/                     # Tauri (Rust backend)
 │   ├── src/
-│   │   ├── blob-storage/      # Layer 1: Web CAS implementation
-│   │   │   └── web.ts         # Wraps /api/blob, /api/library/blobs
-│   │   ├── hooks/             # Platform-specific (3 files)
-│   │   │   ├── useBlobStorage.ts   # useWebBlobStorage() singleton
-│   │   │   ├── useAvatars.ts       # Web-specific avatar upload
-│   │   │   └── useFileQueries.ts   # Web-specific file helpers
-│   │   └── server/            # Layer 1 infrastructure
-│   │       ├── cas.ts         # File scanning, hashing, storage
-│   │       └── db.ts          # Drizzle ORM (SQLite)
-├── desktop/                   # Tauri (future)
-│   └── src/blob-storage/tauri.ts
-└── mobile/                    # Capacitor (future)
-    └── src/blob-storage/capacitor.ts
+│   │   ├── blob-storage/tauri.ts         # Tauri CAS implementation
+│   │   └── hooks/useBlobStorage.ts       # useTauriBlobStorage()
+│   └── src-tauri/src/commands/blobs.rs   # Rust blob commands
+└── mobile/                      # Capacitor (iOS/Android)
+    └── src/
+        ├── blob-storage/capacitor.ts     # Capacitor CAS implementation
+        └── hooks/useBlobStorage.ts       # useCapacitorBlobStorage()
 ```
 
-### Key Insight: Data Separation
+**Key Insight**: Only **3 platform-specific files** per app:
 
-**apps/web/src/**: Platform-specific infrastructure (3 hooks, CAS wrapper, server logic)  
-**packages/data/**: Platform-agnostic data layer (all entities, optimistic updates)  
-**packages/ui/**: Platform-agnostic UI components (inject CAS adapter)
+1. `blob-storage/*.ts` - CAS adapter implementation
+2. `hooks/useBlobStorage.ts` - Platform hook
+3. `server/*` (Web only) - Server-side blob operations
+
+Everything else (`packages/data/`, `packages/ui/`) is platform-agnostic!
 
 ---
 
-## Critical Patterns
+## 🔍 Data Type Inventory
 
-### Pattern 1: Optimistic Updates (All Entities)
+### Entities Following Standard Optimistic Pattern (4 Files Each)
 
-**Mental Model**: User Action → Instant Local Write → Background Sync → Cleanup
+| Entity          | Purpose                       | Postgres Table | Dexie Tables                       | Owner Filter |
+| --------------- | ----------------------------- | -------------- | ---------------------------------- | ------------ |
+| **works**       | Abstract intellectual works   | `works`        | `works`, `works_local`             | `owner_id`   |
+| **assets**      | Concrete files (PDFs, EPUBs)  | `assets`       | `assets`, `assets_local`           | `owner_id`   |
+| **authors**     | Researchers and writers       | `authors`      | `authors`, `authors_local`         | `owner_id`   |
+| **activities**  | Courses and projects          | `activities`   | `activities`, `activities_local`   | `owner_id`   |
+| **collections** | Curated groupings             | `collections`  | `collections`, `collections_local` | `owner_id`   |
+| **edges**       | Typed relationships           | `edges`        | `edges`, `edges_local`             | `owner_id`   |
+| **presets**     | Study deck templates          | `presets`      | `presets`, `presets_local`         | `owner_id`   |
+| **annotations** | PDF highlights, notes         | `annotations`  | `annotations`, `annotations_local` | `owner_id`   |
+| **cards**       | Flashcards (from annotations) | `cards`        | `cards`, `cards_local`             | `owner_id`   |
+| **reviewLogs**  | Study session history         | `review_logs`  | `reviewLogs`, `reviewLogs_local`   | `owner_id`   |
+| **boards**      | Whiteboard documents          | `boards`       | `boards`, `boards_local`           | `owner_id`   |
+| **strokes**     | Ink strokes and shapes        | `strokes`      | `strokes`, `strokes_local`         | `owner_id`   |
 
-```typescript
-// packages/data/src/repos/annotations.local.ts
-export async function createAnnotationLocal(input: CreateAnnotationInput) {
-  const annotation = { ...input, id: uuid(), createdAt: Date.now() };
+**Total**: 12 entity types × 4 files = **48 repository files**
 
-  // Instant: Write to local Dexie table
-  await db.annotations_local.add({
-    id: annotation.id,
-    _op: "insert",
-    _timestamp: Date.now(),
-    data: annotation,
-  });
+### Entities Following Blob Coordination Pattern (2-3 Files Each)
 
-  // Background: Enqueue for Postgres sync
-  await buffer.enqueue({
-    table: "annotations",
-    operation: "insert",
-    payload: annotation,
-  });
+| Entity               | Purpose                       | Postgres Table     | Dexie Table       | Owner Filter |
+| -------------------- | ----------------------------- | ------------------ | ----------------- | ------------ |
+| **blobs_meta**       | Global blob metadata          | `blobs_meta`       | `blobsMeta`       | `owner_id`   |
+| **device_blobs**     | Device-level blob tracking    | `device_blobs`     | `deviceBlobs`     | `owner_id`   |
+| **replication_jobs** | P2P/cloud sync tasks (future) | `replication_jobs` | `replicationJobs` | `owner_id`   |
 
-  return annotation;
-}
+**Total**: 3 entity types × 2-3 files = **7 repository files**
 
-// packages/data/src/repos/annotations.merged.ts
-export async function getMergedAnnotations(sha256: string) {
-  const synced = await db.annotations.where({ sha256 }).toArray();
-  const local = await db.annotations_local.toArray();
-  return mergeChanges(synced, local); // Combine both layers
-}
+### Platform-Local Data (Not Synced)
 
-// packages/data/src/hooks/useAnnotations.ts
-export function usePDFAnnotations(sha256: string) {
-  const electricResult = annotationsElectric.usePDFAnnotations(sha256);
-
-  // Sync Electric → Dexie (CRITICAL: check isLoading!)
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data);
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  // Query merged view (synced + local)
-  const mergedQuery = useQuery({
-    queryKey: ["annotations", "merged", "pdf", sha256],
-    queryFn: () => getMergedAnnotations(sha256),
-    placeholderData: [], // Prevent loading flicker
-  });
-
-  // Cleanup confirmed writes
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      cleanup(electricResult.data).then(() => mergedQuery.refetch());
-    }
-  }, [electricResult.isLoading, electricResult.data]);
-
-  return mergedQuery;
-}
-```
-
-### Pattern 2: Platform Injection (Bridge Layer)
-
-**Mental Model**: UI components are platform-agnostic; platform-specific adapters are injected
-
-```typescript
-// apps/web/src/hooks/useBlobStorage.ts (Platform-specific)
-let casInstance: BlobCAS | null = null;
-
-export function useWebBlobStorage(): BlobCAS {
-  if (!casInstance) {
-    casInstance = {
-      list: async () => fetch("/api/library/blobs").then(r => r.json()),
-      getUrl: (sha256) => `/api/blob/${sha256}`,
-      // ... other methods wrapping Web APIs
-    };
-  }
-  return casInstance;
-}
-
-// packages/ui/src/library/OrphanedBlobs.tsx (Platform-agnostic)
-import type { BlobCAS } from "@deeprecall/blob-storage";
-import { useOrphanedBlobs } from "@deeprecall/data/hooks";
-
-interface Props {
-  cas: BlobCAS; // Injected by platform!
-}
-
-export function OrphanedBlobs({ cas }: Props) {
-  const { data: orphans, isLoading } = useOrphanedBlobs(cas);
-  // ... render orphans
-}
-
-// apps/web/app/library/page.tsx (Platform usage)
-import { OrphanedBlobs } from "@deeprecall/ui/library";
-import { useWebBlobStorage } from "@/hooks/useBlobStorage";
-
-export default function LibraryPage() {
-  const cas = useWebBlobStorage(); // Platform injection
-  return <OrphanedBlobs cas={cas} />;
-}
-```
-
-### Pattern 3: Merged View (3-Phase Merge)
-
-**Mental Model**: Collect all changes per ID, apply sequentially, handle deletes last
-
-```typescript
-// packages/data/src/repos/*.merged.ts
-export function mergeChanges<T extends { id: string }>(
-  synced: T[],
-  local: LocalChange[]
-): T[] {
-  const syncedMap = new Map(synced.map((s) => [s.id, s]));
-  const processedIds = new Set<string>();
-
-  // Phase 1: Collect by operation type
-  const pendingInserts = new Map<string, any>();
-  const pendingUpdates = new Map<string, any[]>(); // Array per ID!
-  const pendingDeletes = new Set<string>();
-
-  for (const change of local) {
-    if (change._op === "insert") {
-      pendingInserts.set(change.id, change.data);
-    } else if (change._op === "update") {
-      if (!pendingUpdates.has(change.id)) pendingUpdates.set(change.id, []);
-      pendingUpdates.get(change.id)!.push(change.data); // Collect ALL updates
-    } else if (change._op === "delete") {
-      pendingDeletes.add(change.id);
-    }
-  }
-
-  const result: T[] = [];
-
-  // Phase 2: Process inserts (may have updates before sync)
-  for (const [id, insert] of pendingInserts) {
-    if (pendingDeletes.has(id)) continue;
-    let merged = insert;
-    const updates = pendingUpdates.get(id);
-    if (updates) {
-      for (const update of updates) merged = { ...merged, ...update };
-    }
-    result.push(merged);
-    processedIds.add(id);
-  }
-
-  // Phase 3: Process synced items with updates
-  for (const [id, updates] of pendingUpdates) {
-    if (processedIds.has(id) || pendingDeletes.has(id)) continue;
-    const synced = syncedMap.get(id);
-    if (synced) {
-      let merged = synced;
-      for (const update of updates) merged = { ...merged, ...update };
-      result.push(merged);
-      processedIds.add(id);
-    }
-  }
-
-  // Phase 4: Add untouched synced items
-  for (const [id, item] of syncedMap) {
-    if (!processedIds.has(id) && !pendingDeletes.has(id)) {
-      result.push(item);
-    }
-  }
-
-  return result;
-}
-```
+| Data Type          | Storage                   | Platform                                           | Purpose                                    |
+| ------------------ | ------------------------- | -------------------------------------------------- | ------------------------------------------ |
+| **Blob files**     | Filesystem + SQLite index | Web: apps/web/data/, Desktop: Rust, Mobile: Native | Actual file bytes (too large for Electric) |
+| **PDF page cache** | IndexedDB (separate DB)   | All                                                | LRU cache for rendered PDF pages           |
+| **Device ID**      | LocalStorage              | All                                                | Persistent device identifier               |
+| **Auth tokens**    | Secure storage            | All                                                | JWT tokens, refresh tokens                 |
 
 ---
 
-## Platform Contracts
+## 🚦 Key Principles
 
-### Adding a New Platform (Desktop/Mobile)
-
-**Step 1**: Implement Layer 1 (CAS adapter)
-
-```typescript
-// apps/desktop/src/blob-storage/tauri.ts
-import { invoke } from "@tauri-apps/api/core";
-import type { BlobCAS, BlobWithMetadata } from "@deeprecall/blob-storage";
-
-export function useTauriBlobStorage(): BlobCAS {
-  return {
-    list: () => invoke<BlobWithMetadata[]>("list_blobs"),
-    getUrl: (sha256) => invoke<string>("get_blob_url", { sha256 }),
-    put: (file) => invoke<BlobWithMetadata>("store_blob", { file }),
-    // ... other methods
-  };
-}
-```
-
-**Step 2**: Inject adapter into UI components
-
-```typescript
-// apps/desktop/src/App.tsx
-import { LibraryPage } from "@deeprecall/ui/library";
-import { useTauriBlobStorage } from "./blob-storage/tauri";
-
-export default function App() {
-  const cas = useTauriBlobStorage(); // Platform injection
-  return <LibraryPage cas={cas} />;
-}
-```
-
-**Step 3**: Layer 2 (Electric) works automatically! 🎉
-
-- Same Electric hooks (`useAssets`, `useWorks`, etc.)
-- Same WriteBuffer queue
-- Same optimistic updates
-- No platform-specific code needed
+1. **Blobs Stay Local** - Never sync large binaries through Electric (only small metadata)
+2. **Electric Coordinates** - Small tables track presence, schedule replication
+3. **Platform Injection** - UI components accept CAS adapters, not platform APIs
+4. **One Writer Per Table** - SyncManager calls all sync hooks exactly once
+5. **Guest Mode First** - Full local functionality without authentication
+6. **Optimistic Everything** - Local write → Instant UI → Background sync (for standard entities)
+7. **Content-Addressed** - Blobs identified by SHA-256 hash (immutable, deduplication)
 
 ---
 
-## Key Takeaways
+## 🔗 See Also
 
-1. **Two-Layer Separation**: Platform-specific storage (Layer 1) + Electric metadata (Layer 2)
-2. **Platform Injection**: UI components accept CAS adapters, not platform APIs
-3. **Optimistic Everything**: Local write → Instant UI → Background sync → Cleanup
-4. **Merged Views**: Combine Electric (synced) + Dexie (local) for seamless offline
-5. **Minimal Platform Code**: Web has only 3 hooks; everything else in `@deeprecall/data`
-
-**Mental Model**: "Where is the file?" (Layer 1) vs "What files exist globally?" (Layer 2)
+- **GUIDE_OPTIMISTIC_UPDATES.md** - Detailed implementation patterns for standard entities
+- **GUIDE_SYNC_ARCHITECTURE.md** - SyncManager pattern rationale and best practices
+- **BLOB_ARCHITECTURE_ANALYSIS.md** - Migration history and phase tracking (historical reference)
+- **CODE_REVIEW_MASTER.md** - Project-wide review checklist
 
 ---
 
-**See Also**:
+## 📈 Architecture Evolution
 
-- `GUIDE_OPTIMISTIC_UPDATES.md` - Detailed optimistic update patterns
-- `REFACTOR_CHECKLIST.md` - Migration progress and milestones
-- `MentalModels.md` - Philosophy and anti-patterns
+**Phase 1** (Complete): Two-layer separation (CAS + Electric)  
+**Phase 2** (Complete): Platform injection pattern  
+**Phase 3** (Complete): Blob coordination tables (blobs_meta, device_blobs)  
+**Phase 4** (Complete): Guest mode support  
+**Phase 5** (In Progress): Blob health monitoring, scan automation  
+**Phase 6** (Future): Cloud sync (S3/MinIO) via replication_jobs  
+**Phase 7** (Future): P2P sync (WebRTC/Tauri channels) for large files
+
+**Current State**: Production-ready for Web/Desktop/Mobile with guest mode, optimistic updates, and blob coordination fully functional.

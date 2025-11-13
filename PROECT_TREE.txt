@@ -1,0 +1,569 @@
+.
+├── CODE_REVIEW_MASTER.md
+├── README_DEV.md
+├── LICENSE
+├── Makefile
+├── package.json
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+├── docker-compose.yml
+│
+├── Documentation (Core Guides)
+│   ├── GUIDE_DATA_ARCHITECTURE.md
+│   ├── GUIDE_OPTIMISTIC_UPDATES.md
+│   ├── GUIDE_SYNC_ARCHITECTURE.md
+│   ├── GUIDE_INKING.md
+│   ├── GUIDE_RENDER_WHITEBOARD.md
+│   ├── GUIDE_NOTES_MODULE.md
+│   ├── GUIDE_MIDDLEWARE.md
+│   ├── GUIDE_RUNTIME_CONFIG_ROUTING_CORS.md
+│   ├── GUIDE_CROSS_DEVICE_REACTIVITY.md
+│   ├── GUIDE_LOGGING.md
+│   └── PLATFORM_WRAPPER_PATTERN.md
+│
+├── Documentation (Architecture)
+│   ├── BLOB_ARCHITECTURE_ANALYSIS.md
+│   ├── BLOB_STORAGE_UNIFICATION.md
+│   ├── BLOB_CHAT.md
+│   ├── ELECTRIC_PATTERN.md
+│   ├── SYSTEM_STATE_MANAGEMENT.md
+│   └── CONFLICT_RESOLUTION_STRATEGY.md
+│
+├── Documentation (Features)
+│   ├── INKING_AIDS_FEATURES.md
+│   ├── INKING_CRITICAL_ISSUES.md
+│   └── WHITEBOARD_REFACTOR_SUMMARY.md
+│
+├── Documentation (Auth)
+│   ├── AUTH_DESKTOP_MOBILE_STRATEGY.md
+│   ├── AUTH_MIGRATION_GUIDE.md
+│   ├── AUTH_SETUP_PHASE2.md
+│   ├── GUEST_MODE_IMPLEMENTATION_SUMMARY.md
+│   ├── GUEST_USER_UPGRADE.md
+│   ├── DESKTOP_GOOGLE_OAUTH_SUMMARY.md
+│   ├── MOBILE_OAUTH_SETUP.md
+│   ├── NATIVE_OAUTH_PROGRESS.md
+│   ├── SETUP_OAUTH_CLIENTS.md
+│   └── TESTING_DESKTOP_OAUTH.md
+│
+├── Documentation (Logging)
+│   ├── LOGGING_IMPLEMENTATION_GUIDE.md
+│   ├── LOGGING_MIGRATION_CHECKLIST.md
+│   ├── CONSOLE_LOGGING_CONTROL.md
+│   ├── MOBILE_LOGGER_TEMP.md
+│   └── OTLP_CORS_CONFIG.md
+│
+├── Documentation (Setup & Deploy)
+│   ├── ENVIRONMENT_SETUP.md
+│   ├── DEPLOY_QUICKSTART.md
+│   ├── QUICKSTART_BLOB_UNIFICATION.md
+│   ├── PRE_DEPLOYMENT_CHECKLIST.md
+│   ├── PRODUCTION_DEPLOYMENT_CHECKLIST.md
+│   ├── IOS_SETUP_QUICKSTART.md
+│   ├── TESTFLIGHT_SETUP.md
+│   └── MOBILE_LOCAL_DEV_FIX.md
+│
+├── Documentation (Migration)
+│   ├── OPTIMISTIC_UPDATES_MIGRATION.md
+│   ├── PHASE3_MIGRATION_CHECKLIST.md
+│   ├── CAPACITOR_MIGRATION_PLAN.md
+│   └── TAURI_MIGRATION_PLAN.md
+│
+├── Documentation (Other)
+│   ├── MentalModels.md
+│   ├── Pitch.md
+│   └── LINTING_CONFIG.md
+│
+├── migrations/
+│   ├── 001_initial_schema.sql
+│   ├── 002_blob_coordination.sql
+│   ├── 003_fix_annotation_id_type.sql
+│   ├── 004_boards_and_strokes.sql
+│   ├── 005_shape_metadata.sql
+│   ├── 006_app_users_auth.sql
+│   ├── 007_rls_multi_tenant.sql
+│   ├── 007b_force_rls.sql
+│   ├── 008_account_linking.sql
+│   ├── init-db.sh
+│   └── run.js
+│
+├── apps/
+│   ├── desktop/
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   ├── tailwind.config.ts
+│   │   ├── tsconfig.json
+│   │   ├── src/
+│   │   │   ├── App.tsx
+│   │   │   ├── main.tsx
+│   │   │   ├── providers.tsx
+│   │   │   ├── globals.css
+│   │   │   ├── telemetry.ts
+│   │   │   ├── auth/
+│   │   │   │   ├── README.md
+│   │   │   │   ├── desktop-auth.ts
+│   │   │   │   ├── github.ts
+│   │   │   │   ├── google.ts
+│   │   │   │   ├── oauth-utils.ts
+│   │   │   │   ├── secure-store.ts
+│   │   │   │   ├── session.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── blob-storage/
+│   │   │   │   └── tauri.ts
+│   │   │   ├── hooks/
+│   │   │   │   └── useBlobStorage.ts
+│   │   │   ├── components/
+│   │   │   │   ├── Layout.tsx
+│   │   │   │   ├── SignInModal.tsx
+│   │   │   │   ├── UserMenu.tsx
+│   │   │   │   ├── indicators/
+│   │   │   │   │   ├── ElectricIndicator.tsx
+│   │   │   │   │   ├── GPUIndicator.tsx
+│   │   │   │   │   └── PostgresIndicator.tsx
+│   │   │   │   └── library/_components/
+│   │   │   │       ├── LibraryHeader.tsx
+│   │   │   │       ├── LibraryLeftSidebar.tsx
+│   │   │   │       ├── AuthorLibrary.tsx
+│   │   │   │       ├── WorkCardCompact.tsx
+│   │   │   │       ├── WorkCardDetailed.tsx
+│   │   │   │       ├── WorkCardList.tsx
+│   │   │   │       └── [other components]
+│   │   │   └── pages/
+│   │   │       ├── LibraryPage.tsx
+│   │   │       ├── ReaderPage.tsx
+│   │   │       ├── StudyPage.tsx
+│   │   │       ├── AdminPage.tsx
+│   │   │       └── admin/
+│   │   │           ├── CASPage.tsx
+│   │   │           ├── DexiePage.tsx
+│   │   │           ├── ElectricPage.tsx
+│   │   │           └── PostgresPage.tsx
+│   │   └── src-tauri/
+│   │       ├── Cargo.toml
+│   │       ├── build.rs
+│   │       ├── tauri.conf.json
+│   │       ├── capabilities/
+│   │       │   └── default.json
+│   │       └── src/
+│   │           ├── main.rs
+│   │           ├── lib.rs
+│   │           ├── logger.rs
+│   │           ├── commands/
+│   │           │   ├── mod.rs
+│   │           │   ├── auth.rs
+│   │           │   ├── blobs.rs
+│   │           │   ├── database.rs
+│   │           │   ├── avatars.rs
+│   │           │   ├── devtools.rs
+│   │           │   └── oauth_server.rs
+│   │           └── db/
+│   │               ├── mod.rs
+│   │               ├── catalog.rs
+│   │               └── types.rs
+│   │
+│   ├── mobile/
+│   │   ├── capacitor.config.ts
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   ├── tailwind.config.ts
+│   │   ├── tsconfig.json
+│   │   ├── index.html
+│   │   ├── MOBILE_DATA_STORAGE.md
+│   │   ├── README_ENVIRONMENT.md
+│   │   ├── README_QUICKSTART.md
+│   │   ├── setup-ios.sh
+│   │   ├── certificates/
+│   │   │   ├── LINUX_SETUP_GUIDE.md
+│   │   │   └── [iOS certificates & provisioning]
+│   │   ├── ios/
+│   │   │   └── App/
+│   │   │       ├── App/
+│   │   │       │   ├── AppDelegate.swift
+│   │   │       │   ├── Info.plist
+│   │   │       │   └── Assets.xcassets/
+│   │   │       ├── App.xcodeproj/
+│   │   │       └── Podfile
+│   │   └── src/
+│   │       ├── App.tsx
+│   │       ├── main.tsx
+│   │       ├── providers.tsx
+│   │       ├── globals.css
+│   │       ├── telemetry.ts
+│   │       ├── auth/
+│   │       │   ├── github.ts
+│   │       │   ├── google.ts
+│   │       │   ├── oauth-utils.ts
+│   │       │   ├── secure-store.ts
+│   │       │   ├── session.ts
+│   │       │   └── index.ts
+│   │       ├── blob-storage/
+│   │       │   └── capacitor.ts
+│   │       ├── config/
+│   │       │   └── api.ts
+│   │       ├── hooks/
+│   │       │   └── useBlobStorage.ts
+│   │       ├── components/
+│   │       │   ├── Layout.tsx
+│   │       │   ├── Portal.tsx
+│   │       │   ├── UserMenu.tsx
+│   │       │   └── indicators/
+│   │       │       ├── ElectricIndicator.tsx
+│   │       │       ├── GPUIndicator.tsx
+│   │       │       └── PostgresIndicator.tsx
+│   │       ├── pages/
+│   │       │   ├── HomePage.tsx
+│   │       │   ├── ReaderPage.tsx
+│   │       │   ├── StudyPage.tsx
+│   │       │   ├── admin/
+│   │       │   │   ├── [admin pages]
+│   │       │   ├── board/
+│   │       │   │   ├── BoardPage.tsx
+│   │       │   │   └── BoardsPage.tsx
+│   │       │   ├── library/
+│   │       │   │   ├── LibraryPage.tsx
+│   │       │   │   └── _components/
+│   │       │   └── reader/
+│   │       │       ├── PDFViewer.tsx
+│   │       │       └── _components/
+│   │       ├── polyfills/
+│   │       │   └── capacitor-preferences.ts
+│   │       └── utils/
+│   │           └── fileUpload.ts
+│   │
+│   └── web/
+│       ├── Dockerfile
+│       ├── package.json
+│       ├── next.config.ts
+│       ├── tsconfig.json
+│       ├── tailwind.config.ts
+│       ├── middleware.ts
+│       ├── instrumentation.ts
+│       ├── drizzle.config.ts
+│       ├── app/
+│       │   ├── layout.tsx
+│       │   ├── page.tsx
+│       │   ├── ClientLayout.tsx
+│       │   ├── globals.css
+│       │   ├── providers.tsx
+│       │   ├── favicon.ico
+│       │   ├── admin/
+│       │   │   ├── cas/page.tsx
+│       │   │   ├── dexie/page.tsx
+│       │   │   ├── electric/page.tsx
+│       │   │   ├── logs/page.tsx
+│       │   │   └── postgres/page.tsx
+│       │   ├── api/
+│       │   │   ├── admin/
+│       │   │   │   ├── blobs/
+│       │   │   │   ├── database/
+│       │   │   │   ├── postgres/
+│       │   │   │   └── sync-to-electric/
+│       │   │   ├── auth/
+│       │   │   │   ├── [...nextauth]/route.ts
+│       │   │   │   ├── exchange/
+│       │   │   │   └── github/
+│       │   │   ├── avatars/
+│       │   │   ├── blob/[sha256]/route.ts
+│       │   │   ├── config/route.ts
+│       │   │   ├── data-sync/
+│       │   │   ├── files/route.ts
+│       │   │   ├── health/
+│       │   │   ├── lib/
+│       │   │   │   ├── auth-helpers.ts
+│       │   │   │   ├── cors.ts
+│       │   │   │   ├── postgres-client.ts
+│       │   │   │   └── postgres.ts
+│       │   │   ├── library/
+│       │   │   ├── profile/
+│       │   │   ├── replication/token/route.ts
+│       │   │   ├── scan/route.ts
+│       │   │   ├── user/status/route.ts
+│       │   │   └── writes/
+│       │   │       ├── batch/route.ts
+│       │   │       └── blobs/route.ts
+│       │   ├── auth/
+│       │   │   ├── signin/page.tsx
+│       │   │   └── error/page.tsx
+│       │   ├── board/
+│       │   │   ├── page.tsx
+│       │   │   └── [id]/page.tsx
+│       │   ├── components/
+│       │   │   ├── ElectricIndicator.tsx
+│       │   │   ├── GPUIndicator.tsx
+│       │   │   ├── PostgresIndicator.tsx
+│       │   │   ├── UserMenu.tsx
+│       │   │   └── [other components]
+│       │   ├── library/
+│       │   │   ├── page.tsx
+│       │   │   └── _components/
+│       │   ├── profile/page.tsx
+│       │   ├── reader/
+│       │   │   ├── page.tsx
+│       │   │   ├── PDFViewer.tsx
+│       │   │   ├── annotation/[annotationId]/page.tsx
+│       │   │   └── _components/
+│       │   └── study/page.tsx
+│       ├── data/
+│       │   ├── avatars/
+│       │   ├── cas.db
+│       │   └── library/
+│       ├── src/
+│       │   ├── auth/
+│       │   │   ├── client.ts
+│       │   │   ├── server.ts
+│       │   │   ├── jwt.ts
+│       │   │   └── types.ts
+│       │   ├── blob-storage/
+│       │   │   └── web.ts
+│       │   ├── hooks/
+│       │   │   ├── useAvatars.ts
+│       │   │   ├── useBlobStorage.ts
+│       │   │   └── useFilesQuery.ts
+│       │   ├── server/
+│       │   │   ├── cas.ts
+│       │   │   ├── db.ts
+│       │   │   ├── hash.ts
+│       │   │   ├── init.ts
+│       │   │   ├── metadata.ts
+│       │   │   ├── pdf.ts
+│       │   │   └── schema.ts
+│       │   ├── sync/
+│       │   │   └── init.ts
+│       │   ├── telemetry.ts
+│       │   └── utils/
+│       │       └── export-import-web.ts
+│       └── scripts/
+│           └── reset-db.sh
+│
+├── packages/
+│   ├── blob-storage/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       └── index.ts
+│   │
+│   ├── core/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── schemas/
+│   │       │   ├── annotation.ts
+│   │       │   ├── blobs.ts
+│   │       │   ├── boards.ts
+│   │       │   ├── cards.ts
+│   │       │   ├── data-sync.ts
+│   │       │   ├── files.ts
+│   │       │   ├── library.ts
+│   │       │   ├── presets.ts
+│   │       │   └── index.ts
+│   │       ├── types/
+│   │       │   └── index.ts
+│   │       └── utils/
+│   │           ├── annotation-id.ts
+│   │           ├── coords.ts
+│   │           ├── hash.ts
+│   │           ├── mime.ts
+│   │           ├── navigation.ts
+│   │           ├── presets.ts
+│   │           └── index.ts
+│   │
+│   ├── data/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── electric.ts
+│   │       ├── writeBuffer.ts
+│   │       ├── auth/
+│   │       │   ├── accountStatus.ts
+│   │       │   ├── flows.ts
+│   │       │   └── upgradeGuest.ts
+│   │       ├── auth.ts
+│   │       ├── guest-upgrade.ts
+│   │       ├── db/
+│   │       │   ├── dexie.ts
+│   │       │   ├── naming.ts
+│   │       │   └── index.ts
+│   │       ├── hooks/
+│   │       │   ├── index.ts
+│   │       │   ├── useActivities.ts
+│   │       │   ├── useAnnotations.ts
+│   │       │   ├── useAssets.ts
+│   │       │   ├── useAuthors.ts
+│   │       │   ├── useBlobBridge.ts
+│   │       │   ├── useBlobsMeta.ts
+│   │       │   ├── useBoards.ts
+│   │       │   ├── useCards.ts
+│   │       │   ├── useCollections.ts
+│   │       │   ├── useDeviceBlobs.ts
+│   │       │   ├── useEdges.ts
+│   │       │   ├── useEntitlements.ts
+│   │       │   ├── usePresets.ts
+│   │       │   ├── useReplicationJobs.ts
+│   │       │   ├── useReviewLogs.ts
+│   │       │   ├── useStrokes.ts
+│   │       │   ├── useSystemMonitoring.ts
+│   │       │   └── useWorks.ts
+│   │       ├── repos/
+│   │       │   ├── index.ts
+│   │       │   ├── library.ts
+│   │       │   ├── [entity].local.ts (pattern)
+│   │       │   ├── [entity].electric.ts (pattern)
+│   │       │   ├── [entity].merged.ts (pattern)
+│   │       │   ├── [entity].cleanup.ts (pattern)
+│   │       │   ├── blobs-meta.electric.ts
+│   │       │   ├── blobs-meta.local.ts
+│   │       │   ├── blobs-meta.writes.ts
+│   │       │   ├── blobs.server.ts
+│   │       │   ├── device-blobs.electric.ts
+│   │       │   ├── device-blobs.writes.ts
+│   │       │   ├── presets.default.ts
+│   │       │   └── presets.init.ts
+│   │       ├── stores/
+│   │       │   ├── index.ts
+│   │       │   ├── annotation-ui.ts
+│   │       │   ├── graph-ui.ts
+│   │       │   ├── reader-ui.ts
+│   │       │   ├── systemStore.ts
+│   │       │   ├── template-library-ui.ts
+│   │       │   └── viewer-ui.ts
+│   │       ├── types/
+│   │       │   └── unified.ts
+│   │       └── utils/
+│   │           ├── casIntegrityCheck.ts
+│   │           ├── consoleLogger.ts
+│   │           ├── coordinateLocalBlobs.ts
+│   │           ├── deviceId.ts
+│   │           ├── export-import.ts
+│   │           └── index.ts
+│   │
+│   ├── pdf/
+│   │   ├── README.md
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── hooks/
+│   │       │   ├── index.ts
+│   │       │   ├── usePDF.ts
+│   │       │   ├── usePDFPage.ts
+│   │       │   └── usePDFViewport.ts
+│   │       └── utils/
+│   │           ├── cache.ts
+│   │           ├── pdf.ts
+│   │           ├── viewport.ts
+│   │           └── index.ts
+│   │
+│   ├── telemetry/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── auth.ts
+│   │       ├── logger.ts
+│   │       └── sinks/
+│   │           ├── index.ts
+│   │           ├── console.ts
+│   │           ├── otlpHttp.ts
+│   │           └── ringBuffer.ts
+│   │
+│   ├── ui/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── admin/
+│   │       │   ├── DexieGraphVisualization.tsx
+│   │       │   ├── LogViewer.tsx
+│   │       │   ├── TelemetryLogViewer.tsx
+│   │       │   └── index.ts
+│   │       ├── auth/
+│   │       │   └── UserMenu.tsx
+│   │       ├── components/
+│   │       │   ├── GuestBanner.tsx
+│   │       │   ├── ImageCropper.tsx
+│   │       │   ├── MarkdownPreview.tsx
+│   │       │   ├── PDFPreview.tsx
+│   │       │   ├── SimplePDFViewer.tsx
+│   │       │   └── index.ts
+│   │       ├── library/
+│   │       │   ├── index.ts
+│   │       │   ├── ActivityBanner.tsx
+│   │       │   ├── LibraryHeader.tsx
+│   │       │   ├── PresetManager.tsx
+│   │       │   ├── TemplateLibrary.tsx
+│   │       │   └── [other components]
+│   │       ├── reader/
+│   │       │   ├── AnnotationEditor.tsx
+│   │       │   ├── AnnotationOverlay.tsx
+│   │       │   ├── NoteSidebar.tsx
+│   │       │   ├── PDFPage.tsx
+│   │       │   ├── ReaderLayout.tsx
+│   │       │   ├── annotation/
+│   │       │   └── [other components]
+│   │       ├── system/
+│   │       │   └── ConnectionStatusIndicator.tsx
+│   │       ├── utils/
+│   │       │   ├── bibtex.ts
+│   │       │   ├── library.ts
+│   │       │   ├── presets.ts
+│   │       │   └── index.ts
+│   │       └── whiteboard/
+│   │           ├── WhiteboardToolbar.tsx
+│   │           ├── WhiteboardView.tsx
+│   │           └── index.ts
+│   │
+│   └── whiteboard/
+│       ├── README.md
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── src/
+│           ├── index.ts
+│           ├── board/
+│           │   ├── commands.ts
+│           │   ├── orchestrator.ts
+│           │   └── index.ts
+│           ├── core/
+│           │   ├── camera.ts
+│           │   ├── math.ts
+│           │   ├── tiling.ts
+│           │   └── index.ts
+│           ├── geometry/
+│           │   ├── fitting.ts
+│           │   ├── recognition.ts
+│           │   ├── shapes.ts
+│           │   └── index.ts
+│           ├── index/
+│           │   ├── hit-test.ts
+│           │   ├── spatial.ts
+│           │   └── index.ts
+│           ├── ink/
+│           │   ├── ARCHITECTURE.md
+│           │   ├── README.md
+│           │   ├── aids.ts
+│           │   ├── gestures.ts
+│           │   ├── inking.ts
+│           │   ├── rendering.ts
+│           │   ├── smoothing.ts
+│           │   └── tools.ts
+│           ├── render/
+│           │   ├── canvas.ts
+│           │   ├── minimap.ts
+│           │   ├── pixi/
+│           │   └── index.ts
+│           ├── scene/
+│           │   ├── layers.ts
+│           │   ├── objects.ts
+│           │   └── index.ts
+│           └── workers/
+│               └── index.ts
+│
+└── python/
+    ├── api.py
+    ├── Dockerfile
+    ├── environment.yml
+    ├── init.py
+    ├── endpoints/
+    └── helpers/

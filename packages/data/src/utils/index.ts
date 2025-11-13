@@ -7,3 +7,4 @@ export * from "./deviceId";
 export * from "./export-import";
 export * from "./consoleLogger";
 export * from "./coordinateLocalBlobs";
+export * from "./ensureAssetForBlob";

@@ -1,7 +1,7 @@
 /**
  * POST /api/library/create-markdown
  * Create a markdown note from text content
- * Returns blob metadata for client to create Asset
+ * Asset creation happens client-side via coordinateSingleBlob()
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
       size,
     });
 
+    // Return blob metadata
+    // Asset creation happens client-side via coordinateSingleBlob()
     return NextResponse.json({
       blob: {
         sha256: hash,

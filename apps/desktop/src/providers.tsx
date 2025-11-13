@@ -70,9 +70,9 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
             }
           );
 
-          setAuthState(true, sessionInfo.userId, deviceId);
-
           // Perform guest→user upgrade once per session
+          // IMPORTANT: This must complete BEFORE setAuthState to prevent race conditions
+          // with Electric sync (which triggers when userId is set)
           if (!hasUpgradedRef.current) {
             hasUpgradedRef.current = true;
 
@@ -153,6 +153,13 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
                 userId: sessionInfo.userId.slice(0, 8),
               });
             }
+
+            // Set auth state AFTER guest data handling completes
+            // This ensures wipeGuestData() finishes before Electric starts syncing
+            setAuthState(true, sessionInfo.userId, deviceId);
+          } else {
+            // Already upgraded, just set auth state
+            setAuthState(true, sessionInfo.userId, deviceId);
           }
         } else {
           // Guest mode
@@ -161,6 +168,9 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
           });
           setAuthState(false, null, deviceId);
           hasUpgradedRef.current = false;
+
+          // Note: Guest mode initialization (presets + CAS scan) is handled
+          // by a separate component to ensure proper coordination
         }
       } catch (error) {
         logger.error("auth", "Failed to initialize session", { error });
@@ -192,6 +202,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <DevToolsShortcut />
       <AuthStateManager>
+        <GuestModeInitializer />
         <SystemMonitoringProvider />
         <ElectricInitializer />
         <SyncManager />
@@ -199,6 +210,71 @@ export function Providers({ children }: { children: React.ReactNode }) {
       </AuthStateManager>
     </QueryClientProvider>
   );
+}
+
+/**
+ * Initialize guest mode when user is not authenticated
+ * Handles presets initialization and CAS scan
+ */
+function GuestModeInitializer() {
+  const hasInitializedRef = useRef(false);
+
+  useEffect(() => {
+    async function checkAndInitialize() {
+      // Check if user is authenticated
+      const { initializeSession } = await import("./auth");
+      const sessionInfo = await initializeSession();
+
+      const isGuest = sessionInfo.status !== "authenticated";
+
+      if (isGuest && !hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+
+        const { getDeviceId } = await import("@deeprecall/data");
+        const deviceId = getDeviceId();
+
+        // Check if blob tables are empty (need initialization)
+        const { db } = await import("@deeprecall/data/db");
+        const [blobsMetaCount, deviceBlobsCount] = await Promise.all([
+          db.blobsMeta.count(),
+          db.deviceBlobs.count(),
+        ]);
+
+        if (blobsMetaCount === 0 && deviceBlobsCount === 0) {
+          logger.info(
+            "auth",
+            "Desktop guest mode: Initializing (presets + CAS scan)"
+          );
+
+          const { initializeGuestMode } = await import("@deeprecall/data");
+          const { TauriBlobStorage } = await import("./blob-storage/tauri");
+          const cas = new TauriBlobStorage();
+
+          try {
+            const result = await initializeGuestMode(cas, deviceId);
+            logger.info("auth", "✅ Desktop guest mode initialized", {
+              presetsInitialized: result.presetsInitialized,
+              blobsScanned: result.blobsScanned,
+              blobsCoordinated: result.blobsCoordinated,
+            });
+          } catch (error) {
+            logger.error("auth", "Failed to initialize desktop guest mode", {
+              error,
+            });
+          }
+        } else {
+          logger.debug("auth", "Desktop guest mode: Data already initialized", {
+            blobsMetaCount,
+            deviceBlobsCount,
+          });
+        }
+      }
+    }
+
+    checkAndInitialize();
+  }, []);
+
+  return null;
 }
 
 /**
