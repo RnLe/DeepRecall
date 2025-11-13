@@ -39,7 +39,7 @@ const buffer = createWriteBuffer();
  * Writes to local Dexie immediately, enqueues for sync
  */
 export async function createAssetLocal(
-  data: Omit<Asset, "id" | "kind" | "createdAt" | "updatedAt">,
+  data: Omit<Asset, "id" | "kind" | "createdAt" | "updatedAt">
 ): Promise<Asset> {
   const asset: Asset = AssetSchema.parse({
     ...data,
@@ -80,7 +80,7 @@ export async function createAssetLocal(
  */
 export async function updateAssetLocal(
   id: string,
-  updates: Partial<Asset>,
+  updates: Partial<Asset>
 ): Promise<void> {
   const updatedData = {
     ...updates,
@@ -162,7 +162,7 @@ export async function markAssetSynced(id: string): Promise<void> {
  */
 export async function markAssetSyncFailed(
   id: string,
-  error: string,
+  error: string
 ): Promise<void> {
   await db.assets_local.where("id").equals(id).modify({
     _status: "error",
