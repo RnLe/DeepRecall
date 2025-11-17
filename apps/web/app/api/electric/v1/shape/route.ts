@@ -54,6 +54,9 @@ export async function GET(req: NextRequest) {
     logger.info("sync.electric", "Proxying Electric shape request", {
       table: upstreamUrl.searchParams.get("table"),
       where: upstreamUrl.searchParams.get("where"),
+      offset: upstreamUrl.searchParams.get("offset"),
+      handle: upstreamUrl.searchParams.get("handle"),
+      upstreamUrl: upstreamUrl.toString(),
     });
 
     const headers: Record<string, string> = {
@@ -70,6 +73,12 @@ export async function GET(req: NextRequest) {
       method: "GET",
       headers,
       cache: "no-store",
+    });
+
+    logger.debug("sync.electric", "Upstream Electric response received", {
+      status: upstreamResponse.status,
+      hasBody: !!upstreamResponse.body,
+      contentType: upstreamResponse.headers.get("content-type"),
     });
 
     if (!upstreamResponse.body) {

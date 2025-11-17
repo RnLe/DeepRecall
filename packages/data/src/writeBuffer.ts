@@ -162,22 +162,28 @@ export function createWriteBuffer(): WriteBuffer {
       };
 
       await writeBufferDB.changes.add(writeChange);
+      const totalCount = await writeBufferDB.changes.count();
       logger.info("sync.writeBuffer", "Operation enqueued", {
         table: change.table,
         op: change.op,
         changeId: writeChange.id,
+        totalBufferSize: totalCount,
       });
 
       return writeChange;
     },
 
     async peek(limit) {
-      const pending = await writeBufferDB.changes
-        .where("status")
-        .equals("pending")
-        .or("status")
-        .equals("error") // Retry failed changes
-        .sortBy("created_at");
+      // Get all changes (Dexie doesn't support or-queries on non-indexed fields easily)
+      const allChanges = await writeBufferDB.changes.toArray();
+      const pending = allChanges
+        .filter((c) => c.status === "pending" || c.status === "error")
+        .sort((a, b) => a.created_at - b.created_at);
+
+      logger.debug("sync.writeBuffer", "Buffer peek query result", {
+        totalChanges: allChanges.length,
+        pendingOrError: pending.length,
+      });
 
       // Filter out changes that exceeded max retries (shouldn't be in peek)
       const retryable = pending.filter((c) => c.retry_count < 5);
