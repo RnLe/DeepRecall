@@ -10,18 +10,14 @@ import {
   type UnlinkedAssetsListOperations,
 } from "@deeprecall/ui";
 import type { Asset } from "@deeprecall/core";
+import { assetsElectric } from "@deeprecall/data/repos";
+import { LinkBlobDialog } from "./LinkBlobDialog";
 
 interface UnlinkedAssetsListProps {
-  onLinkAsset: (asset: Asset) => void;
   onViewAsset: (asset: Asset) => void;
-  onMoveToInbox: (assetId: string) => void;
 }
 
-export function UnlinkedAssetsList({
-  onLinkAsset,
-  onViewAsset,
-  onMoveToInbox,
-}: UnlinkedAssetsListProps) {
+export function UnlinkedAssetsList({ onViewAsset }: UnlinkedAssetsListProps) {
   // Platform-specific blob operations
   const operations: UnlinkedAssetsListOperations = {
     // Rename blob on server (Next.js-specific)
@@ -44,14 +40,20 @@ export function UnlinkedAssetsList({
       if (!response.ok) throw new Error("Failed to fetch file");
       return await response.text();
     },
+
+    // Delete asset (Next.js-specific)
+    deleteAsset: async (assetId: string) => {
+      // Delete asset from Electric (blob remains in CAS)
+      await assetsElectric.deleteAsset(assetId);
+    },
   };
 
   return (
     <UnlinkedAssetsListUI
       operations={operations}
-      onLinkAsset={onLinkAsset}
       onViewAsset={onViewAsset}
-      onMoveToInbox={onMoveToInbox}
+      LinkBlobDialog={LinkBlobDialog}
+      getBlobUrl={(sha256: string) => `/api/blob/${sha256}`}
     />
   );
 }

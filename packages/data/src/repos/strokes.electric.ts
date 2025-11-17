@@ -13,7 +13,7 @@ import { type Stroke } from "@deeprecall/core";
  * @param userId - Owner filter for multi-tenant isolation
  */
 export function useStrokes(boardId: string | undefined, userId?: string) {
-  const where = [];
+  const where: string[] = [];
   if (boardId) where.push(`board_id = '${boardId}'`);
   if (userId) where.push(`owner_id = '${userId}'`);
 

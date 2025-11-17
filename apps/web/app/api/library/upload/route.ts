@@ -76,12 +76,16 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // Get deviceId from metadata or generate a fallback
+    // In production, deviceId should always be provided by client
+    const deviceId = metadata.deviceId || "web-upload-fallback";
+
     // Store in CAS with organized structure
     const {
       hash,
       path: filePath,
       size,
-    } = await storeBlob(buffer, file.name, metadata.role, metadata.deviceId);
+    } = await storeBlob(buffer, file.name, metadata.role, deviceId);
 
     logger.info("blob.upload", "Blob uploaded successfully", {
       filename: file.name,
