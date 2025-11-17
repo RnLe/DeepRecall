@@ -410,7 +410,11 @@ export class FlushWorker {
    * Flush pending changes to server
    */
   async flush(): Promise<void> {
+    logger.debug("sync.writeBuffer", "FlushWorker.flush() called");
     const pending = await this.buffer.peek(this.config.batchSize);
+    logger.debug("sync.writeBuffer", "FlushWorker pending check", {
+      pendingCount: pending.length,
+    });
 
     if (pending.length === 0) {
       // Check if there are stuck changes and clean them up
@@ -460,18 +464,22 @@ export class FlushWorker {
 
       // Use custom flush handler if provided (e.g., Tauri command)
       if (this.config.flushHandler) {
-        logger.debug("sync.writeBuffer", "Using custom flush handler", {
+        logger.info("sync.writeBuffer", "Using custom flush handler", {
           changeCount: retryable.length,
         });
         result = await this.config.flushHandler(retryable);
+        logger.info("sync.writeBuffer", "Custom flush handler returned", {
+          appliedCount: result.applied?.length || 0,
+          errorCount: result.errors?.length || 0,
+        });
       } else {
         // Use HTTP API (web app)
         if (!this.config.apiBase) {
           throw new Error("No apiBase or flushHandler configured");
         }
 
-        const url = `${this.config.apiBase}/api/writes/batch/`;
-        logger.debug("sync.writeBuffer", "POSTing to API", {
+        const url = `${this.config.apiBase}/api/writes/batch`;
+        logger.info("sync.writeBuffer", "POSTing to batch API", {
           url,
           changeCount: retryable.length,
         });

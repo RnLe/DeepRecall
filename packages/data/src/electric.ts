@@ -437,6 +437,8 @@ export function useShape<T = any>(spec: ShapeSpec<T>): ShapeResult<T> {
         logger.error("sync.electric", "Shape error", {
           table: spec.table,
           error: err instanceof Error ? err.message : String(err),
+          errorObject: err,
+          stack: err instanceof Error ? err.stack : undefined,
         });
         setError(err as Error);
         setSyncStatus("error");
