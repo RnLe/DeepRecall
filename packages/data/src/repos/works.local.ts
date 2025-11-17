@@ -16,6 +16,8 @@ import { createWriteBuffer } from "../writeBuffer";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "@deeprecall/telemetry";
 import { isAuthenticated } from "../auth";
+import { updateAssetLocal } from "./assets.local";
+import { getMergedAssetsByWork } from "./assets.merged";
 
 /**
  * Local change record with sync metadata
@@ -39,7 +41,7 @@ const buffer = createWriteBuffer();
  * Writes to local Dexie immediately, enqueues for sync
  */
 export async function createWorkLocal(
-  data: Omit<Work, "id" | "kind" | "createdAt" | "updatedAt">,
+  data: Omit<Work, "id" | "kind" | "createdAt" | "updatedAt">
 ): Promise<Work> {
   const work: Work = WorkSchema.parse({
     ...data,
@@ -80,7 +82,7 @@ export async function createWorkLocal(
  */
 export async function updateWorkLocal(
   id: string,
-  updates: Partial<Work>,
+  updates: Partial<Work>
 ): Promise<void> {
   const updatedData = {
     ...updates,
@@ -116,6 +118,29 @@ export async function updateWorkLocal(
  * Delete a work locally (optimistic)
  */
 export async function deleteWorkLocal(id: string): Promise<void> {
+  try {
+    const linkedAssets = await getMergedAssetsByWork(id);
+    if (linkedAssets.length > 0) {
+      await Promise.all(
+        linkedAssets.map((asset) =>
+          updateAssetLocal(asset.id, {
+            // Cast to satisfy TypeScript while sending actual SQL NULL downstream
+            workId: null as unknown as string | undefined,
+          })
+        )
+      );
+      logger.info("db.local", "Detached assets before deleting work", {
+        workId: id,
+        assetCount: linkedAssets.length,
+      });
+    }
+  } catch (error) {
+    logger.error("db.local", "Failed to detach assets for deleted work", {
+      workId: id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // 1. Mark as deleted in local Dexie
   await db.works_local.put({
     id,
@@ -159,7 +184,7 @@ export async function markWorkSynced(id: string): Promise<void> {
  */
 export async function markWorkSyncFailed(
   id: string,
-  error: string,
+  error: string
 ): Promise<void> {
   await db.works_local.where("id").equals(id).modify({
     _status: "error",

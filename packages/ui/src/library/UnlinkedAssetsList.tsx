@@ -15,9 +15,9 @@ import {
   CloudOff,
 } from "lucide-react";
 import type { Asset, BlobWithMetadata } from "@deeprecall/core";
-import { useAssets, useEdges, useDeviceBlobs } from "@deeprecall/data/hooks";
+import { useUnlinkedAssets, useDeviceBlobs } from "@deeprecall/data/hooks";
 import { assetsElectric } from "@deeprecall/data/repos";
-import { getDeviceId } from "@deeprecall/data/utils/deviceId";
+import { getDeviceId } from "@deeprecall/data";
 import { MarkdownPreview } from "../components/MarkdownPreview";
 import { SimplePDFViewer } from "../components/SimplePDFViewer";
 import { logger } from "@deeprecall/telemetry";
@@ -37,6 +37,7 @@ interface UnlinkedAssetsListProps {
     blob: BlobWithMetadata;
     onSuccess: () => void;
     onCancel: () => void;
+    existingAssetId?: string;
   }>;
   getBlobUrl: (sha256: string) => string;
 }
@@ -49,42 +50,10 @@ export function UnlinkedAssetsList({
 }: UnlinkedAssetsListProps) {
   const { renameBlob, fetchBlobContent, deleteAsset } = operations;
 
-  // Fetch data using Electric hooks
-  const { data: allAssets = [] } = useAssets();
-  const { data: allEdges = [] } = useEdges();
+  // Fetch data using hooks
+  const unlinkedAssets = useUnlinkedAssets();
   const { data: deviceBlobs = [] } = useDeviceBlobs();
   const currentDeviceId = getDeviceId();
-
-  // Compute unlinked assets (inline useUnlinkedAssets logic)
-  const unlinkedAssets = useMemo(() => {
-    // Asset IDs that should be excluded (linked to works)
-    const linkedAssetIds = new Set<string>();
-
-    // 1. Exclude assets with direct workId link
-    allAssets.forEach((asset) => {
-      if (asset.workId) {
-        linkedAssetIds.add(asset.id);
-      }
-    });
-
-    // 2. Exclude assets that are targets of "contains" edges
-    const assetIds = new Set(allAssets.map((a) => a.id));
-    allEdges.forEach((edge) => {
-      if (edge.relation === "contains" && assetIds.has(edge.toId)) {
-        linkedAssetIds.add(edge.toId);
-      }
-    });
-
-    // 3. Exclude assets that are sources of edges (pointing to other entities)
-    allEdges.forEach((edge) => {
-      if (assetIds.has(edge.fromId)) {
-        linkedAssetIds.add(edge.fromId);
-      }
-    });
-
-    // Return only truly unlinked assets
-    return allAssets.filter((asset) => !linkedAssetIds.has(asset.id));
-  }, [allAssets, allEdges]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [linkingAsset, setLinkingAsset] = useState<Asset | null>(null);
   const [assetContextMenu, setAssetContextMenu] = useState<{
@@ -616,6 +585,7 @@ export function UnlinkedAssetsList({
             mtime_ms: Date.now(),
             created_ms: Date.now(),
           }}
+          existingAssetId={linkingAsset.id}
           onSuccess={() => setLinkingAsset(null)}
           onCancel={() => setLinkingAsset(null)}
         />

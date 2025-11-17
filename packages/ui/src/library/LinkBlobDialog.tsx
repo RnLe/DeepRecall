@@ -7,13 +7,17 @@
  */
 
 import { useState, useMemo } from "react";
-import type { BlobWithMetadata, Preset, Author } from "@deeprecall/core";
+import type { BlobWithMetadata, Preset, Author, Asset } from "@deeprecall/core";
 import type { BibtexEntry } from "./BibtexImportModal";
 
 // Electric hooks - platform-agnostic
 import { usePresets } from "@deeprecall/data/hooks";
 import { useWorks, useCreateWork } from "@deeprecall/data/hooks";
-import { useAssets, useCreateAsset } from "@deeprecall/data/hooks";
+import {
+  useAssets,
+  useCreateAsset,
+  useUpdateAsset,
+} from "@deeprecall/data/hooks";
 import { useAuthors, useFindOrCreateAuthor } from "@deeprecall/data/hooks";
 import { useDeviceBlobsByHash } from "@deeprecall/data/hooks";
 import { getDeviceId } from "@deeprecall/data";
@@ -40,11 +44,120 @@ export interface LinkBlobDialogOperations {
   syncBlobToElectric: (sha256: string) => Promise<void>;
 }
 
+type AssetLike = Asset & { _local?: unknown };
+
+function coerceNumber(
+  value: unknown,
+  { min }: { min?: number } = {}
+): number | undefined {
+  let result: number | undefined;
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    result = value;
+  } else if (typeof value === "bigint") {
+    result = Number(value);
+  } else if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) {
+      result = parsed;
+    }
+  }
+
+  if (result === undefined) {
+    return undefined;
+  }
+
+  const rounded = Math.round(result);
+  if (typeof min === "number" && rounded < min) {
+    return min;
+  }
+  return rounded;
+}
+
+function normalizeBytes(asset: AssetLike, blob: BlobWithMetadata): number {
+  const assetBytes = coerceNumber(asset.bytes, { min: 0 });
+  if (typeof assetBytes === "number") {
+    return assetBytes;
+  }
+  const blobBytes = coerceNumber(blob.size, { min: 0 });
+  if (typeof blobBytes === "number") {
+    return blobBytes;
+  }
+  return 0;
+}
+
+function normalizePageCount(
+  asset: AssetLike,
+  blob: BlobWithMetadata
+): number | undefined {
+  const assetPages = coerceNumber(asset.pageCount, { min: 1 });
+  if (typeof assetPages === "number") {
+    return assetPages;
+  }
+  if (blob.pageCount != null) {
+    const blobPages = coerceNumber(blob.pageCount, { min: 1 });
+    if (typeof blobPages === "number") {
+      return blobPages;
+    }
+  }
+  return undefined;
+}
+
+function buildExistingAssetUpdatePayload(
+  asset: AssetLike,
+  blob: BlobWithMetadata,
+  workId: string
+): Partial<Asset> {
+  const filename = asset.filename || blob.filename || "unknown.pdf";
+  const mime = asset.mime || blob.mime;
+  const bytes = normalizeBytes(asset, blob);
+  const pageCount = normalizePageCount(asset, blob);
+
+  return {
+    kind: "asset",
+    workId,
+    sha256: asset.sha256 || blob.sha256,
+    filename,
+    bytes,
+    mime,
+    pageCount,
+    role: asset.role ?? "main",
+    purpose: asset.purpose ?? undefined,
+    annotationId: asset.annotationId ?? undefined,
+    userTitle: asset.userTitle ?? undefined,
+    userDescription: asset.userDescription ?? undefined,
+    noteGroup: asset.noteGroup ?? undefined,
+    edition: asset.edition ?? undefined,
+    versionNumber: asset.versionNumber ?? undefined,
+    year: asset.year ?? undefined,
+    publishingDate: asset.publishingDate ?? undefined,
+    publisher: asset.publisher ?? undefined,
+    journal: asset.journal ?? undefined,
+    volume: asset.volume ?? undefined,
+    issue: asset.issue ?? undefined,
+    pages: asset.pages ?? undefined,
+    doi: asset.doi ?? undefined,
+    arxivId: asset.arxivId ?? undefined,
+    isbn: asset.isbn ?? undefined,
+    assetTitle: asset.assetTitle ?? undefined,
+    notes: asset.notes ?? undefined,
+    read: asset.read ?? undefined,
+    favorite: asset.favorite ?? false,
+    partIndex: asset.partIndex ?? undefined,
+    thumbnailUrl: asset.thumbnailUrl ?? undefined,
+    presetId: asset.presetId ?? undefined,
+    metadata: asset.metadata ?? undefined,
+    createdAt: asset.createdAt ?? new Date().toISOString(),
+  };
+}
+
 interface LinkBlobDialogProps {
   /** Blob to link */
   blob: BlobWithMetadata;
   /** Pre-selected work ID (from drag-and-drop) */
   preselectedWorkId?: string | null;
+  /** Optional asset already created for this blob */
+  existingAssetId?: string | null;
   /** Callback when blob is successfully linked */
   onSuccess: () => void;
   /** Callback when dialog is cancelled */
@@ -59,6 +172,7 @@ type Step = "select" | "form" | "create-preset";
 export function LinkBlobDialog({
   blob,
   preselectedWorkId,
+  existingAssetId,
   onSuccess,
   onCancel,
   operations,
@@ -68,6 +182,7 @@ export function LinkBlobDialog({
   const { data: allPresets = [], isLoading: presetsLoading } = usePresets();
   const { data: allWorks = [], isLoading: worksLoading } = useWorks();
   const { data: allAssets = [] } = useAssets();
+  const updateAsset = useUpdateAsset();
 
   // Check if blob is available on this device
   const currentDeviceId = getDeviceId();
@@ -117,6 +232,10 @@ export function LinkBlobDialog({
     (p: Preset) => p.id === selectedPresetId
   );
   const selectedWork = worksExtended.find((w: any) => w.id === selectedWorkId);
+
+  const existingAsset = existingAssetId
+    ? allAssets.find((asset: any) => asset.id === existingAssetId) || null
+    : null;
 
   // Group presets by system/user
   const systemPresets = allPresets.filter((p: Preset) => p.isSystem);
@@ -257,17 +376,27 @@ export function LinkBlobDialog({
         metadata,
       });
 
-      // Then create Asset linked to the work
-      await createAsset.mutateAsync({
-        workId: work.id,
-        sha256: blob.sha256,
-        filename: blob.filename || "unknown.pdf",
-        bytes: typeof blob.size === "bigint" ? Number(blob.size) : blob.size,
-        mime: blob.mime,
-        role: "main",
-        ...(blob.pageCount != null && { pageCount: blob.pageCount }),
-        favorite: false,
-      });
+      if (existingAsset) {
+        await updateAsset.mutateAsync({
+          id: existingAsset.id,
+          updates: buildExistingAssetUpdatePayload(
+            existingAsset as AssetLike,
+            blob,
+            work.id
+          ),
+        });
+      } else {
+        await createAsset.mutateAsync({
+          workId: work.id,
+          sha256: blob.sha256,
+          filename: blob.filename || "unknown.pdf",
+          bytes: typeof blob.size === "bigint" ? Number(blob.size) : blob.size,
+          mime: blob.mime,
+          role: "main",
+          ...(blob.pageCount != null && { pageCount: blob.pageCount }),
+          favorite: false,
+        });
+      }
 
       logger.info("ui", "Work + Asset created successfully", {
         workId: work.id,
@@ -300,17 +429,27 @@ export function LinkBlobDialog({
       await syncBlobToElectric(blob.sha256);
       logger.info("ui", "Blob synced to Electric", { hash: blob.sha256 });
 
-      // Create asset linked directly to the work
-      await createAsset.mutateAsync({
-        workId: selectedWorkId,
-        sha256: blob.sha256,
-        filename: blob.filename || "unknown.pdf",
-        bytes: typeof blob.size === "bigint" ? Number(blob.size) : blob.size,
-        mime: blob.mime,
-        role: "main",
-        pageCount: blob.pageCount,
-        favorite: false,
-      });
+      if (existingAsset) {
+        await updateAsset.mutateAsync({
+          id: existingAsset.id,
+          updates: buildExistingAssetUpdatePayload(
+            existingAsset as AssetLike,
+            blob,
+            selectedWorkId
+          ),
+        });
+      } else {
+        await createAsset.mutateAsync({
+          workId: selectedWorkId,
+          sha256: blob.sha256,
+          filename: blob.filename || "unknown.pdf",
+          bytes: typeof blob.size === "bigint" ? Number(blob.size) : blob.size,
+          mime: blob.mime,
+          role: "main",
+          pageCount: blob.pageCount,
+          favorite: false,
+        });
+      }
 
       logger.info("ui", "Asset linked to work successfully", {
         workId: selectedWorkId,

@@ -62,6 +62,13 @@
 - Poll loop timeout during Electric sync logs a warning but proceeds; investigate Electric connectivity if repeated.
 - CAS stats (`coordinated`, `skipped`) confirm duplicate suppression after wipes.
 
+## Troubleshooting Notes (Nov 2025)
+
+- **Partial asset updates can strand guest data.** When a guest-created asset is relinked right after sign-in, Postgres may not have a row yet (RLS hides the insert), so an `update` WriteBuffer entry falls back to `insert`. If the payload only includes `workId`/`filename`, schema validation fails and the change loops forever as “pending”. Always include the full asset shape (`kind`, `sha256`, `bytes`, `mime`, timestamps, etc.) whenever we reuse an existing asset ID. See `packages/ui/src/library/LinkBlobDialog.tsx` for the normalized payload helper.
+- **Detach before delete must send `workId: null`.** When removing a work we optimistically clear its assets via `updateAssetLocal`. Passing `undefined` slips through Dexie and only updates `updatedAt`, so the writebuffer change never reconciles. Explicitly send SQL `NULL` (e.g. `workId: null as unknown as string | undefined`) so Postgres sees the update and Electric can confirm cleanup. The shared schema (`packages/core/src/schemas/library.ts`) now allows `workId` to be nullable so these updates validate server-side. Relying solely on `ON DELETE SET NULL` leaves a stuck local record.
+- **Symptom to watch:** Link/unlink succeeds locally but Electric never delivers the delta after auth; WriteBuffer shows “applied” yet Postgres row is missing. Check logs for repeated `assets` update retries and confirm the payload isn’t truncated.
+- **Mitigation:** After guest→user upgrade (or any auth toggle), prefer rebuilding stale rows via full-payload updates or rerunning `upgradeGuestToUser` so that every asset has a server-side owner before we start issuing partial updates.
+
 ## Reference Files
 
 - `packages/data/src/auth/flows.ts` — `handleSignIn`, `handleSignOut`, `debugAccountStatus`.

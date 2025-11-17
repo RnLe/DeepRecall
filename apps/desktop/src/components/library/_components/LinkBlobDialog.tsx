@@ -15,6 +15,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 interface LinkBlobDialogProps {
   blob: BlobWithMetadata;
   preselectedWorkId?: string | null;
+  existingAssetId?: string | null;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -22,6 +23,7 @@ interface LinkBlobDialogProps {
 export function LinkBlobDialog({
   blob,
   preselectedWorkId,
+  existingAssetId,
   onSuccess,
   onCancel,
 }: LinkBlobDialogProps) {
@@ -50,6 +52,7 @@ export function LinkBlobDialog({
     <LinkBlobDialogUI
       blob={blob}
       preselectedWorkId={preselectedWorkId}
+      existingAssetId={existingAssetId}
       onSuccess={onSuccess}
       onCancel={onCancel}
       operations={operations}

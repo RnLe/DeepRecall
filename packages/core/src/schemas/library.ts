@@ -292,7 +292,7 @@ export const AssetSchema = z.object({
   // Foreign key to Work (optional - Assets can be standalone)
   // When set: Asset is part of a Work
   // When null: Asset is standalone, may be linked via edges (Activity/Collection)
-  workId: Id.optional(),
+  workId: Id.nullable().optional(),
 
   // Join key to server CAS (blobs table)
   // Multiple Assets can reference the same blob (e.g., same PDF in different contexts)

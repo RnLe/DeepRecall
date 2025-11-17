@@ -22,10 +22,12 @@ function LinkBlobDialogStub({
   blob,
   onCancel,
   onSuccess,
+  existingAssetId,
 }: {
   blob: BlobWithMetadata;
   onSuccess: () => void;
   onCancel: () => void;
+  existingAssetId?: string;
 }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -45,6 +47,11 @@ function LinkBlobDialogStub({
         <p className="text-gray-400 text-sm mb-6">
           Link blob dialog coming soon...
         </p>
+        {existingAssetId && (
+          <p className="text-gray-600 text-xs mb-4">
+            Existing asset: {existingAssetId.slice(0, 8)}
+          </p>
+        )}
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}

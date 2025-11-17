@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from "react";
-import type { Asset } from "@deeprecall/core";
+import type { Asset, BlobWithMetadata } from "@deeprecall/core";
 import { UnlinkedAssetsList } from "./UnlinkedAssetsList";
 import { SimplePDFViewer } from "../components/SimplePDFViewer";
 import { logger } from "@deeprecall/telemetry";
@@ -27,6 +27,7 @@ interface LibraryLeftSidebarProps {
     blob: BlobWithMetadata;
     onSuccess: () => void;
     onCancel: () => void;
+    existingAssetId?: string;
   }>;
 }
 

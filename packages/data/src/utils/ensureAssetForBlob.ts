@@ -18,9 +18,9 @@
 
 import type { BlobMeta, Asset } from "@deeprecall/core";
 import { logger } from "@deeprecall/telemetry";
-import { db } from "../db";
 import { isAuthenticated } from "../auth";
 import { createAssetLocal } from "../repos/assets.local";
+import { getAllMergedAssets } from "../repos/assets.merged";
 
 export interface EnsureAssetInput {
   sha256: string;
@@ -71,16 +71,14 @@ export async function ensureAssetForBlob(
   } = input;
 
   try {
-    // Check if Asset already exists for this sha256
-    const existingAssets = await db.assets
-      .where("sha256")
-      .equals(sha256)
-      .toArray();
+    // Check if Asset already exists for this sha256 (query merged layer)
+    const allAssets = await getAllMergedAssets();
+    const existingAssets = allAssets.filter((a) => a.sha256 === sha256);
 
     if (existingAssets.length > 0) {
       const existingAsset = existingAssets[0];
 
-      logger.debug("asset.ensure", "Asset already exists for blob", {
+      logger.debug("db.local", "Asset already exists for blob", {
         assetId: existingAsset.id,
         sha256: sha256.slice(0, 16),
         filename: existingAsset.filename,
@@ -90,7 +88,7 @@ export async function ensureAssetForBlob(
       // Warn if multiple Assets exist (violates 1:1 principle)
       if (existingAssets.length > 1) {
         logger.warn(
-          "asset.ensure",
+          "db.local",
           "Multiple Assets found for same blob (violates 1:1)",
           {
             sha256: sha256.slice(0, 16),
@@ -102,7 +100,7 @@ export async function ensureAssetForBlob(
 
       // Optionally update metadata (e.g., on rescan with updated filename)
       if (updateIfExists && filename && filename !== existingAsset.filename) {
-        logger.info("asset.ensure", "Updating Asset filename", {
+        logger.info("db.local", "Updating Asset filename", {
           assetId: existingAsset.id,
           oldFilename: existingAsset.filename,
           newFilename: filename,
@@ -117,7 +115,7 @@ export async function ensureAssetForBlob(
     }
 
     // No Asset exists - create one
-    logger.info("asset.ensure", "Creating Asset for blob", {
+    logger.info("db.local", "Creating Asset for blob", {
       sha256: sha256.slice(0, 16),
       filename: filename || "Untitled",
       mime,
@@ -126,8 +124,7 @@ export async function ensureAssetForBlob(
       isAuthenticated: isAuthenticated(),
     });
 
-    const assetId = await createAssetLocal({
-      kind: "asset",
+    const newAsset = await createAssetLocal({
       sha256,
       filename: filename || "Untitled",
       mime,
@@ -140,15 +137,15 @@ export async function ensureAssetForBlob(
       favorite: false,
     });
 
-    logger.info("asset.ensure", "Asset created successfully", {
-      assetId,
+    logger.info("db.local", "Asset created successfully", {
+      assetId: newAsset.id,
       sha256: sha256.slice(0, 16),
       filename: filename || "Untitled",
     });
 
-    return assetId;
+    return newAsset.id;
   } catch (error) {
-    logger.error("asset.ensure", "Failed to ensure Asset for blob", {
+    logger.error("db.local", "Failed to ensure Asset for blob", {
       sha256: sha256.slice(0, 16),
       filename: filename || "Untitled",
       error: (error as Error).message,
@@ -184,7 +181,7 @@ export async function ensureAssetsForBlobs(
       });
       assetIds.push(assetId);
     } catch (error) {
-      logger.error("asset.ensure", "Failed to ensure Asset in batch", {
+      logger.error("db.local", "Failed to ensure Asset in batch", {
         sha256: blob.sha256.slice(0, 16),
         filename: blob.filename,
         error: (error as Error).message,
@@ -193,7 +190,7 @@ export async function ensureAssetsForBlobs(
     }
   }
 
-  logger.info("asset.ensure", "Batch Asset creation completed", {
+  logger.info("db.local", "Batch Asset creation completed", {
     total: blobs.length,
     succeeded: assetIds.length,
     failed: blobs.length - assetIds.length,
