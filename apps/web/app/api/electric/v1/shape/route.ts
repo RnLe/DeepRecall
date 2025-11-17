@@ -43,6 +43,7 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs"; // Disable edge runtime to prevent response mangling
 
 export async function GET(req: NextRequest) {
   const corsError = checkCorsOrigin(req);
@@ -91,7 +92,8 @@ export async function GET(req: NextRequest) {
       responseHeaders.set(key, value);
     }
 
-    const response = new NextResponse(upstreamResponse.body, {
+    // Use native Response for raw streaming passthrough (avoid NextResponse buffering)
+    const response = new Response(upstreamResponse.body, {
       status: upstreamResponse.status,
       statusText: upstreamResponse.statusText,
       headers: responseHeaders,

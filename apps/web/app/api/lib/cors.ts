@@ -106,9 +106,9 @@ export function checkCorsOrigin(req: NextRequest): NextResponse | null {
  * ```
  */
 export function addCorsHeaders(
-  response: NextResponse,
+  response: NextResponse | Response,
   req: NextRequest
-): NextResponse {
+): NextResponse | Response {
   const origin = req.headers.get("origin") ?? "";
   if (origin && isOriginAllowed(origin)) {
     const headers = corsHeaders(origin);
