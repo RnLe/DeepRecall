@@ -9,18 +9,15 @@ import {
 } from "@deeprecall/ui";
 import type { Asset } from "@deeprecall/core";
 import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { assetsElectric } from "@deeprecall/data/repos";
+import { LinkBlobDialog } from "./LinkBlobDialog";
 
 interface UnlinkedAssetsListProps {
-  onLinkAsset: (asset: Asset) => void;
   onViewAsset: (asset: Asset) => void;
-  onMoveToInbox: (assetId: string) => void;
 }
 
-export function UnlinkedAssetsList({
-  onLinkAsset,
-  onViewAsset,
-  onMoveToInbox,
-}: UnlinkedAssetsListProps) {
+export function UnlinkedAssetsList({ onViewAsset }: UnlinkedAssetsListProps) {
   // Platform-specific blob operations
   const operations: UnlinkedAssetsListOperations = {
     // Rename blob via Tauri command
@@ -33,14 +30,24 @@ export function UnlinkedAssetsList({
       const content = await invoke<string>("read_blob", { sha256: hash });
       return content;
     },
+
+    // Delete asset (Tauri-specific)
+    deleteAsset: async (assetId: string) => {
+      // Delete asset from Electric (blob remains in CAS)
+      await assetsElectric.deleteAsset(assetId);
+    },
   };
 
   return (
     <UnlinkedAssetsListUI
       operations={operations}
-      onLinkAsset={onLinkAsset}
       onViewAsset={onViewAsset}
-      onMoveToInbox={onMoveToInbox}
+      LinkBlobDialog={LinkBlobDialog}
+      getBlobUrl={(sha256: string) =>
+        convertFileSrc(
+          `~/Documents/DeepRecall/blobs/${sha256.substring(0, 2)}/${sha256}`
+        )
+      }
     />
   );
 }
