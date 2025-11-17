@@ -21,11 +21,22 @@ export function initTelemetry() {
 
   const sinks: Sink[] = [ringBuffer];
 
-  // Dev: Add filtered console sink (optional, controlled by env var)
-  if (
-    process.env.NODE_ENV === "development" &&
-    process.env.NEXT_PUBLIC_ENABLE_CONSOLE_LOGS !== "false"
-  ) {
+  // Console sink for both dev AND production
+  // In production, helps debug issues via browser console
+  // In dev, controlled by env vars
+  const isProduction = process.env.NODE_ENV === "production";
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (isProduction) {
+    // Production: Always show error and warn logs in console
+    sinks.push(
+      makeConsoleSink({
+        minLevel: "error", // Only errors in production console
+        verbose: false, // Compact format
+      })
+    );
+  } else if (isDev && process.env.NEXT_PUBLIC_ENABLE_CONSOLE_LOGS !== "false") {
+    // Dev: Add filtered console sink (optional, controlled by env var)
     // Get console log level from env (default: "warn")
     const consoleLevel = (process.env.NEXT_PUBLIC_CONSOLE_LOG_LEVEL ||
       "warn") as "debug" | "info" | "warn" | "error";
