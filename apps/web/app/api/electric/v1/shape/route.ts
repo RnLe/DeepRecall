@@ -92,6 +92,11 @@ export async function GET(req: NextRequest) {
       responseHeaders.set(key, value);
     }
 
+    // Prevent Railway/CDN from compressing the streaming response
+    // Electric SDK requires raw uncompressed JSON stream
+    responseHeaders.set("Cache-Control", "no-transform, no-store");
+    responseHeaders.delete("Content-Encoding"); // Remove any upstream encoding
+
     // Use native Response for raw streaming passthrough (avoid NextResponse buffering)
     const response = new Response(upstreamResponse.body, {
       status: upstreamResponse.status,
