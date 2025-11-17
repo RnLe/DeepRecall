@@ -35,7 +35,8 @@ export async function upgradeGuestToUser(
   userId: string,
   deviceId: string,
   cas: BlobCAS,
-  apiBaseUrl: string
+  apiBaseUrl: string,
+  authToken?: string
 ): Promise<{ success: boolean; synced: number; errors?: string[] }> {
   logger.info("auth", "Starting guest to user upgrade", {
     userId: userId.slice(0, 8),
@@ -302,13 +303,18 @@ export async function upgradeGuestToUser(
       return { success: true, synced: 0 };
     }
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(`${apiBaseUrl}/api/writes/batch`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Session cookie should be present (user just signed in)
-      },
-      credentials: "include", // Important: include session cookie
+      headers,
+      credentials: authToken ? "omit" : "include",
       body: JSON.stringify({ changes }),
     });
 

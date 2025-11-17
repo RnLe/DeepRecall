@@ -295,7 +295,7 @@ When user signs in after using app as guest:
 
 1. **Auth state updates**: `setAuthState(true, userId, deviceId)`
 2. **handleSignIn()** checks for guest data: `hasGuestData()`
-3. **If guest data exists**: `upgradeGuestToUser(userId, cas, apiBaseUrl)`
+3. **If guest data exists**: `upgradeGuestToUser(userId, deviceId, cas, apiBaseUrl, authToken?)`
    - Updates `owner_id` on all local entities
    - Flushes pending WriteBuffer changes
    - Syncs blobs to server coordination tables

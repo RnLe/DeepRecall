@@ -166,6 +166,7 @@ export function UserMenu() {
         deviceId: payload.deviceId || payload.device_id,
         iat: payload.iat,
         exp: payload.exp,
+        appJWT: result.app_jwt,
       };
 
       logger.info("ui", "UserMenu: Setting session state", {

@@ -62,6 +62,7 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
 
         if (sessionInfo.status === "authenticated" && sessionInfo.userId) {
           const userId = sessionInfo.userId;
+          const authToken = sessionInfo.appJWT;
 
           logger.info(
             "auth",
@@ -81,7 +82,7 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
               const cas = new TauriBlobStorage();
 
               try {
-                await debugAccountStatus(userId, apiBaseUrl);
+                await debugAccountStatus(userId, apiBaseUrl, authToken);
               } catch (error) {
                 logger.warn("auth", "Failed to get account debug info", {
                   error: error instanceof Error ? error.message : String(error),
@@ -93,7 +94,8 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
                   userId,
                   deviceId,
                   cas,
-                  apiBaseUrl
+                  apiBaseUrl,
+                  authToken
                 );
 
                 if (result.success) {

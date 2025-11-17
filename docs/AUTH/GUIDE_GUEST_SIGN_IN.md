@@ -16,10 +16,10 @@
 ## Sign-In Flow (`handleSignIn`)
 
 1. **Detect guest data**: `hasGuestData(deviceId)` checks Dexie local tables + CAS pending entries. If none, exit (action `"none"`).
-2. **Account probe**: `isNewAccount(userId, apiBaseUrl)` hits `/api/user/status` to decide upgrade vs wipe.
+2. **Account probe**: `isNewAccount(userId, apiBaseUrl, authToken?)` hits `/api/user/status` to decide upgrade vs wipe.
    - **Clean session alignment** _(Nov 2025 fix)_: even when no guest data exists we now call `setAuthState(true, userId, deviceId)` before returning so `isAuthenticated()` flips immediately for write buffer/Electric. This prevents authenticated sessions from behaving like guests after refreshes.
 3. **Upgrade branch (new account)**:
-   - `upgradeGuestToUser(userId, deviceId, blobStorage, apiBaseUrl)` relabels local rows, uploads blobs via WriteBuffer, enforces 1:1 asset creation, and coordinates CAS metadata.
+   - `upgradeGuestToUser(userId, deviceId, blobStorage, apiBaseUrl, authToken?)` relabels local rows, uploads blobs via WriteBuffer, enforces 1:1 asset creation, and coordinates CAS metadata.
    - **New behavior**: `setAuthState(true, userId, deviceId)` is invoked before upgrade kicks off so that every CAS coordination and WriteBuffer enqueue runs in authenticated mode even while the migration is in flight.
    - Returns counts for logging and telemetry; `AuthStateManager` proceeds to set auth state after success.
 4. **Wipe branch (existing account)**:
@@ -47,7 +47,7 @@
 ## Method Ordering (per platform)
 
 1. Session provider detects auth event (NextAuth/Tauri/Capacitor) and fetches session token.
-2. Call `handleSignIn(userId, deviceId, blobStorage, apiBaseUrl)`.
+2. Call `handleSignIn(userId, deviceId, blobStorage, apiBaseUrl, authToken?)` — native clients pass the stored app JWT so `/api/*` calls can use Authorization headers instead of cookies.
 3. On success, call `setAuthState(true, userId, deviceId)` and render `SyncManager`.
 4. On failure, keep guest mode and surface error.
 5. On sign-out request, call `handleSignOut(deviceId, blobStorage)` then `setAuthState(false)` and stop SyncManager.

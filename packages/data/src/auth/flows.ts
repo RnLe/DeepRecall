@@ -49,7 +49,8 @@ export async function handleSignIn(
   userId: string,
   deviceId: string,
   blobStorage: BlobCAS,
-  apiBaseUrl: string
+  apiBaseUrl: string,
+  authToken?: string
 ): Promise<SignInResult> {
   logger.info("auth", "Starting sign-in flow", {
     userId: userId.slice(0, 8),
@@ -84,7 +85,7 @@ export async function handleSignIn(
     });
 
     // Step 2: Check account status
-    const accountIsNew = await isNewAccount(userId, apiBaseUrl);
+    const accountIsNew = await isNewAccount(userId, apiBaseUrl, authToken);
 
     logger.info("auth", "Account status determined", {
       userId: userId.slice(0, 8),
@@ -111,7 +112,8 @@ export async function handleSignIn(
         userId,
         deviceId,
         blobStorage,
-        apiBaseUrl
+        apiBaseUrl,
+        authToken
       );
 
       logger.info("auth", "✅ Guest data UPGRADED successfully", {
@@ -320,7 +322,8 @@ export async function handleSignOut(
  */
 export async function debugAccountStatus(
   userId: string,
-  apiBaseUrl: string
+  apiBaseUrl: string,
+  authToken?: string
 ): Promise<void> {
   logger.info("auth", "Checking account status details", {
     userId: userId.slice(0, 8),
@@ -328,10 +331,18 @@ export async function debugAccountStatus(
   });
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(`${apiBaseUrl}/api/user/status`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers,
+      credentials: authToken ? "omit" : "include",
     });
 
     if (!response.ok) {

@@ -5,6 +5,7 @@ import LibraryPage from "./pages/LibraryPage";
 import ReaderPage from "./pages/ReaderPage";
 import StudyPage from "./pages/StudyPage";
 import AdminPage from "./pages/AdminPage";
+import LogsPage from "./pages/admin/LogsPage";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
@@ -18,6 +19,7 @@ function AppContent() {
           <Route path="/reader" element={<ReaderPage />} />
           <Route path="/study" element={<StudyPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/logs" element={<LogsPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>

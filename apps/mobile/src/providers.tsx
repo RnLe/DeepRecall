@@ -91,6 +91,8 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
 
         // Detect sign-in (user wasn't authenticated, now is)
         if (!prevUserId && currentUserId) {
+          const authToken = sessionInfo?.appJWT;
+
           logger.info("auth", "Sign-in detected, running auth flow", {
             userId: currentUserId.slice(0, 8),
           });
@@ -106,14 +108,15 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
             const cas = new CapacitorBlobStorage();
 
             // Debug: Log detailed account status
-            await debugAccountStatus(currentUserId, apiBaseUrl);
+            await debugAccountStatus(currentUserId, apiBaseUrl, authToken);
 
             try {
               const result = await handleSignIn(
                 currentUserId,
                 deviceId,
                 cas,
-                apiBaseUrl
+                apiBaseUrl,
+                authToken
               );
               if (result.success) {
                 logger.info("auth", `Sign-in complete: ${result.action}`, {

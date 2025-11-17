@@ -25,15 +25,22 @@ import { logger } from "@deeprecall/telemetry";
  */
 export async function isNewAccount(
   userId: string,
-  apiBaseUrl: string
+  apiBaseUrl: string,
+  authToken?: string
 ): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(`${apiBaseUrl}/api/user/status`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include", // Include session cookie
+      headers,
+      credentials: authToken ? "omit" : "include",
     });
 
     if (!response.ok) {

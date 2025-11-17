@@ -11,6 +11,7 @@ export interface SessionInfo {
   deviceId: string;
   iat?: number;
   exp?: number;
+  appJWT: string;
 }
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
@@ -73,6 +74,7 @@ export async function loadSession(): Promise<SessionInfo | null> {
       deviceId: payload.deviceId || payload.device_id,
       iat: payload.iat,
       exp: payload.exp,
+      appJWT: jwt,
     };
   } catch (error) {
     console.error("[Session] Failed to load session:", error);
