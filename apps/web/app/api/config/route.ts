@@ -29,10 +29,11 @@ export async function GET() {
   // IMPORTANT: NEXT_PUBLIC_* vars are baked into the bundle at build time
   // For Railway, we need to read them without the NEXT_PUBLIC_ prefix on the server
   // But keep NEXT_PUBLIC_ for client-side builds
+  // IMPORTANT: Always use the proxy endpoint, never fallback to direct Electric Cloud URL
   const electricUrl =
     process.env.NEXT_PUBLIC_ELECTRIC_URL ||
     process.env.ELECTRIC_URL ||
-    "http://localhost:5133";
+    "/api/electric/v1/shape"; // Relative path to use our proxy
 
   const electricSourceId =
     process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_ID ||

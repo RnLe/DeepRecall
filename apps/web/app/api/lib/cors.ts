@@ -50,7 +50,9 @@ export function corsHeaders(origin: string) {
     "Access-Control-Expose-Headers": [
       "electric-handle",
       "electric-offset",
+      "electric-cursor",
       "electric-schema",
+      "electric-shape-id",
       "content-type",
     ].join(", "),
   };
