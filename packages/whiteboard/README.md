@@ -4,7 +4,7 @@ Modular whiteboard/canvas module for DeepRecall note-taking.
 
 ## Architecture
 
-This package follows a clean, domain-driven architecture as outlined in `GUIDE_NOTES_MODULE.md`:
+This package follows a clean, domain-driven architecture as outlined in `../../docs/NOTES/GUIDE_WHITEBOARD.md`:
 
 ```
 packages/whiteboard/
@@ -85,4 +85,4 @@ pnpm build
 4. **Worker-ready** - Heavy computation can be moved to workers
 5. **Data-layer integration** - Uses `@deeprecall/data` for persistence
 
-See `GUIDE_NOTES_MODULE.md` for complete architectural details.
+See `../../docs/NOTES/GUIDE_WHITEBOARD.md` for complete architectural details.

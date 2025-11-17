@@ -1,5 +1,4 @@
 .
-├── CODE_REVIEW_MASTER.md
 ├── README_DEV.md
 ├── LICENSE
 ├── Makefile
@@ -9,69 +8,34 @@
 ├── docker-compose.yml
 │
 ├── docs/
-│   ├── ARCHITECTURE/
-│   │   ├── GUIDE_DATA_ARCHITECTURE.md          # Complete data architecture overview
-│   │   ├── GUIDE_OPTIMISTIC_UPDATES.md         # Optimistic update patterns
-│   │   ├── GUIDE_FILES_TO_ASSETS.md            # File to asset conversion (includes blob tables analysis)
-│   │   ├── GUIDE_ELECTRIC_PATTERN.md           # Electric + WriteBuffer pattern (4-file repo structure)
-│   │   ├── GUIDE_PLATFORM_WRAPPERS.md          # Platform-specific wrapper pattern
-│   │   └── GUIDE_ZUSTAND_STORES.md             # Global state management with Zustand
+│   ├── NOTES/
+│   │   ├── GUIDE_WHITEBOARD.md                 # Complete whiteboard architecture (entry point)
+│   │   ├── INKING_REFERENCE.md                 # Inking system technical reference
+│   │   └── INK_API.md                          # Complete API reference with types
 │   │
-│   └── AUTH/
-│       └── GUIDE_GUEST_SIGN_IN.md              # Guest sign-in and upgrade flow
+│   ├── AUTH/
+│   │   ├── GUIDE_AUTHENTICATION.md             # High-level auth architecture overview
+│   │   ├── GUIDE_GUEST_SIGN_IN.md              # Guest sign-in and upgrade flow
+│   │   ├── GUIDE_MIDDLEWARE.md                 # Middleware, profile API, authorization
+│   │   ├── GUEST_USER_UPGRADE.md               # Guest to user upgrade process
+│   │   ├── GUIDE_AUTH_DESKTOP.md               # Desktop native OAuth (PKCE, Device Code, keychain)
+│   │   ├── GUIDE_AUTH_WEB.md                   # Web NextAuth setup and integration
+│   │   └── GUIDE_AUTH_MOBILE.md                # Mobile Capacitor OAuth (PKCE, Device Code, iOS Keychain)
+│   │
+│   ├── DEPLOYMENT/
+│   │   ├── GUIDE_DEPLOYMENT.md                 # Main deployment overview and platform matrix
+│   │   ├── GUIDE_DEPLOY_WEB.md                 # Railway deployment, environment setup
+│   │   ├── GUIDE_DEPLOY_MOBILE.md              # TestFlight automation, GitHub Actions
+│   │   ├── GUIDE_DEPLOY_DESKTOP.md             # Tauri builds, code signing, distribution
+│   │   └── GUIDE_RUNTIME_CONFIG_CORS.md        # Runtime config, CORS, routing
+│   │
+│   ├── CONFIG/
+│   │   └── LINTING_CONFIG.md                   # ESLint and Prettier configuration
+│   │
+│   └── OBSERVABILITY/
+│       └── GUIDE_LOGGING.md                    # Complete logging guide (ring buffer, console, OTLP)
 │
-├── Markdown Documentation (remaining in root - to be organized)
-│   ├── Architecture & Infrastructure
-│   │   ├── GUIDE_MIDDLEWARE.md
-│   │   ├── GUIDE_RUNTIME_CONFIG_ROUTING_CORS.md
-│   │   └── CONFLICT_RESOLUTION_STRATEGY.md
-│   ├── Board & Notes (Whiteboard System)
-│   │   ├── GUIDE_RENDER_WHITEBOARD.md
-│   │   ├── GUIDE_NOTES_MODULE.md
-│   │   ├── INKING_AIDS_FEATURES.md
-│   │   ├── INKING_CRITICAL_ISSUES.md
-│   │   └── WHITEBOARD_REFACTOR_SUMMARY.md
-│   ├── Features
-│   │   └── GUIDE_INKING.md
-│   ├── Authentication
-│   │   ├── AUTH_DESKTOP_MOBILE_STRATEGY.md
-│   │   ├── AUTH_MIGRATION_GUIDE.md
-│   │   ├── AUTH_SETUP_PHASE2.md
-│   │   ├── DESKTOP_GOOGLE_OAUTH_SUMMARY.md
-│   │   ├── GUEST_MODE_IMPLEMENTATION_SUMMARY.md
-│   │   ├── GUEST_USER_UPGRADE.md
-│   │   ├── MOBILE_OAUTH_SETUP.md
-│   │   ├── NATIVE_OAUTH_PROGRESS.md
-│   │   ├── SETUP_OAUTH_CLIENTS.md
-│   │   └── TESTING_DESKTOP_OAUTH.md
-│   ├── Logging & Observability
-│   │   ├── GUIDE_LOGGING.md
-│   │   ├── LOGGING_IMPLEMENTATION_GUIDE.md
-│   │   ├── LOGGING_MIGRATION_CHECKLIST.md
-│   │   ├── CONSOLE_LOGGING_CONTROL.md
-│   │   ├── MOBILE_LOGGER_TEMP.md
-│   │   └── OTLP_CORS_CONFIG.md
-│   ├── Deployment & Setup
-│   │   ├── ENVIRONMENT_SETUP.md
-│   │   ├── DEPLOY_QUICKSTART.md
-│   │   ├── PRE_DEPLOYMENT_CHECKLIST.md
-│   │   ├── PRODUCTION_DEPLOYMENT_CHECKLIST.md
-│   │   ├── IOS_SETUP_QUICKSTART.md
-│   │   ├── TESTFLIGHT_SETUP.md
-│   │   └── MOBILE_LOCAL_DEV_FIX.md
-│   ├── Migration & Technical Debt
-│   │   ├── OPTIMISTIC_UPDATES_MIGRATION.md
-│   │   ├── PHASE1_COMPLETE.md
-│   │   ├── PHASE3_MIGRATION_CHECKLIST.md
-│   │   ├── MIGRATION_FILE_INBOX.md
-│   │   ├── CAPACITOR_MIGRATION_PLAN.md
-│   │   └── TAURI_MIGRATION_PLAN.md
-│   ├── Configuration & Tooling
-│   │   └── LINTING_CONFIG.md
-│   └── Miscellaneous
-│       ├── MentalModels.md
-│       └── Pitch.md
-│
+
 ├── migrations/
 │   ├── 001_initial_schema.sql
 │   ├── 002_blob_coordination.sql

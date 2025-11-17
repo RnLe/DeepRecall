@@ -9,6 +9,7 @@ DeepRecall is a cross-platform app (Web, Desktop, iPad) for managing academic pa
 **Core Features:**
 
 - PDF annotation with ink support (Apple Pencil ready)
+- Whiteboard note-taking with inking engine (see `docs/ARCHITECTURE/GUIDE_WHITEBOARD.md`)
 - Spaced repetition system (Anki-like cards)
 - Reference management (BibTeX, works/assets/activities hierarchy)
 - Content-addressed blob storage (SHA-256 deduplication)
@@ -16,7 +17,7 @@ DeepRecall is a cross-platform app (Web, Desktop, iPad) for managing academic pa
 
 **Planned Features:**
 
-- Rich note-taking module (OneNote/Goodnotes style)
+- Enhanced whiteboard features (collaborative editing, vector eraser, WASM tessellation)
 - User profiles and permissions
 - Multi-party collaborative editing (shared annotations/decks)
 - Cloud blob delivery with CDN
@@ -65,11 +66,37 @@ Large files (PDFs, images) are **not synced** through Electric. Instead:
 - **Layer 2 (Electric)**: Small metadata tables (`blobs_meta`, `device_blobs`) coordinate availability
 - **Bridge**: Platform-agnostic hooks combine both layers
 
-See: [`GUIDE_DATA_ARCHITECTURE.md`](GUIDE_DATA_ARCHITECTURE.md)
+**Platform implementations**:
+
+- Web: API routes + server filesystem (see `apps/web/src/server/cas.ts`)
+- Desktop: Rust commands + local filesystem (see `docs/ARCHITECTURE/GUIDE_DESKTOP.md`)
+- Mobile: Capacitor Filesystem plugin (see `docs/ARCHITECTURE/GUIDE_MOBILE.md`)
+
+See: [`docs/ARCHITECTURE/GUIDE_DATA_ARCHITECTURE.md`](docs/ARCHITECTURE/GUIDE_DATA_ARCHITECTURE.md)
 
 ### Storage Systems Overview
 
 **Three persistent databases**: Postgres (server, source of truth), Dexie/IndexedDB (browser, survives refresh/restart), CAS SQLite (server, blob catalog). **One stateless service**: Electric (sync middleware, no storage—streams Postgres WAL to clients, restarts clean). All metadata flows through Electric; large blobs bypass it via content-addressed storage.
+
+### Authentication & User Management
+
+DeepRecall supports multi-platform authentication with offline-first capability:
+
+- **Web**: NextAuth/Auth.js with OAuth providers (Google, GitHub) - see `docs/AUTH/GUIDE_AUTH_WEB.md`
+- **Desktop**: Native OAuth (PKCE + Device Code flows, OS keychain storage) - see `docs/AUTH/GUIDE_AUTH_DESKTOP.md`
+- **Mobile**: Native OAuth (PKCE + Device Code flows, iOS Keychain/Android Keystore) - see `docs/AUTH/GUIDE_AUTH_MOBILE.md`
+- **Guest Mode**: Full offline functionality without authentication - see `docs/AUTH/GUIDE_GUEST_SIGN_IN.md`
+- **Security**: Row-Level Security (RLS) via Postgres GUC, CORS for native apps
+
+**Key guides**:
+
+- `docs/AUTH/GUIDE_AUTHENTICATION.md` - High-level auth architecture overview
+- `docs/AUTH/GUIDE_AUTH_WEB.md` - NextAuth setup, OAuth clients, session management
+- `docs/AUTH/GUIDE_AUTH_DESKTOP.md` - Native OAuth flows, keychain storage, troubleshooting
+- `docs/AUTH/GUIDE_AUTH_MOBILE.md` - Capacitor OAuth, iOS Keychain, CORS setup, local development
+- `docs/AUTH/GUIDE_GUEST_SIGN_IN.md` - Guest mode implementation and upgrade flow
+- `docs/AUTH/GUEST_USER_UPGRADE.md` - Account detection and upgrade process
+- `docs/AUTH/GUIDE_MIDDLEWARE.md` - Middleware protection and authorization
 
 ---
 
@@ -81,14 +108,15 @@ See: [`GUIDE_DATA_ARCHITECTURE.md`](GUIDE_DATA_ARCHITECTURE.md)
 DeepRecall/
 ├── apps/
 │   ├── web/              # Next.js (Web platform + server APIs)
-│   ├── desktop/          # Tauri (future: native desktop app)
-│   └── mobile/           # Capacitor (future: iOS/Android)
+│   ├── desktop/          # Tauri (native desktop app - see docs/ARCHITECTURE/GUIDE_DESKTOP.md)
+│   └── mobile/           # Capacitor (iOS/Android - see docs/ARCHITECTURE/GUIDE_MOBILE.md)
 │
 ├── packages/
 │   ├── core/             # Zod schemas, types, utilities (platform-agnostic)
 │   ├── data/             # Dexie DB, Electric hooks, WriteBuffer, repos
-│   ├── ui/               # Shared React components (library, reader, study, admin)
+│   ├── ui/               # Shared React components (library, reader, study, whiteboard, admin)
 │   ├── pdf/              # PDF.js utilities (rendering, viewports, text extraction)
+│   ├── whiteboard/       # Whiteboard system (inking, rendering, camera, shapes - see docs/ARCHITECTURE/GUIDE_WHITEBOARD.md)
 │   └── blob-storage/     # CAS interface + platform adapters
 │
 ├── migrations/           # Postgres schema migrations (auto-applied on startup)
@@ -97,16 +125,17 @@ DeepRecall/
 
 ### Key Packages
 
-| Package                            | Purpose                                   | Platform-Specific?          |
-| ---------------------------------- | ----------------------------------------- | --------------------------- |
-| `@deeprecall/core`                 | Zod schemas, types, hash utilities        | ❌ No                       |
-| `@deeprecall/data`                 | Dexie DB, Electric hooks, WriteBuffer     | ❌ No                       |
-| `@deeprecall/ui`                   | React components (library, reader, study) | ❌ No                       |
-| `@deeprecall/pdf`                  | PDF.js utilities                          | ❌ No                       |
-| `@deeprecall/blob-storage`         | CAS interface                             | ❌ No (implementations are) |
-| `apps/web/src/blob-storage/web.ts` | Web CAS implementation                    | ✅ Yes                      |
-| `apps/web/src/hooks/`              | Platform-specific hooks (3 files)         | ✅ Yes                      |
-| `apps/web/src/server/`             | Next.js API routes, Drizzle ORM           | ✅ Yes                      |
+| Package                            | Purpose                                               | Platform-Specific?          |
+| ---------------------------------- | ----------------------------------------------------- | --------------------------- |
+| `@deeprecall/core`                 | Zod schemas, types, hash utilities                    | ❌ No                       |
+| `@deeprecall/data`                 | Dexie DB, Electric hooks, WriteBuffer                 | ❌ No                       |
+| `@deeprecall/ui`                   | React components (library, reader, study, whiteboard) | ❌ No                       |
+| `@deeprecall/pdf`                  | PDF.js utilities                                      | ❌ No                       |
+| `@deeprecall/whiteboard`           | Whiteboard system (inking, rendering, camera, shapes) | ❌ No                       |
+| `@deeprecall/blob-storage`         | CAS interface                                         | ❌ No (implementations are) |
+| `apps/web/src/blob-storage/web.ts` | Web CAS implementation                                | ✅ Yes                      |
+| `apps/web/src/hooks/`              | Platform-specific hooks (3 files)                     | ✅ Yes                      |
+| `apps/web/src/server/`             | Next.js API routes, Drizzle ORM                       | ✅ Yes                      |
 
 ---
 
@@ -227,105 +256,98 @@ A persistent queue (Dexie) that batches writes and retries with exponential back
 
 ---
 
+## Documentation Organization
+
+### Two-Pillar System
+
+1. **README_DEV.md** (this file) - Developer overview with categorized guide index
+2. **PROJECT_TREE.txt** - Complete file/folder structure snapshot
+
+### Documentation Structure
+
+All guides live in `docs/` organized by category:
+
+- **ARCHITECTURE/** - System design, data flow, core patterns
+- **AUTH/** - Authentication, authorization, user management
+- **DEPLOYMENT/** - Platform deployment guides and infrastructure
+- **CONFIG/** - Linting, tooling, environment configuration
+- **OBSERVABILITY/** - Logging, monitoring, debugging
+- **NOTES/** - Whiteboard/inking system documentation
+
+### Creating New Documentation
+
+When adding a new guide:
+
+1. **Location**: Place in appropriate `docs/` subfolder (create new category if needed)
+2. **Naming**: Use `GUIDE_*.md` for how-to guides, descriptive names for references
+3. **Length**: Keep focused and actionable (~200-500 lines). Split large topics into multiple files
+4. **Structure**: Start with purpose/scope, include code examples, end with troubleshooting/gotchas
+5. **Updates**: Update this index immediately after creating new guide
+6. **Cross-references**: Link related guides, avoid duplication
+
+**Avoid**: Root-level markdown files (except this file), redundant documentation, mixing unrelated topics
+
+---
+
 ## Guides & References
 
 ### 📐 Architecture & Data Flow
 
-| Guide                                                                          | Description                                                                           |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| [`GUIDE_DATA_ARCHITECTURE.md`](docs/ARCHITECTURE/GUIDE_DATA_ARCHITECTURE.md)   | Complete data architecture: CAS, Electric sync, platform injection, blob coordination |
-| [`GUIDE_OPTIMISTIC_UPDATES.md`](docs/ARCHITECTURE/GUIDE_OPTIMISTIC_UPDATES.md) | Optimistic update patterns, WriteBuffer, guest mode, critical checks                  |
-| [`GUIDE_FILES_TO_ASSETS.md`](docs/ARCHITECTURE/GUIDE_FILES_TO_ASSETS.md)       | File upload flow, CAS integration, asset creation, blob tables analysis               |
-| [`GUIDE_ELECTRIC_PATTERN.md`](docs/ARCHITECTURE/GUIDE_ELECTRIC_PATTERN.md)     | Electric + WriteBuffer pattern: 4-file repo structure, data flow diagram              |
-| [`GUIDE_PLATFORM_WRAPPERS.md`](docs/ARCHITECTURE/GUIDE_PLATFORM_WRAPPERS.md)   | Platform-specific wrapper pattern for UI components                                   |
-| [`GUIDE_ZUSTAND_STORES.md`](docs/ARCHITECTURE/GUIDE_ZUSTAND_STORES.md)         | Global state management with Zustand (system status, future settings)                 |
+| Guide                                                                                  | Description                                                                           |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [`GUIDE_DATA_ARCHITECTURE.md`](docs/ARCHITECTURE/GUIDE_DATA_ARCHITECTURE.md)           | Complete data architecture: CAS, Electric sync, platform injection, blob coordination |
+| [`GUIDE_OPTIMISTIC_UPDATES.md`](docs/ARCHITECTURE/GUIDE_OPTIMISTIC_UPDATES.md)         | Optimistic update patterns, WriteBuffer, guest mode, critical checks                  |
+| [`GUIDE_FILES_TO_ASSETS.md`](docs/ARCHITECTURE/GUIDE_FILES_TO_ASSETS.md)               | File upload flow, CAS integration, asset creation, blob tables analysis               |
+| [`GUIDE_ELECTRIC_PATTERN.md`](docs/ARCHITECTURE/GUIDE_ELECTRIC_PATTERN.md)             | Electric + WriteBuffer pattern: 4-file repo structure, data flow diagram              |
+| [`GUIDE_PLATFORM_WRAPPERS.md`](docs/ARCHITECTURE/GUIDE_PLATFORM_WRAPPERS.md)           | Platform-specific wrapper pattern for UI components                                   |
+| [`GUIDE_ZUSTAND_STORES.md`](docs/ARCHITECTURE/GUIDE_ZUSTAND_STORES.md)                 | Global state management with Zustand (system status, future settings)                 |
+| [`CONFLICT_RESOLUTION_STRATEGY.md`](docs/ARCHITECTURE/CONFLICT_RESOLUTION_STRATEGY.md) | Conflict resolution strategy for distributed sync (future implementation)             |
 
 ### 🎨 Board & Notes (Whiteboard System)
 
-| Guide                                                              | Description                                        |
-| ------------------------------------------------------------------ | -------------------------------------------------- |
-| [`GUIDE_RENDER_WHITEBOARD.md`](GUIDE_RENDER_WHITEBOARD.md)         | Whiteboard rendering pipeline, canvas optimization |
-| [`GUIDE_NOTES_MODULE.md`](GUIDE_NOTES_MODULE.md)                   | Note-taking module architecture                    |
-| [`INKING_AIDS_FEATURES.md`](INKING_AIDS_FEATURES.md)               | Inking aids: rulers, shapes, snap-to-grid          |
-| [`INKING_CRITICAL_ISSUES.md`](INKING_CRITICAL_ISSUES.md)           | Known inking issues and workarounds                |
-| [`WHITEBOARD_REFACTOR_SUMMARY.md`](WHITEBOARD_REFACTOR_SUMMARY.md) | Whiteboard refactor notes                          |
+| Guide                                                   | Description                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [`GUIDE_WHITEBOARD.md`](docs/NOTES/GUIDE_WHITEBOARD.md) | **Complete whiteboard architecture**: inking, rendering, camera, shapes, persistence |
+| [`INKING_REFERENCE.md`](docs/NOTES/INKING_REFERENCE.md) | Inking system technical reference                                                    |
+| [`INK_API.md`](docs/NOTES/INK_API.md)                   | Complete API reference with type signatures                                          |
 
 ### 🔐 Authentication & User Management
 
-| Guide                                                                          | Description                                              |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| [`GUIDE_GUEST_SIGN_IN.md`](docs/AUTH/GUIDE_GUEST_SIGN_IN.md)                   | Guest mode flow, sign-in process, account upgrade        |
-| [`AUTH_DESKTOP_MOBILE_STRATEGY.md`](AUTH_DESKTOP_MOBILE_STRATEGY.md)           | Authentication strategy for desktop and mobile platforms |
-| [`AUTH_MIGRATION_GUIDE.md`](AUTH_MIGRATION_GUIDE.md)                           | Migration guide for authentication system                |
-| [`AUTH_SETUP_PHASE2.md`](AUTH_SETUP_PHASE2.md)                                 | Phase 2 authentication setup                             |
-| [`GUEST_MODE_IMPLEMENTATION_SUMMARY.md`](GUEST_MODE_IMPLEMENTATION_SUMMARY.md) | Guest mode implementation summary                        |
-| [`GUEST_USER_UPGRADE.md`](GUEST_USER_UPGRADE.md)                               | Guest to authenticated user upgrade process              |
-| [`DESKTOP_GOOGLE_OAUTH_SUMMARY.md`](DESKTOP_GOOGLE_OAUTH_SUMMARY.md)           | Desktop Google OAuth implementation                      |
-| [`MOBILE_OAUTH_SETUP.md`](MOBILE_OAUTH_SETUP.md)                               | Mobile OAuth setup guide                                 |
-| [`NATIVE_OAUTH_PROGRESS.md`](NATIVE_OAUTH_PROGRESS.md)                         | Native OAuth implementation progress                     |
-| [`SETUP_OAUTH_CLIENTS.md`](SETUP_OAUTH_CLIENTS.md)                             | OAuth client configuration                               |
-| [`TESTING_DESKTOP_OAUTH.md`](TESTING_DESKTOP_OAUTH.md)                         | Desktop OAuth testing guide                              |
+| Guide                                                          | Description                                                                              |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [`GUIDE_AUTHENTICATION.md`](docs/AUTH/GUIDE_AUTHENTICATION.md) | **Complete auth architecture**: Web/Desktop/Mobile flows, OAuth, JWT, RLS, CORS, logging |
+| [`GUIDE_AUTH_WEB.md`](docs/AUTH/GUIDE_AUTH_WEB.md)             | Web NextAuth setup and integration                                                       |
+| [`GUIDE_AUTH_DESKTOP.md`](docs/AUTH/GUIDE_AUTH_DESKTOP.md)     | Desktop native OAuth (PKCE, Device Code, keychain)                                       |
+| [`GUIDE_AUTH_MOBILE.md`](docs/AUTH/GUIDE_AUTH_MOBILE.md)       | Mobile Capacitor OAuth (PKCE, Device Code, iOS Keychain)                                 |
+| [`GUIDE_GUEST_SIGN_IN.md`](docs/AUTH/GUIDE_GUEST_SIGN_IN.md)   | Guest mode flow, sign-in process, account upgrade                                        |
+| [`GUIDE_MIDDLEWARE.md`](docs/AUTH/GUIDE_MIDDLEWARE.md)         | Middleware, profile API, authorization, feature gating                                   |
+| [`GUEST_USER_UPGRADE.md`](docs/AUTH/GUEST_USER_UPGRADE.md)     | Guest to user upgrade process (implementation guide)                                     |
 
 ### 🎨 Features
 
-| Guide                                | Description                                              |
-| ------------------------------------ | -------------------------------------------------------- |
-| [`GUIDE_INKING.md`](GUIDE_INKING.md) | Inking system, Apple Pencil support, gesture recognition |
+| Guide | Description |
+| ----- | ----------- |
 
-### 🛠️ Platform & Infrastructure
+### 🚀 Deployment & Infrastructure
 
-| Guide                                                                          | Description                                  |
-| ------------------------------------------------------------------------------ | -------------------------------------------- |
-| [`GUIDE_MIDDLEWARE.md`](GUIDE_MIDDLEWARE.md)                                   | Middleware architecture and request handling |
-| [`GUIDE_RUNTIME_CONFIG_ROUTING_CORS.md`](GUIDE_RUNTIME_CONFIG_ROUTING_CORS.md) | Runtime configuration, routing, CORS setup   |
-| [`CONFLICT_RESOLUTION_STRATEGY.md`](CONFLICT_RESOLUTION_STRATEGY.md)           | Conflict resolution in distributed sync      |
+| Guide                                                                          | Description                                                                           |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| [`GUIDE_DEPLOYMENT.md`](docs/DEPLOYMENT/GUIDE_DEPLOYMENT.md)                   | **START HERE** - Deployment overview with platform matrix and shared infrastructure   |
+| [`GUIDE_DEPLOY_WEB.md`](docs/DEPLOYMENT/GUIDE_DEPLOY_WEB.md)                   | Railway deployment for web (automatic on push to main)                                |
+| [`GUIDE_DEPLOY_MOBILE.md`](docs/DEPLOYMENT/GUIDE_DEPLOY_MOBILE.md)             | TestFlight deployment for iOS (GitHub Actions automation)                             |
+| [`GUIDE_DEPLOY_DESKTOP.md`](docs/DEPLOYMENT/GUIDE_DEPLOY_DESKTOP.md)           | Tauri builds for desktop (manual builds with code signing)                            |
+| [`GUIDE_RUNTIME_CONFIG_CORS.md`](docs/DEPLOYMENT/GUIDE_RUNTIME_CONFIG_CORS.md) | Runtime config API, CORS for mobile, Next.js routing, database pooling, health checks |
 
 ### 📊 Logging & Observability
 
-| Guide                                                                | Description                                |
-| -------------------------------------------------------------------- | ------------------------------------------ |
-| [`GUIDE_LOGGING.md`](GUIDE_LOGGING.md)                               | Logging architecture and best practices    |
-| [`LOGGING_IMPLEMENTATION_GUIDE.md`](LOGGING_IMPLEMENTATION_GUIDE.md) | Step-by-step logging implementation        |
-| [`LOGGING_MIGRATION_CHECKLIST.md`](LOGGING_MIGRATION_CHECKLIST.md)   | Migration checklist for new logging system |
-| [`CONSOLE_LOGGING_CONTROL.md`](CONSOLE_LOGGING_CONTROL.md)           | Console log control and filtering          |
-| [`MOBILE_LOGGER_TEMP.md`](MOBILE_LOGGER_TEMP.md)                     | Mobile-specific logging notes (temporary)  |
-| [`OTLP_CORS_CONFIG.md`](OTLP_CORS_CONFIG.md)                         | OpenTelemetry OTLP CORS configuration      |
-
-### 🚀 Deployment & Setup
-
-| Guide                                                                      | Description                              |
-| -------------------------------------------------------------------------- | ---------------------------------------- |
-| [`ENVIRONMENT_SETUP.md`](ENVIRONMENT_SETUP.md)                             | Complete environment setup guide         |
-| [`DEPLOY_QUICKSTART.md`](DEPLOY_QUICKSTART.md)                             | Quick deployment guide for all platforms |
-| [`PRE_DEPLOYMENT_CHECKLIST.md`](PRE_DEPLOYMENT_CHECKLIST.md)               | Pre-deployment verification checklist    |
-| [`PRODUCTION_DEPLOYMENT_CHECKLIST.md`](PRODUCTION_DEPLOYMENT_CHECKLIST.md) | Production deployment steps              |
-| [`IOS_SETUP_QUICKSTART.md`](IOS_SETUP_QUICKSTART.md)                       | iOS setup and configuration              |
-| [`TESTFLIGHT_SETUP.md`](TESTFLIGHT_SETUP.md)                               | TestFlight setup for iOS beta testing    |
-| [`MOBILE_LOCAL_DEV_FIX.md`](MOBILE_LOCAL_DEV_FIX.md)                       | Fixes for mobile local development       |
-
-### 🔄 Migrations & Technical Debt
-
-| Guide                                                                | Description                             |
-| -------------------------------------------------------------------- | --------------------------------------- |
-| [`OPTIMISTIC_UPDATES_MIGRATION.md`](OPTIMISTIC_UPDATES_MIGRATION.md) | Migration to optimistic updates pattern |
-| [`PHASE1_COMPLETE.md`](PHASE1_COMPLETE.md)                           | Phase 1 migration completion summary    |
-| [`PHASE3_MIGRATION_CHECKLIST.md`](PHASE3_MIGRATION_CHECKLIST.md)     | Phase 3 migration checklist             |
-| [`MIGRATION_FILE_INBOX.md`](MIGRATION_FILE_INBOX.md)                 | Temporary migration file inbox          |
-| [`CAPACITOR_MIGRATION_PLAN.md`](CAPACITOR_MIGRATION_PLAN.md)         | Capacitor migration strategy            |
-| [`TAURI_MIGRATION_PLAN.md`](TAURI_MIGRATION_PLAN.md)                 | Tauri migration plan for desktop        |
+| Guide                                                     | Description                                                                   |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [`GUIDE_LOGGING.md`](docs/OBSERVABILITY/GUIDE_LOGGING.md) | Complete logging guide: structured logging, ring buffer, console, OTLP export |
 
 ### ⚙️ Configuration & Tooling
 
-| Guide                                    | Description                       |
-| ---------------------------------------- | --------------------------------- |
-| [`LINTING_CONFIG.md`](LINTING_CONFIG.md) | ESLint and Prettier configuration |
-
-### 📝 Other Documentation
-
-| Guide                                | Description                                         |
-| ------------------------------------ | --------------------------------------------------- |
-| [`MentalModels.md`](MentalModels.md) | Mental models and design philosophy                 |
-| [`Pitch.md`](Pitch.md)               | Project pitch and vision                            |
-| [`BLOB_CHAT.md`](BLOB_CHAT.md)       | Design discussion on blob architecture (historical) |
+| Guide                                                | Description                       |
+| ---------------------------------------------------- | --------------------------------- |
+| [`LINTING_CONFIG.md`](docs/CONFIG/LINTING_CONFIG.md) | ESLint and Prettier configuration |
 
 ---

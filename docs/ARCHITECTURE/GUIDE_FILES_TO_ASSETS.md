@@ -179,12 +179,14 @@ Tables can grow independently:
 ```
 Admin clicks "Rescan"
   ↓
-Step 1: /api/scan → Rebuild SQLite from filesystem
+Step 1: /api/scan (Web) or invoke("scan_blobs") (Desktop) → Rebuild SQLite from filesystem
   ↓
 Step 2: scanAndCheckCAS(skipIntegrityCheck=true) → Coordinate to Dexie + create Assets
   ↓
 Result: blobs_meta, device_blobs, assets all populated immediately
 ```
+
+**Platform-specific**: Desktop uses Rust `scan_blobs` command - see `docs/ARCHITECTURE/GUIDE_DESKTOP.md` for details.
 
 ---
 

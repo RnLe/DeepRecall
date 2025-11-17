@@ -106,8 +106,8 @@ Both patterns share the same underlying layers but differ in how local changes a
 **CAS (Content-Addressed Storage)** - Platform-local files:
 
 - **Web**: Filesystem + better-sqlite3 (apps/web/src/server/cas.ts)
-- **Desktop**: Rust filesystem commands (apps/desktop/src-tauri/src/commands/blobs.rs)
-- **Mobile**: Capacitor Filesystem plugin (apps/mobile/src/blob-storage/capacitor.ts)
+- **Desktop**: Rust filesystem commands (see [GUIDE_DESKTOP.md](./GUIDE_DESKTOP.md))
+- **Mobile**: Capacitor Filesystem plugin (see [GUIDE_MOBILE.md](./GUIDE_MOBILE.md))
 - **Interface**: `BlobCAS` in packages/blob-storage/src/index.ts
 
 ### Layer 2: Electric Sync (Platform-Agnostic)
@@ -163,7 +163,7 @@ packages/data/src/repos/
    ↓
 3. Enqueue to WriteBuffer (if authenticated)
    ↓
-4. Background flush to /api/writes/batch → Postgres
+4. Background flush to /api/writes/batch (Web) or invoke("flush_writes") (Desktop) → Postgres
    ↓
 5. Electric syncs back → useWorksSync() → works (Dexie)
    ↓
@@ -171,6 +171,8 @@ packages/data/src/repos/
    ↓
 7. UI queries works.merged.ts → combines works + works_local
 ```
+
+**Platform-specific**: Desktop uses Rust commands instead of API routes - see `docs/ARCHITECTURE/GUIDE_DESKTOP.md`.
 
 **Guest Mode**: Steps 3-5 skipped (local-only, no WriteBuffer enqueue).
 
@@ -529,7 +531,7 @@ apps/
 │       └── server/
 │           ├── cas.ts                    # File scanning, hashing, storage
 │           └── db.ts                     # Drizzle ORM (SQLite for blobs)
-├── desktop/                     # Tauri (Rust backend)
+├── desktop/                     # Tauri (see docs/ARCHITECTURE/GUIDE_DESKTOP.md)
 │   ├── src/
 │   │   ├── blob-storage/tauri.ts         # Tauri CAS implementation
 │   │   └── hooks/useBlobStorage.ts       # useTauriBlobStorage()
