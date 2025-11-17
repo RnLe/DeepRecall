@@ -64,6 +64,15 @@ export async function handleSignIn(
       logger.info("auth", "No guest data found - clean sign-in", {
         userId: userId.slice(0, 8),
       });
+      
+      // Set auth state for clean sign-in (no guest data to migrate)
+      const { setAuthState } = await import("../auth");
+      setAuthState(true, userId, deviceId);
+      
+      logger.info("auth", "Auth state set for clean sign-in", {
+        userId: userId.slice(0, 8),
+      });
+      
       return {
         action: "none",
         success: true,
@@ -87,6 +96,14 @@ export async function handleSignIn(
     if (accountIsNew) {
       // NEW account: Upgrade guest data
       logger.info("auth", "NEW account - upgrading guest data", {
+        userId: userId.slice(0, 8),
+      });
+
+      // Set auth state BEFORE upgrade so write buffer can enqueue during upgrade
+      const { setAuthState } = await import("../auth");
+      setAuthState(true, userId, deviceId);
+
+      logger.info("auth", "Auth state set before upgrade", {
         userId: userId.slice(0, 8),
       });
 
