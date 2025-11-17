@@ -236,8 +236,8 @@ export function useFileUpload() {
 VITE_API_BASE_URL=http://localhost:3000  # Dev
 # VITE_API_BASE_URL=https://deeprecall-production.up.railway.app  # Production
 
-# Electric Cloud (Real-time Sync) - Same as Desktop
-VITE_ELECTRIC_URL=https://api.electric-sql.com/v1/shape
+# Electric Cloud (Real-time Sync via API proxy)
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
 VITE_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 VITE_ELECTRIC_SOURCE_SECRET=eyJ0eXA...your-jwt-token...
 
@@ -351,13 +351,13 @@ function SyncManager() {
 
 ```typescript
 // Electric client automatically appends auth to all requests
-GET https://api.electric-sql.com/v1/shape?source_id={sourceId}&secret={secret}&table=works
+GET https://your-app.railway.app/api/electric/v1/shape?table=works&source_id={sourceId}&secret={secret}
 ```
 
 **Why Query Params?**
 
-- Electric Cloud requires auth in URL (not headers)
-- Same as desktop app (consistent architecture)
+- The backend proxy forwards `source_id`/`secret` to Electric Cloud
+- Matches the desktop app for consistency
 - Works in iOS WKWebView without custom header injection
 
 ---
@@ -464,7 +464,7 @@ pnpm cap run ios  # Launch in iOS Simulator
 
 # Mobile app connects to:
 # - HTTP API: http://localhost:3000 (Next.js)
-# - Electric Cloud: https://api.electric-sql.com (production)
+# - Electric Cloud (proxied): https://your-app.railway.app/api/electric
 # - Neon Postgres: Via Electric sync (no direct connection)
 ```
 

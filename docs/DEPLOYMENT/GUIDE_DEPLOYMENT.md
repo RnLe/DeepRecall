@@ -77,7 +77,7 @@ DeepRecall uses a **multi-platform architecture** with shared cloud infrastructu
 **Configuration**:
 
 ```bash
-VITE_ELECTRIC_URL=https://api.electric-sql.com/v1/shape
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
 VITE_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 VITE_ELECTRIC_SOURCE_SECRET=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 ```
@@ -123,7 +123,7 @@ Platform-specific:
 
    ```bash
    DATABASE_URL=<neon-postgres-url>
-   NEXT_PUBLIC_ELECTRIC_URL=https://api.electric-sql.com/v1/shape
+   NEXT_PUBLIC_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
    NEXT_PUBLIC_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
    NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET=<your-secret>
    ```

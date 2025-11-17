@@ -30,6 +30,18 @@ import { DevToolsShortcut } from "./components/DevToolsShortcut";
 import { logger } from "@deeprecall/telemetry";
 import { TauriBlobStorage } from "./blob-storage/tauri";
 import { tokens as secureTokens } from "./auth/secure-store";
+import { AUTH_STATE_CHANGED_EVENT } from "./auth";
+
+function resolveElectricUrl(): string {
+  const configured = import.meta.env.VITE_ELECTRIC_URL?.trim();
+  if (configured && configured.length > 0) {
+    return configured.replace(/\/$/, "");
+  }
+
+  const apiBase =
+    import.meta.env.VITE_API_URL?.trim() || "http://localhost:3000";
+  return `${apiBase.replace(/\/$/, "")}/api/electric`;
+}
 
 // Configure PDF.js worker for Tauri platform
 // Tauri serves static assets from public/ directory
@@ -51,6 +63,7 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const deviceId = getDeviceId();
 
     // Initialize session on mount
@@ -58,6 +71,8 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
       try {
         const { initializeSession } = await import("./auth");
         const sessionInfo = await initializeSession();
+
+        if (!isMounted) return;
         setSession(sessionInfo);
 
         if (sessionInfo.status === "authenticated" && sessionInfo.userId) {
@@ -103,6 +118,7 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
                     userId: userId.slice(0, 8),
                     ...result.details,
                   });
+                  setAuthState(true, userId, deviceId);
                 } else {
                   logger.error("auth", "Sign-in flow failed", {
                     userId: userId.slice(0, 8),
@@ -140,6 +156,22 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
     }
 
     initSession();
+
+    const handleAuthChanged = () => {
+      logger.info("auth", "Auth change event received, refreshing session");
+      initSession();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthChanged);
+    }
+
+    return () => {
+      isMounted = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthChanged);
+      }
+    };
   }, []);
 
   return <>{children}</>;
@@ -308,8 +340,7 @@ function ElectricInitializer() {
     if (isInitialized) return; // Only initialize once
 
     // Initialize Electric connection
-    const electricUrl =
-      import.meta.env.VITE_ELECTRIC_URL || "http://localhost:5133";
+    const electricUrl = resolveElectricUrl();
     const electricSourceId = import.meta.env.VITE_ELECTRIC_SOURCE_ID;
     const electricSecret = import.meta.env.VITE_ELECTRIC_SOURCE_SECRET;
 

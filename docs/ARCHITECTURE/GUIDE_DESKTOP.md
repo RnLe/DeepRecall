@@ -191,17 +191,19 @@ VITE_POSTGRES_HOST=ep-late-cell-ag9og5sf.c-2.eu-central-1.aws.neon.tech
 VITE_POSTGRES_PORT=5432
 VITE_POSTGRES_DB=neondb
 VITE_POSTGRES_USER=neondb_owner
-VITE_POSTGRES_PASSWORD=REDACTED
+VITE_POSTGRES_PASSWORD=<set-from-neon-dashboard>
 VITE_POSTGRES_SSL=require
 
-# Electric Cloud (Real-time Sync)
-VITE_ELECTRIC_URL=https://api.electric-sql.com/v1/shape
+# Electric Cloud (Real-time Sync via API proxy)
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
 VITE_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
-VITE_ELECTRIC_SOURCE_SECRET=eyJ0eXA...your-jwt-token...
+VITE_ELECTRIC_SOURCE_SECRET=<your-electric-source-secret>
 
-# Auth Broker (for OAuth)
-VITE_AUTH_BROKER_URL=https://deeprecall-production.up.railway.app
+# Auth Broker (desktop always targets production API)
+VITE_API_URL=https://deeprecall-production.up.railway.app
 ```
+
+> **Note**: Desktop executables are always built against the production stack. If you need to run against staging/local services, edit `.env.local` before building—there is no runtime switch.
 
 ### Build-time Embedding
 

@@ -25,6 +25,7 @@ import {
   clearSession,
   getOrCreateDeviceId,
   type SessionInfo,
+  emitAuthStateChanged,
 } from "../auth";
 import { SignInModal } from "./SignInModal";
 import { GitHubDeviceCodeModal } from "./GitHubDeviceCodeModal";
@@ -153,6 +154,8 @@ export function UserMenu() {
     setSessionInfo(session);
     setStatus("authenticated");
     setShowGitHubCodeModal(false); // Close GitHub modal if open
+
+    emitAuthStateChanged({ reason: "signin" });
   };
 
   const handleCancelGitHub = () => {
@@ -171,6 +174,7 @@ export function UserMenu() {
       setStatus("unauthenticated");
       setError(null);
       console.log("[UserMenu] Signed out successfully");
+      emitAuthStateChanged({ reason: "signout" });
     } catch (err) {
       console.error("[UserMenu] Sign out failed:", err);
       setError(err instanceof Error ? err.message : "Sign out failed");

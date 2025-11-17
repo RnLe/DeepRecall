@@ -37,6 +37,20 @@ import { configurePdfWorker } from "@deeprecall/pdf";
 import { logger } from "@deeprecall/telemetry";
 import { CapacitorBlobStorage } from "./blob-storage/capacitor";
 
+function resolveElectricUrl(): string {
+  const configured = import.meta.env.VITE_ELECTRIC_URL?.trim();
+  if (configured && configured.length > 0) {
+    return configured.replace(/\/$/, "");
+  }
+
+  const apiBaseCandidate =
+    import.meta.env.VITE_API_BASE_URL?.trim() ||
+    (import.meta.env.DEV ? "http://localhost:3000" : undefined) ||
+    "https://deeprecall-production.up.railway.app";
+
+  return `${apiBaseCandidate.replace(/\/$/, "")}/api/electric`;
+}
+
 // Extend Window interface for Capacitor
 declare global {
   interface Window {
@@ -281,8 +295,7 @@ function ElectricInitializer() {
 
   useEffect(() => {
     // Initialize Electric connection with Cloud credentials
-    const electricUrl =
-      import.meta.env.VITE_ELECTRIC_URL || "http://localhost:5133";
+    const electricUrl = resolveElectricUrl();
     const electricSourceId = import.meta.env.VITE_ELECTRIC_SOURCE_ID;
     const electricSecret = import.meta.env.VITE_ELECTRIC_SOURCE_SECRET;
 

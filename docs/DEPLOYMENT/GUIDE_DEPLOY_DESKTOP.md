@@ -47,7 +47,7 @@ pnpm tauri dev
 
 ### 1. Prepare Environment
 
-**Create production `.env.local`**:
+**Create production `.env.local`** (desktop builds embed these values—no runtime override):
 
 ```bash
 # apps/desktop/.env.local (production values)
@@ -60,12 +60,12 @@ VITE_POSTGRES_USER=neondb_owner
 VITE_POSTGRES_PASSWORD=<your-password>
 VITE_POSTGRES_SSL=require
 
-# Electric Cloud Sync
-VITE_ELECTRIC_URL=https://api.electric-sql.com/v1/shape
+# Electric Cloud Sync (proxied)
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
 VITE_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 VITE_ELECTRIC_SOURCE_SECRET=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 
-# OAuth (Optional - for desktop sign-in)
+# OAuth (Required for desktop sign-in)
 VITE_API_URL=https://deeprecall-production.up.railway.app
 VITE_GOOGLE_DESKTOP_CLIENT_ID=<your-google-desktop-client-id>
 VITE_GOOGLE_DESKTOP_CLIENT_SECRET=<your-google-desktop-secret>

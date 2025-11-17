@@ -58,8 +58,9 @@ When building for production:
 # For production: Set to your Railway URL
 VITE_API_BASE_URL=https://your-app.railway.app
 
-# Electric Cloud credentials (same for all environments)
-VITE_ELECTRIC_URL=https://api.electric-sql.cloud/v1/shape
+# Electric Cloud credentials (proxied through your API)
+# Use https://<your-api-domain>/api/electric to avoid CORS issues
+VITE_ELECTRIC_URL=https://your-app.railway.app/api/electric
 VITE_ELECTRIC_SOURCE_ID=...
 VITE_ELECTRIC_SOURCE_SECRET=...
 ```
@@ -98,9 +99,9 @@ const response = await fetch(`${getApiBaseUrl()}/api/admin/sync-blob`, { ... });
 
 **Solution:** Make sure the Next.js web server is running on `localhost:3000`
 
-### Issue: 300+ CORS errors from Electric Cloud
+### Issue: Electric Cloud CORS errors
 
-**This is expected and harmless.** Electric Cloud is configured for `http://localhost:3000`, but the mobile Vite server runs on port 3001. Electric will retry and connect successfully (the indicator will turn green). The errors are transient and don't affect functionality.
+**Solution:** Make sure `VITE_ELECTRIC_URL` points to your backend proxy (`https://<api-domain>/api/electric`). Direct calls to `https://api.electric-sql.cloud` from Capacitor/WebView origins will be blocked by CORS.
 
 ### Issue: "Failed to resolve module specifier '@capacitor/preferences'"
 
@@ -128,7 +129,7 @@ console.log(getEnvironmentInfo());
 //   isProd: false,
 //   apiBaseUrl: '',
 //   configuredUrl: undefined,
-//   electricUrl: 'https://api.electric-sql.cloud/v1/shape'
+//   electricUrl: 'https://your-app.railway.app/api/electric'
 // }
 ```
 

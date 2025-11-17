@@ -26,6 +26,9 @@ export type { SessionInfo } from "./session";
 export { secureStore, tokens } from "./secure-store";
 export type { SecureStore } from "./secure-store";
 
+// Auth event helpers
+export { AUTH_STATE_CHANGED_EVENT, emitAuthStateChanged } from "./events";
+
 // OAuth utilities
 export {
   generatePKCE,

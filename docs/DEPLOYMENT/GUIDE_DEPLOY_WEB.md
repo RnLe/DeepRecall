@@ -34,8 +34,8 @@ In Railway dashboard → Variables, add:
 # Database (Required)
 DATABASE_URL=postgresql://neondb_owner:PASSWORD@ep-late-cell-ag9og5sf.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require
 
-# Electric Cloud (Required - exposed to client)
-NEXT_PUBLIC_ELECTRIC_URL=https://api.electric-sql.com/v1/shape
+# Electric Cloud (Required - proxied to avoid CORS)
+NEXT_PUBLIC_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
 NEXT_PUBLIC_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET=<your-electric-source-secret>
 

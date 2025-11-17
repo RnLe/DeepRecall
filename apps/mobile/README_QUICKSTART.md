@@ -18,7 +18,7 @@ pnpm run dev:mobile
 
 - Mobile app runs in browser at `http://localhost:5173`
 - All `/api` requests are proxied to `localhost:3000` (web server)
-- Electric syncs from cloud (`https://api.electric-sql.cloud`)
+- Electric syncs via backend proxy (`https://your-app.railway.app/api/electric`)
 - Changes sync between web and mobile in real-time
 
 ## Production Build (iOS Device)
