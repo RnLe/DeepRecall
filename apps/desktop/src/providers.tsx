@@ -7,8 +7,8 @@ import {
   initializeDeviceId,
   setAuthState,
   getDeviceId,
-  upgradeGuestToUser,
-  hasGuestData,
+  handleSignIn,
+  debugAccountStatus,
   useSystemMonitoring,
   usePresetsSync,
   useActivitiesSync,
@@ -61,105 +61,63 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
         setSession(sessionInfo);
 
         if (sessionInfo.status === "authenticated" && sessionInfo.userId) {
+          const userId = sessionInfo.userId;
+
           logger.info(
             "auth",
             "Desktop user authenticated, updating auth state",
             {
-              userId: sessionInfo.userId,
+              userId,
               deviceId,
             }
           );
 
-          // Perform guest→user upgrade once per session
-          // IMPORTANT: This must complete BEFORE setAuthState to prevent race conditions
-          // with Electric sync (which triggers when userId is set)
           if (!hasUpgradedRef.current) {
             hasUpgradedRef.current = true;
 
-            const hasData = await hasGuestData(deviceId);
-            if (hasData) {
-              logger.info(
-                "auth",
-                "Guest data detected, checking account status",
-                {
-                  userId: sessionInfo.userId.slice(0, 8),
-                }
-              );
+            (async () => {
+              const apiBaseUrl =
+                import.meta.env.VITE_API_URL || "http://localhost:3000";
+              const cas = new TauriBlobStorage();
 
               try {
-                const { isNewAccount, wipeGuestData } = await import(
-                  "@deeprecall/data"
-                );
-                const apiBaseUrl =
-                  import.meta.env.VITE_API_URL || "http://localhost:3000";
+                await debugAccountStatus(userId, apiBaseUrl);
+              } catch (error) {
+                logger.warn("auth", "Failed to get account debug info", {
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
 
-                const accountIsNew = await isNewAccount(
-                  sessionInfo.userId,
+              try {
+                const result = await handleSignIn(
+                  userId,
+                  deviceId,
+                  cas,
                   apiBaseUrl
                 );
 
-                logger.info("auth", "Account status determined", {
-                  userId: sessionInfo.userId.slice(0, 8),
-                  isNew: accountIsNew,
-                  hasGuestData: true,
-                });
-
-                if (accountIsNew) {
-                  // NEW account: Upgrade guest data
-                  logger.info(
-                    "auth",
-                    "NEW account detected - upgrading guest data",
-                    {
-                      userId: sessionInfo.userId.slice(0, 8),
-                    }
-                  );
-
-                  const cas = new TauriBlobStorage();
-                  const result = await upgradeGuestToUser(
-                    sessionInfo.userId,
-                    deviceId,
-                    cas,
-                    apiBaseUrl
-                  );
-
-                  logger.info("auth", "✅ Guest data UPGRADED successfully", {
-                    userId: sessionInfo.userId.slice(0, 8),
-                    synced: result.synced,
+                if (result.success) {
+                  logger.info("auth", `Sign-in complete: ${result.action}`, {
+                    userId: userId.slice(0, 8),
+                    ...result.details,
                   });
                 } else {
-                  // EXISTING account: Wipe guest data
-                  logger.info(
-                    "auth",
-                    "EXISTING account detected - wiping guest data",
-                    {
-                      userId: sessionInfo.userId.slice(0, 8),
-                    }
-                  );
-
-                  await wipeGuestData();
-
-                  logger.info("auth", "✅ Guest data WIPED successfully", {
-                    userId: sessionInfo.userId.slice(0, 8),
+                  logger.error("auth", "Sign-in flow failed", {
+                    userId: userId.slice(0, 8),
+                    error: result.error,
                   });
                 }
               } catch (error) {
-                logger.error("auth", "❌ Guest data handling failed", {
+                logger.error("auth", "Sign-in flow exception", {
                   error: error instanceof Error ? error.message : String(error),
-                  userId: sessionInfo.userId.slice(0, 8),
+                  userId: userId.slice(0, 8),
                 });
+                // Fallback to authenticated state so user can continue offline
+                setAuthState(true, userId, deviceId);
               }
-            } else {
-              logger.info("auth", "No guest data found - starting fresh", {
-                userId: sessionInfo.userId.slice(0, 8),
-              });
-            }
-
-            // Set auth state AFTER guest data handling completes
-            // This ensures wipeGuestData() finishes before Electric starts syncing
-            setAuthState(true, sessionInfo.userId, deviceId);
+            })();
           } else {
-            // Already upgraded, just set auth state
-            setAuthState(true, sessionInfo.userId, deviceId);
+            setAuthState(true, userId, deviceId);
           }
         } else {
           // Guest mode

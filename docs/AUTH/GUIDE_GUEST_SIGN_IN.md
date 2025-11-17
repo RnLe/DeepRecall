@@ -17,8 +17,10 @@
 
 1. **Detect guest data**: `hasGuestData(deviceId)` checks Dexie local tables + CAS pending entries. If none, exit (action `"none"`).
 2. **Account probe**: `isNewAccount(userId, apiBaseUrl)` hits `/api/user/status` to decide upgrade vs wipe.
+   - **Clean session alignment** _(Nov 2025 fix)_: even when no guest data exists we now call `setAuthState(true, userId, deviceId)` before returning so `isAuthenticated()` flips immediately for write buffer/Electric. This prevents authenticated sessions from behaving like guests after refreshes.
 3. **Upgrade branch (new account)**:
    - `upgradeGuestToUser(userId, deviceId, blobStorage, apiBaseUrl)` relabels local rows, uploads blobs via WriteBuffer, enforces 1:1 asset creation, and coordinates CAS metadata.
+   - **New behavior**: `setAuthState(true, userId, deviceId)` is invoked before upgrade kicks off so that every CAS coordination and WriteBuffer enqueue runs in authenticated mode even while the migration is in flight.
    - Returns counts for logging and telemetry; `AuthStateManager` proceeds to set auth state after success.
 4. **Wipe branch (existing account)**:
    - `wipeGuestData()` clears all `*_local` tables plus guest CAS metadata.
