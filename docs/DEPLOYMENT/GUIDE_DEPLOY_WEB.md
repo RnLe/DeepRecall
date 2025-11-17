@@ -35,7 +35,7 @@ In Railway dashboard → Variables, add:
 DATABASE_URL=postgresql://neondb_owner:PASSWORD@ep-late-cell-ag9og5sf.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require
 
 # Electric Cloud (Required - proxied to avoid CORS)
-NEXT_PUBLIC_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
+NEXT_PUBLIC_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
 NEXT_PUBLIC_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET=<your-electric-source-secret>
 
@@ -58,6 +58,7 @@ APP_JWT_SECRET=<generate with: openssl rand -base64 32>
 - `DATABASE_URL`: Get from Neon dashboard (connection string with `?sslmode=require`)
 - `NEXTAUTH_URL`: Replace with your actual Railway domain
 - `AUTH_SECRET`: Generate unique secret (never reuse across environments)
+- `NEXT_PUBLIC_ELECTRIC_URL`: Always include `/api/electric/v1/shape` so clients talk to the proxy instead of hitting Electric Cloud directly
 - OAuth credentials: Only needed if enabling Google/GitHub sign-in
 
 ---

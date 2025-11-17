@@ -61,7 +61,7 @@ VITE_POSTGRES_PASSWORD=<your-password>
 VITE_POSTGRES_SSL=require
 
 # Electric Cloud Sync (proxied)
-VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
 VITE_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 VITE_ELECTRIC_SOURCE_SECRET=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 
@@ -72,7 +72,7 @@ VITE_GOOGLE_DESKTOP_CLIENT_SECRET=<your-google-desktop-secret>
 VITE_GITHUB_DESKTOP_CLIENT_ID=<your-github-desktop-client-id>
 ```
 
-**Important**: `.env.local` is **embedded at build time** via `build.rs`. Credentials are baked into the executable.
+**Important**: `.env.local` is **embedded at build time** via `build.rs`. Credentials are baked into the executable, and the Electric proxy path must include `/api/electric/v1/shape` so sync calls stay behind the Next.js API.
 
 ---
 

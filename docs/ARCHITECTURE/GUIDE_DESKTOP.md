@@ -195,7 +195,7 @@ VITE_POSTGRES_PASSWORD=<set-from-neon-dashboard>
 VITE_POSTGRES_SSL=require
 
 # Electric Cloud (Real-time Sync via API proxy)
-VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
 VITE_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 VITE_ELECTRIC_SOURCE_SECRET=<your-electric-source-secret>
 
@@ -203,7 +203,7 @@ VITE_ELECTRIC_SOURCE_SECRET=<your-electric-source-secret>
 VITE_API_URL=https://deeprecall-production.up.railway.app
 ```
 
-> **Note**: Desktop executables are always built against the production stack. If you need to run against staging/local services, edit `.env.local` before building—there is no runtime switch.
+> **Note**: Desktop executables are always built against the production stack. If you need to run against staging/local services, edit `.env.local` before building—there is no runtime switch. The Electric proxy path must include `/api/electric/v1/shape` so the client receives shape feeds via the Next.js API.
 
 ### Build-time Embedding
 

@@ -40,7 +40,7 @@ function resolveElectricUrl(): string {
 
   const apiBase =
     import.meta.env.VITE_API_URL?.trim() || "http://localhost:3000";
-  return `${apiBase.replace(/\/$/, "")}/api/electric`;
+  return `${apiBase.replace(/\/$/, "")}/api/electric/v1/shape`;
 }
 
 // Configure PDF.js worker for Tauri platform

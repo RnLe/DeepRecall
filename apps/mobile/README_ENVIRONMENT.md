@@ -59,8 +59,8 @@ When building for production:
 VITE_API_BASE_URL=https://your-app.railway.app
 
 # Electric Cloud credentials (proxied through your API)
-# Use https://<your-api-domain>/api/electric to avoid CORS issues
-VITE_ELECTRIC_URL=https://your-app.railway.app/api/electric
+# Use https://<your-api-domain>/api/electric/v1/shape to avoid CORS issues
+VITE_ELECTRIC_URL=https://your-app.railway.app/api/electric/v1/shape
 VITE_ELECTRIC_SOURCE_ID=...
 VITE_ELECTRIC_SOURCE_SECRET=...
 ```
@@ -101,7 +101,7 @@ const response = await fetch(`${getApiBaseUrl()}/api/admin/sync-blob`, { ... });
 
 ### Issue: Electric Cloud CORS errors
 
-**Solution:** Make sure `VITE_ELECTRIC_URL` points to your backend proxy (`https://<api-domain>/api/electric`). Direct calls to `https://api.electric-sql.cloud` from Capacitor/WebView origins will be blocked by CORS.
+**Solution:** Make sure `VITE_ELECTRIC_URL` points to your backend proxy (`https://<api-domain>/api/electric/v1/shape`). Direct calls to `https://api.electric-sql.cloud` from Capacitor/WebView origins will be blocked by CORS.
 
 ### Issue: "Failed to resolve module specifier '@capacitor/preferences'"
 
@@ -129,7 +129,7 @@ console.log(getEnvironmentInfo());
 //   isProd: false,
 //   apiBaseUrl: '',
 //   configuredUrl: undefined,
-//   electricUrl: 'https://your-app.railway.app/api/electric'
+//   electricUrl: 'https://your-app.railway.app/api/electric/v1/shape'
 // }
 ```
 

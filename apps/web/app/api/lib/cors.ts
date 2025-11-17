@@ -20,6 +20,23 @@ export const ALLOW_ORIGINS = new Set([
   // Add your custom domain when you have one
 ]);
 
+const LOCALHOST_ORIGIN_PATTERNS = [
+  /^https?:\/\/localhost(?::\d+)?$/i,
+  /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i,
+];
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  if (ALLOW_ORIGINS.has(origin)) {
+    return true;
+  }
+
+  return LOCALHOST_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin));
+}
+
 /**
  * Generate CORS headers for the given origin
  */
@@ -45,7 +62,7 @@ export function corsHeaders(origin: string) {
  */
 export function handleCorsOptions(req: NextRequest): NextResponse {
   const origin = req.headers.get("origin") ?? "";
-  if (!ALLOW_ORIGINS.has(origin)) {
+  if (!isOriginAllowed(origin)) {
     return new NextResponse("Origin not allowed", { status: 403 });
   }
   return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
@@ -73,7 +90,7 @@ export function handleCorsOptions(req: NextRequest): NextResponse {
  */
 export function checkCorsOrigin(req: NextRequest): NextResponse | null {
   const origin = req.headers.get("origin");
-  if (origin && !ALLOW_ORIGINS.has(origin)) {
+  if (!isOriginAllowed(origin ?? null)) {
     return new NextResponse("Origin not allowed", { status: 403 });
   }
   return null;
@@ -93,7 +110,7 @@ export function addCorsHeaders(
   req: NextRequest
 ): NextResponse {
   const origin = req.headers.get("origin") ?? "";
-  if (ALLOW_ORIGINS.has(origin)) {
+  if (origin && isOriginAllowed(origin)) {
     const headers = corsHeaders(origin);
     Object.entries(headers).forEach(([key, value]) => {
       response.headers.set(key, value);

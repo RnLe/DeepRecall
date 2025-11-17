@@ -48,7 +48,7 @@ function resolveElectricUrl(): string {
     (import.meta.env.DEV ? "http://localhost:3000" : undefined) ||
     "https://deeprecall-production.up.railway.app";
 
-  return `${apiBaseCandidate.replace(/\/$/, "")}/api/electric`;
+  return `${apiBaseCandidate.replace(/\/$/, "")}/api/electric/v1/shape`;
 }
 
 // Extend Window interface for Capacitor

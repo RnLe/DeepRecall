@@ -237,13 +237,15 @@ VITE_API_BASE_URL=http://localhost:3000  # Dev
 # VITE_API_BASE_URL=https://deeprecall-production.up.railway.app  # Production
 
 # Electric Cloud (Real-time Sync via API proxy)
-VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
 VITE_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
 VITE_ELECTRIC_SOURCE_SECRET=eyJ0eXA...your-jwt-token...
 
 # Optional: Custom blob directory (defaults to "blobs" in production)
 VITE_MOBILE_BLOB_DIR=blobs
 ```
+
+> **Tip**: Always include `/api/electric/v1/shape` in the proxy URL so the Electric client talks to the Next.js proxy instead of hitting Electric Cloud directly.
 
 ### How Env Vars Work
 
@@ -464,7 +466,7 @@ pnpm cap run ios  # Launch in iOS Simulator
 
 # Mobile app connects to:
 # - HTTP API: http://localhost:3000 (Next.js)
-# - Electric Cloud (proxied): https://your-app.railway.app/api/electric
+# - Electric Cloud (proxied): https://your-app.railway.app/api/electric/v1/shape
 # - Neon Postgres: Via Electric sync (no direct connection)
 ```
 
