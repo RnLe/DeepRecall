@@ -15,11 +15,12 @@ This document tracks the complete review of DeepRecall's codebase and documentat
 
 ## Progress Summary
 
-- **Total Markdown Files**: 42
-- **Reviewed**: 5 / 42
-- **To Keep**: 3 (GUIDE_DATA_ARCHITECTURE.md, GUIDE_OPTIMISTIC_UPDATES.md, GUIDE_SYNC_ARCHITECTURE.md)
-- **To Merge**: 2 → 1 (BLOB_ARCHITECTURE_ANALYSIS + BLOB_STORAGE_UNIFICATION → GUIDE_DATA_ARCHITECTURE)
-- **To Delete**: 2 (BLOB_ARCHITECTURE_ANALYSIS.md, BLOB_STORAGE_UNIFICATION.md)
+- **Total Markdown Files**: 47 (41 in root directory, 6 in docs/)
+- **Reviewed & Organized**: 15 / 47
+- **Architecture Guides**: 6 files in `docs/ARCHITECTURE/`
+- **Auth Guides**: 1 file in `docs/AUTH/`
+- **Deleted**: 10 files (BLOB_ARCHITECTURE_ANALYSIS, BLOB_STORAGE_UNIFICATION, BLOB_TABLES_ANALYSIS, QUICKSTART_BLOB_UNIFICATION, BLOB_CHAT, PLATFORM_WRAPPER_PATTERN, SYSTEM_STATE_MANAGEMENT, GUIDE_CROSS_DEVICE_REACTIVITY)
+- **Next Priority**: Review remaining architecture guides (middleware, runtime config), consolidate auth documentation
 
 ---
 
@@ -28,47 +29,50 @@ This document tracks the complete review of DeepRecall's codebase and documentat
 ### Core Documentation (Essential)
 
 - [ ] `README_DEV.md` - Main developer overview
-- [ ] `PROECT_TREE.txt` - Project structure reference
+- [ ] `PROJECT_TREE.txt` - Project structure reference
 
 ### Architecture & Data Guides
 
-- [x] `GUIDE_DATA_ARCHITECTURE.md` - ✅ **CONSOLIDATED** - Complete data architecture (replaces 3 files)
-- [x] `GUIDE_OPTIMISTIC_UPDATES.md` - ✅ **UPDATED** - Optimistic update patterns with guest mode
-- [x] `GUIDE_SYNC_ARCHITECTURE.md` - ✅ **KEEP** - SyncManager pattern (short, actionable)
+- [x] `docs/ARCHITECTURE/GUIDE_DATA_ARCHITECTURE.md` - ✅ **CONSOLIDATED & MOVED** - Complete data architecture (replaces 3 files)
+- [x] `docs/ARCHITECTURE/GUIDE_OPTIMISTIC_UPDATES.md` - ✅ **UPDATED & MOVED** - Optimistic update patterns with guest mode
+- [x] `docs/ARCHITECTURE/GUIDE_FILES_TO_ASSETS.md` - ✅ **MOVED** - File to asset conversion guide (includes blob tables analysis)
+- [x] `docs/ARCHITECTURE/GUIDE_ELECTRIC_PATTERN.md` - ✅ **CONDENSED & MOVED** - Electric + WriteBuffer pattern (4-file repo structure)
+- [x] `docs/ARCHITECTURE/GUIDE_PLATFORM_WRAPPERS.md` - ✅ **CONDENSED & MOVED** - Platform-specific wrapper pattern
+- [x] `docs/ARCHITECTURE/GUIDE_ZUSTAND_STORES.md` - ✅ **CONDENSED & MOVED** - Global state management with Zustand
+- [x] ~~`BLOB_CHAT.md`~~ - ❌ **DELETED** (outdated design discussion)
+- [x] ~~`BLOB_TABLES_ANALYSIS.md`~~ - ❌ **DELETED** (merged into GUIDE_FILES_TO_ASSETS.md)
+- [x] ~~`QUICKSTART_BLOB_UNIFICATION.md`~~ - ❌ **DELETED** (obsolete migration guide)
+- [x] ~~`PLATFORM_WRAPPER_PATTERN.md`~~ - ❌ **REPLACED** (now GUIDE_PLATFORM_WRAPPERS.md)
+- [x] ~~`SYSTEM_STATE_MANAGEMENT.md`~~ - ❌ **REPLACED** (now GUIDE_ZUSTAND_STORES.md)
+- [x] ~~`GUIDE_CROSS_DEVICE_REACTIVITY.md`~~ - ❌ **DELETED** (covered in GUIDE_DATA_ARCHITECTURE.md)
+- [x] ~~`GUIDE_SYNC_ARCHITECTURE.md`~~ - ❌ **DOES NOT EXIST** (removed from checklist)
 - [x] ~~`BLOB_ARCHITECTURE_ANALYSIS.md`~~ - ❌ **DELETED** (merged into GUIDE_DATA_ARCHITECTURE.md)
 - [x] ~~`BLOB_STORAGE_UNIFICATION.md`~~ - ❌ **DELETED** (merged into GUIDE_DATA_ARCHITECTURE.md)
-- [ ] `BLOB_CHAT.md` - Blob design discussions
-- [ ] `QUICKSTART_BLOB_UNIFICATION.md` - Quick setup for blob system
+- [ ] `GUIDE_MIDDLEWARE.md` - Middleware architecture (review & move)
+- [ ] `GUIDE_RUNTIME_CONFIG_ROUTING_CORS.md` - Runtime config & CORS (review & move)
+- [ ] `CONFLICT_RESOLUTION_STRATEGY.md` - Conflict resolution (review & move)
 
-### Feature Guides
+### Board & Notes (Whiteboard System)
 
-- [ ] `GUIDE_INKING.md` - Inking system (Apple Pencil, gestures)
 - [ ] `GUIDE_RENDER_WHITEBOARD.md` - Whiteboard rendering
 - [ ] `GUIDE_NOTES_MODULE.md` - Note-taking module
 - [ ] `INKING_AIDS_FEATURES.md` - Inking aids (rulers, shapes)
 - [ ] `INKING_CRITICAL_ISSUES.md` - Known inking issues
 - [ ] `WHITEBOARD_REFACTOR_SUMMARY.md` - Whiteboard refactor notes
 
-### Platform & Infrastructure
-
-- [ ] `PLATFORM_WRAPPER_PATTERN.md` - Platform adapter pattern
-- [ ] `GUIDE_MIDDLEWARE.md` - Middleware architecture
-- [ ] `GUIDE_RUNTIME_CONFIG_ROUTING_CORS.md` - Runtime config & CORS
-- [ ] `GUIDE_CROSS_DEVICE_REACTIVITY.md` - Cross-device sync
-- [ ] `ELECTRIC_PATTERN.md` - ElectricSQL patterns
-
 ### Authentication & User Management
 
-- [ ] `AUTH_DESKTOP_MOBILE_STRATEGY.md` - Auth strategy overview
-- [ ] `AUTH_MIGRATION_GUIDE.md` - Auth migration steps
-- [ ] `AUTH_SETUP_PHASE2.md` - Auth setup phase 2
-- [ ] `GUEST_MODE_IMPLEMENTATION_SUMMARY.md` - Guest mode summary
-- [ ] `GUEST_USER_UPGRADE.md` - Guest to authenticated upgrade
-- [ ] `DESKTOP_GOOGLE_OAUTH_SUMMARY.md` - Desktop OAuth
-- [ ] `MOBILE_OAUTH_SETUP.md` - Mobile OAuth setup
-- [ ] `NATIVE_OAUTH_PROGRESS.md` - Native OAuth progress
-- [ ] `SETUP_OAUTH_CLIENTS.md` - OAuth client setup
-- [ ] `TESTING_DESKTOP_OAUTH.md` - Desktop OAuth testing
+- [x] `docs/AUTH/GUIDE_GUEST_SIGN_IN.md` - ✅ **MOVED** - Guest sign-in flow and upgrade process
+- [ ] `AUTH_DESKTOP_MOBILE_STRATEGY.md` - Auth strategy overview (review & move)
+- [ ] `AUTH_MIGRATION_GUIDE.md` - Auth migration steps (review & move)
+- [ ] `AUTH_SETUP_PHASE2.md` - Auth setup phase 2 (review & move)
+- [ ] `GUEST_MODE_IMPLEMENTATION_SUMMARY.md` - Guest mode summary (review & move)
+- [ ] `GUEST_USER_UPGRADE.md` - Guest to authenticated upgrade (review & move)
+- [ ] `DESKTOP_GOOGLE_OAUTH_SUMMARY.md` - Desktop OAuth (review & move)
+- [ ] `MOBILE_OAUTH_SETUP.md` - Mobile OAuth setup (review & move)
+- [ ] `NATIVE_OAUTH_PROGRESS.md` - Native OAuth progress (review & move)
+- [ ] `SETUP_OAUTH_CLIENTS.md` - OAuth client setup (review & move)
+- [ ] `TESTING_DESKTOP_OAUTH.md` - Desktop OAuth testing (review & move)
 
 ### Logging & Observability
 
@@ -92,15 +96,15 @@ This document tracks the complete review of DeepRecall's codebase and documentat
 ### Migration & Technical Debt
 
 - [ ] `OPTIMISTIC_UPDATES_MIGRATION.md` - Optimistic updates migration
+- [ ] `PHASE1_COMPLETE.md` - Phase 1 completion summary
 - [ ] `PHASE3_MIGRATION_CHECKLIST.md` - Phase 3 migration
+- [ ] `MIGRATION_FILE_INBOX.md` - Migration file inbox
 - [ ] `CAPACITOR_MIGRATION_PLAN.md` - Capacitor migration plan
 - [ ] `TAURI_MIGRATION_PLAN.md` - Tauri migration plan
-- [ ] `CONFLICT_RESOLUTION_STRATEGY.md` - Conflict resolution
 
 ### Configuration & Tooling
 
 - [ ] `LINTING_CONFIG.md` - Linting configuration
-- [ ] `SYSTEM_STATE_MANAGEMENT.md` - System state management
 
 ### Miscellaneous
 
@@ -199,26 +203,41 @@ This document tracks the complete review of DeepRecall's codebase and documentat
 
 ## Documentation Consolidation Plan
 
-### Proposed Structure (To Be Refined)
+### Folder Structure (Implemented)
 
-1. **README_DEV.md** - Keep as main entry point
-2. **ARCHITECTURE.md** - Merge data/sync/blob architecture guides
-3. **PLATFORM_GUIDE.md** - Platform adapters, injection pattern
-4. **FEATURE_GUIDES/** folder
+```
+docs/
+├── ARCHITECTURE/          # Core architecture & data flow guides
+│   ├── GUIDE_DATA_ARCHITECTURE.md        # ✅ Main data architecture overview
+│   ├── GUIDE_OPTIMISTIC_UPDATES.md       # ✅ Optimistic update patterns
+│   ├── GUIDE_FILES_TO_ASSETS.md          # ✅ File to asset conversion
+│   ├── BLOB_TABLES_ANALYSIS.md           # ✅ Analysis: why 3 separate tables
+│   ├── ELECTRIC_PATTERN.md               # ✅ Electric + WriteBuffer pattern
+│   └── QUICKSTART_BLOB_UNIFICATION.md    # ✅ Blob implementation guide
+│
+└── AUTH/                  # Authentication & user management
+    └── GUIDE_GUEST_SIGN_IN.md            # ✅ Guest sign-in flow
+```
+
+### Future Consolidation (To Be Refined)
+
+1. **README_DEV.md** - Keep as main entry point with documentation index
+2. **docs/ARCHITECTURE/** - Continue consolidating architecture guides
+3. **docs/AUTH/** - Consolidate all auth-related documentation
+4. **docs/FEATURES/** folder (future)
    - `INKING.md` - Consolidated inking documentation
-   - `PDF_READER.md` - PDF system documentation
    - `WHITEBOARD.md` - Whiteboard documentation
-5. **AUTH_GUIDE.md** - Consolidated authentication documentation
-6. **DEPLOYMENT.md** - Consolidated deployment guides
-7. **SETUP/** folder - Quick setup guides per platform
-8. **ARCHIVE/** folder - Obsolete/completed migration docs
+   - `NOTES.md` - Note-taking module
+5. **docs/DEPLOYMENT/** folder (future) - Deployment guides per platform
+6. **docs/ARCHIVE/** folder (future) - Obsolete/completed migration docs
+7. **ARCHIVE/** folder - Obsolete/completed migration docs
 
 ---
 
 ## Next Steps
 
 1. ✅ Create this master document
-2. ✅ Trim `PROECT_TREE.txt` to essential files only
+2. ✅ Trim `PROJECT_TREE.txt` to essential files only
 3. ⏳ Review each markdown file and assess:
    - Is this still relevant?
    - Is this information duplicated elsewhere?

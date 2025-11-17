@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  pdfjs-dist: 5.4.394
+
 importers:
 
   .:
@@ -290,7 +293,7 @@ importers:
         specifier: ^2.3.11
         version: 2.4.5
       pdfjs-dist:
-        specifier: ^5.0.0
+        specifier: 5.4.394
         version: 5.4.394
       pg:
         specifier: ^8.13.1
@@ -452,7 +455,7 @@ importers:
         specifier: workspace:*
         version: link:../telemetry
       pdfjs-dist:
-        specifier: ^5.0.0
+        specifier: 5.4.394
         version: 5.4.394
       react:
         specifier: ^19.0.0
@@ -3852,10 +3855,6 @@ packages:
     resolution: {integrity: sha512-mHU89HGh7v+4u2ubfnevJ03lmPgQ5WU4CxAVmTSh/sxVTEDYd1er/dKS/A6vg77NX47KTEoihq8jZBLr8Cxuwg==}
     engines: {node: '>=20.16.0 <21 || >=22.3.0'}
     hasBin: true
-
-  pdfjs-dist@5.4.296:
-    resolution: {integrity: sha512-DlOzet0HO7OEnmUmB6wWGJrrdvbyJKftI1bhMitK7O2N8W2gc757yyYBbINy9IDafXAV9wmKr9t7xsTaNKRG5Q==}
-    engines: {node: '>=20.16.0 || >=22.3.0'}
 
   pdfjs-dist@5.4.394:
     resolution: {integrity: sha512-9ariAYGqUJzx+V/1W4jHyiyCep6IZALmDzoaTLZ6VNu8q9LWi1/ukhzHgE2Xsx96AZi0mbZuK4/ttIbqSbLypg==}
@@ -7998,11 +7997,7 @@ snapshots:
   pdf-parse@2.4.5:
     dependencies:
       '@napi-rs/canvas': 0.1.80
-      pdfjs-dist: 5.4.296
-
-  pdfjs-dist@5.4.296:
-    optionalDependencies:
-      '@napi-rs/canvas': 0.1.80
+      pdfjs-dist: 5.4.394
 
   pdfjs-dist@5.4.394:
     optionalDependencies:

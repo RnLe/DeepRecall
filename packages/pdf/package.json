@@ -15,7 +15,7 @@
   "dependencies": {
     "@deeprecall/core": "workspace:*",
     "@deeprecall/telemetry": "workspace:*",
-    "pdfjs-dist": "^5.0.0"
+    "pdfjs-dist": "5.4.394"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
