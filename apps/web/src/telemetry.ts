@@ -48,18 +48,26 @@ export function initTelemetry() {
     );
   }
 
-  // OTLP sink (optional, for testing/production)
-  // Enable in dev by setting NEXT_PUBLIC_ENABLE_OTLP=true in .env.local
-  if (process.env.NEXT_PUBLIC_ENABLE_OTLP === "true") {
+  // Production: Always enable OTLP sink for error logging
+  // Dev: Enable by setting NEXT_PUBLIC_ENABLE_OTLP=true in .env.local
+  const shouldEnableOtlp =
+    process.env.NODE_ENV === "production" ||
+    process.env.NEXT_PUBLIC_ENABLE_OTLP === "true";
+
+  if (shouldEnableOtlp) {
     const endpoint =
       process.env.NEXT_PUBLIC_OTLP_ENDPOINT ||
       "https://opentelemetry-collector-contrib-production-700b.up.railway.app/v1/logs";
 
     sinks.push(
       makeOtlpHttpSink(endpoint, {
-        app: "deeprecall",
+        service_name: "deeprecall-web", // Proper service name (not "unknown_service")
+        deployment_environment: process.env.NODE_ENV || "development",
         platform: "web",
-        env: process.env.NODE_ENV || "development",
+        // Add Railway service ID if available
+        ...(process.env.RAILWAY_SERVICE_ID && {
+          railway_service_id: process.env.RAILWAY_SERVICE_ID,
+        }),
       })
     );
   }

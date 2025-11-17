@@ -12,6 +12,12 @@ export function makeOtlpHttpSink(
   let queue: LogEvent[] = [];
   let inflight = false;
 
+  // Ensure service_name is always set (fixes "unknown_service" issue)
+  const resourceWithDefaults = {
+    service_name: "deeprecall",
+    ...resource,
+  };
+
   async function flushBatch() {
     if (inflight || queue.length === 0) return;
     inflight = true;
@@ -21,7 +27,7 @@ export function makeOtlpHttpSink(
       resourceLogs: [
         {
           resource: {
-            attributes: Object.entries(resource).map(([k, v]) => ({
+            attributes: Object.entries(resourceWithDefaults).map(([k, v]) => ({
               key: k,
               value: { stringValue: String(v) },
             })),

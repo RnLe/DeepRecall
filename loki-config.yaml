@@ -1,0 +1,94 @@
+# Loki Configuration for Railway
+# This file should be mounted to the Loki service on Railway
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+
+# Use filesystem storage for Railway (no S3/GCS needed for small scale)
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+# Schema configuration
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# Ingester configuration
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 5m
+  chunk_retain_period: 30s
+  max_chunk_age: 1h
+  wal:
+    enabled: true
+    dir: /loki/wal
+
+# Limits configuration
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  ingestion_rate_mb: 10
+  ingestion_burst_size_mb: 20
+  max_query_series: 500
+  max_query_parallelism: 32
+
+# Chunk store configuration
+chunk_store_config:
+  max_look_back_period: 0s
+
+# Table manager configuration
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 168h # 7 days
+
+# Query configuration
+query_range:
+  align_queries_with_step: true
+  max_retries: 5
+  parallelise_sharded_queries: true
+  cache_results: true
+
+# Compactor configuration
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+
+# Ruler configuration (optional, for alerts)
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  alertmanager_url: http://localhost:9093
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
