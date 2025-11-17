@@ -91,54 +91,29 @@ export async function saveSession(jwt: string): Promise<void> {
  * Clear session from secure storage
  */
 export async function clearSession(): Promise<void> {
-  // Clear secure tokens
-  await secureStore.removeAppJWT();
-  await secureStore.removeGoogleRefreshToken();
-
-  // Clear write buffer to prevent 401 errors when flushing after sign-out
   try {
-    const { getFlushWorker } = await import("@deeprecall/data");
-    const flushWorker = getFlushWorker();
-    if (flushWorker) {
-      const buffer = flushWorker.getBuffer();
-      await buffer.clear();
-      console.log("[Session] Cleared write buffer");
-    }
-  } catch (error) {
-    console.error("[Session] Failed to clear write buffer:", error);
-    // Don't throw - continue with other cleanup
-  }
-
-  // Clear blob metadata from Dexie to prevent guest users from seeing
-  // previous user's blob coordination data
-  try {
-    const { db } = await import("@deeprecall/data/db");
-    await Promise.all([
-      db.blobsMeta.clear(),
-      db.deviceBlobs.clear(),
-      db.replicationJobs.clear(),
-    ]);
-    console.log("[Session] Cleared blob metadata from Dexie");
-
-    // Rescan CAS after clearing to repopulate metadata for guest mode
-    const { coordinateAllLocalBlobs, getDeviceId } = await import(
-      "@deeprecall/data"
-    );
+    // Use centralized sign-out flow
+    const { handleSignOut, getDeviceId } = await import("@deeprecall/data");
     const { CapacitorBlobStorage } = await import("../blob-storage/capacitor");
 
-    const cas = new CapacitorBlobStorage();
     const deviceId = getDeviceId();
+    const cas = new CapacitorBlobStorage();
 
-    coordinateAllLocalBlobs(cas, deviceId)
-      .then((result) => {
-        console.log("[Session] CAS rescan complete", result);
-      })
-      .catch((error: unknown) => {
-        console.error("[Session] CAS rescan failed:", error);
-      });
+    console.log("[Session] Running centralized sign-out flow...");
+    await handleSignOut(deviceId, cas);
+    console.log("[Session] Sign-out flow completed successfully");
+
+    // Clear secure tokens
+    await secureStore.removeAppJWT();
+    await secureStore.removeGoogleRefreshToken();
+
+    console.log("[Session] Session cleared successfully");
   } catch (error) {
-    console.error("[Session] Failed to clear blob metadata:", error);
-    // Don't throw - session clearing is more important
+    console.error("[Session] Failed to clear session:", error);
+    // Even if centralized flow fails, clear tokens
+    await secureStore.removeAppJWT();
+    await secureStore.removeGoogleRefreshToken();
+    throw error;
   }
 }
 

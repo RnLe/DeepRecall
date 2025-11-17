@@ -16,8 +16,6 @@ import {
   initFlushWorker,
   setAuthState,
   getDeviceId,
-  upgradeGuestToUser,
-  hasGuestData,
   usePresetsSync,
   useActivitiesSync,
   useAnnotationsSync,
@@ -64,139 +62,100 @@ initializeDeviceId().catch((err) =>
 /**
  * AuthStateManager: Syncs mobile session with global auth state
  * Handles guest→user upgrade after sign-in
+ * Handles sign-out cleanup
  */
 function AuthStateManager({ children }: { children: React.ReactNode }) {
   const hasUpgradedRef = useRef(false);
+  const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const deviceId = getDeviceId();
 
-    // Initialize session on mount
-    async function initSession() {
+    // Check session periodically to detect sign-in/sign-out
+    async function checkSession() {
       try {
         const { loadSession } = await import("./auth/session");
         const sessionInfo = await loadSession();
 
-        if (sessionInfo && sessionInfo.userId) {
-          // User authenticated
-          const userId = sessionInfo.userId;
+        const currentUserId = sessionInfo?.userId || null;
+        const prevUserId = prevUserIdRef.current;
 
-          logger.info(
-            "auth",
-            "Mobile user authenticated, updating auth state",
-            {
-              userId,
-              deviceId,
-            }
-          );
+        // Detect sign-out (user was authenticated, now isn't)
+        if (prevUserId && !currentUserId) {
+          logger.info("auth", "Sign-out detected, resetting auth state");
+          setAuthState(false, null, deviceId);
+          hasUpgradedRef.current = false;
+          prevUserIdRef.current = null;
+          return;
+        }
 
-          // Perform guest→user upgrade once per session
-          // IMPORTANT: This must complete BEFORE setAuthState to prevent race conditions
-          // with Electric sync (which triggers when userId is set)
+        // Detect sign-in (user wasn't authenticated, now is)
+        if (!prevUserId && currentUserId) {
+          logger.info("auth", "Sign-in detected, running auth flow", {
+            userId: currentUserId.slice(0, 8),
+          });
+
+          // Perform guest→user upgrade once per session using centralized flow
           if (!hasUpgradedRef.current) {
             hasUpgradedRef.current = true;
 
-            const hasData = await hasGuestData(deviceId);
-            if (hasData) {
-              logger.info(
-                "auth",
-                "Guest data detected, checking account status",
-                {
-                  userId: userId.slice(0, 8),
-                }
+            const { handleSignIn, debugAccountStatus } = await import(
+              "@deeprecall/data"
+            );
+            const apiBaseUrl = getApiBaseUrl();
+            const cas = new CapacitorBlobStorage();
+
+            // Debug: Log detailed account status
+            await debugAccountStatus(currentUserId, apiBaseUrl);
+
+            try {
+              const result = await handleSignIn(
+                currentUserId,
+                deviceId,
+                cas,
+                apiBaseUrl
               );
-
-              try {
-                const { isNewAccount, wipeGuestData } = await import(
-                  "@deeprecall/data"
-                );
-                const apiBaseUrl = getApiBaseUrl();
-
-                const accountIsNew = await isNewAccount(userId, apiBaseUrl);
-
-                logger.info("auth", "Account status determined", {
-                  userId: userId.slice(0, 8),
-                  isNew: accountIsNew,
-                  hasGuestData: true,
+              if (result.success) {
+                logger.info("auth", `Sign-in complete: ${result.action}`, {
+                  userId: currentUserId.slice(0, 8),
+                  ...result.details,
                 });
-
-                if (accountIsNew) {
-                  // NEW account: Upgrade guest data
-                  logger.info(
-                    "auth",
-                    "NEW account detected - upgrading guest data",
-                    {
-                      userId: userId.slice(0, 8),
-                    }
-                  );
-
-                  const cas = new CapacitorBlobStorage();
-                  const result = await upgradeGuestToUser(
-                    userId,
-                    deviceId,
-                    cas,
-                    apiBaseUrl
-                  );
-
-                  logger.info("auth", "✅ Guest data UPGRADED successfully", {
-                    userId: userId.slice(0, 8),
-                    synced: result.synced,
-                  });
-                } else {
-                  // EXISTING account: Wipe guest data
-                  logger.info(
-                    "auth",
-                    "EXISTING account detected - wiping guest data",
-                    {
-                      userId: userId.slice(0, 8),
-                    }
-                  );
-
-                  await wipeGuestData();
-
-                  logger.info("auth", "✅ Guest data WIPED successfully", {
-                    userId: userId.slice(0, 8),
-                  });
-                }
-              } catch (error) {
-                logger.error("auth", "❌ Guest data handling failed", {
-                  error: error instanceof Error ? error.message : String(error),
-                  userId: userId.slice(0, 8),
+              } else {
+                logger.error("auth", "Sign-in flow failed", {
+                  userId: currentUserId.slice(0, 8),
+                  error: result.error,
                 });
               }
-            } else {
-              logger.info("auth", "No guest data found - starting fresh", {
-                userId: userId.slice(0, 8),
+            } catch (error) {
+              logger.error("auth", "Sign-in flow exception", {
+                error: error instanceof Error ? error.message : String(error),
+                userId: currentUserId.slice(0, 8),
               });
             }
 
-            // Set auth state AFTER guest data handling completes
-            // This ensures wipeGuestData() finishes before Electric starts syncing
-            setAuthState(true, userId, deviceId);
-          } else {
-            // Already upgraded, just set auth state
-            setAuthState(true, userId, deviceId);
+            // Note: setAuthState is called INSIDE handleSignIn
           }
-        } else {
-          // Guest mode (no session)
-          logger.info("auth", "Mobile user not authenticated, guest mode", {
-            deviceId,
-          });
-          setAuthState(false, null, deviceId);
-          hasUpgradedRef.current = false;
 
-          // Note: Guest mode initialization (presets + CAS scan) is handled
-          // by a separate component to ensure proper coordination
+          prevUserIdRef.current = currentUserId;
+        }
+
+        // No change in auth state
+        if (prevUserId === currentUserId) {
+          return;
         }
       } catch (error) {
-        logger.error("auth", "Failed to load session", { error });
-        // Default to guest mode on error
-        const deviceId = getDeviceId();
-        setAuthState(false, null, deviceId);
+        logger.error("auth", "Failed to check session", { error });
       }
     }
 
-    initSession();
+    // Initial check on mount
+    checkSession();
+
+    // Check every 2 seconds for session changes
+    // This is lightweight since we just check secure storage
+    const interval = setInterval(checkSession, 2000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return <>{children}</>;
@@ -215,12 +174,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
+  // Expose QueryClient globally for auth flows
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__queryClient = queryClient;
+    }
+  }, [queryClient]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthStateManager>
         <GuestModeInitializer />
         <ElectricInitializer />
-        <SyncManager />
+        <ConditionalSyncManager />
         {children}
       </AuthStateManager>
     </QueryClientProvider>
@@ -424,6 +391,51 @@ function ElectricInitializer() {
 }
 
 /**
+ * Wrapper that conditionally renders SyncManager based on auth
+ * Blob syncs (useBlobsMetaSync, useDeviceBlobsSync) run for both guest and authenticated
+ * Other syncs only run when authenticated
+ */
+function ConditionalSyncManager() {
+  // CRITICAL: Use global auth state userId, NOT session info
+  // The session loads immediately on app startup, but handleSignIn() must complete
+  // BEFORE we start syncing (to allow wipeGuestData() to finish first).
+  // The global userId is only set AFTER handleSignIn() completes.
+  const [authUserId, setAuthUserId] = useState<string | undefined>(undefined);
+
+  // Subscribe to global auth state changes
+  useEffect(() => {
+    import("@deeprecall/data").then(({ getUserId, subscribeToAuthState }) => {
+      // Set initial value
+      const userId = getUserId();
+      setAuthUserId(userId || undefined);
+
+      // Subscribe to changes
+      const unsubscribe = subscribeToAuthState(() => {
+        const newUserId = getUserId();
+        setAuthUserId(newUserId || undefined);
+      });
+
+      return unsubscribe;
+    });
+  }, []); // Only run once on mount
+
+  const isGuest = !authUserId;
+
+  // SECURITY: Always sync blob metadata (needed for CAS coordination)
+  // When userId is undefined, guests can see their local blobs only
+  // When userId is present, RLS filters to user's blobs
+  useBlobsMetaSync(authUserId);
+  useDeviceBlobsSync(authUserId);
+
+  // Only sync other data when authenticated
+  if (isGuest) {
+    return null;
+  }
+
+  return <SyncManager userId={authUserId} />;
+}
+
+/**
  * SyncManager: Centralized Electric → Dexie sync coordinator
  *
  * CRITICAL: Runs ALL sync hooks exactly ONCE to prevent race conditions.
@@ -432,24 +444,26 @@ function ElectricInitializer() {
  * - Runs cleanup on local tables
  *
  * Same implementation as desktop/web - platform agnostic!
+ *
+ * NOTE: Blob syncs (useBlobsMetaSync, useDeviceBlobsSync) are in ConditionalSyncManager
+ * so they run even for guests (needed for local CAS functionality).
  */
-function SyncManager() {
-  // Sync hooks (alphabetical order)
-  useActivitiesSync();
-  useAnnotationsSync();
-  useAssetsSync();
-  useAuthorsSync();
-  useBlobsMetaSync();
-  useBoardsSync();
-  useCardsSync();
-  useCollectionsSync();
-  useDeviceBlobsSync();
-  useEdgesSync();
-  usePresetsSync();
-  useReplicationJobsSync();
-  useReviewLogsSync();
-  useStrokesSync();
-  useWorksSync();
+function SyncManager({ userId }: { userId?: string }) {
+  // Sync hooks (alphabetical order) - user data only
+  // Pass userId for multi-tenant isolation (filters by owner_id)
+  useActivitiesSync(userId);
+  useAnnotationsSync(userId);
+  useAssetsSync(userId);
+  useAuthorsSync(userId);
+  useBoardsSync(userId);
+  useCardsSync(userId);
+  useCollectionsSync(userId);
+  useEdgesSync(userId);
+  usePresetsSync(userId);
+  useReplicationJobsSync(userId);
+  useReviewLogsSync(userId);
+  useStrokesSync(userId);
+  useWorksSync(userId);
 
   return null;
 }

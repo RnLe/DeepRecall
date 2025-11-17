@@ -20,11 +20,11 @@ interface LinkRequest {
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
     const userContext = await requireAuth(req);
-    const { provider } = params;
+    const { provider } = await params;
 
     if (provider !== "google" && provider !== "github") {
       return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
