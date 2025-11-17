@@ -4,7 +4,12 @@
  * Dev: Console + Ring Buffer (4000 events)
  * Prod: Ring Buffer only (silent unless OTLP enabled via env)
  */
-import { registerSinks, type Sink } from "@deeprecall/telemetry";
+import {
+  registerSinks,
+  hijackConsole,
+  type Sink,
+  type Domain,
+} from "@deeprecall/telemetry";
 import {
   makeRingBufferSink,
   makeConsoleSink,
@@ -20,6 +25,8 @@ export function initTelemetry() {
   ringBuffer = makeRingBufferSink(4000);
 
   const sinks: Sink[] = [ringBuffer];
+
+  const consoleExcludeDomains: Domain[] = ["console"];
 
   // Dev: Add filtered console sink (optional, controlled by env var)
   if (
@@ -41,6 +48,7 @@ export function initTelemetry() {
       makeConsoleSink({
         minLevel: consoleLevel, // Control via VITE_CONSOLE_LOG_LEVEL
         excludeDomains: [
+          ...consoleExcludeDomains,
           // Uncomment to exclude specific noisy domains:
           // "sync.electric", // Electric shape updates
           // "sync.writeBuffer", // Write buffer operations
@@ -68,6 +76,14 @@ export function initTelemetry() {
   }
 
   registerSinks(...sinks);
+
+  const shouldCaptureConsole =
+    typeof window !== "undefined" &&
+    import.meta.env.VITE_CAPTURE_CONSOLE_LOGS !== "false";
+
+  if (shouldCaptureConsole) {
+    hijackConsole("console");
+  }
 }
 
 export function getRingBuffer(): RingBufferSink {

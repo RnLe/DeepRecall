@@ -74,6 +74,7 @@ Logs are categorized by domain for filtering and analysis:
 | `auth`              | Authentication operations                       |
 | `network`           | Network requests and retries                    |
 | `ui`                | UI interactions and errors                      |
+| `console`           | Captured `console.log/warn/error` output        |
 
 ---
 
@@ -101,6 +102,7 @@ Logs are categorized by domain for filtering and analysis:
 NEXT_PUBLIC_ENABLE_CONSOLE_LOGS=true    # Toggle console output
 NEXT_PUBLIC_CONSOLE_LOG_LEVEL=warn      # Minimum level: debug|info|warn|error
 NEXT_PUBLIC_CONSOLE_VERBOSE=false       # Compact (default) or verbose data
+NEXT_PUBLIC_CAPTURE_CONSOLE_LOGS=true   # Mirror browser console into telemetry log viewer
 
 # OTLP export (optional, production)
 NEXT_PUBLIC_ENABLE_OTLP=true            # Enable OTLP export
@@ -116,6 +118,7 @@ NEXT_PUBLIC_OTLP_ENDPOINT=https://opentelemetry-collector-contrib-production-700
 VITE_ENABLE_CONSOLE_LOGS=true           # Toggle console output
 VITE_CONSOLE_LOG_LEVEL=warn             # Minimum level: debug|info|warn|error
 VITE_CONSOLE_VERBOSE=false              # Compact (default) or verbose data
+VITE_CAPTURE_CONSOLE_LOGS=true          # Mirror native console into telemetry log viewer
 
 # OTLP export (optional, production)
 VITE_ENABLE_OTLP=true                   # Enable OTLP export
@@ -130,6 +133,7 @@ VITE_OTLP_ENDPOINT=https://opentelemetry-collector-contrib-production-700b.up.ra
 ENABLE_CONSOLE_LOGS=true
 CONSOLE_LOG_LEVEL=warn
 CONSOLE_VERBOSE=false
+CAPTURE_CONSOLE_LOGS=true
 ```
 
 Clean console showing only warnings/errors.
@@ -140,6 +144,7 @@ Clean console showing only warnings/errors.
 ENABLE_CONSOLE_LOGS=true
 CONSOLE_LOG_LEVEL=debug
 CONSOLE_VERBOSE=true
+CAPTURE_CONSOLE_LOGS=true
 ```
 
 See everything with full data objects.

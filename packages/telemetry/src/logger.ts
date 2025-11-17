@@ -30,7 +30,8 @@ export type Domain =
   | "srs"
   | "auth"
   | "network"
-  | "ui";
+  | "ui"
+  | "console";
 
 export interface LogEvent {
   ts: number;

@@ -4,7 +4,12 @@
  * Dev: Console + Ring Buffer (4000 events)
  * Prod: Ring Buffer only (silent unless OTLP enabled via env)
  */
-import { registerSinks, type Sink } from "@deeprecall/telemetry";
+import {
+  registerSinks,
+  hijackConsole,
+  type Sink,
+  type Domain,
+} from "@deeprecall/telemetry";
 import {
   makeRingBufferSink,
   makeConsoleSink,
@@ -27,12 +32,15 @@ export function initTelemetry() {
   const isProduction = process.env.NODE_ENV === "production";
   const isDev = process.env.NODE_ENV === "development";
 
+  const consoleExcludeDomains: Domain[] = ["console"];
+
   if (isProduction) {
     // Production: Always show error and warn logs in console
     sinks.push(
       makeConsoleSink({
         minLevel: "error", // Only errors in production console
         verbose: false, // Compact format
+        excludeDomains: [...consoleExcludeDomains],
       })
     );
   } else if (isDev && process.env.NEXT_PUBLIC_ENABLE_CONSOLE_LOGS !== "false") {
@@ -49,6 +57,7 @@ export function initTelemetry() {
       makeConsoleSink({
         minLevel: consoleLevel, // Control via NEXT_PUBLIC_CONSOLE_LOG_LEVEL
         excludeDomains: [
+          ...consoleExcludeDomains,
           // Uncomment to exclude specific noisy domains:
           // "sync.electric", // Electric shape updates
           // "sync.writeBuffer", // Write buffer operations
@@ -84,6 +93,14 @@ export function initTelemetry() {
   }
 
   registerSinks(...sinks);
+
+  const shouldCaptureConsole =
+    typeof window !== "undefined" &&
+    process.env.NEXT_PUBLIC_CAPTURE_CONSOLE_LOGS !== "false";
+
+  if (shouldCaptureConsole) {
+    hijackConsole("console");
+  }
 }
 
 export function getRingBuffer(): RingBufferSink {
