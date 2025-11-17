@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { GPUIndicator } from "./indicators/GPUIndicator";
 import { PostgresIndicator } from "./indicators/PostgresIndicator";
 import { ElectricIndicator } from "./indicators/ElectricIndicator";
@@ -12,6 +12,7 @@ import { GuestBannerWrapper } from "./GuestBannerWrapper";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const connectionStatus = useConnectionStatus();
 
   const isActive = (path: string) => {
@@ -119,7 +120,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
         {/* Status Indicators */}
         <div className="flex items-center gap-2 px-4 border-l border-gray-800 [app-region:no-drag]">
-          <TelemetryLogViewerButton />
+          <TelemetryLogViewerButton
+            onNavigate={() => navigate("/admin/logs")}
+          />
           <ConnectionStatusIndicator status={connectionStatus} />
           <ElectricIndicator />
           <PostgresIndicator />

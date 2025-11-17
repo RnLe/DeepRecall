@@ -2,6 +2,7 @@
 
 import { Providers } from "./providers";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { GPUIndicator } from "./components/GPUIndicator";
 import { ElectricIndicator } from "./components/ElectricIndicator";
 import { PostgresIndicator } from "./components/PostgresIndicator";
@@ -12,6 +13,8 @@ import { WebConnectionStatus } from "./components/WebConnectionStatus";
 import { GuestBannerWrapper } from "./components/GuestBannerWrapper";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
   return (
     <Providers>
       <SystemMonitoringProvider>
@@ -70,7 +73,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </div>
               <div className="ml-auto flex items-center gap-3">
-                <TelemetryLogViewerButton />
+                <TelemetryLogViewerButton
+                  onNavigate={() => router.push("/admin/logs")}
+                />
                 <WebConnectionStatus />
                 <ElectricIndicator />
                 <PostgresIndicator />

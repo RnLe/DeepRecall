@@ -3,7 +3,7 @@
  * Similar to web app layout with navigation and indicators
  */
 
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 import { GPUIndicator } from "./indicators/GPUIndicator";
 import { ElectricIndicator } from "./indicators/ElectricIndicator";
 import { PostgresIndicator } from "./indicators/PostgresIndicator";
@@ -11,6 +11,8 @@ import { TelemetryLogViewerButton } from "@deeprecall/ui";
 import { UserMenu } from "./UserMenu";
 
 export function Layout() {
+  const navigate = useNavigate();
+
   return (
     <div className="h-screen bg-gray-950 text-gray-100 flex flex-col overflow-hidden">
       {/* Navigation Bar */}
@@ -72,7 +74,9 @@ export function Layout() {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <UserMenu />
-            <TelemetryLogViewerButton />
+            <TelemetryLogViewerButton
+              onNavigate={() => navigate("/admin/logs")}
+            />
             <GPUIndicator />
             <ElectricIndicator />
             <PostgresIndicator />

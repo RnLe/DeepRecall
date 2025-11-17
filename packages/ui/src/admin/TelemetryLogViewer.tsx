@@ -534,15 +534,35 @@ export function TelemetryLogViewer({ getRingBuffer }: TelemetryLogViewerProps) {
 /**
  * Header button component for quick access to telemetry logs
  */
-export function TelemetryLogViewerButton() {
+interface TelemetryLogViewerButtonProps {
+  onNavigate?: () => void;
+  path?: string;
+}
+
+export function TelemetryLogViewerButton({
+  onNavigate,
+  path = "/admin/logs",
+}: TelemetryLogViewerButtonProps) {
+  const handleClick = () => {
+    if (onNavigate) {
+      onNavigate();
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      window.location.assign(path);
+    }
+  };
+
   return (
-    <a
-      href="/admin/logs"
+    <button
+      type="button"
+      onClick={handleClick}
       className="relative px-2 py-1 text-xs rounded bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors flex items-center gap-1"
       title="View telemetry logs"
     >
       <span>📊</span>
       <span>Logs</span>
-    </a>
+    </button>
   );
 }
