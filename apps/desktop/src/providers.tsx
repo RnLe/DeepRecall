@@ -157,9 +157,25 @@ function AuthStateManager({ children }: { children: React.ReactNode }) {
 
     initSession();
 
-    const handleAuthChanged = () => {
-      logger.info("auth", "Auth change event received, refreshing session");
-      initSession();
+    const handleAuthChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{ reason?: string }>;
+      const reason = customEvent.detail?.reason;
+
+      logger.info("auth", "Auth change event received", { reason });
+
+      // For sign-in events, don't re-initialize immediately
+      // The UserMenu already set the auth state correctly
+      // Just refresh after a delay to ensure keychain sync
+      if (reason === "signin") {
+        logger.debug("auth", "Sign-in detected, skipping immediate refresh");
+        setTimeout(() => {
+          logger.debug("auth", "Delayed session refresh after sign-in");
+          initSession();
+        }, 500); // 500ms delay for keychain write to complete
+      } else {
+        // For other events (signout, refresh), re-initialize immediately
+        initSession();
+      }
     };
 
     if (typeof window !== "undefined") {

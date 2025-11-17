@@ -155,6 +155,18 @@ export function UserMenu() {
     setStatus("authenticated");
     setShowGitHubCodeModal(false); // Close GitHub modal if open
 
+    // Update global auth state directly (don't rely on event listener race condition)
+    const { setAuthState } = await import("@deeprecall/data");
+    const { getDeviceId } = await import("@deeprecall/data");
+    const deviceId = getDeviceId();
+
+    setAuthState(true, payload.userId, deviceId);
+    console.log("[UserMenu] Updated global auth state", {
+      userId: payload.userId,
+      deviceId,
+    });
+
+    // Emit event for other listeners (after state is set)
     emitAuthStateChanged({ reason: "signin" });
   };
 
