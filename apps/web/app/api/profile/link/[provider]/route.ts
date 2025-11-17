@@ -146,11 +146,11 @@ export async function POST(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
     const userContext = await requireAuth(req);
-    const { provider } = params;
+    const { provider } = await params;
 
     const pool = getPostgresPool();
 
