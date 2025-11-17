@@ -79,26 +79,27 @@ const { data: orphans } = useOrphanedBlobs(cas);
 
 ### WriteBuffer Flush
 
-**Desktop-specific**: Uses Rust `flush_writes` command instead of web API.
+**Current approach**: Desktop now shares the same `/api/writes/batch` endpoint as web/mobile. The flush worker issues `fetch` requests with the stored app JWT (`Authorization: Bearer …`), so no database credentials ship with the client.
 
 **Location**: `apps/desktop/src/providers.tsx`
 
 ```typescript
-// Initialize FlushWorker with Tauri command
-initializeFlushWorker({
-  flushFn: async (changes) => {
-    return await invoke("flush_writes", { changes });
+const worker = initFlushWorker({
+  flushHandler: async (changes) => {
+    const token = await secureTokens.getAppJWT();
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${apiBase}/api/writes/batch`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ changes }),
+    });
+    return res.json();
   },
-  deviceId,
 });
 ```
 
-**Rust implementation**: `apps/desktop/src-tauri/src/commands/database.rs`
-
-- Direct `tokio-postgres` connection to Neon
-- Type-safe parameter conversion (UUID, JSONB, arrays)
-- LWW conflict resolution
-- Schema transformation (camelCase → snake_case)
+**Legacy option**: The Rust `flush_writes` command (`apps/desktop/src-tauri/src/commands/database.rs`) remains in the codebase for potential offline/Postgres-direct scenarios, but it is no longer invoked in production builds.
 
 ---
 
@@ -137,7 +138,7 @@ initializeFlushWorker({
 
 **Primary command**: `flush_writes(changes: Vec<WriteChange>) -> Result<Vec<WriteResult>, String>`
 
-**Replaces**: Web API `/api/writes/batch`
+> **Status:** Legacy/optional. The React layer now prefers the hosted `/api/writes/batch` endpoint, but this command remains available if we ever re-enable direct Postgres writes (e.g., for offline-first deployments).
 
 **Implementation details**:
 
@@ -422,9 +423,9 @@ Return BlobWithMetadata to frontend
   ↓
 coordinateSingleBlob() → Dexie (blobsMeta, deviceBlobs, assets)
   ↓
-WriteBuffer enqueue → invoke("flush_writes")
+WriteBuffer enqueue → POST /api/writes/batch
   ↓
-Rust: Direct Postgres write
+Web API: Authenticated write → Postgres
   ↓
 Electric syncs back → useBlobsMetaSync()
   ↓
@@ -440,9 +441,9 @@ createWork() → Dexie (works_local)
   ↓
 [INSTANT] UI update (optimistic)
   ↓
-WriteBuffer enqueue → invoke("flush_writes")
+WriteBuffer enqueue → POST /api/writes/batch
   ↓
-Rust: INSERT INTO works ... (Postgres)
+Web API: INSERT INTO works … (Postgres)
   ↓
 Electric syncs back → useWorksSync()
   ↓
@@ -516,11 +517,11 @@ tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 
 ### Common Issues
 
-**"Connection refused" to Postgres**:
+**HTTP 401/403 from `/api/writes/batch`**:
 
-- Check `VITE_POSTGRES_HOST` in `.env.local`
-- Verify Neon project is active (not paused)
-- Check SSL setting matches Neon requirements
+- Ensure the desktop session saved an app JWT (`SecureStore` log shows `Saved app_jwt`)
+- Confirm `VITE_API_URL` points at the deployed web app (defaults to `http://localhost:3000` in dev)
+- If the JWT recently rotated, sign out/in to refresh secure storage
 
 **Electric sync not working**:
 
@@ -536,8 +537,8 @@ tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 **WriteBuffer errors**:
 
 - Check flush logs in `deeprecall.log`
-- Verify Postgres connection succeeds
-- Test SQL manually in Neon dashboard
+- Inspect `window.__deeprecall_buffer.getStats()` for stuck changes/errors
+- Hit `/api/writes/batch` manually with the desktop JWT to confirm the API is reachable
 
 ---
 
@@ -546,7 +547,7 @@ tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 | Aspect              | Web                            | Desktop                                      |
 | ------------------- | ------------------------------ | -------------------------------------------- |
 | **Blob Storage**    | API routes + server filesystem | Rust commands + local filesystem             |
-| **Database Writes** | POST `/api/writes/batch`       | `invoke("flush_writes")`                     |
+| **Database Writes** | POST `/api/writes/batch`       | POST `/api/writes/batch` (with app JWT)      |
 | **Auth**            | NextAuth (HTTP cookies)        | Native OAuth (OS keychain)                   |
 | **File Upload**     | HTML file input                | Tauri dialog plugin (native)                 |
 | **Environment**     | Runtime API (`/api/config`)    | Build-time embedding (`.env.local` → binary) |
@@ -605,4 +606,4 @@ tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 
 ---
 
-**TL;DR**: Desktop is a native app that reuses all shared packages but replaces web API routes with Rust commands. Uses direct Postgres connection, local filesystem for blobs, and Electric Cloud for sync. Self-contained executable with credentials baked in. Zero web server dependency.
+**TL;DR**: Desktop is a native app that reuses all shared packages; blobs still flow through Rust commands/local storage, while database writes reuse the hosted `/api/writes/batch` endpoint with the stored app JWT. Electric handles sync, so the desktop build only needs API + Electric URLs baked in.

@@ -163,7 +163,7 @@ packages/data/src/repos/
    ↓
 3. Enqueue to WriteBuffer (if authenticated)
    ↓
-4. Background flush to /api/writes/batch (Web) or invoke("flush_writes") (Desktop) → Postgres
+4. Background flush to `/api/writes/batch` (all platforms) → Postgres
    ↓
 5. Electric syncs back → useWorksSync() → works (Dexie)
    ↓

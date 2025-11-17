@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import {
   initElectric,
   initFlushWorker,
@@ -30,6 +29,7 @@ import { configurePdfWorker } from "@deeprecall/pdf";
 import { DevToolsShortcut } from "./components/DevToolsShortcut";
 import { logger } from "@deeprecall/telemetry";
 import { TauriBlobStorage } from "./blob-storage/tauri";
+import { tokens as secureTokens } from "./auth/secure-store";
 
 // Configure PDF.js worker for Tauri platform
 // Tauri serves static assets from public/ directory
@@ -344,48 +344,56 @@ function ElectricInitializer() {
     // Desktop uses Tauri commands for direct Postgres writes
     const worker = initFlushWorker({
       flushHandler: async (changes) => {
+        const apiBaseUrl =
+          import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+        if (!apiBaseUrl) {
+          logger.error("sync.writeBuffer", "Missing API base URL");
+          return {
+            applied: [],
+            errors: changes.map((c) => ({
+              id: c.id,
+              error: "Missing API base URL",
+            })),
+          };
+        }
+
         try {
-          // Get current user ID from session
-          const { initializeSession } = await import("./auth");
-          const session = await initializeSession();
+          const token = await secureTokens.getAppJWT();
 
-          const userId =
-            session.status === "authenticated" ? session.userId : null;
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
 
-          if (!userId) {
+          if (token) {
+            headers.Authorization = `Bearer ${token}`;
+          } else {
             logger.warn(
               "sync.writeBuffer",
-              "No authenticated user - writes may fail due to RLS"
+              "No app JWT found - batch request will likely fail"
             );
           }
 
-          const results = await invoke<
-            Array<{ id: string; success: boolean; error?: string }>
-          >("flush_writes", { changes, userId });
+          const response = await fetch(`${apiBaseUrl}/api/writes/batch`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ changes }),
+          });
 
-          // Transform Rust results to FlushWorker format
-          const applied: string[] = [];
-          const errors: Array<{ id: string; error: string }> = [];
-
-          for (const result of results) {
-            if (result.success) {
-              applied.push(result.id);
-            } else {
-              errors.push({
-                id: result.id,
-                error: result.error || "Unknown error",
-              });
-            }
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(
+              `HTTP ${response.status}: ${response.statusText} - ${errorText}`
+            );
           }
 
-          return { applied, errors };
+          const result = await response.json();
+          return {
+            applied: result.applied || [],
+            errors: result.errors || [],
+          };
         } catch (error) {
-          logger.error(
-            "sync.writeBuffer",
-            "Tauri flush_writes command failed",
-            { error }
-          );
-          // Return all changes as failed
+          logger.error("sync.writeBuffer", "HTTP flush failed", { error });
           return {
             applied: [],
             errors: changes.map((c) => ({
@@ -407,7 +415,7 @@ function ElectricInitializer() {
     });
     logger.debug(
       "sync.writeBuffer",
-      "Using Tauri flush_writes command for direct Postgres writes"
+      "Using HTTP batch endpoint for write buffer flushes"
     );
 
     // Expose for debugging
