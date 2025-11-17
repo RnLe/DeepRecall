@@ -7,7 +7,6 @@ import {
   initElectric,
   initFlushWorker,
   initializeDeviceId,
-  initConsoleLogger,
   setAuthState,
   getDeviceId,
   upgradeGuestToUser,
@@ -46,10 +45,6 @@ if (typeof window !== "undefined") {
   logger.info("pdf", "PDF.js worker configured", {
     workerPath: "/pdf.worker.min.mjs",
   });
-
-  // Initialize console logger for debugging (temporary)
-  initConsoleLogger();
-  logger.info("ui", "Console logger initialized");
 
   // Initialize device ID on app startup (reliable persistence)
   initializeDeviceId()

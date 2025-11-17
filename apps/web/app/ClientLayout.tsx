@@ -5,7 +5,7 @@ import Link from "next/link";
 import { GPUIndicator } from "./components/GPUIndicator";
 import { ElectricIndicator } from "./components/ElectricIndicator";
 import { PostgresIndicator } from "./components/PostgresIndicator";
-import { LogViewerButton } from "@deeprecall/ui";
+import { TelemetryLogViewerButton } from "@deeprecall/ui";
 import { UserMenu } from "./components/UserMenu";
 import { SystemMonitoringProvider } from "./components/SystemMonitoringProvider";
 import { WebConnectionStatus } from "./components/WebConnectionStatus";
@@ -70,7 +70,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </div>
               <div className="ml-auto flex items-center gap-3">
-                <LogViewerButton />
+                <TelemetryLogViewerButton />
                 <WebConnectionStatus />
                 <ElectricIndicator />
                 <PostgresIndicator />

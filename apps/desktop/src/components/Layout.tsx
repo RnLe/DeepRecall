@@ -2,7 +2,10 @@ import { Link, useLocation } from "react-router-dom";
 import { GPUIndicator } from "./indicators/GPUIndicator";
 import { PostgresIndicator } from "./indicators/PostgresIndicator";
 import { ElectricIndicator } from "./indicators/ElectricIndicator";
-import { LogViewerButton, ConnectionStatusIndicator } from "@deeprecall/ui";
+import {
+  TelemetryLogViewerButton,
+  ConnectionStatusIndicator,
+} from "@deeprecall/ui";
 import { UserMenu } from "./UserMenu";
 import { useConnectionStatus } from "@deeprecall/data/hooks";
 import { GuestBannerWrapper } from "./GuestBannerWrapper";
@@ -116,7 +119,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
         {/* Status Indicators */}
         <div className="flex items-center gap-2 px-4 border-l border-gray-800 [app-region:no-drag]">
-          <LogViewerButton />
+          <TelemetryLogViewerButton />
           <ConnectionStatusIndicator status={connectionStatus} />
           <ElectricIndicator />
           <PostgresIndicator />
