@@ -70,6 +70,7 @@
 - **Detach before delete must send `workId: null`.** When removing a work we optimistically clear its assets via `updateAssetLocal`. Passing `undefined` slips through Dexie and only updates `updatedAt`, so the writebuffer change never reconciles. Explicitly send SQL `NULL` (e.g. `workId: null as unknown as string | undefined`) so Postgres sees the update and Electric can confirm cleanup. The shared schema (`packages/core/src/schemas/library.ts`) now allows `workId` to be nullable so these updates validate server-side. Relying solely on `ON DELETE SET NULL` leaves a stuck local record.
 - **Symptom to watch:** Link/unlink succeeds locally but Electric never delivers the delta after auth; WriteBuffer shows “applied” yet Postgres row is missing. Check logs for repeated `assets` update retries and confirm the payload isn’t truncated.
 - **Mitigation:** After guest→user upgrade (or any auth toggle), prefer rebuilding stale rows via full-payload updates or rerunning `upgradeGuestToUser` so that every asset has a server-side owner before we start issuing partial updates.
+- **Electric proxy enforcement:** If you ever see browser logs like `missing electric-cursor` or `CORS policy: No 'Access-Control-Allow-Origin'`, confirm `NEXT_PUBLIC_ELECTRIC_URL=/api/electric/v1/shape` (relative) and that the proxy exposes the Electric headers. Desktop/Mobile rely on the same endpoint, so a misconfigured variable strands both Electric sync and WriteBuffer flushes after guest upgrades.
 
 ## Reference Files
 

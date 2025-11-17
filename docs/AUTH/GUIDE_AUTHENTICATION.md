@@ -24,6 +24,14 @@ DeepRecall uses **three-tier authentication** across platforms:
 - **Local web dev**: Uses production Postgres/Electric for simplicity
 - **Mobile local dev**: `pnpm dev:mobile` uses Vite proxy to forward API calls to Next.js
 
+### Electric Proxy & Runtime Config (Nov 2025)
+
+- **Single entrypoint**: Every platform must talk to Electric through `https://<app-domain>/api/electric/v1/shape` (or the relative `/api/electric/v1/shape`). Direct hits to `https://api.electric-sql.cloud` will fail due to CORS and missing header exposure.
+- **Runtime config**: `apps/web/app/api/config/route.ts` now defaults `electricUrl` to `/api/electric/v1/shape`, so forgetting to set `NEXT_PUBLIC_ELECTRIC_URL` no longer bypasses the proxy. Production environments should still set `NEXT_PUBLIC_ELECTRIC_URL=/api/electric/v1/shape` explicitly.
+- **Header exposure**: The proxy exposes `electric-cursor`, `electric-offset`, `electric-schema`, `electric-shape-id`, and `content-type` so the Electric SDK can read cursors. Update `addCorsHeaders()` whenever Electric adds new headers.
+- **Compression guard**: The proxy strips `Content-Encoding` and sets `Cache-Control: no-transform, no-store` so CDNs (Railway edge) do not Brotli-compress the NDJSON stream. Electric’s SSE/polling transport cannot process compressed payloads.
+- **Auth injection**: The proxy backfills `source_id` and `secret` when clients omit them, keeping secrets server-side while allowing unauthenticated guest sync.
+
 ## Architecture
 
 ```
@@ -31,7 +39,7 @@ DeepRecall uses **three-tier authentication** across platforms:
 │  Web (Next.js)                          │
 │  ├─ NextAuth OAuth redirects            │
 │  ├─ HTTP-only cookies                   │
-│  └─ Direct Electric sync                │
+│  └─ Electric proxy (/api/electric/v1/shape)
 └─────────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────────┐
@@ -141,6 +149,7 @@ Desktop uses **true native OAuth** (no WebView) with offline-first capability.
 - Google OAuth with PKCE flow + loopback HTTP server
 - GitHub OAuth with Device Code flow
 - OS keychain storage (Windows Credential Manager, macOS Keychain, Linux Secret Service)
+- Automatic keychain fallback: when secure storage refuses to return the JWT, the desktop app mirrors tokens into `localStorage` so `initializeSession()` still finds them after OAuth (watch logs for `Retrieved fallback for app_jwt`).
 - Auth broker endpoints for token exchange
 - Session init/refresh patterns
 - Guest mode fallback for offline work

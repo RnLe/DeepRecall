@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { resolveElectricUrl } from "../../utils/electricConfig";
 
 interface ElectricStatus {
   connected: boolean;
@@ -13,8 +14,7 @@ export function ElectricIndicator() {
 
   useEffect(() => {
     const checkConnection = async () => {
-      const electricUrl =
-        import.meta.env.VITE_ELECTRIC_URL || "http://localhost:5133";
+      const electricUrl = resolveElectricUrl();
       const sourceId = import.meta.env.VITE_ELECTRIC_SOURCE_ID;
       const secret = import.meta.env.VITE_ELECTRIC_SOURCE_SECRET;
 

@@ -83,10 +83,11 @@ See: [`docs/ARCHITECTURE/GUIDE_DATA_ARCHITECTURE.md`](docs/ARCHITECTURE/GUIDE_DA
 DeepRecall supports multi-platform authentication with offline-first capability:
 
 - **Web**: NextAuth/Auth.js with OAuth providers (Google, GitHub) - see `docs/AUTH/GUIDE_AUTH_WEB.md`
-- **Desktop**: Native OAuth (PKCE + Device Code flows, OS keychain storage) - see `docs/AUTH/GUIDE_AUTH_DESKTOP.md`
+- **Desktop**: Native OAuth (PKCE + Device Code flows, OS keychain storage) with automatic `localStorage` fallback when the OS keychain driver refuses reads (prevents the "signed-in but guest" loop after OAuth) - see `docs/AUTH/GUIDE_AUTH_DESKTOP.md`
 - **Mobile**: Native OAuth (PKCE + Device Code flows, iOS Keychain/Android Keystore) - see `docs/AUTH/GUIDE_AUTH_MOBILE.md`
 - **Guest Mode**: Full offline functionality without authentication - see `docs/AUTH/GUIDE_GUEST_SIGN_IN.md`
 - **Security**: Row-Level Security (RLS) via Postgres GUC, CORS for native apps
+- **Electric Proxy**: All clients must hit `https://<app-domain>/api/electric/v1/shape` (or `/api/electric/v1/shape` relative). Direct requests to `https://api.electric-sql.cloud` break due to CORS and missing header exposure. Set `NEXT_PUBLIC_ELECTRIC_URL=/api/electric/v1/shape` everywhere, and ensure the proxy exposes `electric-cursor`, `electric-offset`, `electric-schema`, `electric-shape-id`, etc.
 
 **Key guides**:
 

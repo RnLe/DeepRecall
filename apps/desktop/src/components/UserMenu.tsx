@@ -136,6 +136,13 @@ export function UserMenu() {
     await tokens.saveAppJWT(result.app_jwt);
     console.log("[UserMenu] Saved app JWT to keychain");
 
+    // Verify keychain write immediately (helps diagnose keychain issues)
+    const verifyJWT = await tokens.getAppJWT();
+    console.log("[UserMenu] Verified stored app JWT", {
+      retrieved: !!verifyJWT,
+      matches: verifyJWT === result.app_jwt,
+    });
+
     // Parse JWT to get session info
     const { parseJWTUnsafe } = await import("../auth/session");
     const payload = parseJWTUnsafe(result.app_jwt);

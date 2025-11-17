@@ -90,7 +90,8 @@ Desktop uses **native OAuth** (no WebView) with OS keychain storage for offline-
 ```bash
 # Required
 VITE_API_URL=https://your-backend.railway.app
-VITE_ELECTRIC_URL=https://your-electric.railway.app
+# Always point to the Next.js proxy, not Electric Cloud directly
+VITE_ELECTRIC_URL=https://your-domain.com/api/electric/v1/shape
 
 # Google OAuth
 VITE_GOOGLE_DESKTOP_CLIENT_ID=xxxxx.apps.googleusercontent.com
@@ -99,6 +100,8 @@ VITE_GOOGLE_DESKTOP_CLIENT_SECRET=GOCSPX-xxx  # Required by Google
 # GitHub OAuth
 VITE_GITHUB_DESKTOP_CLIENT_ID=Ov23lii9xxx
 ```
+
+**Electric proxy reminder**: Desktop never speaks to Electric Cloud directly. `VITE_ELECTRIC_URL` must point to your deployed Next.js proxy (`https://<app-domain>/api/electric/v1/shape`), which injects the Electric Cloud credentials and disables CDN compression. This is the same endpoint used by web/mobile.
 
 ## Session Management
 
@@ -176,6 +179,13 @@ export const secureStore = {
 
   async delete(key: string) {
     await invoke("clear_auth_session", { key });
+
+### Keychain Fallback (Nov 2025)
+
+- Some Linux distributions or locked-down Windows profiles intermittently refuse `get_auth_session` calls even though `save_auth_session` succeeded. When the secure store cannot read a key, `secure-store.ts` now logs `No value found for app_jwt, checking fallback` and automatically mirrors the token into `localStorage` under the `deeprecall.auth.*` namespace.
+- Desktop always writes both the keychain and the fallback; reads prefer the keychain but fall back to `localStorage` transparently. This prevents the "signed in but immediately downgraded to guest" loop seen in early November.
+- When troubleshooting, look for `[SecureStore] Retrieved fallback for app_jwt` in the console. If fallback reads appear frequently, inspect OS keychain permissions but the session will still persist.
+- Clearing auth data (`clearSession()`) removes entries from both the OS keychain and the fallback to avoid stale JWTs.
   },
 
   // Helper methods

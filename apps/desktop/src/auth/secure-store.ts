@@ -8,7 +8,56 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+const FALLBACK_PREFIX = "deeprecall.auth.";
+
 const KEYCHAIN_SERVICE = "dev.deeprecall.desktop";
+
+function hasFallbackStorage(): boolean {
+  return typeof window !== "undefined" && !!window.localStorage;
+}
+
+function saveFallback(key: string, value: string) {
+  if (!hasFallbackStorage()) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(`${FALLBACK_PREFIX}${key}`, value);
+    console.log(`[SecureStore] Saved fallback for ${key}`);
+  } catch (error) {
+    console.warn(`[SecureStore] Failed to save fallback for ${key}:`, error);
+  }
+}
+
+function getFallback(key: string): string | null {
+  if (!hasFallbackStorage()) {
+    return null;
+  }
+
+  try {
+    const value = window.localStorage.getItem(`${FALLBACK_PREFIX}${key}`);
+    if (value) {
+      console.log(`[SecureStore] Retrieved fallback for ${key}`);
+    }
+    return value;
+  } catch (error) {
+    console.warn(`[SecureStore] Failed to get fallback for ${key}:`, error);
+    return null;
+  }
+}
+
+function clearFallback(key: string) {
+  if (!hasFallbackStorage()) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(`${FALLBACK_PREFIX}${key}`);
+    console.log(`[SecureStore] Cleared fallback for ${key}`);
+  } catch (error) {
+    console.warn(`[SecureStore] Failed to clear fallback for ${key}:`, error);
+  }
+}
 
 export interface SecureStore {
   save(key: string, value: string): Promise<void>;
@@ -31,8 +80,11 @@ async function save(key: string, value: string): Promise<void> {
     console.log(`[SecureStore] Saved ${key} to keychain`);
   } catch (error) {
     console.error(`[SecureStore] Failed to save ${key}:`, error);
-    throw new Error(`Failed to save ${key} to keychain: ${error}`);
+    console.warn(`[SecureStore] Falling back to local storage for ${key}`);
   }
+
+  // Always copy to fallback storage to keep session alive even if keychain fails
+  saveFallback(key, value);
 }
 
 /**
@@ -48,13 +100,16 @@ async function get(key: string): Promise<string | null> {
 
     if (value) {
       console.log(`[SecureStore] Retrieved ${key} from keychain`);
+      return value;
     }
 
-    return value;
+    console.warn(`[SecureStore] No value found for ${key}, checking fallback`);
   } catch (error) {
     console.error(`[SecureStore] Failed to get ${key}:`, error);
-    return null;
+    console.warn(`[SecureStore] Falling back to local storage for ${key}`);
   }
+
+  return getFallback(key);
 }
 
 /**
@@ -70,8 +125,10 @@ async function deleteKey(key: string): Promise<void> {
     console.log(`[SecureStore] Deleted ${key} from keychain`);
   } catch (error) {
     console.error(`[SecureStore] Failed to delete ${key}:`, error);
-    throw new Error(`Failed to delete ${key} from keychain: ${error}`);
+    console.warn(`[SecureStore] Continuing with fallback deletion for ${key}`);
   }
+
+  clearFallback(key);
 }
 
 /**
@@ -93,6 +150,8 @@ async function clear(): Promise<void> {
       // Continue clearing other keys even if one fails
       console.warn(`[SecureStore] Failed to clear ${key}:`, error);
     }
+
+    clearFallback(key);
   }
 
   console.log("[SecureStore] Cleared all auth data");

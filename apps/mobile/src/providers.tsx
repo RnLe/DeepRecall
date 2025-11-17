@@ -36,20 +36,7 @@ import {
 import { configurePdfWorker } from "@deeprecall/pdf";
 import { logger } from "@deeprecall/telemetry";
 import { CapacitorBlobStorage } from "./blob-storage/capacitor";
-
-function resolveElectricUrl(): string {
-  const configured = import.meta.env.VITE_ELECTRIC_URL?.trim();
-  if (configured && configured.length > 0) {
-    return configured.replace(/\/$/, "");
-  }
-
-  const apiBaseCandidate =
-    import.meta.env.VITE_API_BASE_URL?.trim() ||
-    (import.meta.env.DEV ? "http://localhost:3000" : undefined) ||
-    "https://deeprecall-production.up.railway.app";
-
-  return `${apiBaseCandidate.replace(/\/$/, "")}/api/electric/v1/shape`;
-}
+import { resolveElectricUrl } from "./utils/electricConfig";
 
 // Extend Window interface for Capacitor
 declare global {

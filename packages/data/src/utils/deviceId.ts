@@ -114,7 +114,7 @@ async function getDeviceIdFromPlatformStorage(): Promise<string | null> {
       // @ts-ignore - Tauri plugin only available in desktop builds
       const modulePath = "@tauri-apps/plugin-" + "store";
       const { Store } = await import(
-        /* webpackIgnore: true */ modulePath as any
+        /* @vite-ignore */ /* webpackIgnore: true */ modulePath as any
       );
       const store = new Store(".device.dat");
       const deviceId = await store.get(DEVICE_ID_KEY);
@@ -132,7 +132,7 @@ async function getDeviceIdFromPlatformStorage(): Promise<string | null> {
       // @ts-ignore - Capacitor only available in mobile builds
       const modulePath = "@capacitor/prefer" + "ences";
       const { Preferences } = await import(
-        /* webpackIgnore: true */ modulePath as any
+        /* @vite-ignore */ /* webpackIgnore: true */ modulePath as any
       );
       const { value } = await Preferences.get({ key: DEVICE_ID_KEY });
       return value;
@@ -178,7 +178,7 @@ async function saveDeviceIdToPlatformStorage(
       // @ts-ignore - Tauri plugin only available in desktop builds
       const modulePath = "@tauri-apps/plugin-" + "store";
       const { Store } = await import(
-        /* webpackIgnore: true */ modulePath as any
+        /* @vite-ignore */ /* webpackIgnore: true */ modulePath as any
       );
       const store = new Store(".device.dat");
       await store.set(DEVICE_ID_KEY, deviceId);
@@ -198,7 +198,7 @@ async function saveDeviceIdToPlatformStorage(
       // @ts-ignore - Capacitor only available in mobile builds
       const modulePath = "@capacitor/prefer" + "ences";
       const { Preferences } = await import(
-        /* webpackIgnore: true */ modulePath as any
+        /* @vite-ignore */ /* webpackIgnore: true */ modulePath as any
       );
       await Preferences.set({ key: DEVICE_ID_KEY, value: deviceId });
       await Preferences.set({ key: DEVICE_NAME_KEY, value: deviceName });

@@ -89,8 +89,10 @@ AUTH_GITHUB_SECRET=your-github-app-secret
 # Database
 DATABASE_URL=postgresql://user:pass@host/db
 
-# Electric
-ELECTRIC_URL=http://localhost:5133
+# Electric proxy (always use the Next.js route)
+NEXT_PUBLIC_ELECTRIC_URL=/api/electric/v1/shape
+# Optional: override upstream Electric Cloud base URL (defaults to https://api.electric-sql.cloud)
+# ELECTRIC_PROXY_BASE_URL=https://api.electric-sql.cloud
 ```
 
 ### Production (Railway)
@@ -102,6 +104,9 @@ AUTH_GOOGLE_ID=<production-google-client-id>
 AUTH_GOOGLE_SECRET=<production-google-client-secret>
 AUTH_GITHUB_ID=<production-github-app-id>
 AUTH_GITHUB_SECRET=<production-github-app-secret>
+NEXT_PUBLIC_ELECTRIC_URL=/api/electric/v1/shape
+# Optional: override upstream Electric Cloud base URL
+# ELECTRIC_PROXY_BASE_URL=https://api.electric-sql.cloud
 ```
 
 **Generate secrets**:
@@ -109,6 +114,15 @@ AUTH_GITHUB_SECRET=<production-github-app-secret>
 ```bash
 openssl rand -base64 32  # For AUTH_SECRET
 ```
+
+## Electric Proxy Requirement (Nov 2025)
+
+- **Never call Electric Cloud directly from the browser.** Browsers send `Origin` and expect `Access-Control-Allow-Origin` + exposed headers. Electric Cloud only exposes CORS for the proxy, so `NEXT_PUBLIC_ELECTRIC_URL` must be `/api/electric/v1/shape` (relative path).
+- **Proxy responsibilities** (`apps/web/app/api/electric/v1/shape/route.ts`): inject `source_id`/`secret`, stream upstream responses without compression, and expose Electric headers via `addCorsHeaders()`.
+- **Headers to expose**: `electric-handle`, `electric-offset`, `electric-cursor`, `electric-schema`, `electric-shape-id`, `content-type`. Update `apps/web/app/api/lib/cors.ts` whenever Electric adds a header.
+- **Cache-control**: Keep `Cache-Control: no-transform, no-store` so Railway/other CDNs cannot Brotli-compress the NDJSON stream.
+- **Runtime config**: `/api/config` now reports the proxy URL even if the env var is missing, but set `NEXT_PUBLIC_ELECTRIC_URL=/api/electric/v1/shape` explicitly so older builds stay correct.
+- **Desktop/Mobile benefit**: Tauri/Capacitor fetch the proxy as well, so auth headers and CORS logic are centralized.
 
 ## NextAuth Configuration
 
@@ -406,21 +420,25 @@ export async function POST(request: Request) {
 
 ## Electric Sync
 
-**Web apps connect directly to Electric** (no Auth Broker token exchange needed)
+**Web apps connect through the Next.js proxy** (`/api/electric/v1/shape`). No Auth Broker token exchange is required; the proxy injects the Electric Cloud credentials and maintains the CORS/headers contract.
 
-**Pattern**: User-scoped shapes with `WHERE owner_id = :userId`
+**Pattern**: Fetch runtime config once, then use user-scoped shapes with `WHERE owner_id = :userId`.
 
 ```typescript
-const { data: works } = useShape({
-  url: ELECTRIC_URL,
-  table: "works",
-  where: session ? `owner_id='${session.user.id}'` : undefined,
-});
+async function init() {
+  const config = await fetch("/api/config").then((res) => res.json());
+
+  const { data: works } = useShape({
+    url: config.electricUrl, // resolves to /api/electric/v1/shape
+    table: "works",
+    where: session ? `owner_id='${session.user.id}'` : undefined,
+  });
+}
 ```
 
 **Guest mode**: No `userId` → no Electric sync (local-only)
 
-**Authenticated mode**: Electric replicates only user's data
+**Authenticated mode**: Electric replicates only the signed-in user's data, and the proxy ensures cursors survive CDNs.
 
 ## Troubleshooting
 
