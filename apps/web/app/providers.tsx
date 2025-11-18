@@ -21,6 +21,7 @@ import {
   useCollectionsSync,
   useDeviceBlobsSync,
   useEdgesSync,
+  useFolderSourcesSync,
   useReplicationJobsSync,
   useReviewLogsSync,
   useWorksSync,
@@ -535,6 +536,7 @@ function SyncManager({ userId }: { userId?: string }) {
   useCardsSync(userId);
   useCollectionsSync(userId);
   useEdgesSync(userId);
+  useFolderSourcesSync(userId);
   usePresetsSync(userId);
   useReplicationJobsSync(userId);
   useReviewLogsSync(userId);

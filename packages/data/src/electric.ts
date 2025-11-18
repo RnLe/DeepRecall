@@ -40,6 +40,7 @@ const JSONB_COLUMNS_BY_TABLE: Record<string, string[]> = {
   works: ["authors", "metadata"],
   annotations: ["geometry", "style", "metadata"],
   authors: ["avatar_crop_region"],
+  folder_sources: ["metadata"],
   // Add more tables as needed
 };
 

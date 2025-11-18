@@ -30,7 +30,18 @@ export interface LocalFolderSourceChange {
 }
 
 const buffer = createWriteBuffer();
-const ENABLE_REMOTE_ENQUEUE = false; // Flip once backend schema exists
+
+const featureFlagValue =
+  (typeof process !== "undefined" &&
+    process.env?.NEXT_PUBLIC_ENABLE_FOLDER_SOURCES_SYNC) ??
+  (typeof globalThis !== "undefined"
+    ? (globalThis as any).__DEEPRECALL_ENABLE_FOLDER_SOURCES_SYNC
+    : undefined);
+
+const ENABLE_REMOTE_ENQUEUE =
+  featureFlagValue === undefined
+    ? true
+    : featureFlagValue === true || featureFlagValue === "true";
 
 function nowIso() {
   return new Date().toISOString();
@@ -97,7 +108,7 @@ export async function registerFolderSourceLocal(
 ): Promise<FolderSource> {
   const parsed = FolderSourceRegistrationSchema.parse(input);
   const ownerId = getUserId() ?? undefined;
-  const deviceId = getDeviceId();
+  const deviceId = parsed.deviceId ?? getDeviceId();
 
   const folderSource = FolderSourceSchema.parse({
     id: uuidv4(),

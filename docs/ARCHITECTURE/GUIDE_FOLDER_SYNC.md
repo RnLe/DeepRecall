@@ -49,28 +49,33 @@
 
 ## 4. Implementation Checklist
 
-- [ ] **Schema**
-  - [ ] Postgres: `folder_sources` table (`source_id UUID`, `owner_id`, `device_id`, `path`, `type`, `is_default`, `status`, timestamps`).
-  - [ ] Dexie: synced + local tables mirroring schema; add indexes for `device_id` and `is_default`.
+- [ ] **Schema & RLS**
+  - [ ] Postgres: create `folder_sources` table (`id`, `owner_id`, `device_id`, `display_name`, `path`, `path_hash`, `uri`, `type`, `priority`, `is_default`, `status`, `metadata`, scan timestamps, `last_error`, `kind`).
+  - [ ] Postgres: add constraints/indexes (`CHECK` on `type`/`status`, `UNIQUE(owner_id, device_id) WHERE is_default`, `INDEX(owner_id, device_id, status)`).
+  - [ ] Postgres: enable RLS + defaults (`owner_id DEFAULT current_setting('app.user_id')`, `updated_at` trigger, privacy stance for `path` vs `path_hash`).
+  - [ ] Dexie: ensure synced/local tables mirror schema with indexes on `deviceId`, `isDefault`, and tombstone awareness.
+- [ ] **Write Path & APIs**
+  - [ ] Teach WriteBuffer + `/api/writes/batch` about `folder_sources` (Zod schema, snake_case conversion, conflict strategy).
+  - [ ] Expose `/api/sources` (`GET`/`POST`) and `/api/sources/[id]` (`GET`/`PATCH`/`DELETE`) with RLS context + default-flip transaction.
+  - [ ] Surface feature flag / env toggles so Desktop/Mobile enqueue remote writes only when server table exists.
 - [ ] **Repos & Hooks**
-  - [ ] Implement `{entity}.{local|electric|merged|cleanup}.ts` for `folder_sources`.
-  - [ ] Add `useFolderSources` + helper selectors for default source resolution.
-- [ ] **BlobCAS Extensions**
-  - [ ] Interface additions guarded by optional chaining to keep Web functional.
-  - [ ] Desktop/Mobile adapters implement folder registration + scanning entrypoints.
-- [ ] **Explorer Page**
-  - [ ] Route skeleton in `apps/web/app/library/sources/page.tsx` using shared components (tree, tabs, upload target selector).
-  - [ ] Fetch data via `useFolderSources`, `useBlobsMeta`, CAS stats.
-- [ ] **Default Source Preference**
-  - [ ] When user picks default, update Dexie + server (WriteBuffer) and persist fallback in local storage for guests.
-  - [ ] Drag-drop/upload flows query helper `resolveDefaultSource()`.
-- [ ] **Cloud Separation Prep**
-  - [ ] Create `packages/data/src/cloud/` with interfaces: `CloudFileService`, `CloudSyncPlan`.
-  - [ ] Provide `LocalCloudStub` implementation that bridges to existing Next.js blob APIs.
-  - [ ] Document handshake requirements for future service (auth headers, replication events).
-- [ ] **Web Placeholders**
-  - [ ] Implement cache decorator (IndexedDB or Cache Storage) with eviction; wire into Web CAS to opportunistically cache downloads.
-  - [ ] Keep folder source list read-only with single `cloud` entry.
+  - [ ] Implement `folder-sources.{electric|local|merged|cleanup}.ts` (Electric sync writes Dexie, cleanup clears applied locals).
+  - [ ] Extend `useFolderSourcesSync(userId)` + helpers (`resolveDefaultFolderSource`, selectors for per-device filtering, guest fallbacks).
+  - [ ] Wire SyncManager to call the new hook (alphabetical order) so Electric drives Dexie authoritative state.
+- [ ] **Scanner + CAS Coordination**
+  - [ ] Desktop/mobile adapters expose `registerSource`, `removeSource`, `scan({sourceId})`, and emit `{sha256, path, size, mtime, sourceId}` events.
+  - [ ] Split scan pipeline: (1) CAS ingestion/`device_blobs` coordination, (2) explorer index `(sourceId, path) → sha256` with rename/delete handling.
+  - [ ] Implement incremental hashing strategy (mtime/size gate + watcher support on Desktop, periodic sweep on Mobile).
+- [ ] **Explorer & Default Target**
+  - [ ] Build `/library/sources` route using shared tree, filters (All / Cloud / per-source), and download CTAs for remote-only blobs.
+  - [ ] Ensure drag-drop + uploads call `resolveDefaultSource()` so Desktop/Mobile use local folders and Web falls back to `cloud` entry.
+  - [ ] Persist last-picked folder in device config for guests; wipe account-owned sources on sign-out per auth guide.
+- [ ] **Cloud Separation & Web Placeholders**
+  - [ ] Introduce `packages/data/src/cloud/{CloudFileService,CloudSyncPlan}.ts` plus `LocalCloudStub` bridging to current Next.js APIs.
+  - [ ] Keep Web in read-only `cloud` mode, add cache decorator (IndexedDB/Cache Storage) with LRU eviction for opportunistic downloads.
+  - [ ] Document handshake requirements (auth headers, replication events, streaming contracts) for future dedicated service.
+
+Track completion directly in this checklist as work lands across repos/platforms.
 
 ## 5. Testing & Verification
 
@@ -82,13 +87,51 @@
   3. Remote-only blob shows placeholder + download CTA.
   4. Default source change immediately affects drag-drop.
 
-## 6. Future Cloud Server Notes
+## 6. Deep-Dive Notes & Gotchas
 
-- Define gRPC/HTTP contract: `ListSources`, `PushDescriptor`, `StreamChanges`.
-- Plan for bidirectional sync: device publishes hashes, server schedules fetch.
-- Ensure `folder_sources.type` supports values: `local`, `cloud`, `remote-cache`.
-- Telemetry hooks: log scan duration, bytes ingested, cache hit rate.
+### 6.1 Data Model & RLS
 
----
+- Schema needs `display_name`, `priority`, and `status` checks in addition to path metadata.
+- Enforce privacy stance now (raw `path` vs `path_hash` stored server-side) and document trade-offs.
+- Default + RLS must mirror other user-owned tables: `owner_id DEFAULT current_setting('app.user_id')::uuid`, policy `owner_id = current_setting('app.user_id')`.
 
-Maintain this checklist as work progresses; update README index after major milestones.
+### 6.2 Guest ↔ Auth Flow
+
+- Guests keep everything in Dexie; WriteBuffer enqueue only when authenticated.
+- Decide during guest→user upgrade whether to carry folder sources forward; if yes, extend `upgradeGuestToUser()` to rewrite IDs + enqueue writes.
+- Sign-out should wipe `folder_sources` (account-owned) but keep a device-local “last folder” hint for UX continuity.
+
+### 6.3 Scanner Behavior
+
+- Treat CAS ingestion separately from explorer index updates to keep dedupe invariants (`blobs_meta` per user, `device_blobs` per device, `(sourceId,path)` in explorer).
+- Use `(size, mtime)` guard before expensive re-hash; Desktop can lean on OS watchers, Mobile likely reruns targeted scans.
+- Handle delete/move as “path disappeared” events; CAS data remains until no device references hash.
+
+### 6.4 Default Source Semantics
+
+- Default is per-device; Web always falls back to synthetic `cloud` entry.
+- `resolveDefaultSource()` order: explicit default → first active local source → cloud fallback (if allowed).
+- Guest mode cannot reference cloud, so ensure helper short-circuits accordingly.
+
+### 6.5 Explorer UX Guardrails
+
+- Explorer is a _view_ over blobs, not a separate entity graph—avoid duplicating library semantics.
+- Filter logic lives in hooks/selectors, not spread through components.
+- Remote-only blobs should clearly show download CTA and health state (cloud vs device).
+
+### 6.6 Cloud Stub Prep
+
+- `CloudFileService` must be the only consumer-facing surface; wrap current `/api/library/blobs` + `/api/sources` via `LocalCloudStub` to ease future service swap.
+- Plan telemetry hooks now (scan duration, bytes ingested, cache hit rate) so future service can observe behavior from day one.
+
+## 7. Recommended Implementation Order
+
+1. Schema + RLS + Dexie plumbing.
+2. Minimal UX (list sources, default selection) reusing new hooks.
+3. Desktop scanner + CAS wiring.
+4. Blob coordination + explorer tree.
+5. Guest upgrade + auth edge cases.
+6. Mobile scanner subset.
+7. Web cache + cloud placeholders.
+
+Maintain this guide as the single source of truth; update README indices after major milestones.

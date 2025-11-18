@@ -32,6 +32,7 @@ import {
   StrokeSchema,
   BlobMetaSchema,
   DeviceBlobSchema,
+  FolderSourceSchema,
 } from "@deeprecall/core";
 
 /**
@@ -61,6 +62,7 @@ const WriteChangeSchema = z.object({
     "strokes",
     "blobs_meta",
     "device_blobs",
+    "folder_sources",
   ]),
   op: z.enum(["insert", "update", "delete"]),
   payload: z.any(), // Will be validated by specific table schema
@@ -111,6 +113,8 @@ function getSchemaForTable(table: string): z.ZodTypeAny {
       return BlobMetaSchema;
     case "device_blobs":
       return DeviceBlobSchema;
+    case "folder_sources":
+      return FolderSourceSchema;
     default:
       throw new Error(`Unknown table: ${table}`);
   }

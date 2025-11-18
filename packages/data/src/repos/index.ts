@@ -25,6 +25,7 @@ export * as cardsElectric from "./cards.electric";
 export * as collectionsElectric from "./collections.electric";
 export * as edgesElectric from "./edges.electric";
 export * as worksElectric from "./works.electric";
+export * as folderSourcesElectric from "./folder-sources.electric";
 
 // Export blob coordination repos (Electric-only, no Dexie versions)
 export * as blobsMetaElectric from "./blobs-meta.electric";
