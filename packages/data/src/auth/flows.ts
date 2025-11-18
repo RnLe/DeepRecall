@@ -80,6 +80,8 @@ export async function handleSignIn(
         userId: userId.slice(0, 8),
       });
 
+      await ensureDefaultPresetsSeeded();
+
       return {
         action: "none",
         success: true,
@@ -127,6 +129,8 @@ export async function handleSignIn(
         synced: result.synced,
         errorCount: result.errors?.length || 0,
       });
+
+      await ensureDefaultPresetsSeeded();
 
       return {
         action: "upgrade",
@@ -217,6 +221,8 @@ export async function handleSignIn(
         skipped: scanResult.skipped,
       });
 
+      await ensureDefaultPresetsSeeded();
+
       return {
         action: "wipe",
         success: true,
@@ -278,6 +284,18 @@ export async function handleSignOut(
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
+  }
+}
+
+async function ensureDefaultPresetsSeeded(): Promise<void> {
+  try {
+    const { initializePresets } = await import("../repos/presets.init");
+    await initializePresets();
+    logger.debug("auth", "Ensured default presets for authenticated session");
+  } catch (error) {
+    logger.error("auth", "Failed to ensure default presets", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

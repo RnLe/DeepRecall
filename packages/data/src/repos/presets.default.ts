@@ -5,7 +5,13 @@
  */
 
 import type { Preset } from "@deeprecall/core";
-import { v4 as uuidv4 } from "uuid";
+import { v5 as uuidv5 } from "uuid";
+
+const PRESET_NAMESPACE = "f5a17765-6c3c-4f59-8a46-369f4be381ff";
+
+function presetId(name: string): string {
+  return uuidv5(`preset:${name.toLowerCase()}`, PRESET_NAMESPACE);
+}
 
 const now = new Date().toISOString();
 
@@ -14,7 +20,7 @@ const now = new Date().toISOString();
  * Covers: @article, @inproceedings, @conference, @incollection
  */
 export const PAPER_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("paper"),
   kind: "preset",
   name: "Paper",
   description: "Research paper, journal article, or conference publication",
@@ -226,7 +232,7 @@ export const PAPER_PRESET: Preset = {
  * Educational textbook - specialized @book for teaching
  */
 export const TEXTBOOK_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("textbook"),
   kind: "preset",
   name: "Textbook",
   description: "Educational textbook or course book",
@@ -417,7 +423,7 @@ export const TEXTBOOK_PRESET: Preset = {
  * Covers: @book, @inbook
  */
 export const BOOK_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("book"),
   kind: "preset",
   name: "Book",
   description: "General book or book chapter/section",
@@ -608,7 +614,7 @@ export const BOOK_PRESET: Preset = {
  * Covers: @phdthesis, @mastersthesis
  */
 export const THESIS_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("thesis"),
   kind: "preset",
   name: "Thesis",
   description: "PhD dissertation, Master's thesis, or Bachelor's thesis",
@@ -775,7 +781,7 @@ export const THESIS_PRESET: Preset = {
  * Covers: @techreport, @manual
  */
 export const REPORT_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("report"),
   kind: "preset",
   name: "Report",
   description:
@@ -927,7 +933,7 @@ export const REPORT_PRESET: Preset = {
  * Script preset (lecture scripts, course materials)
  */
 export const SCRIPT_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("script"),
   kind: "preset",
   name: "Script",
   description: "Lecture script, course materials, or teaching notes",
@@ -1020,7 +1026,7 @@ export const SCRIPT_PRESET: Preset = {
  * Slides preset (presentation slides)
  */
 export const SLIDES_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("slides"),
   kind: "preset",
   name: "Slides",
   description: "Presentation slides, talk, or seminar",
@@ -1126,7 +1132,7 @@ export const SLIDES_PRESET: Preset = {
  * Covers: @proceedings
  */
 export const PROCEEDINGS_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("proceedings"),
   kind: "preset",
   name: "Proceedings",
   description: "Conference proceedings or edited collection of papers",
@@ -1286,7 +1292,7 @@ export const PROCEEDINGS_PRESET: Preset = {
  * Covers: @unpublished
  */
 export const UNPUBLISHED_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("unpublished"),
   kind: "preset",
   name: "Unpublished",
   description: "Unpublished work, draft, or manuscript in preparation",
@@ -1392,7 +1398,7 @@ export const UNPUBLISHED_PRESET: Preset = {
  * Covers: @booklet
  */
 export const BOOKLET_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("booklet"),
   kind: "preset",
   name: "Booklet",
   description:
@@ -1502,7 +1508,7 @@ export const BOOKLET_PRESET: Preset = {
  * Covers: @misc (web pages, lecture notes, etc.)
  */
 export const MISC_PRESET: Preset = {
-  id: uuidv4(),
+  id: presetId("misc"),
   kind: "preset",
   name: "Misc",
   description: "Web page, online resource, or other miscellaneous work",

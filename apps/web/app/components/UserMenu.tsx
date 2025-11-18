@@ -35,7 +35,7 @@ export function UserMenu() {
         session={session}
         status={status}
         onSignIn={handleSignIn}
-        onSignOut={() => signOut({ callbackUrl: "/library" })}
+        onSignOut={() => signOut({ callbackUrl: "/" })}
         onNavigateProfile={() => router.push("/profile")}
       />
 

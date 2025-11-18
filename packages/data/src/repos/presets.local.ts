@@ -39,14 +39,18 @@ const buffer = createWriteBuffer();
  * Writes to local Dexie immediately, enqueues for sync
  */
 export async function createPresetLocal(
-  data: Omit<Preset, "id" | "kind" | "createdAt" | "updatedAt">,
+  data: Omit<Preset, "id" | "kind" | "createdAt" | "updatedAt"> & {
+    id?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }
 ): Promise<Preset> {
   const preset: Preset = PresetSchema.parse({
     ...data,
-    id: uuidv4(),
+    id: data.id ?? uuidv4(),
     kind: "preset",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: data.createdAt ?? new Date().toISOString(),
+    updatedAt: data.updatedAt ?? new Date().toISOString(),
   });
 
   // 1. Write to local Dexie (instant)
@@ -83,7 +87,7 @@ export async function createPresetLocal(
  */
 export async function updatePresetLocal(
   id: string,
-  updates: Partial<Preset>,
+  updates: Partial<Preset>
 ): Promise<void> {
   const updatedData = {
     ...updates,
@@ -167,7 +171,7 @@ export async function markPresetSynced(id: string): Promise<void> {
  */
 export async function markPresetSyncFailed(
   id: string,
-  error: string,
+  error: string
 ): Promise<void> {
   await db.presets_local.where("id").equals(id).modify({
     _status: "error",
