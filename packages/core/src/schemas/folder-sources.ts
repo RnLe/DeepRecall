@@ -33,7 +33,7 @@ export const FolderSourceSchema = z.object({
   type: FolderSourceTypeSchema.default("local"),
   displayName: z.string(),
   path: z.string().optional(),
-  pathHash: z.string().optional(),
+  pathHash: z.string().nullable().optional(),
   uri: z.string().url().optional(),
   priority: z.number().int().min(0).max(100).default(50),
   isDefault: z.boolean().default(false),

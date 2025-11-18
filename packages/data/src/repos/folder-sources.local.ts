@@ -47,6 +47,42 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function bufferToHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function computePathHash(
+  value?: string | null
+): Promise<string | undefined> {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (typeof globalThis.crypto?.subtle !== "undefined") {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(normalized);
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+    return bufferToHex(digest);
+  }
+
+  try {
+    const { createHash } = await import("crypto");
+    return createHash("sha256").update(normalized, "utf8").digest("hex");
+  } catch (error) {
+    logger.warn("sync.coordination", "Failed to compute path hash", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
 async function enqueueIfEnabled(
   table: "folder_sources",
   op: "insert" | "update" | "delete",
@@ -109,6 +145,7 @@ export async function registerFolderSourceLocal(
   const parsed = FolderSourceRegistrationSchema.parse(input);
   const ownerId = getUserId() ?? undefined;
   const deviceId = parsed.deviceId ?? getDeviceId();
+  const pathHash = parsed.pathHash ?? (await computePathHash(parsed.path));
 
   const folderSource = FolderSourceSchema.parse({
     id: uuidv4(),
@@ -118,6 +155,7 @@ export async function registerFolderSourceLocal(
     type: parsed.type,
     displayName: parsed.displayName,
     path: parsed.path,
+    pathHash,
     uri: parsed.uri,
     priority: parsed.priority ?? 50,
     isDefault: parsed.isDefault ?? false,
@@ -154,10 +192,24 @@ export async function updateFolderSourceLocal(
   id: string,
   updates: Partial<FolderSource>
 ): Promise<void> {
-  const mergedUpdates = {
+  const mergedUpdates: Partial<FolderSource> = {
     ...updates,
     updatedAt: nowIso(),
   };
+
+  const pathProvided = Object.prototype.hasOwnProperty.call(updates, "path");
+  const hashProvided = Object.prototype.hasOwnProperty.call(
+    updates,
+    "pathHash"
+  );
+
+  if (pathProvided && !hashProvided) {
+    if (updates.path) {
+      mergedUpdates.pathHash = await computePathHash(updates.path);
+    } else if (updates.path === null) {
+      mergedUpdates.pathHash = null;
+    }
+  }
 
   if (updates.isDefault) {
     const existingSynced = await db.folderSources

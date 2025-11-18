@@ -49,25 +49,27 @@
 
 ## 4. Implementation Checklist
 
-- [ ] **Schema & RLS**
-  - [ ] Postgres: create `folder_sources` table (`id`, `owner_id`, `device_id`, `display_name`, `path`, `path_hash`, `uri`, `type`, `priority`, `is_default`, `status`, `metadata`, scan timestamps, `last_error`, `kind`).
-  - [ ] Postgres: add constraints/indexes (`CHECK` on `type`/`status`, `UNIQUE(owner_id, device_id) WHERE is_default`, `INDEX(owner_id, device_id, status)`).
-  - [ ] Postgres: enable RLS + defaults (`owner_id DEFAULT current_setting('app.user_id')`, `updated_at` trigger, privacy stance for `path` vs `path_hash`).
-  - [ ] Dexie: ensure synced/local tables mirror schema with indexes on `deviceId`, `isDefault`, and tombstone awareness.
+> **Status (Nov 18, 2025)**: Migration `009_folder_sources.sql` has been applied via `migrations/run-neon.sh` to the production Neon cluster (`neondb`). Use the shared runner for future schema changes so Desktop/Mobile continue targeting the same canonical database.
+
+- [x] **Schema & RLS**
+  - [x] Postgres: create `folder_sources` table (`id`, `owner_id`, `device_id`, `display_name`, `path`, `path_hash`, `uri`, `type`, `priority`, `is_default`, `status`, `metadata`, scan timestamps, `last_error`, `kind`).
+  - [x] Postgres: add constraints/indexes (`CHECK` on `type`/`status`, `UNIQUE(owner_id, device_id) WHERE is_default`, `INDEX(owner_id, device_id, status)`).
+  - [x] Postgres: enable RLS + defaults (`owner_id DEFAULT current_setting('app.user_id')`, `updated_at` trigger, privacy stance for `path` vs `path_hash`).
+  - [x] Dexie: ensure synced/local tables mirror schema with indexes on `deviceId`, `isDefault`, and tombstone awareness.
 - [ ] **Write Path & APIs**
-  - [ ] Teach WriteBuffer + `/api/writes/batch` about `folder_sources` (Zod schema, snake_case conversion, conflict strategy).
-  - [ ] Expose `/api/sources` (`GET`/`POST`) and `/api/sources/[id]` (`GET`/`PATCH`/`DELETE`) with RLS context + default-flip transaction.
+  - [x] Teach WriteBuffer + `/api/writes/batch` about `folder_sources` (Zod schema, snake_case conversion, conflict strategy).
+  - [x] Expose `/api/sources` (`GET`/`POST`) and `/api/sources/[id]` (`GET`/`PATCH`/`DELETE`) with RLS context + default-flip transaction.
   - [ ] Surface feature flag / env toggles so Desktop/Mobile enqueue remote writes only when server table exists.
-- [ ] **Repos & Hooks**
-  - [ ] Implement `folder-sources.{electric|local|merged|cleanup}.ts` (Electric sync writes Dexie, cleanup clears applied locals).
-  - [ ] Extend `useFolderSourcesSync(userId)` + helpers (`resolveDefaultFolderSource`, selectors for per-device filtering, guest fallbacks).
-  - [ ] Wire SyncManager to call the new hook (alphabetical order) so Electric drives Dexie authoritative state.
+- [x] **Repos & Hooks**
+  - [x] Implement `folder-sources.{electric|local|merged|cleanup}.ts` (Electric sync writes Dexie, cleanup clears applied locals).
+  - [x] Extend `useFolderSourcesSync(userId)` + helpers (`resolveDefaultFolderSource`, selectors for per-device filtering, guest fallbacks).
+  - [x] Wire SyncManager to call the new hook (alphabetical order) so Electric drives Dexie authoritative state.
 - [ ] **Scanner + CAS Coordination**
   - [ ] Desktop/mobile adapters expose `registerSource`, `removeSource`, `scan({sourceId})`, and emit `{sha256, path, size, mtime, sourceId}` events.
   - [ ] Split scan pipeline: (1) CAS ingestion/`device_blobs` coordination, (2) explorer index `(sourceId, path) → sha256` with rename/delete handling.
   - [ ] Implement incremental hashing strategy (mtime/size gate + watcher support on Desktop, periodic sweep on Mobile).
 - [ ] **Explorer & Default Target**
-  - [ ] Build `/library/sources` route using shared tree, filters (All / Cloud / per-source), and download CTAs for remote-only blobs.
+  - [x] Build `/library/sources` route using shared tree, filters (All / Cloud / per-source), and download CTAs for remote-only blobs.
   - [ ] Ensure drag-drop + uploads call `resolveDefaultSource()` so Desktop/Mobile use local folders and Web falls back to `cloud` entry.
   - [ ] Persist last-picked folder in device config for guests; wipe account-owned sources on sign-out per auth guide.
 - [ ] **Cloud Separation & Web Placeholders**

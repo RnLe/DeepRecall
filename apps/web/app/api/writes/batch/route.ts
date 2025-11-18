@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Pool, PoolClient } from "pg";
 import { createPostgresPool } from "@/app/api/lib/postgres";
+import { createHash } from "crypto";
 import {
   handleCorsOptions,
   checkCorsOrigin,
@@ -143,6 +144,36 @@ const JSONB_COLUMNS = new Set([
   "bounding_box", // strokes bounding box
 ]);
 
+function hashPath(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function transformFolderSourceRecord(
+  data: Record<string, any>
+): Record<string, any> {
+  if (!data) return data;
+  const result = { ...data };
+
+  if (!result.kind) {
+    result.kind = "folder_source";
+  }
+
+  const hasPath = Object.prototype.hasOwnProperty.call(result, "path");
+  const hasPathHash = Object.prototype.hasOwnProperty.call(result, "path_hash");
+
+  if (hasPath && !hasPathHash) {
+    if (result.path) {
+      result.path_hash = hashPath(result.path);
+    } else if (result.path === null) {
+      result.path_hash = null;
+    }
+  } else if (!hasPath && result.path && !result.path_hash) {
+    result.path_hash = hashPath(result.path);
+  }
+
+  return result;
+}
+
 /**
  * Convert object keys to snake_case and prepare values for Postgres
  */
@@ -272,7 +303,11 @@ async function applyInsert(
     transformed as Record<string, any>
   );
 
-  const data = keysToSnakeCase(blobTransformed as Record<string, any>);
+  const withSnakeKeys = keysToSnakeCase(blobTransformed as Record<string, any>);
+  const data =
+    change.table === "folder_sources"
+      ? transformFolderSourceRecord(withSnakeKeys)
+      : withSnakeKeys;
 
   // Build INSERT query
   const columns = Object.keys(data);
@@ -342,7 +377,11 @@ async function applyUpdate(
     transformed as Record<string, any>
   );
 
-  const data = keysToSnakeCase(blobTransformed as Record<string, any>);
+  const withSnakeKeys = keysToSnakeCase(blobTransformed as Record<string, any>);
+  const data =
+    change.table === "folder_sources"
+      ? transformFolderSourceRecord(withSnakeKeys)
+      : withSnakeKeys;
 
   // Check if record exists and compare timestamps
   const existing = await client.query(
