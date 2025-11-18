@@ -43,7 +43,8 @@ export type WriteTable =
   | "device_blobs"
   | "replication_jobs"
   | "boards"
-  | "strokes";
+  | "strokes"
+  | "folder_sources";
 
 /**
  * A single write change to be synced

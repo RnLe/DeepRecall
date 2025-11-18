@@ -21,6 +21,7 @@ import type {
   ReplicationJob,
   Board,
   Stroke,
+  FolderSource,
 } from "@deeprecall/core";
 import { logger } from "@deeprecall/telemetry";
 
@@ -38,6 +39,9 @@ class DeepRecallDB extends Dexie {
   blobsMeta!: EntityTable<BlobMeta, "sha256">;
   deviceBlobs!: EntityTable<DeviceBlob, "id">;
   replicationJobs!: EntityTable<ReplicationJob, "id">;
+
+  // Folder source registry (multi-origin ingest)
+  folderSources!: EntityTable<FolderSource, "id">;
 
   // Boards and strokes (synced from Electric)
   boards!: EntityTable<Board, "id">;
@@ -196,6 +200,19 @@ class DeepRecallDB extends Dexie {
       _timestamp: number;
       _error?: string;
       data?: Stroke;
+    },
+    "_localId"
+  >;
+
+  folderSources_local!: EntityTable<
+    {
+      _localId?: number;
+      id: string;
+      _op: "insert" | "update" | "delete";
+      _status: "pending" | "syncing" | "synced" | "error";
+      _timestamp: number;
+      _error?: string;
+      data?: FolderSource;
     },
     "_localId"
   >;
@@ -1119,6 +1136,70 @@ class DeepRecallDB extends Dexie {
         logger.info(
           "db.local",
           "✅ Database upgraded to v19 - boards and strokes tables enabled"
+        );
+      });
+
+    // Version 20: Add folderSources tables for multi-origin ingest
+    this.version(20)
+      .stores({
+        // Authors table (unchanged)
+        authors:
+          "id, lastName, firstName, orcid, affiliation, avatarDisplayPath, createdAt, updatedAt",
+
+        // Library tables (unchanged)
+        works:
+          "id, workType, title, favorite, allowMultipleAssets, presetId, year, read, createdAt, updatedAt, *authorIds",
+        assets:
+          "id, workId, annotationId, sha256, role, purpose, mime, year, read, favorite, presetId, createdAt, updatedAt",
+        activities:
+          "id, activityType, title, startsAt, endsAt, createdAt, updatedAt",
+        collections: "id, name, isPrivate, createdAt, updatedAt",
+        edges: "id, fromId, toId, relation, createdAt",
+        presets: "id, name, targetEntity, isSystem, createdAt, updatedAt",
+
+        // Blob coordination (unchanged)
+        blobsMeta: "sha256, mime, createdAt",
+        deviceBlobs: "id, deviceId, sha256, present, health, createdAt",
+        replicationJobs:
+          "id, sha256, targetDeviceId, status, priority, createdAt",
+
+        // Boards and strokes (unchanged)
+        boards: "id, title, createdAt, updatedAt",
+        strokes: "id, boardId, createdAt",
+
+        // Folder sources (new synced table)
+        folderSources:
+          "id, deviceId, type, isDefault, status, priority, createdAt, updatedAt",
+
+        // Local optimistic tables
+        presets_local: "++_localId, id, _op, _status, _timestamp",
+        works_local: "++_localId, id, _op, _status, _timestamp",
+        assets_local: "++_localId, id, _op, _status, _timestamp",
+        activities_local: "++_localId, id, _op, _status, _timestamp",
+        authors_local: "++_localId, id, _op, _status, _timestamp",
+        collections_local: "++_localId, id, _op, _status, _timestamp",
+        edges_local: "++_localId, id, _op, _status, _timestamp",
+        annotations_local: "++_localId, id, _op, _status, _timestamp",
+        cards_local: "++_localId, id, _op, _status, _timestamp",
+        reviewLogs_local: "++_localId, id, _op, _status, _timestamp",
+        boards_local: "++_localId, id, _op, _status, _timestamp",
+        strokes_local: "++_localId, id, _op, _status, _timestamp",
+        folderSources_local: "++_localId, id, _op, _status, _timestamp",
+
+        // Annotations & cards (unchanged)
+        annotations:
+          "id, sha256, [sha256+page], page, type, createdAt, updatedAt",
+        cards: "id, annotation_id, sha256, due, state, created_ms",
+        reviewLogs: "id, card_id, review_ms",
+      })
+      .upgrade(async () => {
+        logger.info(
+          "db.local",
+          "Upgrading database to version 20 (adding folderSources tables)"
+        );
+        logger.info(
+          "db.local",
+          "✅ Database upgraded to v20 - folder source registry enabled"
         );
       });
   }

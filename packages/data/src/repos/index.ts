@@ -13,6 +13,8 @@ export * as edges from "./edges";
 export * as library from "./library";
 export * as presets from "./presets";
 export * as works from "./works";
+export * as folderSourcesLocal from "./folder-sources.local";
+export * as folderSourcesMerged from "./folder-sources.merged";
 
 // Export Electric-enabled repos separately
 export * as activitiesElectric from "./activities.electric";

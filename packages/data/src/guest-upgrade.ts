@@ -68,8 +68,8 @@ export async function upgradeGuestToUser(
     const guestDbName = `deeprecall_guest_${deviceId}`;
     const guestDb = new Dexie(guestDbName);
 
-    // Open with version 19 (current schema version)
-    guestDb.version(19).stores({
+    // Open with version 20 (current schema version)
+    guestDb.version(20).stores({
       works_local: "++_localId, id, _op, _status, _timestamp",
       assets_local: "++_localId, id, _op, _status, _timestamp",
       activities_local: "++_localId, id, _op, _status, _timestamp",
@@ -82,6 +82,7 @@ export async function upgradeGuestToUser(
       reviewLogs_local: "++_localId, id, _op, _status, _timestamp",
       boards_local: "++_localId, id, _op, _status, _timestamp",
       strokes_local: "++_localId, id, _op, _status, _timestamp",
+      folderSources_local: "++_localId, id, _op, _status, _timestamp",
     });
 
     await guestDb.open();
@@ -106,6 +107,7 @@ export async function upgradeGuestToUser(
       { name: "review_logs", table: guestDb.table("reviewLogs_local") },
       { name: "boards", table: guestDb.table("boards_local") },
       { name: "strokes", table: guestDb.table("strokes_local") },
+      { name: "folder_sources", table: guestDb.table("folderSources_local") },
     ];
 
     for (const { name, table } of tables) {

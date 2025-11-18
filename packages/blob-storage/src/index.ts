@@ -87,6 +87,30 @@ export interface HealthReport {
 }
 
 /**
+ * Descriptor for a logical blob source (local folder, cloud mirror, etc.)
+ */
+export interface BlobSourceDescriptor {
+  id: string;
+  type: "local" | "cloud" | "remote-cache";
+  displayName: string;
+  path?: string | null;
+  uri?: string | null;
+  priority?: number;
+  isDefault?: boolean;
+  deviceId?: string;
+  status?: "idle" | "scanning" | "syncing" | "degraded" | "error" | "disabled";
+}
+
+export interface BlobSourceRegistration {
+  displayName: string;
+  path?: string;
+  uri?: string;
+  type?: "local" | "cloud" | "remote-cache";
+  isDefault?: boolean;
+  priority?: number;
+}
+
+/**
  * Platform-agnostic blob storage interface
  *
  * Implementations:
@@ -148,10 +172,27 @@ export interface BlobCAS {
   /**
    * Scan filesystem for new/changed/deleted files
    */
-  scan(opts?: { directory?: string }): Promise<ScanResult>;
+  scan(opts?: { directory?: string; sourceId?: string }): Promise<ScanResult>;
 
   /**
    * Check health of all blobs
    */
   healthCheck(): Promise<HealthReport>;
+
+  /**
+   * Optional: enumerate folder sources managed by this adapter
+   */
+  listSources?(): Promise<BlobSourceDescriptor[]>;
+
+  /**
+   * Optional: register new folder source
+   */
+  registerSource?(
+    registration: BlobSourceRegistration
+  ): Promise<BlobSourceDescriptor>;
+
+  /**
+   * Optional: remove folder source
+   */
+  removeSource?(sourceId: string): Promise<void>;
 }

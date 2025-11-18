@@ -13,6 +13,7 @@ export * from "./useCards";
 export * from "./useCollections";
 export * from "./useEdges";
 export * from "./useReviewLogs";
+export * from "./useFolderSources";
 
 // Blob coordination hooks
 export * from "./useBlobsMeta";

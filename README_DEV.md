@@ -304,6 +304,7 @@ When adding a new guide:
 | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | [`GUIDE_DATA_ARCHITECTURE.md`](docs/ARCHITECTURE/GUIDE_DATA_ARCHITECTURE.md)           | Complete data architecture: CAS, Electric sync, platform injection, blob coordination |
 | [`GUIDE_OPTIMISTIC_UPDATES.md`](docs/ARCHITECTURE/GUIDE_OPTIMISTIC_UPDATES.md)         | Optimistic update patterns, WriteBuffer, guest mode, critical checks                  |
+| [`GUIDE_FOLDER_SYNC.md`](docs/ARCHITECTURE/GUIDE_FOLDER_SYNC.md)                       | Multi-source folder ingestion plan, explorer checklist, cloud separation roadmap      |
 | [`GUIDE_FILES_TO_ASSETS.md`](docs/ARCHITECTURE/GUIDE_FILES_TO_ASSETS.md)               | File upload flow, CAS integration, asset creation, blob tables analysis               |
 | [`GUIDE_ELECTRIC_PATTERN.md`](docs/ARCHITECTURE/GUIDE_ELECTRIC_PATTERN.md)             | Electric + WriteBuffer pattern: 4-file repo structure, data flow diagram              |
 | [`GUIDE_PLATFORM_WRAPPERS.md`](docs/ARCHITECTURE/GUIDE_PLATFORM_WRAPPERS.md)           | Platform-specific wrapper pattern for UI components                                   |

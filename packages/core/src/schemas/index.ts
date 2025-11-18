@@ -15,4 +15,5 @@ export * from "./boards";
 export * from "./cards";
 export * from "./data-sync";
 export * from "./files";
+export * from "./folder-sources";
 export * from "./presets";
