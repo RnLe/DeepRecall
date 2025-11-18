@@ -9,6 +9,7 @@ import {
 import { UserMenu } from "./UserMenu";
 import { useConnectionStatus } from "@deeprecall/data/hooks";
 import { GuestBannerWrapper } from "./GuestBannerWrapper";
+import { NotificationsHost } from "./NotificationsHost";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -21,6 +22,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col h-screen w-full bg-gray-950 text-gray-100 overflow-hidden">
+      <NotificationsHost />
       {/* Desktop-style navigation bar */}
       <nav className="flex items-center bg-linear-to-brom-gray-900 to-gray-950 border-b border-gray-800 h-14 shrink-0 select-none [app-region:drag] relative z-50">
         <div className="flex items-center gap-2.5 px-5 h-full border-r border-gray-800 [app-region:no-drag]">
@@ -50,6 +52,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
             <span>Library</span>
+          </Link>
+          <Link
+            to="/sources"
+            className={`flex items-center gap-2 px-6 h-full text-gray-400 no-underline text-sm font-medium border-none border-r border-gray-800 bg-transparent transition-all duration-150 relative hover:bg-gray-900 hover:text-gray-100 ${
+              isActive("/sources")
+                ? "bg-gray-950 text-white border-b-2 border-b-blue-500"
+                : ""
+            }`}
+          >
+            <svg
+              className="w-[18px] h-[18px] shrink-0"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M3 6h5l2 2h9a2 2 0 012 2v7a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2z" />
+              <path d="M3 6V5a2 2 0 012-2h4l2 2" />
+            </svg>
+            <span>Sources</span>
           </Link>
           <Link
             to="/reader"

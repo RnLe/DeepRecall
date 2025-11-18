@@ -31,7 +31,7 @@
 
 ### Platform (Desktop/Mobile)
 
-- UI: folder picker modal, status indicators, conflict warnings.
+- UI: folder picker modal, status indicators, conflict warnings, manual review queue with toast hooks.
 - Native bridge: returns canonicalized paths + watch tokens.
 - Scanner: emits `{sha256, path, size, mtime, sourceId}` records; hands bytes to existing CAS ingestion.
 
@@ -125,6 +125,12 @@ Track completion directly in this checklist as work lands across repos/platforms
 
 - `CloudFileService` must be the only consumer-facing surface; wrap current `/api/library/blobs` + `/api/sources` via `LocalCloudStub` to ease future service swap.
 - Plan telemetry hooks now (scan duration, bytes ingested, cache hit rate) so future service can observe behavior from day one.
+
+### 6.7 Manual Review & Notifications
+
+- Desktop enforces a soft cap of ≤100 files and depth ≤5 per automatic source. Anything larger sets `metadata.manualOverride = true` and pauses ingestion until reviewed.
+- The new Sources page queue lists these holds, reruns `analyzeFolder(path)` when you click “Start manual sync,” updates `manualApprovedAt`, and clears `manualOverride` so the scanner can proceed even if the folder still exceeds limits.
+- User-facing feedback now flows through the shared `deeprecall:notification` event bus + toast rail, keeping inline banners focused on persistent warnings while success/error states surface consistently across the desktop shell.
 
 ## 7. Recommended Implementation Order
 

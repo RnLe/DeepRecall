@@ -4,6 +4,7 @@ import { Layout } from "./components/Layout";
 import LibraryPage from "./pages/LibraryPage";
 import ReaderPage from "./pages/ReaderPage";
 import StudyPage from "./pages/StudyPage";
+import SourcesPage from "./pages/SourcesPage";
 import AdminPage from "./pages/AdminPage";
 import LogsPage from "./pages/admin/LogsPage";
 import "./globals.css";
@@ -16,6 +17,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Navigate to="/library" replace />} />
           <Route path="/library" element={<LibraryPage />} />
+          <Route path="/sources" element={<SourcesPage />} />
           <Route path="/reader" element={<ReaderPage />} />
           <Route path="/study" element={<StudyPage />} />
           <Route path="/admin" element={<AdminPage />} />
