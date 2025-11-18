@@ -45,46 +45,11 @@ export async function clearAllUserData(): Promise<void> {
       });
     }
 
-    // Step 2: Clear all Dexie tables
-    const { db } = await import("../db");
+    // Step 2: Clear all Dexie tables (synced + local + future tables)
+    const { clearAllDexieData } = await import("../db");
 
     logger.info("auth", "Clearing all Dexie tables");
-
-    await Promise.all([
-      // Electric-synced content tables
-      db.works.clear(),
-      db.assets.clear(),
-      db.authors.clear(),
-      db.annotations.clear(),
-      db.cards.clear(),
-      db.reviewLogs.clear(),
-      db.collections.clear(),
-      db.edges.clear(),
-      db.presets.clear(),
-      db.activities.clear(),
-      db.boards.clear(),
-      db.strokes.clear(),
-
-      // Blob coordination tables (MUST clear to prevent data leakage)
-      db.blobsMeta.clear(),
-      db.deviceBlobs.clear(),
-      db.replicationJobs.clear(),
-
-      // Local optimistic tables
-      db.works_local.clear(),
-      db.assets_local.clear(),
-      db.authors_local.clear(),
-      db.annotations_local.clear(),
-      db.cards_local.clear(),
-      db.reviewLogs_local.clear(),
-      db.collections_local.clear(),
-      db.edges_local.clear(),
-      db.presets_local.clear(),
-      db.activities_local.clear(),
-      db.boards_local.clear(),
-      db.strokes_local.clear(),
-    ]);
-
+    await clearAllDexieData();
     logger.info("auth", "✅ All Dexie tables cleared");
 
     // Step 3: Delete Electric's IndexedDB databases

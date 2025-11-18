@@ -28,6 +28,12 @@ export interface SignInResult {
   };
 }
 
+export interface SignOutResult {
+  presetsInitialized: boolean;
+  blobsScanned: number;
+  blobsCoordinated: number;
+}
+
 /**
  * Handle user sign-in flow
  *
@@ -245,64 +251,28 @@ export async function handleSignIn(
 export async function handleSignOut(
   deviceId: string,
   blobStorage: BlobCAS
-): Promise<void> {
+): Promise<SignOutResult> {
   logger.info("auth", "Starting sign-out flow", {
     deviceId: deviceId.slice(0, 8),
   });
 
   try {
-    // Step 1: Clear write buffer
-    const { getFlushWorker } = await import("../writeBuffer");
-    const flushWorker = getFlushWorker();
-    if (flushWorker) {
-      const buffer = flushWorker.getBuffer();
-      await buffer.clear();
-      logger.info("auth", "Write buffer cleared");
-    }
+    const { clearAllUserData, initializeGuestMode } = await import(
+      "./cleanupAndInit"
+    );
+    const { setAuthState } = await import("../auth");
 
-    // Step 2: Clear blob metadata tables
-    const { db } = await import("../db");
-    await Promise.all([
-      db.blobsMeta.clear(),
-      db.deviceBlobs.clear(),
-      db.replicationJobs.clear(),
-    ]);
-    logger.info("auth", "Blob metadata cleared");
+    await clearAllUserData();
+    setAuthState(false, null, deviceId);
 
-    // Step 3: Rescan CAS for guest mode + integrity check
-    // Note: scanAndCheckCAS does both scan and integrity check in one pass
-    const { scanAndCheckCAS } = await import("../utils/casIntegrityCheck");
-    const result = await scanAndCheckCAS(blobStorage, deviceId);
+    const guestInitResult = await initializeGuestMode(blobStorage, deviceId);
 
-    logger.info("auth", "CAS rescan complete", {
-      scanned: result.scan.scanned,
-      coordinated: result.scan.coordinated,
-      skipped: result.scan.skipped,
+    logger.info("auth", "✅ Sign-out flow complete", {
+      deviceId: deviceId.slice(0, 8),
+      ...guestInitResult,
     });
 
-    if (result.integrity.hasIssues) {
-      logger.warn(
-        "auth",
-        "CAS integrity check found missing files after sign-out",
-        {
-          totalChecked: result.integrity.totalChecked,
-          missing: result.integrity.missing,
-        }
-      );
-    } else {
-      logger.info("auth", "CAS integrity check passed after sign-out", {
-        totalChecked: result.integrity.totalChecked,
-      });
-    }
-
-    // Step 4: Invalidate React Query caches to update UI immediately
-    if (typeof window !== "undefined" && (window as any).__queryClient) {
-      const queryClient = (window as any).__queryClient;
-      await queryClient.invalidateQueries();
-      logger.info("auth", "UI caches invalidated after sign-out");
-    }
-
-    logger.info("auth", "✅ Sign-out flow complete");
+    return guestInitResult;
   } catch (error) {
     logger.error("auth", "❌ Sign-out flow failed", {
       error: error instanceof Error ? error.message : String(error),

@@ -23,17 +23,15 @@ export async function signOut(options?: { callbackUrl?: string }) {
   console.log("[Auth] Starting sign-out process...");
 
   try {
-    // Clear all Dexie tables and Electric databases
-    // This is fast because it's all client-side IndexedDB operations
-    const { clearAllUserData } = await import("@deeprecall/data");
-    await clearAllUserData();
-    console.log("[Auth] ✅ All user data cleared");
+    const [dataModule, blobModule] = await Promise.all([
+      import("@deeprecall/data"),
+      import("../blob-storage/web"),
+    ]);
 
-    // Note: We do NOT delete blob files from CAS storage here because:
-    // 1. It's slow (500ms+ per blob via API)
-    // 2. Guest mode will rescan CAS and recreate metadata anyway
-    // 3. Blobs are content-addressed, so they're safe to reuse
+    const deviceId = dataModule.getDeviceId();
+    const cas = blobModule.getWebBlobStorage();
 
+    await dataModule.handleSignOut(deviceId, cas);
     console.log("[Auth] ✅ Sign-out cleanup complete");
   } catch (error) {
     console.error("[Auth] ❌ Failed to clear data on sign-out:", error);
@@ -42,5 +40,6 @@ export async function signOut(options?: { callbackUrl?: string }) {
 
   // Sign out with NextAuth (this will trigger session change and page reload/redirect)
   console.log("[Auth] Calling NextAuth signOut...");
-  return nextAuthSignOut(options);
+  const callbackUrl = options?.callbackUrl ?? "/";
+  return nextAuthSignOut({ ...options, callbackUrl });
 }

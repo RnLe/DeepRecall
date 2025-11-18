@@ -1151,40 +1151,13 @@ export async function clearAllDexieData(): Promise<void> {
   logger.info("db.local", "[Dexie] Clearing all data...");
 
   try {
-    // Clear all tables
-    await Promise.all([
-      // Synced tables
-      db.works.clear(),
-      db.assets.clear(),
-      db.activities.clear(),
-      db.collections.clear(),
-      db.edges.clear(),
-      db.presets.clear(),
-      db.authors.clear(),
-      db.annotations.clear(),
-      db.cards.clear(),
-      db.reviewLogs.clear(),
-      db.blobsMeta.clear(),
-      db.deviceBlobs.clear(),
-      db.boards.clear(),
-      db.strokes.clear(),
+    const tableNames = db.tables.map((table) => table.name);
 
-      // Local optimistic tables
-      db.works_local.clear(),
-      db.assets_local.clear(),
-      db.activities_local.clear(),
-      db.collections_local.clear(),
-      db.edges_local.clear(),
-      db.presets_local.clear(),
-      db.authors_local.clear(),
-      db.annotations_local.clear(),
-      db.cards_local.clear(),
-      db.reviewLogs_local.clear(),
-      db.boards_local.clear(),
-      db.strokes_local.clear(),
-    ]);
+    await Promise.all(db.tables.map((table) => table.clear()));
 
-    logger.info("db.local", "[Dexie] ✅ All data cleared successfully");
+    logger.info("db.local", "[Dexie] ✅ All data cleared successfully", {
+      tables: tableNames,
+    });
   } catch (error) {
     logger.error("db.local", "[Dexie] Failed to clear data", { error });
     throw error;

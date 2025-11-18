@@ -21,7 +21,7 @@ export { upgradeGuestToUser } from "./auth/upgradeGuest";
 export { hasGuestData } from "./guest-upgrade";
 export { isNewAccount, wipeGuestData } from "./auth/accountStatus";
 export { handleSignIn, handleSignOut, debugAccountStatus } from "./auth/flows";
-export type { SignInResult } from "./auth/flows";
+export type { SignInResult, SignOutResult } from "./auth/flows";
 
 // Export auth cleanup and initialization utilities
 export {

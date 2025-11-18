@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { logger } from "@deeprecall/telemetry";
 import { Portal } from "./Portal";
 import {
@@ -29,6 +30,7 @@ interface GitHubDeviceCodeData {
 }
 
 export function UserMenu() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
@@ -200,6 +202,7 @@ export function UserMenu() {
       setSessionInfo(null);
       setStatus("unauthenticated");
       console.log("[UserMenu] Signed out");
+      navigate("/", { replace: true });
     } catch (err) {
       console.error("[UserMenu] Sign-out failed:", err);
     }

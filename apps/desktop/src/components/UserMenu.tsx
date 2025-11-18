@@ -17,6 +17,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { UserMenu as SharedUserMenu } from "@deeprecall/ui";
 import {
   signInWithGoogle,
@@ -31,6 +32,7 @@ import { SignInModal } from "./SignInModal";
 import { GitHubDeviceCodeModal } from "./GitHubDeviceCodeModal";
 
 export function UserMenu() {
+  const navigate = useNavigate();
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [status, setStatus] = useState<
     "loading" | "authenticated" | "unauthenticated"
@@ -194,6 +196,7 @@ export function UserMenu() {
       setError(null);
       console.log("[UserMenu] Signed out successfully");
       emitAuthStateChanged({ reason: "signout" });
+      navigate("/", { replace: true });
     } catch (err) {
       console.error("[UserMenu] Sign out failed:", err);
       setError(err instanceof Error ? err.message : "Sign out failed");

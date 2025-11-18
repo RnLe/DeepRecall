@@ -180,11 +180,6 @@ export function createWriteBuffer(): WriteBuffer {
         .filter((c) => c.status === "pending" || c.status === "error")
         .sort((a, b) => a.created_at - b.created_at);
 
-      logger.debug("sync.writeBuffer", "Buffer peek query result", {
-        totalChanges: allChanges.length,
-        pendingOrError: pending.length,
-      });
-
       // Filter out changes that exceeded max retries (shouldn't be in peek)
       const retryable = pending.filter((c) => c.retry_count < 5);
 
@@ -416,11 +411,7 @@ export class FlushWorker {
    * Flush pending changes to server
    */
   async flush(): Promise<void> {
-    logger.debug("sync.writeBuffer", "FlushWorker.flush() called");
     const pending = await this.buffer.peek(this.config.batchSize);
-    logger.debug("sync.writeBuffer", "FlushWorker pending check", {
-      pendingCount: pending.length,
-    });
 
     if (pending.length === 0) {
       // Check if there are stuck changes and clean them up
