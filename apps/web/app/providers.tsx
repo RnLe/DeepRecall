@@ -303,8 +303,13 @@ function ConditionalSyncManager() {
   // 2. Integrity check modifies them in Dexie (localPath=null)
   // 3. Sync hook sees mismatch and DELETES the blobs (catastrophic!)
 
-  // Only sync other data when authenticated
-  if (isGuest) {
+  const shouldRunUserSyncs = !isGuest && !!authUserId;
+
+  // Only start user syncs when we have BOTH an authenticated session (NextAuth)
+  // and a resolved authUserId from our global auth state. This prevents sync
+  // hooks from running with an undefined userId during sign-in/out transitions,
+  // which previously rehydrated Dexie with stale data.
+  if (!shouldRunUserSyncs) {
     return null;
   }
 
