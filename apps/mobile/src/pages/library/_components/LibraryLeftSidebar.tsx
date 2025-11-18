@@ -5,15 +5,12 @@
 
 "use client";
 
-import { useCallback } from "react";
 import {
   LibraryLeftSidebar as LibraryLeftSidebarUI,
   type LibraryLeftSidebarOperations,
 } from "@deeprecall/ui/library";
 import type { BlobWithMetadata } from "@deeprecall/core";
 import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
-import { useOrphanedBlobsFromElectric } from "@deeprecall/data/hooks";
-import { getDeviceId } from "@deeprecall/data";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { logger } from "@deeprecall/telemetry";
 
@@ -73,20 +70,9 @@ function LinkBlobDialogStub({
 
 export function LibraryLeftSidebar() {
   const cas = useCapacitorBlobStorage();
-  const currentDeviceId = getDeviceId();
-  const orphanedBlobsQuery = useOrphanedBlobsFromElectric(currentDeviceId);
-
-  const fetchOrphanedBlobs = useCallback(async () => {
-    await orphanedBlobsQuery.refetch();
-    return orphanedBlobsQuery.data || [];
-  }, [orphanedBlobsQuery]);
 
   // Real operations using CapacitorBlobStorage
   const operations: LibraryLeftSidebarOperations = {
-    fetchOrphanedBlobs,
-    orphanedBlobs: orphanedBlobsQuery.data || [],
-    isLoadingBlobs: orphanedBlobsQuery.isLoading,
-
     fetchBlobContent: async (sha256: string) => {
       try {
         // Read blob from filesystem using Capacitor
@@ -106,19 +92,18 @@ export function LibraryLeftSidebar() {
     renameBlob: async (hash: string, filename: string) => {
       try {
         await cas.rename(hash, filename);
-        await fetchOrphanedBlobs(); // Refresh list
       } catch (error) {
         logger.error("cas", "Failed to rename blob", { hash, filename, error });
         throw error;
       }
     },
 
-    deleteBlob: async (hash: string) => {
+    deleteAsset: async (assetId: string) => {
       try {
-        await cas.delete(hash);
-        await fetchOrphanedBlobs(); // Refresh list
+        const { assetsElectric } = await import("@deeprecall/data/repos");
+        await assetsElectric.deleteAsset(assetId);
       } catch (error) {
-        logger.error("cas", "Failed to delete blob", { hash, error });
+        logger.error("cas", "Failed to delete asset", { assetId, error });
         throw error;
       }
     },
@@ -129,7 +114,6 @@ export function LibraryLeftSidebar() {
         for (const file of Array.from(files)) {
           await cas.put(file);
         }
-        await fetchOrphanedBlobs(); // Refresh list
       } catch (error) {
         logger.error("blob.upload", "Failed to upload files", { error });
         throw error;
@@ -140,7 +124,6 @@ export function LibraryLeftSidebar() {
       // Capacitor uses file:// URLs
       return `capacitor://blob/${sha256}`;
     },
-    cas,
   };
 
   return (

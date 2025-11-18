@@ -9,20 +9,26 @@ import {
   UnlinkedAssetsList as UnlinkedAssetsListUI,
   type UnlinkedAssetsListOperations,
 } from "@deeprecall/ui";
-import type { Asset } from "@deeprecall/core";
+import type { Asset, BlobWithMetadata } from "@deeprecall/core";
 import { useCapacitorBlobStorage } from "../../../hooks/useBlobStorage";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { logger } from "@deeprecall/telemetry";
 
 interface UnlinkedAssetsListProps {
-  onLinkAsset: (asset: Asset) => void;
   onViewAsset: (asset: Asset) => void;
-  onMoveToInbox: (assetId: string) => void;
+  LinkBlobDialog: React.ComponentType<{
+    blob: BlobWithMetadata;
+    onSuccess: () => void;
+    onCancel: () => void;
+    existingAssetId?: string;
+  }>;
+  getBlobUrl: (sha256: string) => string;
 }
 
 export function UnlinkedAssetsList({
-  onLinkAsset,
   onViewAsset,
-  onMoveToInbox,
+  LinkBlobDialog,
+  getBlobUrl,
 }: UnlinkedAssetsListProps) {
   const cas = useCapacitorBlobStorage();
 
@@ -30,26 +36,46 @@ export function UnlinkedAssetsList({
   const operations: UnlinkedAssetsListOperations = {
     // Rename blob using Capacitor CAS
     renameBlob: async (hash: string, filename: string) => {
-      await cas.rename(hash, filename);
+      try {
+        await cas.rename(hash, filename);
+      } catch (error) {
+        logger.error("cas", "Failed to rename blob", { hash, filename, error });
+        throw error;
+      }
     },
 
     // Fetch blob content using Capacitor Filesystem
     fetchBlobContent: async (hash: string) => {
-      const result = await Filesystem.readFile({
-        path: `blobs/${hash}`,
-        directory: Directory.Documents,
-      });
-      // Return as base64 string (Capacitor's format)
-      return result.data as string;
+      try {
+        const result = await Filesystem.readFile({
+          path: `blobs/${hash}`,
+          directory: Directory.Documents,
+        });
+        // Return as base64 string (Capacitor's format)
+        return typeof result.data === "string" ? result.data : "";
+      } catch (error) {
+        logger.error("cas", "Failed to fetch blob content", { hash, error });
+        throw error;
+      }
+    },
+
+    deleteAsset: async (assetId: string) => {
+      try {
+        const { assetsElectric } = await import("@deeprecall/data/repos");
+        await assetsElectric.deleteAsset(assetId);
+      } catch (error) {
+        logger.error("cas", "Failed to delete asset", { assetId, error });
+        throw error;
+      }
     },
   };
 
   return (
     <UnlinkedAssetsListUI
       operations={operations}
-      onLinkAsset={onLinkAsset}
       onViewAsset={onViewAsset}
-      onMoveToInbox={onMoveToInbox}
+      LinkBlobDialog={LinkBlobDialog}
+      getBlobUrl={getBlobUrl}
     />
   );
 }

@@ -447,36 +447,20 @@ export async function POST(request: NextRequest) {
 
 ### Mobile Dev Server Setup
 
-**Command**: `pnpm dev:mobile` (runs Vite on `localhost:5173`)
+- Run `pnpm dev:mobile` to serve the Capacitor UI through Vite on `http://localhost:5173`.
+- **All API and Electric requests now go directly to the configured backend (usually Railway)**. There is no longer a Vite proxy; instead, `getApiBaseUrl()` reads `VITE_API_BASE_URL` (or falls back to the production domain) so the dev build mirrors production behavior.
+- CORS now explicitly allows `http://localhost:5173`, and every mobile-facing route (including early 401 responses from `/api/writes/batch` and `/api/user/status`) sets `Access-Control-Allow-Origin`, so the browser dev build can talk to the production API without errors.
 
-**Vite proxy configuration** (`apps/mobile/vite.config.ts`):
-
-```typescript
-server: {
-  proxy: {
-    "/api": {
-      target: "http://localhost:3000",
-      changeOrigin: true,
-    },
-  },
-}
-```
-
-**How it works**:
-
-1. Mobile dev server runs on `localhost:5173`
-2. API calls to `/api/*` are proxied to Next.js on `localhost:3000`
-3. Origin header remains `http://localhost:5173` (must be in CORS allowed origins)
-4. Next.js validates CORS and allows `localhost:5173`
-
-**Environment variables** (`.env.local`):
+**Environment variables** (`apps/mobile/.env.local`):
 
 ```bash
-VITE_AUTH_BROKER_URL=http://localhost:3000
-VITE_ELECTRIC_URL=http://localhost:3000/electric
-VITE_ELECTRIC_SOURCE_ID=<local-source-id>
-VITE_ELECTRIC_SOURCE_SECRET=<local-secret>
+VITE_API_BASE_URL=https://deeprecall-production.up.railway.app
+VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
+VITE_ELECTRIC_SOURCE_ID=<source-id>
+VITE_ELECTRIC_SOURCE_SECRET=<source-secret>
 ```
+
+You can temporarily point the dev build to another backend by changing `VITE_API_BASE_URL`; the Electric URL automatically follows the same base via `resolveElectricUrl()` if `VITE_ELECTRIC_URL` is not set.
 
 ---
 
@@ -657,7 +641,7 @@ Mobile supports full offline functionality without authentication, identical to 
 
 - `apps/mobile/capacitor.config.ts` - Capacitor config
 - `apps/mobile/ios/App/App/Info.plist` - iOS URL schemes, ATS
-- `apps/mobile/vite.config.ts` - Vite proxy for local dev
+- `apps/mobile/vite.config.ts` - Vite dev server configuration (React plugin, alias overrides)
 
 **UI**:
 

@@ -22,7 +22,7 @@ DeepRecall uses **three-tier authentication** across platforms:
 - **Desktop/Mobile**: Tested only in production (no local Electric/Postgres instances)
 - **Database**: Single production Postgres (Neon) + Electric instance shared by all environments
 - **Local web dev**: Uses production Postgres/Electric for simplicity
-- **Mobile local dev**: `pnpm dev:mobile` uses Vite proxy to forward API calls to Next.js
+- **Mobile local dev**: `pnpm dev:mobile` serves the UI via Vite on `localhost:5173` but talks directly to the deployed Next.js API/Electric endpoints (configured via `VITE_API_BASE_URL`), relying on the shared CORS helpers to allow the dev origin.
 
 ### Electric Proxy & Runtime Config (Nov 2025)
 

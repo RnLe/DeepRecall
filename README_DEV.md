@@ -235,6 +235,12 @@ pnpm install
 
 **Critical**: Worker version must exactly match library version, or you'll get "API version does not match Worker version" errors. The version is pinned in root `package.json` (`pnpm.overrides`) to prevent drift.
 
+### Mobile Development Environment
+
+- `pnpm dev:mobile` still serves the Capacitor UI through Vite on `http://localhost:5173`, but **all API, Electric, and write-buffer traffic now targets the deployed Next.js backend**. Set `VITE_API_BASE_URL` (and optionally `VITE_ELECTRIC_URL`) in `apps/mobile/.env.local` to the production Railway domain so dev and production behave identically.
+- Since requests originate from `http://localhost:5173`, the shared CORS helpers explicitly allow that origin and attach `Access-Control-Allow-Origin` headers even on 401 responses (e.g., `/api/writes/batch`, `/api/user/status`).
+- If you need to point the mobile dev build at a different backend, change `VITE_API_BASE_URL`—no proxy edits are required, and Electric will follow the same base automatically via `resolveElectricUrl()`.
+
 ---
 
 ## Critical Concepts
