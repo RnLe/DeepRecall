@@ -58,8 +58,8 @@
   - [x] Dexie: ensure synced/local tables mirror schema with indexes on `deviceId`, `isDefault`, and tombstone awareness.
 - [ ] **Write Path & APIs**
   - [x] Teach WriteBuffer + `/api/writes/batch` about `folder_sources` (Zod schema, snake_case conversion, conflict strategy).
-  - [x] Expose `/api/sources` (`GET`/`POST`) and `/api/sources/[id]` (`GET`/`PATCH`/`DELETE`) with RLS context + default-flip transaction.
-  - [ ] Surface feature flag / env toggles so Desktop/Mobile enqueue remote writes only when server table exists.
+  - [x] Expose `/api/sources` (`GET`/`POST`) and `/api/sources/[id]` (`GET`/`PATCH`/`DELETE`) with RLS context + default-flip transaction; verified Next.js route exports compile by moving `mapRowToFolderSource` into a helper and aligning handler signatures with the promised `params` contract.
+  - [x] Surface feature flag / env toggles so Desktop/Mobile enqueue remote writes only when server table exists (`NEXT_PUBLIC_ENABLE_FOLDER_SOURCES_SYNC` / `ENABLE_FOLDER_SOURCES_SYNC` on web, `VITE_ENABLE_FOLDER_SOURCES_SYNC` on desktop/mobile, also mirrored via `/api/config`).
 - [x] **Repos & Hooks**
   - [x] Implement `folder-sources.{electric|local|merged|cleanup}.ts` (Electric sync writes Dexie, cleanup clears applied locals).
   - [x] Extend `useFolderSourcesSync(userId)` + helpers (`resolveDefaultFolderSource`, selectors for per-device filtering, guest fallbacks).

@@ -27,6 +27,7 @@ import {
   useWorksSync,
   useBoardsSync,
   useStrokesSync,
+  setFolderSourcesRemoteEnqueueEnabled,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 import { initTelemetry } from "@/src/telemetry";
@@ -328,6 +329,17 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
   const workerRef = useRef<ReturnType<typeof initFlushWorker> | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
 
+  const applyFolderSourcesFlag = (enabled: boolean) => {
+    setFolderSourcesRemoteEnqueueEnabled(enabled);
+    if (typeof window !== "undefined") {
+      (window as any).__DEEPRECALL_ENABLE_FOLDER_SOURCES_SYNC = enabled;
+    }
+    logger.info("sync.coordination", "Folder sources remote enqueue toggled", {
+      enabled,
+      source: "web-config",
+    });
+  };
+
   useEffect(() => {
     // Wait for auth status to be determined
     if (status === "loading") {
@@ -350,6 +362,8 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
           hasSourceId: !!config.electricSourceId,
           hasSecret: !!config.electricSecret,
         });
+
+        applyFolderSourcesFlag(!!config.enableFolderSourcesSync);
 
         initElectric({
           url: config.electricUrl,
@@ -381,6 +395,12 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
           process.env.NEXT_PUBLIC_ELECTRIC_URL || "http://localhost:5133";
         const electricSourceId = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_ID;
         const electricSecret = process.env.NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET;
+        const fallbackFolderSourcesFlag =
+          (process.env.NEXT_PUBLIC_ENABLE_FOLDER_SOURCES_SYNC || "")
+            .toLowerCase()
+            .trim() === "true";
+
+        applyFolderSourcesFlag(fallbackFolderSourcesFlag);
 
         logger.info("sync.electric", "Using fallback build-time config", {
           electricUrl,
@@ -506,7 +526,7 @@ function ElectricInitializer({ onReady }: { onReady: () => void }) {
         logger.info("sync.writeBuffer", "FlushWorker stopped");
       }
     };
-  }, [isGuest, isAuthenticated, status]); // Re-run when auth status changes
+  }, [isGuest, isAuthenticated, status, onReady]); // Re-run when auth status changes
 
   return null;
 }

@@ -11,7 +11,7 @@ import { FolderSourceSchema, FolderSourceStatusSchema } from "@deeprecall/core";
 import { requireAuth } from "@/app/api/lib/auth-helpers";
 import { getPostgresPool } from "@/app/api/lib/postgres";
 import { logger } from "@deeprecall/telemetry";
-import { mapRowToFolderSource } from "../route";
+import { mapRowToFolderSource } from "../folder-source-helpers";
 
 const SourceIdParamSchema = z.object({
   sourceId: z.string().uuid("sourceId must be a UUID"),
@@ -36,17 +36,17 @@ const UpdateFolderSourceSchema = z
   });
 
 export async function GET(
-  _req: NextRequest,
-  context: { params: { sourceId: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ sourceId: string }> }
 ) {
   try {
-    const user = await requireAuth(_req);
-    const params = SourceIdParamSchema.parse(context.params);
+    const user = await requireAuth(req);
+    const parsedParams = SourceIdParamSchema.parse(await params);
 
     const pool = getPostgresPool();
     const { rows } = await pool.query(
       `SELECT * FROM folder_sources WHERE id = $1 AND owner_id = $2`,
-      [params.sourceId, user.userId]
+      [parsedParams.sourceId, user.userId]
     );
 
     if (rows.length === 0) {
@@ -67,11 +67,11 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: { sourceId: string } }
+  { params }: { params: Promise<{ sourceId: string }> }
 ) {
   try {
     const user = await requireAuth(req);
-    const params = SourceIdParamSchema.parse(context.params);
+    const parsedParams = SourceIdParamSchema.parse(await params);
     const body = await req.json();
     const updates = UpdateFolderSourceSchema.parse(body);
 
@@ -84,7 +84,7 @@ export async function PATCH(
 
       const existing = await client.query(
         `SELECT device_id FROM folder_sources WHERE id = $1 AND owner_id = $2`,
-        [params.sourceId, user.userId]
+        [parsedParams.sourceId, user.userId]
       );
 
       if (existing.rows.length === 0) {
@@ -98,7 +98,7 @@ export async function PATCH(
         await client.query(
           `UPDATE folder_sources SET is_default = false
            WHERE owner_id = $1 AND device_id = $2 AND id <> $3`,
-          [user.userId, deviceId, params.sourceId]
+          [user.userId, deviceId, parsedParams.sourceId]
         );
       }
 
@@ -165,7 +165,7 @@ export async function PATCH(
 
       const updateResult = await client.query(updateQuery, [
         ...values,
-        params.sourceId,
+        parsedParams.sourceId,
         user.userId,
       ]);
 
@@ -197,16 +197,16 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  context: { params: { sourceId: string } }
+  { params }: { params: Promise<{ sourceId: string }> }
 ) {
   try {
     const user = await requireAuth(req);
-    const params = SourceIdParamSchema.parse(context.params);
+    const parsedParams = SourceIdParamSchema.parse(await params);
     const pool = getPostgresPool();
 
     const result = await pool.query(
       `DELETE FROM folder_sources WHERE id = $1 AND owner_id = $2`,
-      [params.sourceId, user.userId]
+      [parsedParams.sourceId, user.userId]
     );
 
     if (result.rowCount === 0) {

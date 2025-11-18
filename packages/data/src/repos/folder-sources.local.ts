@@ -31,17 +31,66 @@ export interface LocalFolderSourceChange {
 
 const buffer = createWriteBuffer();
 
-const featureFlagValue =
-  (typeof process !== "undefined" &&
-    process.env?.NEXT_PUBLIC_ENABLE_FOLDER_SOURCES_SYNC) ??
-  (typeof globalThis !== "undefined"
-    ? (globalThis as any).__DEEPRECALL_ENABLE_FOLDER_SOURCES_SYNC
-    : undefined);
+function parseBooleanFlag(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") {
+    return value;
+  }
 
-const ENABLE_REMOTE_ENQUEUE =
-  featureFlagValue === undefined
-    ? true
-    : featureFlagValue === true || featureFlagValue === "true";
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+
+  return undefined;
+}
+
+const envFlag =
+  typeof process !== "undefined"
+    ? parseBooleanFlag(
+        process.env?.NEXT_PUBLIC_ENABLE_FOLDER_SOURCES_SYNC ??
+          process.env?.ENABLE_FOLDER_SOURCES_SYNC
+      )
+    : undefined;
+
+const globalFlag =
+  typeof globalThis !== "undefined"
+    ? parseBooleanFlag(
+        (globalThis as { __DEEPRECALL_ENABLE_FOLDER_SOURCES_SYNC?: unknown })
+          .__DEEPRECALL_ENABLE_FOLDER_SOURCES_SYNC
+      )
+    : undefined;
+
+let remoteEnqueueEnabled = envFlag ?? globalFlag ?? false;
+
+function applyRemoteEnqueueFlag(enabled: boolean, { log = true } = {}) {
+  const changed = remoteEnqueueEnabled !== enabled;
+  remoteEnqueueEnabled = enabled;
+
+  if (typeof globalThis !== "undefined") {
+    (globalThis as any).__DEEPRECALL_ENABLE_FOLDER_SOURCES_SYNC = enabled;
+  }
+
+  if (log && changed) {
+    logger.info("sync.coordination", "Folder source remote enqueue flag set", {
+      enabled,
+    });
+  }
+}
+
+applyRemoteEnqueueFlag(remoteEnqueueEnabled, { log: false });
+
+export function setFolderSourcesRemoteEnqueueEnabled(enabled: boolean) {
+  applyRemoteEnqueueFlag(enabled);
+}
+
+export function isFolderSourcesRemoteEnqueueEnabled() {
+  return remoteEnqueueEnabled;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -88,7 +137,7 @@ async function enqueueIfEnabled(
   op: "insert" | "update" | "delete",
   payload: any
 ) {
-  if (!ENABLE_REMOTE_ENQUEUE || !isAuthenticated()) {
+  if (!remoteEnqueueEnabled || !isAuthenticated()) {
     return;
   }
 
@@ -182,7 +231,7 @@ export async function registerFolderSourceLocal(
   logger.info("sync.coordination", "Registered folder source locally", {
     sourceId: folderSource.id,
     type: folderSource.type,
-    syncEnabled: ENABLE_REMOTE_ENQUEUE && isAuthenticated(),
+    syncEnabled: remoteEnqueueEnabled && isAuthenticated(),
   });
 
   return folderSource;

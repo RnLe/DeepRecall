@@ -7,7 +7,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  FolderSourceSchema,
   FolderSourceRegistrationSchema,
   FolderSourceStatusSchema,
   FolderSourceTypeSchema,
@@ -15,6 +14,7 @@ import {
 import { requireAuth } from "@/app/api/lib/auth-helpers";
 import { getPostgresPool } from "@/app/api/lib/postgres";
 import { logger } from "@deeprecall/telemetry";
+import { mapRowToFolderSource } from "./folder-source-helpers";
 
 const CreateFolderSourceSchema = FolderSourceRegistrationSchema.extend({
   id: z.string().uuid().optional(),
@@ -27,33 +27,6 @@ const listQuerySchema = z.object({
   type: FolderSourceTypeSchema.optional(),
   status: FolderSourceStatusSchema.optional(),
 });
-
-export function mapRowToFolderSource(row: any) {
-  return FolderSourceSchema.parse({
-    id: row.id,
-    kind: row.kind ?? "folder_source",
-    ownerId: row.owner_id,
-    deviceId: row.device_id,
-    type: row.type,
-    displayName: row.display_name,
-    path: row.path ?? undefined,
-    pathHash: row.path_hash ?? undefined,
-    uri: row.uri ?? undefined,
-    priority: row.priority,
-    isDefault: row.is_default,
-    status: row.status,
-    metadata: row.metadata ?? undefined,
-    lastScanStartedAt: row.last_scan_started_at
-      ? new Date(row.last_scan_started_at).toISOString()
-      : undefined,
-    lastScanCompletedAt: row.last_scan_completed_at
-      ? new Date(row.last_scan_completed_at).toISOString()
-      : undefined,
-    lastError: row.last_error ?? undefined,
-    createdAt: new Date(row.created_at).toISOString(),
-    updatedAt: new Date(row.updated_at).toISOString(),
-  });
-}
 
 export async function GET(req: NextRequest) {
   try {

@@ -14,6 +14,10 @@ export * from "./types/unified"; // Unified blob handle
 // Export Electric sync and write buffer
 export * from "./electric";
 export * from "./writeBuffer";
+export {
+  setFolderSourcesRemoteEnqueueEnabled,
+  isFolderSourcesRemoteEnqueueEnabled,
+} from "./repos/folder-sources.local";
 
 // Export auth state management and guest upgrade
 export * from "./auth";

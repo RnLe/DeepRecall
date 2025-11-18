@@ -11,6 +11,15 @@
 import { NextResponse } from "next/server";
 import { logger } from "@deeprecall/telemetry";
 
+function parseBooleanFlag(value?: string) {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === "true" || normalized === "1";
+}
+
 export async function GET() {
   // Debug: Log environment variables to diagnose Railway configuration
   const nextPublicVars = Object.keys(process.env).filter((key) =>
@@ -45,16 +54,23 @@ export async function GET() {
     process.env.ELECTRIC_SOURCE_SECRET ||
     "";
 
+  const enableFolderSourcesSync = parseBooleanFlag(
+    process.env.NEXT_PUBLIC_ENABLE_FOLDER_SOURCES_SYNC ??
+      process.env.ENABLE_FOLDER_SOURCES_SYNC
+  );
+
   const config = {
     electricUrl,
     electricSourceId,
     electricSecret,
+    enableFolderSourcesSync,
   };
 
   logger.info("server.api", "Serving runtime config", {
     electricUrl: config.electricUrl,
     hasSourceId: !!config.electricSourceId,
     hasSecret: !!config.electricSecret,
+    folderSourcesSyncEnabled: config.enableFolderSourcesSync,
   });
 
   return NextResponse.json(config);

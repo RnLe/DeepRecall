@@ -6,7 +6,7 @@
 "use client";
 
 import { logger } from "@deeprecall/telemetry";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
@@ -46,6 +46,29 @@ export default function AnnotationDetailPage() {
   const [notes, setNotes] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadAnnotation = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const ann = await getAnnotation(annotationId);
+      if (!ann) {
+        setError("Annotation not found");
+        return;
+      }
+
+      const annNotes = await getAnnotationAssets(annotationId);
+
+      setAnnotation(ann);
+      setNotes(annNotes);
+    } catch (err) {
+      logger.error("ui", "Failed to load annotation:", err);
+      setError("Failed to load annotation");
+    } finally {
+      setLoading(false);
+    }
+  }, [annotationId]);
 
   // ============================================================================
   // Platform-specific Operations
@@ -184,30 +207,7 @@ export default function AnnotationDetailPage() {
 
   useEffect(() => {
     loadAnnotation();
-  }, [annotationId]);
-
-  const loadAnnotation = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const ann = await getAnnotation(annotationId);
-      if (!ann) {
-        setError("Annotation not found");
-        return;
-      }
-
-      const annNotes = await getAnnotationAssets(annotationId);
-
-      setAnnotation(ann);
-      setNotes(annNotes);
-    } catch (err) {
-      logger.error("ui", "Failed to load annotation:", err);
-      setError("Failed to load annotation");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadAnnotation]);
 
   const handleNotesChange = async () => {
     // Reload notes when they change

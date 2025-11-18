@@ -24,6 +24,7 @@ import {
   useWorksSync,
   useBoardsSync,
   useStrokesSync,
+  setFolderSourcesRemoteEnqueueEnabled,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 import { DevToolsShortcut } from "./components/DevToolsShortcut";
@@ -52,6 +53,16 @@ initializeDeviceId().catch((error) => {
   logger.error("sync.coordination", "Failed to initialize device ID", {
     error,
   });
+});
+
+const folderSourcesSyncEnabled =
+  (import.meta.env.VITE_ENABLE_FOLDER_SOURCES_SYNC || "")
+    .toString()
+    .trim()
+    .toLowerCase() === "true";
+setFolderSourcesRemoteEnqueueEnabled(folderSourcesSyncEnabled);
+logger.info("sync.coordination", "Desktop folder sources remote enqueue", {
+  enabled: folderSourcesSyncEnabled,
 });
 
 /**

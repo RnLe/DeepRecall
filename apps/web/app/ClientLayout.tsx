@@ -2,6 +2,7 @@
 
 import { Providers } from "./providers";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { GPUIndicator } from "./components/GPUIndicator";
 import { ElectricIndicator } from "./components/ElectricIndicator";
@@ -25,7 +26,14 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 href="/"
                 className="font-bold text-xl flex items-center gap-2"
               >
-                <img src="/favicon.ico" alt="" className="w-8 h-8" />
+                <Image
+                  src="/favicon.ico"
+                  alt="DeepRecall icon"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8"
+                  priority
+                />
                 DeepRecall
               </Link>
               <div className="flex gap-4 text-sm">

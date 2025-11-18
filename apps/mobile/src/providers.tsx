@@ -32,6 +32,7 @@ import {
   useBoardsSync,
   useStrokesSync,
   initializeDeviceId,
+  setFolderSourcesRemoteEnqueueEnabled,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
 import { logger } from "@deeprecall/telemetry";
@@ -59,6 +60,16 @@ initializeDeviceId().catch((err) =>
     error: err,
   })
 );
+
+const mobileFolderSourcesFlag =
+  (import.meta.env.VITE_ENABLE_FOLDER_SOURCES_SYNC || "")
+    .toString()
+    .trim()
+    .toLowerCase() === "true";
+setFolderSourcesRemoteEnqueueEnabled(mobileFolderSourcesFlag);
+logger.info("sync.coordination", "Mobile folder sources remote enqueue", {
+  enabled: mobileFolderSourcesFlag,
+});
 
 /**
  * AuthStateManager: Syncs mobile session with global auth state

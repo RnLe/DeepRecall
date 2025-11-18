@@ -1,8 +1,9 @@
 "use client";
 
 import { useSession } from "@/src/auth/client";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Check, Link as LinkIcon, Unlink, User } from "lucide-react";
 
 interface LinkedIdentity {
@@ -46,17 +47,9 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState("");
   const [settingsJson, setSettingsJson] = useState("");
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-    } else if (status === "authenticated") {
-      fetchProfile();
-      fetchSettings();
-    }
-  }, [status]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
+      setLoading(true);
       const res = await fetch("/api/profile");
       if (res.ok) {
         const data = await res.json();
@@ -68,9 +61,9 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const res = await fetch("/api/profile/settings");
       if (res.ok) {
@@ -81,7 +74,16 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Failed to fetch settings:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+    } else if (status === "authenticated") {
+      fetchProfile();
+      fetchSettings();
+    }
+  }, [status, router, fetchProfile, fetchSettings]);
 
   const updateProfile = async () => {
     setSaving(true);
@@ -242,12 +244,15 @@ export default function ProfilePage() {
 
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <div className="h-20 w-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
+                <div className="h-20 w-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden relative">
                   {profile.user.avatarUrl ? (
-                    <img
+                    <Image
                       src={profile.user.avatarUrl}
                       alt="Avatar"
-                      className="h-full w-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="80px"
+                      unoptimized
                     />
                   ) : (
                     <User className="h-10 w-10 text-gray-400" />
@@ -319,12 +324,15 @@ export default function ProfilePage() {
                   className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
+                    <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden relative">
                       {identity.avatarUrl ? (
-                        <img
+                        <Image
                           src={identity.avatarUrl}
                           alt="Avatar"
-                          className="h-full w-full object-cover"
+                          fill
+                          className="object-cover"
+                          sizes="40px"
+                          unoptimized
                         />
                       ) : (
                         <span className="text-sm font-medium">
