@@ -1,9 +1,9 @@
 /**
  * API Configuration for Mobile App
  *
- * Automatically detects environment and uses appropriate API URL:
- * - Development (pnpm run dev:mobile): http://localhost:3000
- * - Production (iOS device): Railway URL from env
+ * Automatically resolves the API base URL for all environments.
+ * Development builds now talk to the same deployed API as production to avoid
+ * local Next.js dependencies. Configure via VITE_API_BASE_URL.
  *
  * Usage:
  * ```ts
@@ -19,19 +19,20 @@
  * @returns API base URL without trailing slash
  */
 export function getApiBaseUrl(): string {
-  // In development mode (pnpm run dev:mobile), use Vite proxy
-  // The proxy forwards /api requests to localhost:3000
-  if (import.meta.env.DEV) {
-    return ""; // Empty string means same-origin (Vite dev server with proxy)
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
   }
 
-  // In production mode (built iOS app), use configured URL
-  // Falls back to localhost if not set (though this won't work on physical device)
-  const configuredUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+  const fallback = "https://deeprecall-production.up.railway.app";
 
-  // Remove trailing slash if present
-  return configuredUrl.replace(/\/$/, "");
+  if (import.meta.env.DEV) {
+    console.warn(
+      "[config.api] VITE_API_BASE_URL is not set; falling back to production domain"
+    );
+  }
+
+  return fallback;
 }
 
 /**

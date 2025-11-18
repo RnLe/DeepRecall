@@ -462,10 +462,11 @@ export async function POST(request: NextRequest) {
   try {
     userContext = await requireAuth(request);
   } catch (error) {
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "Authentication required" },
       { status: 401 }
     );
+    return addCorsHeaders(response, request);
   }
 
   const { getPostgresPool } = await import("@/app/api/lib/postgres");

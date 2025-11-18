@@ -12,12 +12,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/app/api/lib/auth-helpers";
 import { getPostgresPool } from "@/app/api/lib/postgres";
+import {
+  addCorsHeaders,
+  checkCorsOrigin,
+  handleCorsOptions,
+} from "@/app/api/lib/cors";
 import { logger } from "@deeprecall/telemetry";
 
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsOptions(req);
+}
+
 export async function GET(req: NextRequest) {
+  const corsError = checkCorsOrigin(req);
+  if (corsError) {
+    return corsError;
+  }
+
+  let userContext;
   try {
-    // Get authenticated user context
-    const userContext = await requireAuth(req);
+    userContext = await requireAuth(req);
+  } catch (error) {
+    const response = NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 }
+    );
+    return addCorsHeaders(response, req);
+  }
+
+  try {
     const userId = userContext.userId;
     const pool = getPostgresPool();
 
@@ -67,15 +90,17 @@ export async function GET(req: NextRequest) {
       ...status,
     });
 
-    return NextResponse.json(status);
+    const response = NextResponse.json(status);
+    return addCorsHeaders(response, req);
   } catch (error) {
     logger.error("auth", "Failed to check user status", {
       error: error instanceof Error ? error.message : String(error),
     });
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "Failed to check account status" },
       { status: 500 }
     );
+    return addCorsHeaders(response, req);
   }
 }

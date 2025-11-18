@@ -315,9 +315,26 @@ function ElectricInitializer() {
           count: changes.length,
         });
         try {
+          const { secureStore } = await import("./auth/secure-store");
+          const token = await secureStore.getAppJWT();
+
+          if (!token) {
+            logger.warn("sync.writeBuffer", "No app JWT found, skipping flush");
+            return {
+              applied: [],
+              errors: changes.map((c) => ({
+                id: c.id,
+                error: "Missing authentication token",
+              })),
+            };
+          }
+
           const response = await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
             body: JSON.stringify({ changes }),
           });
 
