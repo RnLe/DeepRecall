@@ -12,8 +12,8 @@ import { handleCorsOptions, addCorsHeaders } from "@/app/api/lib/cors";
 import { requireAuth } from "@/app/api/lib/auth-helpers";
 import { logger } from "@deeprecall/telemetry";
 import { ExerciseTemplateUpdateSchema } from "@deeprecall/dojo-core";
-import { exerciseTemplateToDomain } from "@deeprecall/dojo-data";
-import type { DojoExerciseTemplateRow } from "@deeprecall/dojo-data";
+import { exerciseTemplateToDomain } from "@deeprecall/dojo-data/mappers";
+import type { DojoExerciseTemplateRow } from "@deeprecall/dojo-data/types";
 
 const pool = createPostgresPool();
 

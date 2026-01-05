@@ -28,7 +28,7 @@ import {
   subtaskAttemptToDomain,
   exerciseBrickToDomain,
   conceptBrickToDomain,
-} from "@deeprecall/dojo-data";
+} from "@deeprecall/dojo-data/mappers";
 import type {
   DojoExerciseAttemptRow,
   DojoSubtaskAttemptRow,
@@ -36,7 +36,7 @@ import type {
   DojoConceptBrickRow,
   DojoExerciseTemplateRow,
   DbBrickMastery,
-} from "@deeprecall/dojo-data";
+} from "@deeprecall/dojo-data/types";
 
 const pool = createPostgresPool();
 

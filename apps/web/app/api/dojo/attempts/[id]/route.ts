@@ -20,11 +20,11 @@ import {
   exerciseAttemptToDomain,
   subtaskAttemptToDomain,
   subtaskAttemptToRow,
-} from "@deeprecall/dojo-data";
+} from "@deeprecall/dojo-data/mappers";
 import type {
   DojoExerciseAttemptRow,
   DojoSubtaskAttemptRow,
-} from "@deeprecall/dojo-data";
+} from "@deeprecall/dojo-data/types";
 
 const pool = createPostgresPool();
 

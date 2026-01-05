@@ -12,8 +12,8 @@ import { handleCorsOptions, addCorsHeaders } from "@/app/api/lib/cors";
 import { requireAuth } from "@/app/api/lib/auth-helpers";
 import { logger } from "@deeprecall/telemetry";
 import { ConceptNodeUpdateSchema } from "@deeprecall/dojo-core";
-import { conceptNodeToDomain } from "@deeprecall/dojo-data";
-import type { DojoConceptNodeRow } from "@deeprecall/dojo-data";
+import { conceptNodeToDomain } from "@deeprecall/dojo-data/mappers";
+import type { DojoConceptNodeRow } from "@deeprecall/dojo-data/types";
 
 const pool = createPostgresPool();
 

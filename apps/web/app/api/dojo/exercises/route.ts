@@ -20,8 +20,8 @@ import {
 import {
   exerciseTemplateToDomain,
   exerciseTemplateToRow,
-} from "@deeprecall/dojo-data";
-import type { DojoExerciseTemplateRow } from "@deeprecall/dojo-data";
+} from "@deeprecall/dojo-data/mappers";
+import type { DojoExerciseTemplateRow } from "@deeprecall/dojo-data/types";
 
 const pool = createPostgresPool();
 

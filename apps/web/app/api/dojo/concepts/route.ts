@@ -15,8 +15,11 @@ import {
   asConceptNodeId,
   generateSlug,
 } from "@deeprecall/dojo-core";
-import { conceptNodeToDomain, conceptNodeToRow } from "@deeprecall/dojo-data";
-import type { DojoConceptNodeRow } from "@deeprecall/dojo-data";
+import {
+  conceptNodeToDomain,
+  conceptNodeToRow,
+} from "@deeprecall/dojo-data/mappers";
+import type { DojoConceptNodeRow } from "@deeprecall/dojo-data/types";
 
 const pool = createPostgresPool();
 

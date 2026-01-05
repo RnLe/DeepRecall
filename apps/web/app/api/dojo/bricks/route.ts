@@ -13,11 +13,11 @@ import { logger } from "@deeprecall/telemetry";
 import {
   conceptBrickToDomain,
   exerciseBrickToDomain,
-} from "@deeprecall/dojo-data";
+} from "@deeprecall/dojo-data/mappers";
 import type {
   DojoConceptBrickRow,
   DojoExerciseBrickRow,
-} from "@deeprecall/dojo-data";
+} from "@deeprecall/dojo-data/types";
 
 const pool = createPostgresPool();
 
