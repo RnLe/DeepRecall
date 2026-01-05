@@ -4,72 +4,56 @@
 >
 > **Date Generated**: January 5, 2026
 >
-> **Status**: 🟡 **ALMOST READY** — Git history cleaned, force push required
+> **Status**: 🟢 **READY TO PUBLISH**
 
 ---
 
 ## Executive Summary
 
-| Category      | Risk Level | Status                                                 |
-| ------------- | ---------- | ------------------------------------------------------ |
-| Git History   | 🟢 DONE    | Secrets removed via git-filter-repo                    |
-| Source Code   | 🟡 MEDIUM  | OAuth client IDs hardcoded (public but identifies you) |
-| Documentation | 🟢 DONE    | Placeholders applied by git-filter-repo                |
-| .env Files    | 🟢 LOW     | Properly gitignored (not tracked)                      |
-| Certificates  | 🟢 LOW     | Properly gitignored (not tracked)                      |
+| Category       | Status   | Notes                                      |
+| -------------- | -------- | ------------------------------------------ |
+| Git History    | 🟢 DONE  | Secrets removed via git-filter-repo        |
+| Source Code    | 🟢 OK    | OAuth client IDs are public by design      |
+| Documentation  | 🟢 DONE  | Placeholders applied by git-filter-repo    |
+| .env Files     | 🟢 SAFE  | Properly gitignored (not tracked)          |
+| Certificates   | 🟢 SAFE  | Properly gitignored (not tracked)          |
 
 ---
 
 ## ✅ COMPLETED: Git History Cleanup
 
-The following secrets were removed from all git history:
-
 - [x] Neon database password → replaced with `REDACTED`
 - [x] ElectricSQL JWT secret → replaced with `<your-electric-source-secret>`
+- [x] Force pushed cleaned history to GitHub
 
 **Backup location**: `~/DeepRecall-backup-20260105-150456`
 
 ---
 
-## 🚀 REMAINING: Force Push to GitHub
+## ✅ OAuth Client IDs (Kept As-Is)
 
-Run this command to update GitHub with the cleaned history:
+OAuth Client IDs are **public by design** — they cannot access data without user consent and are standard practice in open-source apps.
 
-\`\`\`bash
-cd /home/renlephy/DeepRecall
-git push origin main --force-with-lease
-\`\`\`
-
-⚠️ **Warning**: This rewrites remote history. Anyone who cloned the repo will need to re-clone.
-
----
-
-## 🟡 OPTIONAL: OAuth Client IDs in Source Code
-
-OAuth Client IDs are **public by design** (embedded in apps), but they identify your Google Cloud/GitHub accounts:
-
-| Location                             | Client ID                                       | Type           |
-| ------------------------------------ | ----------------------------------------------- | -------------- |
-| \`apps/mobile/src/auth/google.ts\`     | \`193717154963-uvolmq1rfotinfg6g9se6p9ae5ur9q09\` | iOS            |
-| \`apps/mobile/ios/App/App/Info.plist\` | Same                                            | iOS URL Scheme |
-| \`apps/desktop/.env.example\`          | \`193717154963-t1idfsda9tt92ngbm4n9mcvbr73ktbpa\` | Desktop        |
-| \`apps/mobile/src/auth/github.ts\`     | \`Ov23lii9PjHnRsAhhP3S\`                          | GitHub Device  |
-
-**Decision**: Keep as-is (normal for OAuth) or replace with placeholders (requires setup instructions).
+| Location                               | Purpose        |
+| -------------------------------------- | -------------- |
+| `apps/mobile/src/auth/google.ts`       | iOS OAuth      |
+| `apps/mobile/ios/App/App/Info.plist`   | iOS URL Scheme |
+| `apps/desktop/.env.example`            | Desktop OAuth  |
+| `apps/mobile/src/auth/github.ts`       | GitHub Device  |
 
 ---
 
-## 🟢 Verified Safe
+## ✅ Verified Safe
 
-### Gitignored Files (NOT tracked)
+### Gitignored Files (NOT in repository)
 
-- \`apps/web/.env.local\` ✅
-- \`apps/mobile/.env.local\` ✅
-- \`apps/desktop/.env.local\` ✅
-- \`apps/mobile/AuthKey_*.p8\` ✅
-- \`apps/mobile/certificates/*.key|.pem|.p12|.cer|.mobileprovision\` ✅
+- `apps/web/.env.local` ✅
+- `apps/mobile/.env.local` ✅
+- `apps/desktop/.env.local` ✅
+- `apps/mobile/AuthKey_*.p8` ✅
+- `apps/mobile/certificates/*` ✅
 
-### External Services (Unaffected by git changes)
+### External Services (Unaffected)
 
 - Railway environment variables ✅
 - Neon database credentials ✅
@@ -77,12 +61,13 @@ OAuth Client IDs are **public by design** (embedded in apps), but they identify 
 
 ---
 
-## Post-Publication Checklist
+## Final Checklist
 
-- [ ] Force push cleaned history to GitHub
-- [ ] Make repository public
+- [x] Backup repository
+- [x] Run git-filter-repo to remove secrets
+- [x] Force push cleaned history to GitHub
+- [ ] **Make repository public** ← You are here
 - [ ] Verify Railway deployment still works
-- [ ] (Optional) Add \`CONTRIBUTING.md\` with setup instructions
 
 ---
 
