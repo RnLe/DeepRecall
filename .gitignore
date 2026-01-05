@@ -11,4 +11,6 @@
 # Database files
 apps/**/data/
 /blobs/
+/data/
 **/dist/
+catalog.db

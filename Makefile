@@ -61,9 +61,6 @@ clean:
 	sudo rm -rf node_modules
 	sudo rm -rf .pnpm-store
 	sudo rm -f pnpm-lock.yaml
-	@echo "Cleaning python..."
-	sudo rm -rf python/__pycache__
-	sudo rm -rf python/**/__pycache__
 	@echo "Cleaning any node_modules..."
 	sudo rm -rf **/node_modules
 	@echo "Cleaning any Rust build files..."
