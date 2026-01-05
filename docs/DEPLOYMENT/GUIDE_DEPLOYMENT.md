@@ -1,6 +1,6 @@
 # Deployment Guide
 
-**Last Updated**: November 2025  
+**Last Updated**: November 2025 
 **Status**: Production-ready for Web + Mobile, Desktop releases manually
 
 This guide provides a high-level overview of deploying DeepRecall across all platforms. For platform-specific details, see the individual guides.
@@ -22,14 +22,14 @@ This guide provides a high-level overview of deploying DeepRecall across all pla
 DeepRecall uses a **multi-platform architecture** with shared cloud infrastructure:
 
 ```
-┌─────────────┐         ┌──────────────────┐         ┌─────────────┐
-│   Clients   │────────▶│   Railway Web    │────────▶│  Postgres   │
-│ Web/Desktop │         │    (Next.js)     │         │   (Neon)    │
-│   Mobile    │         └──────────────────┘         └─────────────┘
-└─────────────┘                                              ▲
-      │                                                      │
-      └──────────────────▶ Electric Cloud ◀──────────────────┘
-                          (Real-time Sync)
+┌─────────────┐ ┌──────────────────┐ ┌─────────────┐
+│ Clients │────────▶│ Railway Web │────────▶│ Postgres │
+│ Web/Desktop │ │ (Next.js) │ │ (Neon) │
+│ Mobile │ └──────────────────┘ └─────────────┘
+└─────────────┘ ▲
+ │ │
+ └──────────────────▶ Electric Cloud ◀──────────────────┘
+ (Real-time Sync)
 ```
 
 **Data Flow**:
@@ -41,11 +41,11 @@ DeepRecall uses a **multi-platform architecture** with shared cloud infrastructu
 
 ## Deployment Matrix
 
-| Platform    | Method         | Trigger        | Deploy Time | Status         |
+| Platform | Method | Trigger | Deploy Time | Status |
 | ----------- | -------------- | -------------- | ----------- | -------------- |
-| **Web**     | Railway auto   | Push to `main` | ~5 min      | ✅ Production  |
-| **Mobile**  | GitHub Actions | Manual/Push    | ~15 min     | ✅ TestFlight  |
-| **Desktop** | Manual release | Tag push       | ~10 min     | 🟡 Manual only |
+| **Web** | Railway auto | Push to `main` | ~5 min | ✅ Production |
+| **Mobile** | GitHub Actions | Manual/Push | ~15 min | ✅ TestFlight |
+| **Desktop** | Manual release | Tag push | ~10 min | Manual only |
 
 ---
 
@@ -53,8 +53,8 @@ DeepRecall uses a **multi-platform architecture** with shared cloud infrastructu
 
 ### 1. Postgres Database (Neon)
 
-**Provider**: [Neon](https://neon.tech)  
-**Plan**: Free tier (upgrade as needed)  
+**Provider**: [Neon](https://neon.tech) 
+**Plan**: Free tier (upgrade as needed) 
 **Purpose**: Source of truth for all data
 
 **Connection Details**:
@@ -70,8 +70,8 @@ DeepRecall uses a **multi-platform architecture** with shared cloud infrastructu
 
 ### 2. Electric Cloud (Real-time Sync)
 
-**Provider**: [Electric SQL Cloud](https://electric-sql.com)  
-**Plan**: Beta (free)  
+**Provider**: [Electric SQL Cloud](https://electric-sql.com) 
+**Plan**: Beta (free) 
 **Purpose**: Real-time Postgres replication to all clients
 
 **Configuration**:
@@ -84,19 +84,19 @@ VITE_ELECTRIC_SOURCE_SECRET=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 
 > Always include `/api/electric/v1/shape` so all clients stay behind the Next.js proxy when talking to Electric Cloud.
 
-**Auth Method**: Query parameters (`source_id` + `secret` in URL)  
+**Auth Method**: Query parameters (`source_id` + `secret` in URL) 
 **Sync Mode**: Polling (10s interval) - more reliable than SSE for cloud setup
 
 ---
 
 ### 3. Railway (Web Backend)
 
-**Provider**: [Railway](https://railway.app)  
-**Plan**: Hobby/Pro  
+**Provider**: [Railway](https://railway.app) 
+**Plan**: Hobby/Pro 
 **Purpose**: Next.js backend for web UI + API gateway for mobile writes
 
-**Auto-Deploy**: On push to `main` branch  
-**Build**: Defined in `apps/web/railway.json`  
+**Auto-Deploy**: On push to `main` branch 
+**Build**: Defined in `apps/web/railway.json` 
 **URL**: `https://deeprecall-production.up.railway.app`
 
 ---
@@ -123,17 +123,17 @@ Platform-specific:
 
 1. **Set Railway environment variables** (one-time):
 
-   ```bash
-   DATABASE_URL=<neon-postgres-url>
-   NEXT_PUBLIC_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
-   NEXT_PUBLIC_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
-   NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET=<your-secret>
-   ```
+ ```bash
+ DATABASE_URL=<neon-postgres-url>
+ NEXT_PUBLIC_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
+ NEXT_PUBLIC_ELECTRIC_SOURCE_ID=7efa2a2d-20ad-472b-b2bd-4a6110c26d5c
+ NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET=<your-secret>
+ ```
 
 2. **Deploy**:
-   ```bash
-   git push origin main
-   ```
+ ```bash
+ git push origin main
+ ```
 
 That's it! Railway auto-deploys. See [GUIDE_DEPLOY_WEB.md](./GUIDE_DEPLOY_WEB.md) for details.
 
@@ -142,14 +142,14 @@ That's it! Railway auto-deploys. See [GUIDE_DEPLOY_WEB.md](./GUIDE_DEPLOY_WEB.md
 ### Deploy Mobile (15 minutes first time, 5 minutes after)
 
 1. **Set GitHub secrets** (one-time):
-   - `VITE_ELECTRIC_URL`, `VITE_ELECTRIC_SOURCE_ID`, `VITE_ELECTRIC_SOURCE_SECRET`
-   - `VITE_API_BASE_URL` (Railway URL)
-   - `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_CONTENT` (Apple credentials)
-   - `MATCH_GIT_SSH_PRIVATE_KEY`, `P12_PASSWORD` (code signing)
+ - `VITE_ELECTRIC_URL`, `VITE_ELECTRIC_SOURCE_ID`, `VITE_ELECTRIC_SOURCE_SECRET`
+ - `VITE_API_BASE_URL` (Railway URL)
+ - `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_CONTENT` (Apple credentials)
+ - `MATCH_GIT_SSH_PRIVATE_KEY`, `P12_PASSWORD` (code signing)
 
 2. **Deploy**:
-   - Go to GitHub Actions → "iOS → TestFlight" → Run workflow
-   - Or push to `main` (if workflow configured for auto-trigger)
+ - Go to GitHub Actions → "iOS → TestFlight" → Run workflow
+ - Or push to `main` (if workflow configured for auto-trigger)
 
 See [GUIDE_DEPLOY_MOBILE.md](./GUIDE_DEPLOY_MOBILE.md) for full setup.
 
@@ -161,7 +161,7 @@ Desktop releases are currently **manual**. Build locally and distribute:
 
 ```bash
 cd apps/desktop
-pnpm run build  # Creates installer in src-tauri/target/release/bundle/
+pnpm run build # Creates installer in src-tauri/target/release/bundle/
 ```
 
 See [GUIDE_DEPLOY_DESKTOP.md](./GUIDE_DEPLOY_DESKTOP.md) for code signing and distribution.
@@ -172,51 +172,51 @@ See [GUIDE_DEPLOY_DESKTOP.md](./GUIDE_DEPLOY_DESKTOP.md) for code signing and di
 
 ### Web (Railway)
 
-| Variable                             | Value                                   | Required |
+| Variable | Value | Required |
 | ------------------------------------ | --------------------------------------- | -------- |
-| `DATABASE_URL`                       | Neon Postgres connection string         | ✅       |
-| `NEXT_PUBLIC_ELECTRIC_URL`           | Electric Cloud shape endpoint           | ✅       |
-| `NEXT_PUBLIC_ELECTRIC_SOURCE_ID`     | Electric source ID                      | ✅       |
-| `NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET` | Electric source secret                  | ✅       |
-| `NEXTAUTH_URL`                       | Production domain                       | ✅       |
-| `AUTH_SECRET`                        | NextAuth secret (generate with openssl) | ✅       |
-| `AUTH_GOOGLE_ID`                     | Google OAuth client ID                  | 🟡       |
-| `AUTH_GOOGLE_SECRET`                 | Google OAuth secret                     | 🟡       |
-| `AUTH_GITHUB_ID`                     | GitHub OAuth client ID                  | 🟡       |
-| `AUTH_GITHUB_SECRET`                 | GitHub OAuth secret                     | 🟡       |
+| `DATABASE_URL` | Neon Postgres connection string | ✅ |
+| `NEXT_PUBLIC_ELECTRIC_URL` | Electric Cloud shape endpoint | ✅ |
+| `NEXT_PUBLIC_ELECTRIC_SOURCE_ID` | Electric source ID | ✅ |
+| `NEXT_PUBLIC_ELECTRIC_SOURCE_SECRET` | Electric source secret | ✅ |
+| `NEXTAUTH_URL` | Production domain | ✅ |
+| `AUTH_SECRET` | NextAuth secret (generate with openssl) | ✅ |
+| `AUTH_GOOGLE_ID` | Google OAuth client ID | |
+| `AUTH_GOOGLE_SECRET` | Google OAuth secret | |
+| `AUTH_GITHUB_ID` | GitHub OAuth client ID | |
+| `AUTH_GITHUB_SECRET` | GitHub OAuth secret | |
 
 ---
 
 ### Mobile (GitHub Secrets)
 
-| Secret                        | Value                         | Required |
+| Secret | Value | Required |
 | ----------------------------- | ----------------------------- | -------- |
-| `VITE_ELECTRIC_URL`           | Electric Cloud shape endpoint | ✅       |
-| `VITE_ELECTRIC_SOURCE_ID`     | Electric source ID            | ✅       |
-| `VITE_ELECTRIC_SOURCE_SECRET` | Electric source secret        | ✅       |
-| `VITE_API_BASE_URL`           | Railway web app URL           | ✅       |
-| `ASC_KEY_ID`                  | App Store Connect key ID      | ✅       |
-| `ASC_ISSUER_ID`               | App Store Connect issuer ID   | ✅       |
-| `ASC_KEY_CONTENT`             | App Store Connect API key     | ✅       |
-| `MATCH_GIT_SSH_PRIVATE_KEY`   | SSH key for certificates repo | ✅       |
-| `P12_PASSWORD`                | Certificate password          | ✅       |
+| `VITE_ELECTRIC_URL` | Electric Cloud shape endpoint | ✅ |
+| `VITE_ELECTRIC_SOURCE_ID` | Electric source ID | ✅ |
+| `VITE_ELECTRIC_SOURCE_SECRET` | Electric source secret | ✅ |
+| `VITE_API_BASE_URL` | Railway web app URL | ✅ |
+| `ASC_KEY_ID` | App Store Connect key ID | ✅ |
+| `ASC_ISSUER_ID` | App Store Connect issuer ID | ✅ |
+| `ASC_KEY_CONTENT` | App Store Connect API key | ✅ |
+| `MATCH_GIT_SSH_PRIVATE_KEY` | SSH key for certificates repo | ✅ |
+| `P12_PASSWORD` | Certificate password | ✅ |
 
 ---
 
 ### Desktop (Local .env.local)
 
-| Variable                            | Value                         | Required |
+| Variable | Value | Required |
 | ----------------------------------- | ----------------------------- | -------- |
-| `VITE_POSTGRES_HOST`                | Neon Postgres host            | ✅       |
-| `VITE_POSTGRES_DB`                  | Database name                 | ✅       |
-| `VITE_POSTGRES_USER`                | Database user                 | ✅       |
-| `VITE_POSTGRES_PASSWORD`            | Database password             | ✅       |
-| `VITE_ELECTRIC_URL`                 | Electric Cloud shape endpoint | ✅       |
-| `VITE_ELECTRIC_SOURCE_ID`           | Electric source ID            | ✅       |
-| `VITE_ELECTRIC_SOURCE_SECRET`       | Electric source secret        | ✅       |
-| `VITE_GOOGLE_DESKTOP_CLIENT_ID`     | Google OAuth desktop client   | 🟡       |
-| `VITE_GOOGLE_DESKTOP_CLIENT_SECRET` | Google OAuth secret           | 🟡       |
-| `VITE_GITHUB_DESKTOP_CLIENT_ID`     | GitHub OAuth client           | 🟡       |
+| `VITE_POSTGRES_HOST` | Neon Postgres host | ✅ |
+| `VITE_POSTGRES_DB` | Database name | ✅ |
+| `VITE_POSTGRES_USER` | Database user | ✅ |
+| `VITE_POSTGRES_PASSWORD` | Database password | ✅ |
+| `VITE_ELECTRIC_URL` | Electric Cloud shape endpoint | ✅ |
+| `VITE_ELECTRIC_SOURCE_ID` | Electric source ID | ✅ |
+| `VITE_ELECTRIC_SOURCE_SECRET` | Electric source secret | ✅ |
+| `VITE_GOOGLE_DESKTOP_CLIENT_ID` | Google OAuth desktop client | |
+| `VITE_GOOGLE_DESKTOP_CLIENT_SECRET` | Google OAuth secret | |
+| `VITE_GITHUB_DESKTOP_CLIENT_ID` | GitHub OAuth client | |
 
 ---
 

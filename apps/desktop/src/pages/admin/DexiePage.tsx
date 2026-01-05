@@ -17,6 +17,8 @@ const DEXIE_TABLES = [
   { key: "presets_local", label: "Presets (Local)" },
   { key: "authors", label: "Authors (Synced)" },
   { key: "authors_local", label: "Authors (Local)" },
+  { key: "folderSources", label: "Folder Sources (Synced)" },
+  { key: "folderSources_local", label: "Folder Sources (Local)" },
   { key: "annotations", label: "Annotations (Synced)" },
   { key: "annotations_local", label: "Annotations (Local)" },
   { key: "cards", label: "Cards (Synced)" },

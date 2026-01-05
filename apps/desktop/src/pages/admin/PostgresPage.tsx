@@ -9,6 +9,7 @@ const POSTGRES_TABLES = [
   { key: "activities", label: "Activities" },
   { key: "collections", label: "Collections" },
   { key: "edges", label: "Edges" },
+  { key: "folder_sources", label: "Folder Sources" },
   { key: "presets", label: "Presets" },
   { key: "authors", label: "Authors" },
   { key: "annotations", label: "Annotations" },

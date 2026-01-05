@@ -27,8 +27,8 @@ logger.info("db.local", "Transaction committed", { writes: 5, durationMs: 12 });
 
 // Debug level (detailed diagnostics)
 logger.debug("sync.electric", "Shape data received", {
-  rows: 150,
-  bytes: 45000,
+ rows: 150,
+ bytes: 45000,
 });
 
 // Warning level (recoverable issues)
@@ -36,8 +36,8 @@ logger.warn("network", "Request retry", { attempt: 2, maxRetries: 5 });
 
 // Error level (failures)
 logger.error("server.api", "Database query failed", {
-  error: error.message,
-  query: "SELECT * FROM works",
+ error: error.message,
+ query: "SELECT * FROM works",
 });
 ```
 
@@ -55,37 +55,37 @@ Features: Filter by level/domain, search, export to JSONL/JSON, auto-refresh
 
 Logs are categorized by domain for filtering and analysis:
 
-| Domain              | Description                                     |
+| Domain | Description |
 | ------------------- | ----------------------------------------------- |
-| `db.local`          | Dexie operations (transactions, reads, writes)  |
-| `db.postgres`       | PostgreSQL operations (server-side)             |
-| `sync.writeBuffer`  | Write buffer operations (enqueue, flush, retry) |
-| `sync.electric`     | Electric shape subscriptions and sync           |
-| `sync.coordination` | Blob coordination between Postgres and CAS      |
-| `cas`               | Content-addressed storage operations            |
-| `blob.upload`       | Blob upload operations                          |
-| `blob.download`     | Blob download operations                        |
-| `blob.bridge`       | Blob bridging between platforms                 |
-| `server.api`        | Server-side API handlers                        |
-| `pdf`               | PDF rendering and annotation                    |
-| `ink`               | Inking/drawing operations                       |
-| `whiteboard`        | Whiteboard scene management                     |
-| `srs`               | Spaced repetition system                        |
-| `auth`              | Authentication operations                       |
-| `network`           | Network requests and retries                    |
-| `ui`                | UI interactions and errors                      |
-| `console`           | Captured `console.log/warn/error` output        |
+| `db.local` | Dexie operations (transactions, reads, writes) |
+| `db.postgres` | PostgreSQL operations (server-side) |
+| `sync.writeBuffer` | Write buffer operations (enqueue, flush, retry) |
+| `sync.electric` | Electric shape subscriptions and sync |
+| `sync.coordination` | Blob coordination between Postgres and CAS |
+| `cas` | Content-addressed storage operations |
+| `blob.upload` | Blob upload operations |
+| `blob.download` | Blob download operations |
+| `blob.bridge` | Blob bridging between platforms |
+| `server.api` | Server-side API handlers |
+| `pdf` | PDF rendering and annotation |
+| `ink` | Inking/drawing operations |
+| `whiteboard` | Whiteboard scene management |
+| `srs` | Spaced repetition system |
+| `auth` | Authentication operations |
+| `network` | Network requests and retries |
+| `ui` | UI interactions and errors |
+| `console` | Captured `console.log/warn/error` output |
 
 ---
 
 ## Log Levels
 
-| Level   | Priority | When to Use                                          |
+| Level | Priority | When to Use |
 | ------- | -------- | ---------------------------------------------------- |
-| `debug` | Lowest   | Detailed diagnostics, hot path logs (high frequency) |
-| `info`  | Normal   | Important operations (transactions, syncs, uploads)  |
-| `warn`  | Elevated | Recoverable issues (retries, conflicts, performance) |
-| `error` | Highest  | Failures (exceptions, network errors, crashes)       |
+| `debug` | Lowest | Detailed diagnostics, hot path logs (high frequency) |
+| `info` | Normal | Important operations (transactions, syncs, uploads) |
+| `warn` | Elevated | Recoverable issues (retries, conflicts, performance) |
+| `error` | Highest | Failures (exceptions, network errors, crashes) |
 
 **Console filtering**: Set minimum level to reduce noise (see Environment Variables below)
 
@@ -99,13 +99,13 @@ Logs are categorized by domain for filtering and analysis:
 # apps/web/.env.local
 
 # Console output (development only)
-NEXT_PUBLIC_ENABLE_CONSOLE_LOGS=true    # Toggle console output
-NEXT_PUBLIC_CONSOLE_LOG_LEVEL=warn      # Minimum level: debug|info|warn|error
-NEXT_PUBLIC_CONSOLE_VERBOSE=false       # Compact (default) or verbose data
-NEXT_PUBLIC_CAPTURE_CONSOLE_LOGS=true   # Mirror browser console into telemetry log viewer
+NEXT_PUBLIC_ENABLE_CONSOLE_LOGS=true # Toggle console output
+NEXT_PUBLIC_CONSOLE_LOG_LEVEL=warn # Minimum level: debug|info|warn|error
+NEXT_PUBLIC_CONSOLE_VERBOSE=false # Compact (default) or verbose data
+NEXT_PUBLIC_CAPTURE_CONSOLE_LOGS=true # Mirror browser console into telemetry log viewer
 
 # OTLP export (optional, production)
-NEXT_PUBLIC_ENABLE_OTLP=true            # Enable OTLP export
+NEXT_PUBLIC_ENABLE_OTLP=true # Enable OTLP export
 NEXT_PUBLIC_OTLP_ENDPOINT=https://opentelemetry-collector-contrib-production-700b.up.railway.app/v1/logs
 ```
 
@@ -115,13 +115,13 @@ NEXT_PUBLIC_OTLP_ENDPOINT=https://opentelemetry-collector-contrib-production-700
 # apps/desktop/.env.local or apps/mobile/.env.local
 
 # Console output (development only)
-VITE_ENABLE_CONSOLE_LOGS=true           # Toggle console output
-VITE_CONSOLE_LOG_LEVEL=warn             # Minimum level: debug|info|warn|error
-VITE_CONSOLE_VERBOSE=false              # Compact (default) or verbose data
-VITE_CAPTURE_CONSOLE_LOGS=true          # Mirror native console into telemetry log viewer
+VITE_ENABLE_CONSOLE_LOGS=true # Toggle console output
+VITE_CONSOLE_LOG_LEVEL=warn # Minimum level: debug|info|warn|error
+VITE_CONSOLE_VERBOSE=false # Compact (default) or verbose data
+VITE_CAPTURE_CONSOLE_LOGS=true # Mirror native console into telemetry log viewer
 
 # OTLP export (optional, production)
-VITE_ENABLE_OTLP=true                   # Enable OTLP export
+VITE_ENABLE_OTLP=true # Enable OTLP export
 VITE_OTLP_ENDPOINT=https://opentelemetry-collector-contrib-production-700b.up.railway.app/v1/logs
 ```
 
@@ -188,16 +188,16 @@ Completely clean console. All logs still available at `/admin/logs`.
 ```typescript
 // db.local domain
 logger.debug("db.local", "Transaction started", {
-  tables: ["works", "assets"],
+ tables: ["works", "assets"],
 });
 
 const result = await db.transaction("rw", [db.works, db.assets], async () => {
-  // ... operations
+ // ... operations
 });
 
 logger.info("db.local", "Transaction committed", {
-  writes: result.changes,
-  durationMs: Math.round(performance.now() - start),
+ writes: result.changes,
+ durationMs: Math.round(performance.now() - start),
 });
 ```
 
@@ -209,18 +209,18 @@ const start = performance.now();
 logger.debug("network", "Fetch started", { url, method: "POST" });
 
 try {
-  const response = await fetch(url, { method: "POST", body });
-  logger.debug("network", "Fetch completed", {
-    url,
-    status: response.status,
-    durationMs: Math.round(performance.now() - start),
-  });
+ const response = await fetch(url, { method: "POST", body });
+ logger.debug("network", "Fetch completed", {
+ url,
+ status: response.status,
+ durationMs: Math.round(performance.now() - start),
+ });
 } catch (error) {
-  logger.error("network", "Fetch failed", {
-    url,
-    error: error.message,
-    durationMs: Math.round(performance.now() - start),
-  });
+ logger.error("network", "Fetch failed", {
+ url,
+ error: error.message,
+ durationMs: Math.round(performance.now() - start),
+ });
 }
 ```
 
@@ -229,15 +229,15 @@ try {
 ```typescript
 // cas domain
 try {
-  const blob = await casGet(sha256);
-  logger.debug("cas", "Blob retrieved", { sha256, cached: true });
+ const blob = await casGet(sha256);
+ logger.debug("cas", "Blob retrieved", { sha256, cached: true });
 } catch (error) {
-  logger.error("cas", "Failed to fetch blob", {
-    sha256,
-    error: error.message,
-    stack: error.stack,
-  });
-  throw error;
+ logger.error("cas", "Failed to fetch blob", {
+ sha256,
+ error: error.message,
+ stack: error.stack,
+ });
+ throw error;
 }
 ```
 
@@ -246,9 +246,9 @@ try {
 ```typescript
 // sync.writeBuffer domain
 logger.debug("sync.writeBuffer", "Operation enqueued", {
-  table: "cards",
-  operation: "upsert",
-  id: cardId,
+ table: "cards",
+ operation: "upsert",
+ id: cardId,
 });
 
 // Later, during flush
@@ -257,8 +257,8 @@ logger.info("sync.writeBuffer", "Flush started", { queueDepth: 42 });
 const result = await flushToServer(batch);
 
 logger.info("sync.writeBuffer", "Flush completed", {
-  sent: batch.length,
-  durationMs: Math.round(performance.now() - start),
+ sent: batch.length,
+ durationMs: Math.round(performance.now() - start),
 });
 ```
 
@@ -272,47 +272,47 @@ All three platforms use identical initialization pattern:
 // apps/{web,desktop,mobile}/src/telemetry.ts
 import { registerSinks } from "@deeprecall/telemetry";
 import {
-  makeRingBufferSink,
-  makeConsoleSink,
-  makeOtlpHttpSink,
+ makeRingBufferSink,
+ makeConsoleSink,
+ makeOtlpHttpSink,
 } from "@deeprecall/telemetry/sinks";
 
 let ringBuffer: RingBufferSink | null = null;
 
 export function initTelemetry() {
-  if (ringBuffer) return; // Already initialized
+ if (ringBuffer) return; // Already initialized
 
-  ringBuffer = makeRingBufferSink(4000);
-  const sinks = [ringBuffer];
+ ringBuffer = makeRingBufferSink(4000);
+ const sinks = [ringBuffer];
 
-  // Dev: Add filtered console sink
-  if (isDev && enableConsoleLogs) {
-    sinks.push(
-      makeConsoleSink({
-        minLevel: consoleLevel,
-        excludeDomains: [], // Optional: exclude noisy domains
-        verbose: consoleVerbose,
-      })
-    );
-  }
+ // Dev: Add filtered console sink
+ if (isDev && enableConsoleLogs) {
+ sinks.push(
+ makeConsoleSink({
+ minLevel: consoleLevel,
+ excludeDomains: [], // Optional: exclude noisy domains
+ verbose: consoleVerbose,
+ })
+ );
+ }
 
-  // OTLP sink (optional)
-  if (enableOtlp) {
-    sinks.push(
-      makeOtlpHttpSink(endpoint, {
-        app: "deeprecall",
-        platform: "web|desktop|mobile",
-        env: "development|production",
-      })
-    );
-  }
+ // OTLP sink (optional)
+ if (enableOtlp) {
+ sinks.push(
+ makeOtlpHttpSink(endpoint, {
+ app: "deeprecall",
+ platform: "web|desktop|mobile",
+ env: "development|production",
+ })
+ );
+ }
 
-  registerSinks(...sinks);
+ registerSinks(...sinks);
 }
 
 export function getRingBuffer() {
-  if (!ringBuffer) throw new Error("Telemetry not initialized");
-  return ringBuffer;
+ if (!ringBuffer) throw new Error("Telemetry not initialized");
+ return ringBuffer;
 }
 ```
 
@@ -329,11 +329,11 @@ export function getRingBuffer() {
 
 ```
 DeepRecall Clients (Web/Desktop/Mobile)
-  ↓ OTLP/HTTP
+ ↓ OTLP/HTTP
 OpenTelemetry Collector (Railway)
-  ↓ OTLP
+ ↓ OTLP
 Loki (Railway)
-  ↑
+ ↑
 Grafana (Railway) - Query & Dashboards
 ```
 
@@ -386,7 +386,7 @@ import { TelemetryLogViewer } from "@deeprecall/ui/admin/TelemetryLogViewer";
 import { getRingBuffer } from "@/src/telemetry";
 
 export default function LogsPage() {
-  return <TelemetryLogViewer getRingBuffer={getRingBuffer} />;
+ return <TelemetryLogViewer getRingBuffer={getRingBuffer} />;
 }
 ```
 
@@ -401,13 +401,13 @@ For performance-critical hot paths (e.g., inking), use compile-time guards to el
 ```typescript
 // Define in vite.config.ts or next.config.js
 define: {
-  __LOG_INK__: JSON.stringify(true),
-  __LOG_DB_LOCAL__: JSON.stringify(true),
+ __LOG_INK__: JSON.stringify(true),
+ __LOG_DB_LOCAL__: JSON.stringify(true),
 }
 
 // Usage (dead code elimination when false)
 if (__LOG_INK__) {
-  logger.debug("ink", "Stroke point processed", { x, y, pressure });
+ logger.debug("ink", "Stroke point processed", { x, y, pressure });
 }
 ```
 
@@ -428,8 +428,8 @@ When `__LOG_INK__` is `false`, minifiers completely remove the log call and data
 
 ## Migration Status
 
-✅ **Phase 1 Complete**: Telemetry package created and integrated across all platforms  
-✅ **Phase 2 Complete**: ~989 console calls migrated across 230+ files (100% coverage)  
+✅ **Phase 1 Complete**: Telemetry package created and integrated across all platforms 
+✅ **Phase 2 Complete**: ~989 console calls migrated across 230+ files (100% coverage) 
 ✅ **Phase 3 Complete**: Modern log viewer UI with filters, stats, export
 
 **Remaining**: Add systematic domain-specific logging to critical interfaces (Electric, WriteBuffer, CAS operations)

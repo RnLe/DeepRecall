@@ -1,0 +1,38 @@
+{
+  "name": "@deeprecall/dojo-data",
+  "version": "0.1.0",
+  "description": "Data layer for Dojo module - Electric/Postgres repository implementations",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./repos": "./src/repos/index.ts",
+    "./repos/concepts": "./src/repos/concepts.electric.ts",
+    "./repos/exercises": "./src/repos/exercises.electric.ts",
+    "./repos/attempts": "./src/repos/attempts.electric.ts",
+    "./repos/sessions": "./src/repos/sessions.electric.ts",
+    "./repos/bricks": "./src/repos/bricks.electric.ts",
+    "./repos/scheduler": "./src/repos/scheduler.electric.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./mappers": "./src/mappers/index.ts",
+    "./types": "./src/types/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deeprecall/core": "workspace:*",
+    "@deeprecall/data": "workspace:*",
+    "@deeprecall/dojo-core": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
+    "@electric-sql/client": "^1.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

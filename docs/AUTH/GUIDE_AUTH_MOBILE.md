@@ -1,6 +1,6 @@
 # GUIDE: Mobile Authentication (iOS/Android)
 
-**Status**: ✅ COMPLETE (November 2025)  
+**Status**: ✅ COMPLETE (November 2025) 
 **Platform**: Capacitor (iOS primary, Android ready)
 
 ## Overview
@@ -23,20 +23,20 @@ Mobile uses **native OAuth** (no WebView cookie sharing) with offline-first capa
 
 ```
 ┌─────────────────────────────────────────┐
-│  Mobile App (Capacitor)                 │
-│  ├─ Google PKCE + custom URL scheme     │
-│  ├─ GitHub Device Code flow             │
-│  ├─ iOS Keychain / Android Keystore     │
-│  └─ Offline-first local React SPA       │
+│ Mobile App (Capacitor) │
+│ ├─ Google PKCE + custom URL scheme │
+│ ├─ GitHub Device Code flow │
+│ ├─ iOS Keychain / Android Keystore │
+│ └─ Offline-first local React SPA │
 └─────────────────────────────────────────┘
-              ↓
+ ↓
 ┌─────────────────────────────────────────┐
-│  Auth Broker (apps/web/app/api/)        │
-│  ├─ /api/auth/exchange/google           │
-│  ├─ /api/auth/exchange/github           │
-│  ├─ /api/auth/github/device-code        │
-│  ├─ /api/replication/token              │
-│  └─ CORS: capacitor://localhost         │
+│ Auth Broker (apps/web/app/api/) │
+│ ├─ /api/auth/exchange/google │
+│ ├─ /api/auth/exchange/github │
+│ ├─ /api/auth/github/device-code │
+│ ├─ /api/replication/token │
+│ └─ CORS: capacitor://localhost │
 └─────────────────────────────────────────┘
 ```
 
@@ -72,78 +72,78 @@ Mobile uses **native OAuth** (no WebView cookie sharing) with offline-first capa
 
 ```typescript
 export async function signInWithGoogle(deviceId: string) {
-  // Generate PKCE parameters
-  const { codeVerifier, codeChallenge } = await generatePKCE();
-  const state = generateState();
+ // Generate PKCE parameters
+ const { codeVerifier, codeChallenge } = await generatePKCE();
+ const state = generateState();
 
-  // Store verifier for later
-  sessionStorage.setItem("pkce_verifier", codeVerifier);
-  sessionStorage.setItem("oauth_state", state);
+ // Store verifier for later
+ sessionStorage.setItem("pkce_verifier", codeVerifier);
+ sessionStorage.setItem("oauth_state", state);
 
-  // Set up deep link listener
-  const listenerHandle = await App.addListener("appUrlOpen", async (event) => {
-    if (event.url.startsWith(REDIRECT_URI)) {
-      await Browser.close();
+ // Set up deep link listener
+ const listenerHandle = await App.addListener("appUrlOpen", async (event) => {
+ if (event.url.startsWith(REDIRECT_URI)) {
+ await Browser.close();
 
-      // Extract authorization code
-      const params = new URLSearchParams(event.url.split("?")[1]);
-      const code = params.get("code");
-      const returnedState = params.get("state");
+ // Extract authorization code
+ const params = new URLSearchParams(event.url.split("?")[1]);
+ const code = params.get("code");
+ const returnedState = params.get("state");
 
-      // Validate state
-      if (returnedState !== state) {
-        throw new Error("State mismatch");
-      }
+ // Validate state
+ if (returnedState !== state) {
+ throw new Error("State mismatch");
+ }
 
-      // Exchange code for tokens with Google
-      const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: GOOGLE_CLIENT_ID,
-          code,
-          code_verifier: codeVerifier,
-          redirect_uri: REDIRECT_URI,
-          grant_type: "authorization_code",
-        }),
-      });
+ // Exchange code for tokens with Google
+ const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
+ method: "POST",
+ headers: { "Content-Type": "application/x-www-form-urlencoded" },
+ body: new URLSearchParams({
+ client_id: GOOGLE_CLIENT_ID,
+ code,
+ code_verifier: codeVerifier,
+ redirect_uri: REDIRECT_URI,
+ grant_type: "authorization_code",
+ }),
+ });
 
-      const { id_token, refresh_token } = await tokenResponse.json();
+ const { id_token, refresh_token } = await tokenResponse.json();
 
-      // Exchange with Auth Broker
-      const brokerResponse = await fetch(
-        `${AUTH_BROKER_URL}/api/auth/exchange/google`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id_token, device_id: deviceId }),
-        }
-      );
+ // Exchange with Auth Broker
+ const brokerResponse = await fetch(
+ `${AUTH_BROKER_URL}/api/auth/exchange/google`,
+ {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ id_token, device_id: deviceId }),
+ }
+ );
 
-      const { app_jwt, user } = await brokerResponse.json();
+ const { app_jwt, user } = await brokerResponse.json();
 
-      // Save to keychain
-      await secureStore.saveAppJWT(app_jwt);
-      if (refresh_token) {
-        await secureStore.saveGoogleRefreshToken(refresh_token);
-      }
-    }
-  });
+ // Save to keychain
+ await secureStore.saveAppJWT(app_jwt);
+ if (refresh_token) {
+ await secureStore.saveGoogleRefreshToken(refresh_token);
+ }
+ }
+ });
 
-  // Open browser to Google OAuth
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams(
-    {
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      response_type: "code",
-      scope: "openid email profile",
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-      state,
-    }
-  )}`;
+ // Open browser to Google OAuth
+ const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams(
+ {
+ client_id: GOOGLE_CLIENT_ID,
+ redirect_uri: REDIRECT_URI,
+ response_type: "code",
+ scope: "openid email profile",
+ code_challenge: codeChallenge,
+ code_challenge_method: "S256",
+ state,
+ }
+ )}`;
 
-  await Browser.open({ url: authUrl });
+ await Browser.open({ url: authUrl });
 }
 ```
 
@@ -172,38 +172,38 @@ export async function signInWithGoogle(deviceId: string) {
 
 ```typescript
 export async function signInWithGitHub(deviceId: string) {
-  // Step 1: Request device code from backend proxy
-  const deviceResponse = await fetch(
-    `${AUTH_BROKER_URL}/api/auth/github/device-code`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device_id: deviceId }),
-    }
-  );
+ // Step 1: Request device code from backend proxy
+ const deviceResponse = await fetch(
+ `${AUTH_BROKER_URL}/api/auth/github/device-code`,
+ {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ device_id: deviceId }),
+ }
+ );
 
-  const { device_code, user_code, verification_uri } =
-    await deviceResponse.json();
+ const { device_code, user_code, verification_uri } =
+ await deviceResponse.json();
 
-  // Step 2: Show user code in modal (user needs to enter this in browser)
-  showDeviceCodeModal(user_code, verification_uri);
+ // Step 2: Show user code in modal (user needs to enter this in browser)
+ showDeviceCodeModal(user_code, verification_uri);
 
-  // Step 3: Open browser to verification page
-  await Browser.open({ url: verification_uri });
+ // Step 3: Open browser to verification page
+ await Browser.open({ url: verification_uri });
 
-  // Step 4: Poll backend for completion (backend polls GitHub)
-  const pollResponse = await fetch(`${AUTH_BROKER_URL}/api/auth/github/poll`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ device_code, device_id: deviceId }),
-  });
+ // Step 4: Poll backend for completion (backend polls GitHub)
+ const pollResponse = await fetch(`${AUTH_BROKER_URL}/api/auth/github/poll`, {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ device_code, device_id: deviceId }),
+ });
 
-  const { app_jwt, user } = await pollResponse.json();
+ const { app_jwt, user } = await pollResponse.json();
 
-  // Step 5: Save to keychain
-  await secureStore.saveAppJWT(app_jwt);
+ // Step 5: Save to keychain
+ await secureStore.saveAppJWT(app_jwt);
 
-  return { app_jwt, user };
+ return { app_jwt, user };
 }
 ```
 
@@ -229,27 +229,27 @@ export async function signInWithGitHub(deviceId: string) {
 import { Preferences } from "@capacitor/preferences";
 
 export const secureStore = {
-  async saveAppJWT(jwt: string): Promise<void> {
-    await Preferences.set({ key: "app_jwt", value: jwt });
-  },
+ async saveAppJWT(jwt: string): Promise<void> {
+ await Preferences.set({ key: "app_jwt", value: jwt });
+ },
 
-  async getAppJWT(): Promise<string | null> {
-    const { value } = await Preferences.get({ key: "app_jwt" });
-    return value;
-  },
+ async getAppJWT(): Promise<string | null> {
+ const { value } = await Preferences.get({ key: "app_jwt" });
+ return value;
+ },
 
-  async removeAppJWT(): Promise<void> {
-    await Preferences.remove({ key: "app_jwt" });
-  },
+ async removeAppJWT(): Promise<void> {
+ await Preferences.remove({ key: "app_jwt" });
+ },
 
-  async getOrCreateDeviceId(): Promise<string> {
-    let { value: deviceId } = await Preferences.get({ key: "device_id" });
-    if (!deviceId) {
-      deviceId = crypto.randomUUID();
-      await Preferences.set({ key: "device_id", value: deviceId });
-    }
-    return deviceId;
-  },
+ async getOrCreateDeviceId(): Promise<string> {
+ let { value: deviceId } = await Preferences.get({ key: "device_id" });
+ if (!deviceId) {
+ deviceId = crypto.randomUUID();
+ await Preferences.set({ key: "device_id", value: deviceId });
+ }
+ return deviceId;
+ },
 };
 ```
 
@@ -261,23 +261,23 @@ export const secureStore = {
 
 ```typescript
 export async function loadSession(): Promise<SessionInfo | null> {
-  const jwt = await secureStore.getAppJWT();
-  if (!jwt) return null;
+ const jwt = await secureStore.getAppJWT();
+ if (!jwt) return null;
 
-  // Check expiry
-  if (isJWTExpired(jwt)) {
-    await secureStore.removeAppJWT();
-    return null;
-  }
+ // Check expiry
+ if (isJWTExpired(jwt)) {
+ await secureStore.removeAppJWT();
+ return null;
+ }
 
-  const payload = parseJWTUnsafe(jwt);
-  return {
-    userId: payload.userId,
-    email: payload.email,
-    name: payload.name,
-    deviceId: payload.deviceId,
-    exp: payload.exp,
-  };
+ const payload = parseJWTUnsafe(jwt);
+ return {
+ userId: payload.userId,
+ email: payload.email,
+ name: payload.name,
+ deviceId: payload.deviceId,
+ exp: payload.exp,
+ };
 }
 ```
 
@@ -285,25 +285,25 @@ export async function loadSession(): Promise<SessionInfo | null> {
 
 ```typescript
 export async function clearSession(): Promise<void> {
-  // 1. Clear secure tokens
-  await secureStore.removeAppJWT();
-  await secureStore.removeGoogleRefreshToken();
+ // 1. Clear secure tokens
+ await secureStore.removeAppJWT();
+ await secureStore.removeGoogleRefreshToken();
 
-  // 2. Clear write buffer to prevent 401 errors
-  const flushWorker = getFlushWorker();
-  if (flushWorker) {
-    await flushWorker.getBuffer().clear();
-  }
+ // 2. Clear write buffer to prevent 401 errors
+ const flushWorker = getFlushWorker();
+ if (flushWorker) {
+ await flushWorker.getBuffer().clear();
+ }
 
-  // 3. Clear blob metadata from Dexie
-  await db.blobsMeta.clear();
-  await db.deviceBlobs.clear();
-  await db.replicationJobs.clear();
+ // 3. Clear blob metadata from Dexie
+ await db.blobsMeta.clear();
+ await db.deviceBlobs.clear();
+ await db.replicationJobs.clear();
 
-  // 4. Rescan CAS to repopulate for guest mode
-  const cas = new CapacitorBlobStorage();
-  const deviceId = getDeviceId();
-  await coordinateAllLocalBlobs(cas, deviceId);
+ // 4. Rescan CAS to repopulate for guest mode
+ const cas = new CapacitorBlobStorage();
+ const deviceId = getDeviceId();
+ await coordinateAllLocalBlobs(cas, deviceId);
 }
 ```
 
@@ -321,44 +321,44 @@ export async function clearSession(): Promise<void> {
 <!-- Custom URL schemes for OAuth redirects -->
 <key>CFBundleURLTypes</key>
 <array>
-  <!-- DeepRecall deep link scheme -->
-  <dict>
-    <key>CFBundleURLName</key>
-    <string>DeepRecall App</string>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <string>deeprecall</string>
-    </array>
-  </dict>
+ <!-- DeepRecall deep link scheme -->
+ <dict>
+ <key>CFBundleURLName</key>
+ <string>DeepRecall App</string>
+ <key>CFBundleURLSchemes</key>
+ <array>
+ <string>deeprecall</string>
+ </array>
+ </dict>
 
-  <!-- Google OAuth redirect scheme -->
-  <dict>
-    <key>CFBundleURLName</key>
-    <string>Google OAuth</string>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <string>com.googleusercontent.apps.193717154963-uvolmq1rfotinfg6g9se6p9ae5ur9q09</string>
-    </array>
-  </dict>
+ <!-- Google OAuth redirect scheme -->
+ <dict>
+ <key>CFBundleURLName</key>
+ <string>Google OAuth</string>
+ <key>CFBundleURLSchemes</key>
+ <array>
+ <string>com.googleusercontent.apps.193717154963-uvolmq1rfotinfg6g9se6p9ae5ur9q09</string>
+ </array>
+ </dict>
 </array>
 
 <!-- Network Security (ATS) -->
 <key>NSAppTransportSecurity</key>
 <dict>
-  <key>NSAllowsArbitraryLoads</key>
-  <false/>
-  <key>NSExceptionDomains</key>
-  <dict>
-    <key>deeprecall-production.up.railway.app</key>
-    <dict>
-      <key>NSIncludesSubdomains</key>
-      <true/>
-      <key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
-      <false/>
-      <key>NSTemporaryExceptionMinimumTLSVersion</key>
-      <string>TLSv1.2</string>
-    </dict>
-  </dict>
+ <key>NSAllowsArbitraryLoads</key>
+ <false/>
+ <key>NSExceptionDomains</key>
+ <dict>
+ <key>deeprecall-production.up.railway.app</key>
+ <dict>
+ <key>NSIncludesSubdomains</key>
+ <true/>
+ <key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
+ <false/>
+ <key>NSTemporaryExceptionMinimumTLSVersion</key>
+ <string>TLSv1.2</string>
+ </dict>
+ </dict>
 </dict>
 ```
 
@@ -368,14 +368,14 @@ export async function clearSession(): Promise<void> {
 
 ```typescript
 const config: CapacitorConfig = {
-  appId: "com.renlephy.deeprecall",
-  appName: "DeepRecall",
-  webDir: "dist",
-  server: {
-    androidScheme: "https",
-    iosScheme: "https",
-    allowNavigation: ["deeprecall-production.up.railway.app"],
-  },
+ appId: "com.renlephy.deeprecall",
+ appName: "DeepRecall",
+ webDir: "dist",
+ server: {
+ androidScheme: "https",
+ iosScheme: "https",
+ allowNavigation: ["deeprecall-production.up.railway.app"],
+ },
 };
 ```
 
@@ -421,23 +421,23 @@ All mobile-called API routes include CORS:
 
 ```typescript
 import {
-  handleCorsOptions,
-  checkCorsOrigin,
-  addCorsHeaders,
+ handleCorsOptions,
+ checkCorsOrigin,
+ addCorsHeaders,
 } from "@/app/api/lib/cors";
 
 export async function OPTIONS(req: NextRequest) {
-  return handleCorsOptions(req); // Handle preflight
+ return handleCorsOptions(req); // Handle preflight
 }
 
 export async function POST(request: NextRequest) {
-  const corsError = checkCorsOrigin(request);
-  if (corsError) return corsError;
+ const corsError = checkCorsOrigin(request);
+ if (corsError) return corsError;
 
-  // ... handler logic ...
+ // ... handler logic ...
 
-  const response = NextResponse.json(data);
-  return addCorsHeaders(response, request);
+ const response = NextResponse.json(data);
+ return addCorsHeaders(response, request);
 }
 ```
 
@@ -483,14 +483,14 @@ VITE_ELECTRIC_SOURCE_SECRET=<production-secret>
 
 ```
 Mobile app (capacitor://localhost)
-  ↓ Direct HTTPS call
+ ↓ Direct HTTPS call
 https://deeprecall-production.up.railway.app/api/auth/exchange/google
-  ↓ Origin: capacitor://localhost
+ ↓ Origin: capacitor://localhost
 Next.js API (Railway)
-  ↓ CORS check: Is "capacitor://localhost" allowed? ✅ YES
-  ↓ Add CORS headers
-  ↓ Return: 200 OK with app_jwt
-  ↓
+ ↓ CORS check: Is "capacitor://localhost" allowed? ✅ YES
+ ↓ Add CORS headers
+ ↓ Return: 200 OK with app_jwt
+ ↓
 Mobile app saves to iOS Keychain ✅
 ```
 
@@ -514,41 +514,41 @@ Mobile app saves to iOS Keychain ✅
 
 ```typescript
 export function UserMenu() {
-  const [session, setSession] = useState<SessionInfo | null>(null);
-  const [showSignInModal, setShowSignInModal] = useState(false);
+ const [session, setSession] = useState<SessionInfo | null>(null);
+ const [showSignInModal, setShowSignInModal] = useState(false);
 
-  useEffect(() => {
-    loadSession().then(setSession);
-  }, []);
+ useEffect(() => {
+ loadSession().then(setSession);
+ }, []);
 
-  const handleSignIn = async (provider: "google" | "github") => {
-    setShowSignInModal(false);
-    const deviceId = await getOrCreateDeviceId();
+ const handleSignIn = async (provider: "google" | "github") => {
+ setShowSignInModal(false);
+ const deviceId = await getOrCreateDeviceId();
 
-    try {
-      const result = provider === "google"
-        ? await signInWithGoogle(deviceId)
-        : await signInWithGitHub(deviceId);
+ try {
+ const result = provider === "google"
+ ? await signInWithGoogle(deviceId)
+ : await signInWithGitHub(deviceId);
 
-      await saveSession(result.app_jwt);
-      const newSession = await loadSession();
-      setSession(newSession);
-    } catch (error) {
-      console.error(`Sign-in failed:`, error);
-      alert(`Sign-in failed: ${error.message}`);
-    }
-  };
+ await saveSession(result.app_jwt);
+ const newSession = await loadSession();
+ setSession(newSession);
+ } catch (error) {
+ console.error(`Sign-in failed:`, error);
+ alert(`Sign-in failed: ${error.message}`);
+ }
+ };
 
-  const handleSignOut = async () => {
-    await clearSession();
-    setSession(null);
-  };
+ const handleSignOut = async () => {
+ await clearSession();
+ setSession(null);
+ };
 
-  return session ? (
-    <UserProfile user={session} onSignOut={handleSignOut} />
-  ) : (
-    <SignInButton onClick={() => setShowSignInModal(true)} />
-  );
+ return session ? (
+ <UserProfile user={session} onSignOut={handleSignOut} />
+ ) : (
+ <SignInButton onClick={() => setShowSignInModal(true)} />
+ );
 }
 ```
 

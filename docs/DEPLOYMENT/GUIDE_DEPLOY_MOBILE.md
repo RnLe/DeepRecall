@@ -1,7 +1,7 @@
 # Mobile Deployment Guide (iOS TestFlight)
 
-**Platform**: iOS via Capacitor  
-**Deploy Method**: GitHub Actions → TestFlight  
+**Platform**: iOS via Capacitor 
+**Deploy Method**: GitHub Actions → TestFlight 
 **Build Time**: ~15 minutes
 
 This guide covers deploying the DeepRecall mobile app to Apple TestFlight for beta testing.
@@ -24,22 +24,22 @@ This guide covers deploying the DeepRecall mobile app to Apple TestFlight for be
 
 1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
 2. Apps → Add App
-   - Platform: iOS
-   - Name: DeepRecall
-   - Bundle ID: `com.renlephy.deeprecall`
-   - SKU: `deeprecall`
-   - User Access: Full Access
+ - Platform: iOS
+ - Name: DeepRecall
+ - Bundle ID: `com.renlephy.deeprecall`
+ - SKU: `deeprecall`
+ - User Access: Full Access
 
 ### 2. Generate App Store Connect API Key
 
 1. App Store Connect → Users and Access → Keys (API section)
 2. Generate API Key:
-   - Name: "GitHub Actions"
-   - Access: App Manager
-   - Download key file: `AuthKey_XXXXXXXX.p8`
+ - Name: "GitHub Actions"
+ - Access: App Manager
+ - Download key file: `AuthKey_XXXXXXXX.p8`
 3. Save:
-   - Key ID (e.g., `8BX924ZP9N`)
-   - Issuer ID (e.g., `393dffb5-5841-42c9-9bfa-01bf12d78c3b`)
+ - Key ID (e.g., `8BX924ZP9N`)
+ - Issuer ID (e.g., `393dffb5-5841-42c9-9bfa-01bf12d78c3b`)
 
 ### 3. Set Up Code Signing (Fastlane Match)
 
@@ -92,9 +92,9 @@ VITE_API_BASE_URL=https://deeprecall-production.up.railway.app
 **Apple Credentials**:
 
 ```bash
-ASC_KEY_ID=8BX924ZP9N  # From step 2
-ASC_ISSUER_ID=393dffb5-5841-42c9-9bfa-01bf12d78c3b  # From step 2
-ASC_KEY_CONTENT=<base64 encoded .p8 file>  # Run: base64 -w0 AuthKey_*.p8
+ASC_KEY_ID=8BX924ZP9N # From step 2
+ASC_ISSUER_ID=393dffb5-5841-42c9-9bfa-01bf12d78c3b # From step 2
+ASC_KEY_CONTENT=<base64 encoded .p8 file> # Run: base64 -w0 AuthKey_*.p8
 ```
 
 **Code Signing**:
@@ -146,12 +146,12 @@ To auto-deploy on push to `main`, update `.github/workflows/ios-testflight.yml`:
 
 ```yaml
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/mobile/**"
-      - "packages/**"
-  workflow_dispatch: # Keep manual trigger
+ push:
+ branches: [main]
+ paths:
+ - "apps/mobile/**"
+ - "packages/**"
+ workflow_dispatch: # Keep manual trigger
 ```
 
 ---
@@ -165,8 +165,8 @@ on:
 **File**: `apps/mobile/ios/App/App.xcodeproj/project.pbxproj`
 
 ```xml
-MARKETING_VERSION = 1.0.0;  <!-- User-facing version -->
-CURRENT_PROJECT_VERSION = 1;  <!-- Build number, must increment -->
+MARKETING_VERSION = 1.0.0; <!-- User-facing version -->
+CURRENT_PROJECT_VERSION = 1; <!-- Build number, must increment -->
 ```
 
 Or use Xcode:
@@ -186,11 +186,11 @@ Production env vars are **bundled at build time** via GitHub Actions:
 ```yaml
 # .github/workflows/ios-testflight.yml
 env:
-  VITE_ELECTRIC_URL: ${{ secrets.VITE_ELECTRIC_URL }}
-  VITE_ELECTRIC_SOURCE_ID: ${{ secrets.VITE_ELECTRIC_SOURCE_ID }}
-  VITE_ELECTRIC_SOURCE_SECRET: ${{ secrets.VITE_ELECTRIC_SOURCE_SECRET }}
-  VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-  VITE_BLOB_STORAGE_MODE: native
+ VITE_ELECTRIC_URL: ${{ secrets.VITE_ELECTRIC_URL }}
+ VITE_ELECTRIC_SOURCE_ID: ${{ secrets.VITE_ELECTRIC_SOURCE_ID }}
+ VITE_ELECTRIC_SOURCE_SECRET: ${{ secrets.VITE_ELECTRIC_SOURCE_SECRET }}
+ VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+ VITE_BLOB_STORAGE_MODE: native
 ```
 
 **Vite bundles these into JavaScript** - no runtime config needed.
@@ -240,7 +240,7 @@ npx cap open ios
 3. Add internal testers (up to 100 free)
 4. Or add external testers (requires Apple review for first build)
 
-**Internal Testers**: Immediate access, no Apple review  
+**Internal Testers**: Immediate access, no Apple review 
 **External Testers**: Requires Apple review (~24 hours), up to 10,000 testers
 
 ### Provide Test Instructions
@@ -280,9 +280,9 @@ View build logs:
 1. GitHub → Actions → Select workflow run
 2. Expand steps to see detailed output
 3. Look for:
-   - Build errors: Check "Fastlane beta" step
-   - Certificate errors: Check "Install certificates" step
-   - Upload errors: Check upload to TestFlight step
+ - Build errors: Check "Fastlane beta" step
+ - Certificate errors: Check "Install certificates" step
+ - Upload errors: Check upload to TestFlight step
 
 ### TestFlight Crashes
 
@@ -408,11 +408,11 @@ When ready for production (not TestFlight):
 
 1. App Store Connect → DeepRecall → App Store
 2. Add:
-   - Screenshots (iPhone, iPad)
-   - App description
-   - Keywords
-   - Privacy policy URL
-   - Support URL
+ - Screenshots (iPhone, iPad)
+ - App description
+ - Keywords
+ - Privacy policy URL
+ - Support URL
 
 ### 2. Submit for Review
 

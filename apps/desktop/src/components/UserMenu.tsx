@@ -30,6 +30,7 @@ import {
 } from "../auth";
 import { SignInModal } from "./SignInModal";
 import { GitHubDeviceCodeModal } from "./GitHubDeviceCodeModal";
+import { profileStore } from "../auth/secure-store";
 
 export function UserMenu() {
   const navigate = useNavigate();
@@ -158,7 +159,16 @@ export function UserMenu() {
       appJWT: result.app_jwt,
       email: result.user.email,
       name: result.user.name,
+      avatarUrl: null,
     };
+
+    await profileStore.save({
+      userId: payload.userId,
+      email: result.user.email,
+      name: result.user.name,
+      avatarUrl: null,
+      updatedAt: new Date().toISOString(),
+    });
 
     setSessionInfo(session);
     setStatus("authenticated");
@@ -211,7 +221,7 @@ export function UserMenu() {
             id: sessionInfo.userId,
             name: sessionInfo.name || null,
             email: sessionInfo.email || null,
-            image: null, // Google doesn't provide picture in ID token by default
+            image: sessionInfo.avatarUrl || null,
             provider: sessionInfo.provider,
           },
           expires: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(), // 6h from now

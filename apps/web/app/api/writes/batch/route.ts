@@ -35,6 +35,17 @@ import {
   DeviceBlobSchema,
   FolderSourceSchema,
 } from "@deeprecall/core";
+import {
+  ConceptNodeSchema,
+  ExerciseTemplateSchema,
+  ExerciseVariantSchema,
+  ExerciseAttemptSchema,
+  SubtaskAttemptSchema,
+  SessionSchema,
+  ConceptBrickStateSchema,
+  ExerciseBrickStateSchema,
+  SchedulerItemSchema,
+} from "@deeprecall/dojo-core";
 
 /**
  * Handle OPTIONS request for CORS preflight
@@ -64,6 +75,16 @@ const WriteChangeSchema = z.object({
     "blobs_meta",
     "device_blobs",
     "folder_sources",
+    // Dojo tables
+    "dojo_concept_nodes",
+    "dojo_exercise_templates",
+    "dojo_exercise_variants",
+    "dojo_exercise_attempts",
+    "dojo_subtask_attempts",
+    "dojo_sessions",
+    "dojo_concept_bricks",
+    "dojo_exercise_bricks",
+    "dojo_scheduler_items",
   ]),
   op: z.enum(["insert", "update", "delete"]),
   payload: z.any(), // Will be validated by specific table schema
@@ -116,6 +137,25 @@ function getSchemaForTable(table: string): z.ZodTypeAny {
       return DeviceBlobSchema;
     case "folder_sources":
       return FolderSourceSchema;
+    // Dojo tables
+    case "dojo_concept_nodes":
+      return ConceptNodeSchema;
+    case "dojo_exercise_templates":
+      return ExerciseTemplateSchema;
+    case "dojo_exercise_variants":
+      return ExerciseVariantSchema;
+    case "dojo_exercise_attempts":
+      return ExerciseAttemptSchema;
+    case "dojo_subtask_attempts":
+      return SubtaskAttemptSchema;
+    case "dojo_sessions":
+      return SessionSchema;
+    case "dojo_concept_bricks":
+      return ConceptBrickStateSchema;
+    case "dojo_exercise_bricks":
+      return ExerciseBrickStateSchema;
+    case "dojo_scheduler_items":
+      return SchedulerItemSchema;
     default:
       throw new Error(`Unknown table: ${table}`);
   }
@@ -142,6 +182,12 @@ const JSONB_COLUMNS = new Set([
   "avatar_crop_region",
   "points", // strokes points array
   "bounding_box", // strokes bounding box
+  // Dojo JSONB columns
+  "subtasks_json", // dojo_exercise_templates
+  "parameter_schema", // dojo_exercise_templates
+  "parameter_values", // dojo_exercise_variants
+  "generated_subtasks_json", // dojo_exercise_variants
+  "metrics", // dojo_concept_bricks, dojo_exercise_bricks
 ]);
 
 function hashPath(value: string): string {

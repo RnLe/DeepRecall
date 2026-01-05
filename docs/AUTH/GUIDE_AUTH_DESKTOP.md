@@ -29,15 +29,15 @@ Desktop uses **native OAuth** (no WebView) with OS keychain storage for offline-
 
 ```typescript
 {
-  client_id: VITE_GOOGLE_DESKTOP_CLIENT_ID,
-  redirect_uri: `http://127.0.0.1:${port}/oauth2/callback`,
-  response_type: "code",
-  scope: "openid email profile",
-  code_challenge: sha256(code_verifier),
-  code_challenge_method: "S256",
-  state: randomHex(64),        // CSRF protection
-  access_type: "offline",      // Request refresh token
-  prompt: "consent"            // Force consent for refresh token
+ client_id: VITE_GOOGLE_DESKTOP_CLIENT_ID,
+ redirect_uri: `http://127.0.0.1:${port}/oauth2/callback`,
+ response_type: "code",
+ scope: "openid email profile",
+ code_challenge: sha256(code_verifier),
+ code_challenge_method: "S256",
+ state: randomHex(64), // CSRF protection
+ access_type: "offline", // Request refresh token
+ prompt: "consent" // Force consent for refresh token
 }
 ```
 
@@ -95,7 +95,7 @@ VITE_ELECTRIC_URL=https://your-domain.com/api/electric/v1/shape
 
 # Google OAuth
 VITE_GOOGLE_DESKTOP_CLIENT_ID=xxxxx.apps.googleusercontent.com
-VITE_GOOGLE_DESKTOP_CLIENT_SECRET=GOCSPX-xxx  # Required by Google
+VITE_GOOGLE_DESKTOP_CLIENT_SECRET=GOCSPX-xxx # Required by Google
 
 # GitHub OAuth
 VITE_GITHUB_DESKTOP_CLIENT_ID=Ov23lii9xxx
@@ -111,21 +111,21 @@ VITE_GITHUB_DESKTOP_CLIENT_ID=Ov23lii9xxx
 
 ```typescript
 async function initializeSession() {
-  const app_jwt = await secureStore.get("app_jwt");
+ const app_jwt = await secureStore.get("app_jwt");
 
-  if (!app_jwt || isExpired(app_jwt)) {
-    return { status: "guest" };
-  }
+ if (!app_jwt || isExpired(app_jwt)) {
+ return { status: "guest" };
+ }
 
-  // Get Electric replication token
-  const { electric_token } = await fetch(`${API}/api/replication/token`, {
-    headers: { Authorization: `Bearer ${app_jwt}` },
-  });
+ // Get Electric replication token
+ const { electric_token } = await fetch(`${API}/api/replication/token`, {
+ headers: { Authorization: `Bearer ${app_jwt}` },
+ });
 
-  // Initialize Electric with user-scoped token
-  initElectric({ url: ELECTRIC_URL, token: electric_token });
+ // Initialize Electric with user-scoped token
+ initElectric({ url: ELECTRIC_URL, token: electric_token });
 
-  return { status: "authenticated", userId, deviceId };
+ return { status: "authenticated", userId, deviceId };
 }
 ```
 
@@ -133,31 +133,31 @@ async function initializeSession() {
 
 ```typescript
 async function refreshSession() {
-  const refreshToken = await secureStore.get("google_refresh_token");
+ const refreshToken = await secureStore.get("google_refresh_token");
 
-  if (!refreshToken) {
-    return null; // Must re-authenticate
-  }
+ if (!refreshToken) {
+ return null; // Must re-authenticate
+ }
 
-  // Exchange refresh token with Google
-  const { id_token } = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    body: new URLSearchParams({
-      client_id: VITE_GOOGLE_DESKTOP_CLIENT_ID,
-      client_secret: VITE_GOOGLE_DESKTOP_CLIENT_SECRET,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
+ // Exchange refresh token with Google
+ const { id_token } = await fetch("https://oauth2.googleapis.com/token", {
+ method: "POST",
+ body: new URLSearchParams({
+ client_id: VITE_GOOGLE_DESKTOP_CLIENT_ID,
+ client_secret: VITE_GOOGLE_DESKTOP_CLIENT_SECRET,
+ refresh_token: refreshToken,
+ grant_type: "refresh_token",
+ }),
+ });
 
-  // Exchange with Auth Broker
-  const { app_jwt } = await fetch(`${API}/api/auth/exchange/google`, {
-    method: "POST",
-    body: JSON.stringify({ id_token, device_id: deviceId }),
-  });
+ // Exchange with Auth Broker
+ const { app_jwt } = await fetch(`${API}/api/auth/exchange/google`, {
+ method: "POST",
+ body: JSON.stringify({ id_token, device_id: deviceId }),
+ });
 
-  await secureStore.save("app_jwt", app_jwt);
-  return app_jwt;
+ await secureStore.save("app_jwt", app_jwt);
+ return app_jwt;
 }
 ```
 
@@ -169,37 +169,44 @@ async function refreshSession() {
 
 ```typescript
 export const secureStore = {
-  async save(key: string, value: string) {
-    await invoke("save_auth_session", { key, value });
-  },
+ async save(key: string, value: string) {
+ await invoke("save_auth_session", { key, value });
+ },
 
-  async get(key: string): Promise<string | null> {
-    return invoke("get_auth_session", { key });
-  },
+ async get(key: string): Promise<string | null> {
+ return invoke("get_auth_session", { key });
+ },
 
-  async delete(key: string) {
-    await invoke("clear_auth_session", { key });
+ async delete(key: string) {
+ await invoke("clear_auth_session", { key });
 
 ### Keychain Fallback (Nov 2025)
 
 - Some Linux distributions or locked-down Windows profiles intermittently refuse `get_auth_session` calls even though `save_auth_session` succeeded. When the secure store cannot read a key, `secure-store.ts` now logs `No value found for app_jwt, checking fallback` and automatically mirrors the token into `localStorage` under the `deeprecall.auth.*` namespace.
 - Desktop always writes both the keychain and the fallback; reads prefer the keychain but fall back to `localStorage` transparently. This prevents the "signed in but immediately downgraded to guest" loop seen in early November.
 - When troubleshooting, look for `[SecureStore] Retrieved fallback for app_jwt` in the console. If fallback reads appear frequently, inspect OS keychain permissions but the session will still persist.
+- The November 19 patch reduces log spam by only announcing fallback usage once per key (`[SecureStore] Using fallback storage for app_jwt ...`) and then retrying keychain writes in the background until `[SecureStore] Rehydrated keychain for app_jwt` appears.
 - Clearing auth data (`clearSession()`) removes entries from both the OS keychain and the fallback to avoid stale JWTs.
-  },
 
-  // Helper methods
-  tokens: {
-    async saveAppJwt(jwt: string) {
-      await secureStore.save("app_jwt", jwt);
-    },
-    async getAppJwt() {
-      return secureStore.get("app_jwt");
-    },
-    async saveRefreshToken(token: string) {
-      await secureStore.save("google_refresh_token", token);
-    },
-  },
+### Profile Hydration Cache (Nov 2025)
+
+- Desktop now stores a serialized user profile (`user_profile`) in the same secure store so the User Menu can show the display name/email immediately after restart, even if the network is offline.
+- `initializeSession()` first loads the cached profile; if it belongs to a different user or is missing it issues a single `/api/profile` request, saves the response back into secure storage, and shares it with `@deeprecall/ui`.
+- Refresh flows also update the profile cache to keep names in sync with the server; avatar URLs are fetched from the profile endpoint when available.
+ },
+
+ // Helper methods
+ tokens: {
+ async saveAppJwt(jwt: string) {
+ await secureStore.save("app_jwt", jwt);
+ },
+ async getAppJwt() {
+ return secureStore.get("app_jwt");
+ },
+ async saveRefreshToken(token: string) {
+ await secureStore.save("google_refresh_token", token);
+ },
+ },
 };
 ```
 
@@ -240,24 +247,24 @@ export const secureStore = {
 
 ```typescript
 const handleSignIn = async (provider: "google" | "github") => {
-  const deviceId = await getOrCreateDeviceId();
+ const deviceId = await getOrCreateDeviceId();
 
-  try {
-    if (provider === "google") {
-      await signInWithGoogle(deviceId);
-    } else {
-      await signInWithGitHub(deviceId);
-    }
+ try {
+ if (provider === "google") {
+ await signInWithGoogle(deviceId);
+ } else {
+ await signInWithGitHub(deviceId);
+ }
 
-    // Refresh session to initialize Electric
-    await initializeSession();
+ // Refresh session to initialize Electric
+ await initializeSession();
 
-    // Update UI state
-    setSession({ status: "authenticated", user });
-  } catch (error) {
-    console.error("Sign-in failed:", error);
-    toast.error("Failed to sign in");
-  }
+ // Update UI state
+ setSession({ status: "authenticated", user });
+ } catch (error) {
+ console.error("Sign-in failed:", error);
+ toast.error("Failed to sign in");
+ }
 };
 ```
 
@@ -265,8 +272,8 @@ const handleSignIn = async (provider: "google" | "github") => {
 
 ```typescript
 const handleSignOut = async () => {
-  await clearSession(); // Clears keychain + Electric state
-  setSession({ status: "guest" });
+ await clearSession(); // Clears keychain + Electric state
+ setSession({ status: "guest" });
 };
 ```
 

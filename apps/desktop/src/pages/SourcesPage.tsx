@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readDir } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
-import { FolderPlus, Info, Loader2 } from "lucide-react";
+import { FolderPlus, Info, Loader2, Trash2, Star } from "lucide-react";
 import type { FolderSourceStatus, FolderSource } from "@deeprecall/core";
 import {
   useFolderSources,
@@ -64,9 +65,7 @@ async function analyzeFolder(path: string): Promise<FolderScanStats> {
         path: currentPath,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new Error(
-        `Could not read ${currentPath}. Check permissions and try again.`
-      );
+      throw formatReadDirError(currentPath, error);
     }
 
     for (const entry of entries) {
@@ -96,6 +95,30 @@ async function analyzeFolder(path: string): Promise<FolderScanStats> {
     fileLimitBreached,
     depthLimitBreached,
   };
+}
+
+function formatReadDirError(path: string, error: unknown): Error {
+  const rawMessage =
+    error instanceof Error ? error.message : String(error ?? "Unknown error");
+  const normalized = rawMessage.toLowerCase();
+  const pathLower = path.toLowerCase();
+  const permissionIssue =
+    normalized.includes("forbidden") ||
+    normalized.includes("permission") ||
+    normalized.includes("denied");
+  const icloudPath =
+    normalized.includes("icloud") ||
+    normalized.includes("clouddocs") ||
+    pathLower.includes("icloud") ||
+    pathLower.includes("mobile documents");
+
+  if (permissionIssue || icloudPath) {
+    return new Error(
+      `macOS blocked access to "${path}". Download the folder from iCloud Drive (Right click → Download Now) or grant DeepRecall access via System Settings → Privacy & Security → Files and Folders, then try again.`
+    );
+  }
+
+  return new Error(`Could not read ${path}. Check permissions and try again.`);
 }
 
 function formatTimestamp(value?: string | null) {
@@ -132,6 +155,7 @@ export default function SourcesPage() {
   const [deviceId] = useState(() => getDeviceId());
   const [deviceName] = useState(() => getDeviceName());
 
+  const queryClient = useQueryClient();
   const { data: mergedSources = [], isLoading, error } = useFolderSources();
 
   const defaultSource = useMemo(() => {
@@ -156,6 +180,9 @@ export default function SourcesPage() {
   const manualReviewCount = manualSources.length;
 
   const crossDeviceCount = mergedSources.length - localSources.length;
+
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const [pendingDefaultId, setPendingDefaultId] = useState<string | null>(null);
 
   const handleFolderSelection = async () => {
     setPendingSelection(null);
@@ -237,6 +264,10 @@ export default function SourcesPage() {
         },
       });
 
+      queryClient.invalidateQueries({
+        queryKey: ["folderSources", "merged"],
+      });
+
       emitNotification({
         kind: "success",
         title: "Folder registered",
@@ -253,6 +284,54 @@ export default function SourcesPage() {
       });
     } finally {
       setIsRegistering(false);
+    }
+  }
+
+  async function handleRemoveSource(source: FolderSource) {
+    if (pendingRemoveId) return;
+    setPendingRemoveId(source.id);
+    try {
+      await folderSourcesLocal.removeFolderSourceLocal(source.id);
+      queryClient.invalidateQueries({ queryKey: ["folderSources", "merged"] });
+      emitNotification({
+        kind: "success",
+        title: "Folder removed",
+        description: `"${source.displayName}" has been removed from this device.`,
+      });
+    } catch (error) {
+      emitNotification({
+        kind: "error",
+        title: "Failed to remove folder",
+        description:
+          error instanceof Error ? error.message : "Please try again later.",
+      });
+    } finally {
+      setPendingRemoveId(null);
+    }
+  }
+
+  async function handleMakeDefault(source: FolderSource) {
+    if (pendingDefaultId) return;
+    setPendingDefaultId(source.id);
+    try {
+      await folderSourcesLocal.updateFolderSourceLocal(source.id, {
+        isDefault: true,
+      });
+      queryClient.invalidateQueries({ queryKey: ["folderSources", "merged"] });
+      emitNotification({
+        kind: "success",
+        title: "Default updated",
+        description: `Uploads will target "${source.displayName}".`,
+      });
+    } catch (error) {
+      emitNotification({
+        kind: "error",
+        title: "Failed to update default",
+        description:
+          error instanceof Error ? error.message : "Please try again later.",
+      });
+    } finally {
+      setPendingDefaultId(null);
     }
   }
 
@@ -283,6 +362,10 @@ export default function SourcesPage() {
         metadata,
         status: "scanning",
         lastScanStartedAt: now,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["folderSources", "merged"],
       });
 
       emitNotification({
@@ -522,6 +605,7 @@ export default function SourcesPage() {
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Metrics</th>
                   <th className="px-4 py-3">Updated</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -599,7 +683,40 @@ export default function SourcesPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 align-top text-gray-300">
-                          {formatTimestamp(source.updatedAt)}
+                          <div className="text-xs text-gray-400">
+                            {formatTimestamp(source.updatedAt)}
+                          </div>
+                          {source.deviceId === deviceId ? (
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                              <button
+                                type="button"
+                                onClick={() => handleMakeDefault(source)}
+                                disabled={
+                                  source.isDefault ||
+                                  pendingDefaultId === source.id
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 px-2 py-1 text-emerald-200 hover:bg-emerald-500/10 disabled:opacity-50"
+                              >
+                                <Star className="h-3 w-3" />
+                                {source.isDefault
+                                  ? "Default"
+                                  : pendingDefaultId === source.id
+                                    ? "Updating..."
+                                    : "Make default"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSource(source)}
+                                disabled={pendingRemoveId === source.id}
+                                className="inline-flex items-center gap-1 rounded-lg border border-rose-500/30 px-2 py-1 text-rose-200 hover:bg-rose-500/10 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                {pendingRemoveId === source.id
+                                  ? "Removing..."
+                                  : "Remove"}
+                              </button>
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     );

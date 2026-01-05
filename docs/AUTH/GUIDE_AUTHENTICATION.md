@@ -36,34 +36,34 @@ DeepRecall uses **three-tier authentication** across platforms:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Web (Next.js)                          │
-│  ├─ NextAuth OAuth redirects            │
-│  ├─ HTTP-only cookies                   │
-│  └─ Electric proxy (/api/electric/v1/shape)
+│ Web (Next.js) │
+│ ├─ NextAuth OAuth redirects │
+│ ├─ HTTP-only cookies │
+│ └─ Electric proxy (/api/electric/v1/shape)
 └─────────────────────────────────────────┘
-              ↓
+ ↓
 ┌─────────────────────────────────────────┐
-│  Auth Broker (apps/web/app/api/)        │
-│  ├─ /api/auth/exchange/{google,github}  │ ← Desktop/Mobile
-│  ├─ /api/replication/token              │ ← Electric auth
-│  ├─ /api/writes/batch (RLS enforced)    │
-│  └─ Migration 008: UUID-based users     │
+│ Auth Broker (apps/web/app/api/) │
+│ ├─ /api/auth/exchange/{google,github} │ ← Desktop/Mobile
+│ ├─ /api/replication/token │ ← Electric auth
+│ ├─ /api/writes/batch (RLS enforced) │
+│ └─ Migration 008: UUID-based users │
 └─────────────────────────────────────────┘
-              ↓
+ ↓
 ┌─────────────────────────────────────────┐
-│  Desktop (Tauri) - IMPLEMENTED ✅        │
-│  ├─ Google PKCE + loopback server       │
-│  ├─ GitHub Device Code flow             │
-│  ├─ Windows Credential Manager          │
-│  └─ Offline-first local React SPA       │
+│ Desktop (Tauri) - IMPLEMENTED ✅ │
+│ ├─ Google PKCE + loopback server │
+│ ├─ GitHub Device Code flow │
+│ ├─ Windows Credential Manager │
+│ └─ Offline-first local React SPA │
 └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐
-│  Mobile (Capacitor) - IMPLEMENTED ✅     │
-│  ├─ Google PKCE + custom URL scheme     │
-│  ├─ GitHub Device Code flow             │
-│  ├─ iOS Keychain / Android Keystore     │
-│  └─ Offline-first local React SPA       │
+│ Mobile (Capacitor) - IMPLEMENTED ✅ │
+│ ├─ Google PKCE + custom URL scheme │
+│ ├─ GitHub Device Code flow │
+│ ├─ iOS Keychain / Android Keystore │
+│ └─ Offline-first local React SPA │
 └─────────────────────────────────────────┘
 ```
 
@@ -73,24 +73,24 @@ UUID-based accounts with linked OAuth identities (replaces composite IDs).
 
 ```sql
 CREATE TABLE app_users (
-  user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT,
-  display_name TEXT,
-  avatar_url TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+ user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ email TEXT,
+ display_name TEXT,
+ avatar_url TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE linked_identities (
-  id SERIAL PRIMARY KEY,
-  user_id UUID REFERENCES app_users(user_id) ON DELETE CASCADE,
-  provider TEXT CHECK (provider IN ('google', 'github')),
-  provider_user_id TEXT NOT NULL, -- OIDC "sub"
-  email TEXT,
-  display_name TEXT,
-  avatar_url TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(provider, provider_user_id)
+ id SERIAL PRIMARY KEY,
+ user_id UUID REFERENCES app_users(user_id) ON DELETE CASCADE,
+ provider TEXT CHECK (provider IN ('google', 'github')),
+ provider_user_id TEXT NOT NULL, -- OIDC "sub"
+ email TEXT,
+ display_name TEXT,
+ avatar_url TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ UNIQUE(provider, provider_user_id)
 );
 ```
 
@@ -105,13 +105,13 @@ CREATE TABLE linked_identities (
 1. **Detect guest data**: Check Dexie `*_local` tables + CAS pending entries
 2. **Account probe**: `/api/user/status` determines new vs existing account
 3. **Upgrade branch** (new account):
-   - Relabel local rows with `userId`
-   - Upload blobs via WriteBuffer
-   - Coordinate CAS metadata
+ - Relabel local rows with `userId`
+ - Upload blobs via WriteBuffer
+ - Coordinate CAS metadata
 4. **Wipe branch** (existing account):
-   - Clear `*_local` tables + guest CAS metadata
-   - Wait for Electric sync confirmation (poll Dexie)
-   - Rescan CAS and recreate `device_blobs`
+ - Clear `*_local` tables + guest CAS metadata
+ - Wait for Electric sync confirmation (poll Dexie)
+ - Rescan CAS and recreate `device_blobs`
 
 ### Sign-Out Flow
 
@@ -176,15 +176,15 @@ Mobile uses **native OAuth** (no WebView cookie sharing) with offline-first capa
 
 ## Security Guarantees
 
-| Aspect                    | Implementation                                   |
+| Aspect | Implementation |
 | ------------------------- | ------------------------------------------------ |
-| **No secrets in app**     | PKCE (Google) + Device Code (GitHub) for Desktop |
-| **Token storage**         | OS keychain (encrypted at rest)                  |
-| **JWT expiry**            | App JWT: 1-6h, Electric token: 5-15min           |
-| **Ownership enforcement** | Server RLS + GUC, never trust client `owner_id`  |
-| **Offline safety**        | Local Dexie, no writes to server without session |
-| **Cross-device sync**     | Electric replication with user-scoped shapes     |
-| **Logging**               | Pseudonymous `actor_uid`, no PII                 |
+| **No secrets in app** | PKCE (Google) + Device Code (GitHub) for Desktop |
+| **Token storage** | OS keychain (encrypted at rest) |
+| **JWT expiry** | App JWT: 1-6h, Electric token: 5-15min |
+| **Ownership enforcement** | Server RLS + GUC, never trust client `owner_id` |
+| **Offline safety** | Local Dexie, no writes to server without session |
+| **Cross-device sync** | Electric replication with user-scoped shapes |
+| **Logging** | Pseudonymous `actor_uid`, no PII |
 
 ### Row-Level Security (RLS)
 
@@ -198,8 +198,8 @@ Mobile uses **native OAuth** (no WebView cookie sharing) with offline-first capa
 ALTER TABLE works ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY works_isolation ON works
-  USING  (owner_id = current_setting('app.user_id', true))
-  WITH CHECK (owner_id = current_setting('app.user_id', true));
+ USING (owner_id = current_setting('app.user_id', true))
+ WITH CHECK (owner_id = current_setting('app.user_id', true));
 
 -- Indexing for tenant isolation
 CREATE INDEX works_owner_updated_idx ON works (owner_id, updated_at DESC);
@@ -207,7 +207,7 @@ CREATE UNIQUE INDEX works_owner_id_unique ON works (owner_id, id);
 
 -- Prevent client spoofing
 ALTER TABLE works ALTER COLUMN owner_id
-  SET DEFAULT current_setting('app.user_id', true);
+ SET DEFAULT current_setting('app.user_id', true);
 ```
 
 **Electric sync**: Electric reads from Postgres replication slot (bypasses RLS). Client-side WHERE clauses in shapes provide primary filtering. Server RLS enforces write path security.
@@ -238,16 +238,16 @@ ALTER TABLE works ALTER COLUMN owner_id
 // Desktop/Mobile write flush
 const app_jwt = await secureStore.get("app_jwt");
 if (!app_jwt) {
-  return; // Guest mode - queue locally only
+ return; // Guest mode - queue locally only
 }
 
 await fetch(`${API}/api/writes/batch`, {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${app_jwt}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ ops: pendingOps }),
+ method: "POST",
+ headers: {
+ Authorization: `Bearer ${app_jwt}`,
+ "Content-Type": "application/json",
+ },
+ body: JSON.stringify({ ops: pendingOps }),
 });
 ```
 
@@ -258,20 +258,20 @@ const userContext = await requireAuth(request);
 const client = await pool.connect();
 
 try {
-  await client.query("BEGIN");
+ await client.query("BEGIN");
 
-  // CRITICAL: Set RLS context (must be after BEGIN)
-  await client.query("SET LOCAL app.user_id = $1", [userContext.userId]);
+ // CRITICAL: Set RLS context (must be after BEGIN)
+ await client.query("SET LOCAL app.user_id = $1", [userContext.userId]);
 
-  // Perform writes - owner_id handled by DB defaults
-  await client.query("INSERT INTO works ...");
+ // Perform writes - owner_id handled by DB defaults
+ await client.query("INSERT INTO works ...");
 
-  await client.query("COMMIT");
+ await client.query("COMMIT");
 } catch (error) {
-  await client.query("ROLLBACK");
-  throw error;
+ await client.query("ROLLBACK");
+ throw error;
 } finally {
-  client.release();
+ client.release();
 }
 ```
 
@@ -296,24 +296,24 @@ Electric proxy verifies replication token and sets `app.user_id` GUC on DB conne
 import crypto from "node:crypto";
 
 export function deriveActorUid(provider: string, sub: string) {
-  const key = Buffer.from(process.env.ACTOR_HMAC_SECRET!, "utf8");
-  const h = crypto
-    .createHmac("sha256", key)
-    .update(`${provider}:${sub}`)
-    .digest();
-  return h.toString("base64url");
+ const key = Buffer.from(process.env.ACTOR_HMAC_SECRET!, "utf8");
+ const h = crypto
+ .createHmac("sha256", key)
+ .update(`${provider}:${sub}`)
+ .digest();
+ return h.toString("base64url");
 }
 
 // Client: Attach to telemetry
 registerSinks(
-  makeRingBufferSink(4000),
-  makeOtlpHttpSink("https://.../v1/logs", {
-    app: "deeprecall",
-    platform: "web", // or "desktop", "mobile"
-    actor_uid: actorUid, // pseudonymous
-    session_id: sessionId,
-    device_id: deviceId, // persistent UUID
-  })
+ makeRingBufferSink(4000),
+ makeOtlpHttpSink("https://.../v1/logs", {
+ app: "deeprecall",
+ platform: "web", // or "desktop", "mobile"
+ actor_uid: actorUid, // pseudonymous
+ session_id: sessionId,
+ device_id: deviceId, // persistent UUID
+ })
 );
 ```
 
@@ -384,7 +384,7 @@ registerSinks(
 ```sql
 ALTER TABLE app_users
 ADD COLUMN subscription_tier TEXT DEFAULT 'free' CHECK (
-  subscription_tier IN ('free', 'pro', 'enterprise')
+ subscription_tier IN ('free', 'pro', 'enterprise')
 );
 ```
 
@@ -398,16 +398,16 @@ ADD COLUMN subscription_tier TEXT DEFAULT 'free' CHECK (
 
 ```sql
 CREATE TABLE feature_flags (
-  flag_name TEXT PRIMARY KEY,
-  enabled_for_all BOOLEAN DEFAULT FALSE,
-  enabled_for_pro BOOLEAN DEFAULT FALSE
+ flag_name TEXT PRIMARY KEY,
+ enabled_for_all BOOLEAN DEFAULT FALSE,
+ enabled_for_pro BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE user_feature_flags (
-  user_id UUID REFERENCES app_users(user_id) ON DELETE CASCADE,
-  flag_name TEXT REFERENCES feature_flags(flag_name),
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  PRIMARY KEY (user_id, flag_name)
+ user_id UUID REFERENCES app_users(user_id) ON DELETE CASCADE,
+ flag_name TEXT REFERENCES feature_flags(flag_name),
+ enabled BOOLEAN NOT NULL DEFAULT TRUE,
+ PRIMARY KEY (user_id, flag_name)
 );
 ```
 

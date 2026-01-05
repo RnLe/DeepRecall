@@ -7,10 +7,10 @@
 ## Architecture
 
 ```
-packages/ui/          → Platform-agnostic React components (use Electric hooks)
-apps/web/            → Next.js (Web)
-apps/desktop/        → Tauri (Desktop)
-apps/mobile/         → Capacitor (Mobile)
+packages/ui/ → Platform-agnostic React components (use Electric hooks)
+apps/web/ → Next.js (Web)
+apps/desktop/ → Tauri (Desktop)
+apps/mobile/ → Capacitor (Mobile)
 ```
 
 **Key Principle**: UI components in `packages/ui/` are platform-agnostic. Platform-specific adapters live in `apps/{platform}/`.
@@ -21,11 +21,11 @@ apps/mobile/         → Capacitor (Mobile)
 
 ```
 apps/{platform}/app/{route}/
-├── page.tsx                    # Route orchestrator
-├── _components/                # Platform-specific wrappers only
-│   ├── Component1.tsx         # Wrapper with operations interface
-│   ├── Component2.tsx         # Wrapper with operations interface
-│   └── ...
+├── page.tsx # Route orchestrator
+├── _components/ # Platform-specific wrappers only
+│ ├── Component1.tsx # Wrapper with operations interface
+│ ├── Component2.tsx # Wrapper with operations interface
+│ └── ...
 ```
 
 **Rules:**
@@ -47,11 +47,11 @@ Use **3 clear sections** with comments:
 // PURE UI IMPORTS (from @deeprecall/ui)
 // ========================================
 import {
-  AuthorInput,
-  CreateWorkDialog,
-  TemplateLibrary,
-  WorkSelector,
-  // ... all platform-agnostic components
+ AuthorInput,
+ CreateWorkDialog,
+ TemplateLibrary,
+ WorkSelector,
+ // ... all platform-agnostic components
 } from "@deeprecall/ui";
 
 // ========================================
@@ -94,22 +94,22 @@ import { useBlobStats } from "@/src/hooks/useBlobs";
 "use client";
 
 import {
-  LibraryHeader as LibraryHeaderUI,
-  type LibraryHeaderOperations,
+ LibraryHeader as LibraryHeaderUI,
+ type LibraryHeaderOperations,
 } from "@deeprecall/ui";
 import { useBlobStats } from "@/src/hooks/useBlobs";
 
 export function LibraryHeader() {
-  const blobStats = useBlobStats();
+ const blobStats = useBlobStats();
 
-  const operations: LibraryHeaderOperations = {
-    blobStats,
-    onClearDatabase: async () => {
-      await fetch("/api/library/clear", { method: "POST" });
-    },
-  };
+ const operations: LibraryHeaderOperations = {
+ blobStats,
+ onClearDatabase: async () => {
+ await fetch("/api/library/clear", { method: "POST" });
+ },
+ };
 
-  return <LibraryHeaderUI operations={operations} />;
+ return <LibraryHeaderUI operations={operations} />;
 }
 ```
 

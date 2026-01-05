@@ -2,17 +2,17 @@
 
 This document tracks all locations where linting rules, TypeScript strict mode, and build configurations have been relaxed across the DeepRecall project.
 
-## 📋 Quick Reference
+## Quick Reference
 
-| App                 | TypeScript Strict | ESLint                 | Build Warnings   |
+| App | TypeScript Strict | ESLint | Build Warnings |
 | ------------------- | ----------------- | ---------------------- | ---------------- |
-| **Web**             | ❌ Disabled       | ✅ Next.js defaults    | Ignored          |
-| **Desktop (Tauri)** | ✅ Enabled        | ⚠️ Manual suppressions | Warnings allowed |
-| **Mobile (iOS)**    | ❌ Disabled       | ⚠️ Manual suppressions | Warnings allowed |
+| **Web** | ❌ Disabled | ✅ Next.js defaults | Ignored |
+| **Desktop (Tauri)** | ✅ Enabled | Manual suppressions | Warnings allowed |
+| **Mobile (iOS)** | ❌ Disabled | Manual suppressions | Warnings allowed |
 
 ---
 
-## 🌐 Web App (`apps/web`)
+## Web App (`apps/web`)
 
 ### TypeScript Configuration
 
@@ -20,12 +20,12 @@ This document tracks all locations where linting rules, TypeScript strict mode, 
 
 ```json
 {
-  "compilerOptions": {
-    "strict": false, // ⚠️ Disabled for faster development
-    "strictNullChecks": true, // ✅ Still enforced
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
-  }
+ "compilerOptions": {
+ "strict": false, // Disabled for faster development
+ "strictNullChecks": true, // ✅ Still enforced
+ "noUnusedLocals": false,
+ "noUnusedParameters": false
+ }
 }
 ```
 
@@ -37,7 +37,7 @@ This document tracks all locations where linting rules, TypeScript strict mode, 
 
 ```json
 {
-  "extends": ["next/core-web-vitals", "next/typescript"]
+ "extends": ["next/core-web-vitals", "next/typescript"]
 }
 ```
 
@@ -69,14 +69,14 @@ async function calculateConflicts(importCounts: any): Promise<...> {}
 
 ```typescript
 {
-  serverExternalPackages: ["pino", "better-sqlite3", "pg", "pg-native"],
-  webpack(config) {
-    config.resolve.fallback = {
-      canvas: false,
-      fs: false,
-      // ... other Node.js modules stubbed
-    };
-  }
+ serverExternalPackages: ["pino", "better-sqlite3", "pg", "pg-native"],
+ webpack(config) {
+ config.resolve.fallback = {
+ canvas: false,
+ fs: false,
+ // ... other Node.js modules stubbed
+ };
+ }
 }
 ```
 
@@ -84,7 +84,7 @@ async function calculateConflicts(importCounts: any): Promise<...> {}
 
 ---
 
-## 🖥️ Desktop App (`apps/desktop`)
+## Desktop App (`apps/desktop`)
 
 ### TypeScript Configuration
 
@@ -92,11 +92,11 @@ async function calculateConflicts(importCounts: any): Promise<...> {}
 
 ```json
 {
-  "compilerOptions": {
-    "strict": true, // ✅ Enabled (Tauri Rust integration)
-    "noUnusedLocals": false, // ⚠️ Disabled
-    "noUnusedParameters": false // ⚠️ Disabled
-  }
+ "compilerOptions": {
+ "strict": true, // ✅ Enabled (Tauri Rust integration)
+ "noUnusedLocals": false, // Disabled
+ "noUnusedParameters": false // Disabled
+ }
 }
 ```
 
@@ -115,26 +115,26 @@ async function calculateConflicts(importCounts: any): Promise<...> {}
 ```toml
 [features]
 default = ["custom-protocol"]
-devtools = []  # DevTools enabled even in release
+devtools = [] # DevTools enabled even in release
 ```
 
 **File**: `apps/desktop/src-tauri/tauri.conf.json`
 
 ```json
 {
-  "app": {
-    "windows": [
-      {
-        "devtools": true // ✅ Enabled in production
-      }
-    ]
-  }
+ "app": {
+ "windows": [
+ {
+ "devtools": true // ✅ Enabled in production
+ }
+ ]
+ }
 }
 ```
 
 ---
 
-## 📱 Mobile App (`apps/mobile`)
+## Mobile App (`apps/mobile`)
 
 ### TypeScript Configuration
 
@@ -142,14 +142,14 @@ devtools = []  # DevTools enabled even in release
 
 ```json
 {
-  "compilerOptions": {
-    "strict": false, // ⚠️ Disabled
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "verbatimModuleSyntax": false, // ⚠️ Capacitor compatibility
-    "erasableSyntaxOnly": false,
-    "noUncheckedSideEffectImports": false
-  }
+ "compilerOptions": {
+ "strict": false, // Disabled
+ "noUnusedLocals": false,
+ "noUnusedParameters": false,
+ "verbatimModuleSyntax": false, // Capacitor compatibility
+ "erasableSyntaxOnly": false,
+ "noUncheckedSideEffectImports": false
+ }
 }
 ```
 
@@ -163,14 +163,14 @@ devtools = []  # DevTools enabled even in release
 
 ```typescript
 {
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      }
-    }
-  }
+ server: {
+ proxy: {
+ '/api': {
+ target: 'http://localhost:3000',
+ changeOrigin: true,
+ }
+ }
+ }
 }
 ```
 
@@ -178,7 +178,7 @@ devtools = []  # DevTools enabled even in release
 
 ---
 
-## 📦 Shared Packages
+## Shared Packages
 
 ### Data Package (`packages/data`)
 
@@ -186,11 +186,11 @@ devtools = []  # DevTools enabled even in release
 
 ```json
 {
-  "compilerOptions": {
-    "strict": true, // ✅ Enabled for shared code
-    "declaration": true,
-    "declarationMap": true
-  }
+ "compilerOptions": {
+ "strict": true, // ✅ Enabled for shared code
+ "declaration": true,
+ "declarationMap": true
+ }
 }
 ```
 
@@ -202,16 +202,16 @@ devtools = []  # DevTools enabled even in release
 
 ```json
 {
-  "compilerOptions": {
-    "strict": true, // ✅ Enabled
-    "jsx": "react-jsx"
-  }
+ "compilerOptions": {
+ "strict": true, // ✅ Enabled
+ "jsx": "react-jsx"
+ }
 }
 ```
 
 ---
 
-## 🔧 How to Modify Configurations
+## How to Modify Configurations
 
 ### To Disable TypeScript Strict Mode
 
@@ -240,12 +240,12 @@ function unused() {}
 ```typescript
 // next.config.ts
 {
-  eslint: {
-    ignoreDuringBuilds: true  // ⚠️ Use with caution
-  },
-  typescript: {
-    ignoreBuildErrors: true  // ⚠️ Use with caution
-  }
+ eslint: {
+ ignoreDuringBuilds: true // Use with caution
+ },
+ typescript: {
+ ignoreBuildErrors: true // Use with caution
+ }
 }
 ```
 
@@ -254,42 +254,42 @@ function unused() {}
 ```json
 // tsconfig.json
 {
-  "compilerOptions": {
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
-  }
+ "compilerOptions": {
+ "noUnusedLocals": false,
+ "noUnusedParameters": false
+ }
 }
 ```
 
 ---
 
-## 🚀 Build Commands
+## Build Commands
 
 ### Web App
 
 ```bash
 cd apps/web
-pnpm run build  # Uses Next.js build with relaxed linting
+pnpm run build # Uses Next.js build with relaxed linting
 ```
 
 ### Desktop App
 
 ```bash
 cd apps/desktop
-pnpm run tauri build  # Uses Cargo + Vite (strict TS)
+pnpm run tauri build # Uses Cargo + Vite (strict TS)
 ```
 
 ### Mobile App
 
 ```bash
 cd apps/mobile
-pnpm run build  # Uses Vite (relaxed TS)
-pnpm cap sync   # Sync to native platforms
+pnpm run build # Uses Vite (relaxed TS)
+pnpm cap sync # Sync to native platforms
 ```
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
 1. **Shared Packages**: Keep strict mode enabled for type safety
 2. **Apps**: Relax as needed for rapid development, but document why
@@ -298,7 +298,7 @@ pnpm cap sync   # Sync to native platforms
 
 ---
 
-## 🔍 Quick Search
+## Quick Search
 
 Find all suppressions:
 

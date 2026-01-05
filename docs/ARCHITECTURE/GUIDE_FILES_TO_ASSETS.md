@@ -4,7 +4,7 @@
 
 ---
 
-## 🎯 The Three Tables
+## The Three Tables
 
 DeepRecall uses **three separate tables** to manage files from upload to UI display. Each serves a distinct purpose and **must not be merged**.
 
@@ -12,8 +12,8 @@ DeepRecall uses **three separate tables** to manage files from upload to UI disp
 
 **Purpose**: Global authoritative metadata for each unique file (content-addressed storage).
 
-**Key**: `sha256` (content hash)  
-**Cardinality**: 1 row per unique file  
+**Key**: `sha256` (content hash) 
+**Cardinality**: 1 row per unique file 
 **Contains**: `size`, `mime`, `filename`, `pageCount`, `imageWidth`, `pdfMetadata`
 
 **Role**: "What is this file technically?"
@@ -22,8 +22,8 @@ DeepRecall uses **three separate tables** to manage files from upload to UI disp
 
 **Purpose**: Track which devices have which blobs (sync coordination).
 
-**Key**: `id` (UUID) with `UNIQUE(device_id, sha256)`  
-**Cardinality**: N rows per blob (one per device)  
+**Key**: `id` (UUID) with `UNIQUE(device_id, sha256)` 
+**Cardinality**: N rows per blob (one per device) 
 **Contains**: `deviceId`, `sha256`, `present`, `health`, `localPath`, `mtimeMs`
 
 **Role**: "Where is this file?"
@@ -32,8 +32,8 @@ DeepRecall uses **three separate tables** to manage files from upload to UI disp
 
 **Purpose**: User-facing semantic wrapper (1:1 with blob) that can be linked to multiple entities.
 
-**Key**: `id` (UUID)  
-**Cardinality**: 1 row per blob (semantic wrapper)  
+**Key**: `id` (UUID) 
+**Cardinality**: 1 row per blob (semantic wrapper) 
 **Contains**: `workId`, `sha256`, `role`, `purpose`, `filename`, `notes`, publication metadata
 
 **Role**: "What is the semantic purpose of this file?" (main paper, supplement, slides, notes, etc.)
@@ -42,13 +42,13 @@ DeepRecall uses **three separate tables** to manage files from upload to UI disp
 
 ---
 
-## 🔗 Relationships
+## Relationships
 
 ```
 blobs_meta (1 blob)
-    ↓
-    ├── device_blobs (N devices that have it)
-    └── assets (1 semantic wrapper) ──1:M──> Works/Activities/Collections
+ ↓
+ ├── device_blobs (N devices that have it)
+ └── assets (1 semantic wrapper) ──1:M──> Works/Activities/Collections
 ```
 
 **Key Principle**: **1:1 blob-to-asset relationship**. Each blob has exactly ONE Asset (semantic wrapper). That Asset can be **linked to multiple entities** (Works, Activities, Collections) via `workId` FK or `edges` table.
@@ -121,22 +121,22 @@ Tables can grow independently:
 
 ---
 
-## 📋 Data Flow Example
+## Data Flow Example
 
 ```
 1. User uploads "paper.pdf" (2MB, 50 pages)
-   ↓
+ ↓
 2. CAS calculates sha256 = "abc123..."
-   ↓
+ ↓
 3. INSERT INTO blobs_meta:
-   {sha256: "abc123", size: 2MB, mime: "pdf", pageCount: 50}
-   ↓
+ {sha256: "abc123", size: 2MB, mime: "pdf", pageCount: 50}
+ ↓
 4. INSERT INTO device_blobs:
-   {deviceId: "laptop", sha256: "abc123", present: true, health: "healthy"}
-   ↓
+ {deviceId: "laptop", sha256: "abc123", present: true, health: "healthy"}
+ ↓
 5. INSERT INTO assets (AUTOMATIC - enforced 1:1):
-   {id: uuid1, sha256: "abc123", role: "main", filename: "paper.pdf"}
-   ↓
+ {id: uuid1, sha256: "abc123", role: "main", filename: "paper.pdf"}
+ ↓
 6. User links to Work → UPDATE assets SET workId = "work1"
 ```
 
@@ -144,7 +144,7 @@ Tables can grow independently:
 
 ---
 
-## 🚫 DO NOT
+## DO NOT
 
 - ❌ Add `devices` JSONB column to `blobs_meta`
 - ❌ Add `workId` to `device_blobs`
@@ -161,7 +161,7 @@ Tables can grow independently:
 
 ---
 
-## 🔧 Automatic Asset Creation
+## Automatic Asset Creation
 
 **Where**: `packages/data/src/utils/coordinateLocalBlobs.ts`
 
@@ -178,11 +178,11 @@ Tables can grow independently:
 
 ```
 Admin clicks "Rescan"
-  ↓
+ ↓
 Step 1: /api/scan (Web) or invoke("scan_blobs") (Desktop) → Rebuild SQLite from filesystem
-  ↓
+ ↓
 Step 2: scanAndCheckCAS(skipIntegrityCheck=true) → Coordinate to Dexie + create Assets
-  ↓
+ ↓
 Result: blobs_meta, device_blobs, assets all populated immediately
 ```
 

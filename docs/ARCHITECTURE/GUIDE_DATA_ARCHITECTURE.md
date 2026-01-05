@@ -6,7 +6,7 @@
 
 ---
 
-## 🎯 Core Philosophy
+## Core Philosophy
 
 DeepRecall's data architecture solves a fundamental challenge: **enable instant offline-first UX across Web, Desktop, and Mobile while keeping data synced.**
 
@@ -19,7 +19,7 @@ Both patterns share the same underlying layers but differ in how local changes a
 
 ---
 
-## 📊 What Data Exists?
+## What Data Exists?
 
 ### User Content Entities (Optimistic Pattern)
 
@@ -59,40 +59,40 @@ Both patterns share the same underlying layers but differ in how local changes a
 
 ---
 
-## 🏗️ Architecture Layers
+## Architecture Layers
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    APPLICATION LAYER                             │
-│  React Components (Web, Desktop, Mobile)                         │
-│                                                                   │
-│  • Use platform-agnostic hooks (useWorks, useAssets)            │
-│  • Inject platform-specific adapters (BlobCAS)                  │
+│ APPLICATION LAYER │
+│ React Components (Web, Desktop, Mobile) │
+│ │
+│ • Use platform-agnostic hooks (useWorks, useAssets) │
+│ • Inject platform-specific adapters (BlobCAS) │
 └─────────────────────────────────────────────────────────────────┘
-                                 ▲
-                                 │
+ ▲
+ │
 ┌─────────────────────────────────────────────────────────────────┐
-│                BRIDGE LAYER (@deeprecall/data/hooks)             │
-│  Platform-agnostic React hooks                                   │
-│                                                                   │
-│  • useWorks() → queries merged data from Dexie                  │
-│  • useOrphanedBlobs(cas) → combines CAS + Assets                │
-│  • useBlobStats(cas) → cross-layer statistics                   │
+│ BRIDGE LAYER (@deeprecall/data/hooks) │
+│ Platform-agnostic React hooks │
+│ │
+│ • useWorks() → queries merged data from Dexie │
+│ • useOrphanedBlobs(cas) → combines CAS + Assets │
+│ • useBlobStats(cas) → cross-layer statistics │
 └─────────────────────────────────────────────────────────────────┘
-           ▲                                      ▲
-           │                                      │
-┌──────────┴──────────┐               ┌──────────┴────────────────┐
-│  LAYER 1: LOCAL     │               │  LAYER 2: ELECTRIC SYNC   │
-│  (Platform-Specific)│               │  (Platform-Agnostic)      │
-│                     │               │                           │
-│  • Dexie (IndexedDB)│               │  • Postgres (Neon DB)     │
-│    - Synced tables  │◄──────────────┤  • Electric SQL (SSE)     │
-│    - Local tables   │   Electric    │  • Multi-tenant RLS       │
-│  • CAS (Files)      │   Sync        │  • Owner filtering        │
-│    - Web: FS+SQLite │               │                           │
-│    - Desktop: Rust  │               │                           │
-│    - Mobile: Native │               │                           │
-└─────────────────────┘               └───────────────────────────┘
+ ▲ ▲
+ │ │
+┌──────────┴──────────┐ ┌──────────┴────────────────┐
+│ LAYER 1: LOCAL │ │ LAYER 2: ELECTRIC SYNC │
+│ (Platform-Specific)│ │ (Platform-Agnostic) │
+│ │ │ │
+│ • Dexie (IndexedDB)│ │ • Postgres (Neon DB) │
+│ - Synced tables │◄──────────────┤ • Electric SQL (SSE) │
+│ - Local tables │ Electric │ • Multi-tenant RLS │
+│ • CAS (Files) │ Sync │ • Owner filtering │
+│ - Web: FS+SQLite │ │ │
+│ - Desktop: Rust │ │ │
+│ - Mobile: Native │ │ │
+└─────────────────────┘ └───────────────────────────┘
 ```
 
 ### Layer 1: Local Storage (Platform-Specific)
@@ -138,7 +138,7 @@ Both patterns share the same underlying layers but differ in how local changes a
 
 ---
 
-## 🔄 Two Data Patterns
+## Two Data Patterns
 
 ### Pattern 1: Standard Entities (Full Optimistic Updates)
 
@@ -148,27 +148,27 @@ Both patterns share the same underlying layers but differ in how local changes a
 
 ```
 packages/data/src/repos/
-├── works.local.ts      # Instant writes to Dexie + WriteBuffer enqueue
-├── works.electric.ts   # Electric shape subscriptions (background sync)
-├── works.merged.ts     # Merge synced + local for UI queries
-└── works.cleanup.ts    # Remove local changes after sync confirmation
+├── works.local.ts # Instant writes to Dexie + WriteBuffer enqueue
+├── works.electric.ts # Electric shape subscriptions (background sync)
+├── works.merged.ts # Merge synced + local for UI queries
+└── works.cleanup.ts # Remove local changes after sync confirmation
 ```
 
 **Data Flow** (see GUIDE_OPTIMISTIC_UPDATES.md for full details):
 
 ```
 1. User Action → works.local.ts
-   ↓
+ ↓
 2. Write to works_local (Dexie) → [INSTANT] UI update
-   ↓
+ ↓
 3. Enqueue to WriteBuffer (if authenticated)
-   ↓
+ ↓
 4. Background flush to `/api/writes/batch` (all platforms) → Postgres
-   ↓
+ ↓
 5. Electric syncs back → useWorksSync() → works (Dexie)
-   ↓
+ ↓
 6. Cleanup: Remove from works_local
-   ↓
+ ↓
 7. UI queries works.merged.ts → combines works + works_local
 ```
 
@@ -189,11 +189,11 @@ packages/data/src/repos/
 
 ```
 packages/data/src/repos/
-├── blobs-meta.local.ts    # Guest mode: Direct Dexie writes
-├── blobs-meta.writes.ts   # Authenticated: WriteBuffer enqueue
+├── blobs-meta.local.ts # Guest mode: Direct Dexie writes
+├── blobs-meta.writes.ts # Authenticated: WriteBuffer enqueue
 └── blobs-meta.electric.ts # Electric shape subscriptions
 
-├── device-blobs.writes.ts   # WriteBuffer enqueue (no local file)
+├── device-blobs.writes.ts # WriteBuffer enqueue (no local file)
 └── device-blobs.electric.ts # Electric shape subscriptions
 ```
 
@@ -208,15 +208,15 @@ packages/data/src/repos/
 
 ```
 1. User uploads file → cas.put(file)
-   ↓
+ ↓
 2. CAS stores to disk (platform-specific) → [INSTANT] file available
-   ↓
+ ↓
 3. coordinateBlobUpload() → WriteBuffer enqueue (if authenticated)
-   ↓
+ ↓
 4. Background flush to /api/writes/batch → Postgres
-   ↓
+ ↓
 5. Electric syncs back → useBlobsMetaSync() → blobsMeta (Dexie)
-   ↓
+ ↓
 6. UI queries useBlobsMeta() → reads directly from blobsMeta (no merge)
 ```
 
@@ -229,7 +229,7 @@ packages/data/src/repos/
 
 ---
 
-## 👤 Guest vs Authenticated Mode
+## Guest vs Authenticated Mode
 
 ### Guest Mode (Not Signed In)
 
@@ -250,10 +250,10 @@ packages/data/src/repos/
 
 ```
 User Action → Local Dexie (works_local, blobsMeta) → [INSTANT] UI
-                    ↓
-              Merge Layer (synced + local)
-                    ↓
-              React Query → Component
+ ↓
+ Merge Layer (synced + local)
+ ↓
+ React Query → Component
 ```
 
 ### Authenticated Mode (Signed In)
@@ -275,18 +275,18 @@ User Action → Local Dexie (works_local, blobsMeta) → [INSTANT] UI
 
 ```
 User Action → Local Dexie (works_local) → [INSTANT] UI
-                    ↓                    ↓
-              Merge Layer          WriteBuffer (enqueue)
-                    ↓                    ↓
-              React Query          POST /api/writes/batch
-                    ↓                    ↓
-              Component            Postgres (LWW)
-                                        ↓
-                                   Electric Sync (SSE)
-                                        ↓
-                                   useWorksSync(userId)
-                                        ↓
-                              works (synced) → Cleanup works_local
+ ↓ ↓
+ Merge Layer WriteBuffer (enqueue)
+ ↓ ↓
+ React Query POST /api/writes/batch
+ ↓ ↓
+ Component Postgres (LWW)
+ ↓
+ Electric Sync (SSE)
+ ↓
+ useWorksSync(userId)
+ ↓
+ works (synced) → Cleanup works_local
 ```
 
 ### Guest Upgrade Flow
@@ -296,17 +296,17 @@ When user signs in after using app as guest:
 1. **Auth state updates**: `setAuthState(true, userId, deviceId)`
 2. **handleSignIn()** checks for guest data: `hasGuestData()`
 3. **If guest data exists**: `upgradeGuestToUser(userId, deviceId, cas, apiBaseUrl, authToken?)`
-   - Updates `owner_id` on all local entities
-   - Flushes pending WriteBuffer changes
-   - Syncs blobs to server coordination tables
+ - Updates `owner_id` on all local entities
+ - Flushes pending WriteBuffer changes
+ - Syncs blobs to server coordination tables
 4. **Electric sync starts**: SyncManager calls all sync hooks with userId
 5. **Result**: Guest data becomes part of user's synced library
 
-📎 See `GUIDE_GUEST_SIGN_IN.md` for the precise ordering of `handleSignIn`/`handleSignOut`, polling windows, and CAS coordination steps shared across platforms.
+See `GUIDE_GUEST_SIGN_IN.md` for the precise ordering of `handleSignIn`/`handleSignOut`, polling windows, and CAS coordination steps shared across platforms.
 
 ---
 
-## 🔌 Platform Injection Pattern
+## Platform Injection Pattern
 
 ### Problem
 
@@ -323,13 +323,13 @@ UI components need to access blobs, but blob storage is platform-specific:
 ```typescript
 // packages/blob-storage/src/index.ts
 export interface BlobCAS {
-  has(sha256: string): Promise<boolean>;
-  stat(sha256: string): Promise<BlobInfo | null>;
-  list(): Promise<BlobWithMetadata[]>;
-  getUrl(sha256: string): string;
-  put(source: any, opts?: any): Promise<BlobWithMetadata>;
-  delete(sha256: string): Promise<void>;
-  scan(): Promise<ScanResult>;
+ has(sha256: string): Promise<boolean>;
+ stat(sha256: string): Promise<BlobInfo | null>;
+ list(): Promise<BlobWithMetadata[]>;
+ getUrl(sha256: string): string;
+ put(source: any, opts?: any): Promise<BlobWithMetadata>;
+ delete(sha256: string): Promise<void>;
+ scan(): Promise<ScanResult>;
 }
 ```
 
@@ -338,25 +338,25 @@ export interface BlobCAS {
 ```typescript
 // apps/web/src/blob-storage/web.ts
 export class WebBlobStorage implements BlobCAS {
-  async list() {
-    const response = await fetch("/api/library/blobs");
-    return response.json();
-  }
-  getUrl(sha256: string) {
-    return `/api/blob/${sha256}`;
-  }
-  // ... other methods wrap API routes
+ async list() {
+ const response = await fetch("/api/library/blobs");
+ return response.json();
+ }
+ getUrl(sha256: string) {
+ return `/api/blob/${sha256}`;
+ }
+ // ... other methods wrap API routes
 }
 
 // apps/desktop/src/blob-storage/tauri.ts
 export class TauriBlobStorage implements BlobCAS {
-  async list() {
-    return invoke<BlobWithMetadata[]>("list_blobs");
-  }
-  getUrl(sha256: string) {
-    return `asset://blobs/${sha256}`;
-  }
-  // ... other methods call Tauri commands
+ async list() {
+ return invoke<BlobWithMetadata[]>("list_blobs");
+ }
+ getUrl(sha256: string) {
+ return `asset://blobs/${sha256}`;
+ }
+ // ... other methods call Tauri commands
 }
 ```
 
@@ -365,12 +365,12 @@ export class TauriBlobStorage implements BlobCAS {
 ```typescript
 // apps/web/src/hooks/useBlobStorage.ts
 export function useWebBlobStorage(): BlobCAS {
-  return useMemo(() => getWebBlobStorage(), []);
+ return useMemo(() => getWebBlobStorage(), []);
 }
 
 // apps/desktop/src/hooks/useBlobStorage.ts
 export function useTauriBlobStorage(): BlobCAS {
-  return useMemo(() => getTauriBlobStorage(), []);
+ return useMemo(() => getTauriBlobStorage(), []);
 }
 ```
 
@@ -379,16 +379,16 @@ export function useTauriBlobStorage(): BlobCAS {
 ```typescript
 // packages/data/src/hooks/useBlobBridge.ts
 export function useOrphanedBlobs(cas: BlobCAS) {
-  const { data: assets } = useAssets(); // Layer 2: Electric
-  const { data: casBlobs } = useQuery({
-    queryKey: ["blobs", "cas", "all"],
-    queryFn: () => cas.list(), // Layer 1: Platform CAS
-  });
+ const { data: assets } = useAssets(); // Layer 2: Electric
+ const { data: casBlobs } = useQuery({
+ queryKey: ["blobs", "cas", "all"],
+ queryFn: () => cas.list(), // Layer 1: Platform CAS
+ });
 
-  // Combine: Blobs in CAS without Asset metadata
-  return casBlobs?.filter(
-    (blob) => !assets?.some((a) => a.sha256 === blob.sha256)
-  );
+ // Combine: Blobs in CAS without Asset metadata
+ return casBlobs?.filter(
+ (blob) => !assets?.some((a) => a.sha256 === blob.sha256)
+ );
 }
 ```
 
@@ -397,10 +397,10 @@ export function useOrphanedBlobs(cas: BlobCAS) {
 ```typescript
 // apps/web/app/library/page.tsx
 export default function LibraryPage() {
-  const cas = useWebBlobStorage(); // Platform injection
-  const orphans = useOrphanedBlobs(cas); // Platform-agnostic!
+ const cas = useWebBlobStorage(); // Platform injection
+ const orphans = useOrphanedBlobs(cas); // Platform-agnostic!
 
-  return <OrphanedBlobsList orphans={orphans} />;
+ return <OrphanedBlobsList orphans={orphans} />;
 }
 ```
 
@@ -413,7 +413,7 @@ export default function LibraryPage() {
 
 ---
 
-## 🎛️ SyncManager Pattern
+## SyncManager Pattern
 
 ### Problem
 
@@ -426,39 +426,39 @@ Multiple components subscribing to Electric shapes → multiple writers to same 
 ```typescript
 // apps/web/app/providers.tsx
 function SyncManager({ userId }: { userId?: string }) {
-  // Call ALL sync hooks exactly once
-  useWorksSync(userId);
-  useAssetsSync(userId);
-  useActivitiesSync(userId);
-  useAnnotationsSync(userId);
-  useCardsSync(userId);
-  useReviewLogsSync(userId);
-  useBoardsSync(userId);
-  useStrokesSync(userId);
-  useAuthorsSync(userId);
-  useCollectionsSync(userId);
-  useEdgesSync(userId);
-  usePresetsSync(userId);
-  useReplicationJobsSync(userId);
-  // Blob coordination syncs in ConditionalSyncManager (see below)
+ // Call ALL sync hooks exactly once
+ useWorksSync(userId);
+ useAssetsSync(userId);
+ useActivitiesSync(userId);
+ useAnnotationsSync(userId);
+ useCardsSync(userId);
+ useReviewLogsSync(userId);
+ useBoardsSync(userId);
+ useStrokesSync(userId);
+ useAuthorsSync(userId);
+ useCollectionsSync(userId);
+ useEdgesSync(userId);
+ usePresetsSync(userId);
+ useReplicationJobsSync(userId);
+ // Blob coordination syncs in ConditionalSyncManager (see below)
 
-  return null; // No UI, just sync orchestration
+ return null; // No UI, just sync orchestration
 }
 
 // Special case: Blob syncs run even for guests (needed for CAS coordination)
 function ConditionalSyncManager() {
-  const { data: session, status } = useSession();
-  const userId = status === "authenticated" ? session?.user?.id : undefined;
+ const { data: session, status } = useSession();
+ const userId = status === "authenticated" ? session?.user?.id : undefined;
 
-  // Always sync blob metadata (even for guests, but filtered by userId)
-  useBlobsMetaSync(userId);
-  useDeviceBlobsSync(userId);
+ // Always sync blob metadata (even for guests, but filtered by userId)
+ useBlobsMetaSync(userId);
+ useDeviceBlobsSync(userId);
 
-  // Only sync user entities when authenticated
-  if (userId) {
-    return <SyncManager userId={userId} />;
-  }
-  return null;
+ // Only sync user entities when authenticated
+ if (userId) {
+ return <SyncManager userId={userId} />;
+ }
+ return null;
 }
 ```
 
@@ -467,10 +467,10 @@ function ConditionalSyncManager() {
 ```typescript
 // apps/web/app/library/page.tsx
 export default function LibraryPage() {
-  const { data: works } = useWorks(); // ✅ Read-only, no side effects
-  const { data: assets } = useAssets(); // ✅ Safe to call from many components
+ const { data: works } = useWorks(); // ✅ Read-only, no side effects
+ const { data: assets } = useAssets(); // ✅ Safe to call from many components
 
-  return <WorksList works={works} />;
+ return <WorksList works={works} />;
 }
 ```
 
@@ -485,61 +485,61 @@ export default function LibraryPage() {
 
 ---
 
-## 📦 Folder Structure & File Counts
+## Folder Structure & File Counts
 
 ### Monorepo Layout
 
 ```
 packages/
-├── core/                        # Zod schemas, types, utilities
-│   └── src/schemas/             # Entity schemas (20+ files)
-├── data/                        # Data layer (platform-agnostic)
-│   ├── src/
-│   │   ├── db/dexie.ts          # Dexie schema (v3, 1230 lines)
-│   │   ├── repos/               # 60+ files (4 per entity typically)
-│   │   │   ├── works.local.ts
-│   │   │   ├── works.electric.ts
-│   │   │   ├── works.merged.ts
-│   │   │   ├── works.cleanup.ts
-│   │   │   ├── blobs-meta.local.ts
-│   │   │   ├── blobs-meta.electric.ts
-│   │   │   ├── blobs-meta.writes.ts   # No merged/cleanup!
-│   │   │   └── ...
-│   │   ├── hooks/               # 20+ React hooks
-│   │   │   ├── useWorks.ts
-│   │   │   ├── useBlobsMeta.ts
-│   │   │   └── useBlobBridge.ts
-│   │   ├── utils/               # deviceId, merge logic
-│   │   ├── auth.ts              # Global auth state
-│   │   ├── electric.ts          # Electric client (542 lines)
-│   │   └── writeBuffer.ts       # Background sync queue (582 lines)
-├── blob-storage/                # CAS interface (platform-agnostic)
-│   └── src/index.ts             # BlobCAS interface + types
-└── ui/                          # Shared components
+├── core/ # Zod schemas, types, utilities
+│ └── src/schemas/ # Entity schemas (20+ files)
+├── data/ # Data layer (platform-agnostic)
+│ ├── src/
+│ │ ├── db/dexie.ts # Dexie schema (v3, 1230 lines)
+│ │ ├── repos/ # 60+ files (4 per entity typically)
+│ │ │ ├── works.local.ts
+│ │ │ ├── works.electric.ts
+│ │ │ ├── works.merged.ts
+│ │ │ ├── works.cleanup.ts
+│ │ │ ├── blobs-meta.local.ts
+│ │ │ ├── blobs-meta.electric.ts
+│ │ │ ├── blobs-meta.writes.ts # No merged/cleanup!
+│ │ │ └── ...
+│ │ ├── hooks/ # 20+ React hooks
+│ │ │ ├── useWorks.ts
+│ │ │ ├── useBlobsMeta.ts
+│ │ │ └── useBlobBridge.ts
+│ │ ├── utils/ # deviceId, merge logic
+│ │ ├── auth.ts # Global auth state
+│ │ ├── electric.ts # Electric client (542 lines)
+│ │ └── writeBuffer.ts # Background sync queue (582 lines)
+├── blob-storage/ # CAS interface (platform-agnostic)
+│ └── src/index.ts # BlobCAS interface + types
+└── ui/ # Shared components
 
 apps/
-├── web/                         # Next.js (Web platform)
-│   ├── app/                     # Pages + API routes
-│   │   └── api/
-│   │       ├── blob/[sha256]/route.ts    # Stream blobs
-│   │       ├── library/blobs/route.ts    # List blobs
-│   │       └── writes/batch/route.ts     # WriteBuffer flush
-│   └── src/
-│       ├── blob-storage/web.ts           # Web CAS implementation
-│       ├── hooks/
-│       │   └── useBlobStorage.ts         # useWebBlobStorage()
-│       └── server/
-│           ├── cas.ts                    # File scanning, hashing, storage
-│           └── db.ts                     # Drizzle ORM (SQLite for blobs)
-├── desktop/                     # Tauri (see docs/ARCHITECTURE/GUIDE_DESKTOP.md)
-│   ├── src/
-│   │   ├── blob-storage/tauri.ts         # Tauri CAS implementation
-│   │   └── hooks/useBlobStorage.ts       # useTauriBlobStorage()
-│   └── src-tauri/src/commands/blobs.rs   # Rust blob commands
-└── mobile/                      # Capacitor (iOS/Android)
-    └── src/
-        ├── blob-storage/capacitor.ts     # Capacitor CAS implementation
-        └── hooks/useBlobStorage.ts       # useCapacitorBlobStorage()
+├── web/ # Next.js (Web platform)
+│ ├── app/ # Pages + API routes
+│ │ └── api/
+│ │ ├── blob/[sha256]/route.ts # Stream blobs
+│ │ ├── library/blobs/route.ts # List blobs
+│ │ └── writes/batch/route.ts # WriteBuffer flush
+│ └── src/
+│ ├── blob-storage/web.ts # Web CAS implementation
+│ ├── hooks/
+│ │ └── useBlobStorage.ts # useWebBlobStorage()
+│ └── server/
+│ ├── cas.ts # File scanning, hashing, storage
+│ └── db.ts # Drizzle ORM (SQLite for blobs)
+├── desktop/ # Tauri (see docs/ARCHITECTURE/GUIDE_DESKTOP.md)
+│ ├── src/
+│ │ ├── blob-storage/tauri.ts # Tauri CAS implementation
+│ │ └── hooks/useBlobStorage.ts # useTauriBlobStorage()
+│ └── src-tauri/src/commands/blobs.rs # Rust blob commands
+└── mobile/ # Capacitor (iOS/Android)
+ └── src/
+ ├── blob-storage/capacitor.ts # Capacitor CAS implementation
+ └── hooks/useBlobStorage.ts # useCapacitorBlobStorage()
 ```
 
 **Key Insight**: Only **3 platform-specific files** per app:
@@ -552,49 +552,49 @@ Everything else (`packages/data/`, `packages/ui/`) is platform-agnostic!
 
 ---
 
-## 🔍 Data Type Inventory
+## Data Type Inventory
 
 ### Entities Following Standard Optimistic Pattern (4 Files Each)
 
-| Entity          | Purpose                       | Postgres Table | Dexie Tables                       | Owner Filter |
+| Entity | Purpose | Postgres Table | Dexie Tables | Owner Filter |
 | --------------- | ----------------------------- | -------------- | ---------------------------------- | ------------ |
-| **works**       | Abstract intellectual works   | `works`        | `works`, `works_local`             | `owner_id`   |
-| **assets**      | Concrete files (PDFs, EPUBs)  | `assets`       | `assets`, `assets_local`           | `owner_id`   |
-| **authors**     | Researchers and writers       | `authors`      | `authors`, `authors_local`         | `owner_id`   |
-| **activities**  | Courses and projects          | `activities`   | `activities`, `activities_local`   | `owner_id`   |
-| **collections** | Curated groupings             | `collections`  | `collections`, `collections_local` | `owner_id`   |
-| **edges**       | Typed relationships           | `edges`        | `edges`, `edges_local`             | `owner_id`   |
-| **presets**     | Study deck templates          | `presets`      | `presets`, `presets_local`         | `owner_id`   |
-| **annotations** | PDF highlights, notes         | `annotations`  | `annotations`, `annotations_local` | `owner_id`   |
-| **cards**       | Flashcards (from annotations) | `cards`        | `cards`, `cards_local`             | `owner_id`   |
-| **reviewLogs**  | Study session history         | `review_logs`  | `reviewLogs`, `reviewLogs_local`   | `owner_id`   |
-| **boards**      | Whiteboard documents          | `boards`       | `boards`, `boards_local`           | `owner_id`   |
-| **strokes**     | Ink strokes and shapes        | `strokes`      | `strokes`, `strokes_local`         | `owner_id`   |
+| **works** | Abstract intellectual works | `works` | `works`, `works_local` | `owner_id` |
+| **assets** | Concrete files (PDFs, EPUBs) | `assets` | `assets`, `assets_local` | `owner_id` |
+| **authors** | Researchers and writers | `authors` | `authors`, `authors_local` | `owner_id` |
+| **activities** | Courses and projects | `activities` | `activities`, `activities_local` | `owner_id` |
+| **collections** | Curated groupings | `collections` | `collections`, `collections_local` | `owner_id` |
+| **edges** | Typed relationships | `edges` | `edges`, `edges_local` | `owner_id` |
+| **presets** | Study deck templates | `presets` | `presets`, `presets_local` | `owner_id` |
+| **annotations** | PDF highlights, notes | `annotations` | `annotations`, `annotations_local` | `owner_id` |
+| **cards** | Flashcards (from annotations) | `cards` | `cards`, `cards_local` | `owner_id` |
+| **reviewLogs** | Study session history | `review_logs` | `reviewLogs`, `reviewLogs_local` | `owner_id` |
+| **boards** | Whiteboard documents | `boards` | `boards`, `boards_local` | `owner_id` |
+| **strokes** | Ink strokes and shapes | `strokes` | `strokes`, `strokes_local` | `owner_id` |
 
 **Total**: 12 entity types × 4 files = **48 repository files**
 
 ### Entities Following Blob Coordination Pattern (2-3 Files Each)
 
-| Entity               | Purpose                       | Postgres Table     | Dexie Table       | Owner Filter |
+| Entity | Purpose | Postgres Table | Dexie Table | Owner Filter |
 | -------------------- | ----------------------------- | ------------------ | ----------------- | ------------ |
-| **blobs_meta**       | Global blob metadata          | `blobs_meta`       | `blobsMeta`       | `owner_id`   |
-| **device_blobs**     | Device-level blob tracking    | `device_blobs`     | `deviceBlobs`     | `owner_id`   |
-| **replication_jobs** | P2P/cloud sync tasks (future) | `replication_jobs` | `replicationJobs` | `owner_id`   |
+| **blobs_meta** | Global blob metadata | `blobs_meta` | `blobsMeta` | `owner_id` |
+| **device_blobs** | Device-level blob tracking | `device_blobs` | `deviceBlobs` | `owner_id` |
+| **replication_jobs** | P2P/cloud sync tasks (future) | `replication_jobs` | `replicationJobs` | `owner_id` |
 
 **Total**: 3 entity types × 2-3 files = **7 repository files**
 
 ### Platform-Local Data (Not Synced)
 
-| Data Type          | Storage                   | Platform                                           | Purpose                                    |
+| Data Type | Storage | Platform | Purpose |
 | ------------------ | ------------------------- | -------------------------------------------------- | ------------------------------------------ |
-| **Blob files**     | Filesystem + SQLite index | Web: apps/web/data/, Desktop: Rust, Mobile: Native | Actual file bytes (too large for Electric) |
-| **PDF page cache** | IndexedDB (separate DB)   | All                                                | LRU cache for rendered PDF pages           |
-| **Device ID**      | LocalStorage              | All                                                | Persistent device identifier               |
-| **Auth tokens**    | Secure storage            | All                                                | JWT tokens, refresh tokens                 |
+| **Blob files** | Filesystem + SQLite index | Web: apps/web/data/, Desktop: Rust, Mobile: Native | Actual file bytes (too large for Electric) |
+| **PDF page cache** | IndexedDB (separate DB) | All | LRU cache for rendered PDF pages |
+| **Device ID** | LocalStorage | All | Persistent device identifier |
+| **Auth tokens** | Secure storage | All | JWT tokens, refresh tokens |
 
 ---
 
-## 🚦 Key Principles
+## Key Principles
 
 1. **Blobs Stay Local** - Never sync large binaries through Electric (only small metadata)
 2. **Electric Coordinates** - Small tables track presence, schedule replication
@@ -606,7 +606,7 @@ Everything else (`packages/data/`, `packages/ui/`) is platform-agnostic!
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - **GUIDE_OPTIMISTIC_UPDATES.md** - Detailed implementation patterns for standard entities
 - **GUIDE_SYNC_ARCHITECTURE.md** - SyncManager pattern rationale and best practices
@@ -615,14 +615,14 @@ Everything else (`packages/data/`, `packages/ui/`) is platform-agnostic!
 
 ---
 
-## 📈 Architecture Evolution
+## Architecture Evolution
 
-**Phase 1** (Complete): Two-layer separation (CAS + Electric)  
-**Phase 2** (Complete): Platform injection pattern  
-**Phase 3** (Complete): Blob coordination tables (blobs_meta, device_blobs)  
-**Phase 4** (Complete): Guest mode support  
-**Phase 5** (In Progress): Blob health monitoring, scan automation  
-**Phase 6** (Future): Cloud sync (S3/MinIO) via replication_jobs  
+**Phase 1** (Complete): Two-layer separation (CAS + Electric) 
+**Phase 2** (Complete): Platform injection pattern 
+**Phase 3** (Complete): Blob coordination tables (blobs_meta, device_blobs) 
+**Phase 4** (Complete): Guest mode support 
+**Phase 5** (In Progress): Blob health monitoring, scan automation 
+**Phase 6** (Future): Cloud sync (S3/MinIO) via replication_jobs 
 **Phase 7** (Future): P2P sync (WebRTC/Tauri channels) for large files
 
 **Current State**: Production-ready for Web/Desktop/Mobile with guest mode, optimistic updates, and blob coordination fully functional.

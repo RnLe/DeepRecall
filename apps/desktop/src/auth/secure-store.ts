@@ -11,6 +11,10 @@ import { invoke } from "@tauri-apps/api/core";
 const FALLBACK_PREFIX = "deeprecall.auth.";
 
 const KEYCHAIN_SERVICE = "dev.deeprecall.desktop";
+const PROFILE_KEY = "user_profile";
+
+const fallbackKeysInUse = new Set<string>();
+const pendingRehydrate = new Map<string, Promise<void>>();
 
 function hasFallbackStorage(): boolean {
   return typeof window !== "undefined" && !!window.localStorage;
@@ -66,6 +70,43 @@ export interface SecureStore {
   clear(): Promise<void>;
 }
 
+function recordFallbackUsage(key: string) {
+  if (!fallbackKeysInUse.has(key)) {
+    fallbackKeysInUse.add(key);
+    console.info(
+      `[SecureStore] Using fallback storage for ${key} (keychain entry missing)`
+    );
+  } else {
+    console.debug(`[SecureStore] Using cached fallback for ${key}`);
+  }
+}
+
+function recordKeychainRecovery(key: string) {
+  if (fallbackKeysInUse.delete(key)) {
+    console.info(`[SecureStore] Keychain entry restored for ${key}`);
+  }
+}
+
+function scheduleRehydrate(fullKey: string, key: string, value: string) {
+  if (pendingRehydrate.has(fullKey)) {
+    return;
+  }
+
+  const attempt = invoke("save_auth_session", { key: fullKey, value })
+    .then(() => {
+      console.info(`[SecureStore] Rehydrated keychain for ${key}`);
+      fallbackKeysInUse.delete(key);
+    })
+    .catch((error) => {
+      console.debug(`[SecureStore] Keychain still missing ${key}`, error);
+    })
+    .finally(() => {
+      pendingRehydrate.delete(fullKey);
+    });
+
+  pendingRehydrate.set(fullKey, attempt);
+}
+
 /**
  * Save a value securely to the OS keychain
  */
@@ -78,6 +119,7 @@ async function save(key: string, value: string): Promise<void> {
       value: value,
     });
     console.log(`[SecureStore] Saved ${key} to keychain`);
+    recordKeychainRecovery(key);
   } catch (error) {
     console.error(`[SecureStore] Failed to save ${key}:`, error);
     console.warn(`[SecureStore] Falling back to local storage for ${key}`);
@@ -100,16 +142,25 @@ async function get(key: string): Promise<string | null> {
 
     if (value) {
       console.log(`[SecureStore] Retrieved ${key} from keychain`);
+      recordKeychainRecovery(key);
       return value;
     }
-
-    console.warn(`[SecureStore] No value found for ${key}, checking fallback`);
+    console.debug(`[SecureStore] Keychain returned empty for ${key}`);
   } catch (error) {
     console.error(`[SecureStore] Failed to get ${key}:`, error);
     console.warn(`[SecureStore] Falling back to local storage for ${key}`);
   }
 
-  return getFallback(key);
+  const fallbackValue = getFallback(key);
+
+  if (fallbackValue) {
+    recordFallbackUsage(key);
+    scheduleRehydrate(fullKey, key, fallbackValue);
+    return fallbackValue;
+  }
+
+  console.warn(`[SecureStore] No stored value for ${key}`);
+  return null;
 }
 
 /**
@@ -141,6 +192,7 @@ async function clear(): Promise<void> {
     "github_refresh_token",
     "user_id",
     "device_id",
+    PROFILE_KEY,
   ];
 
   for (const key of keys) {
@@ -166,6 +218,37 @@ export const secureStore: SecureStore = {
   delete: deleteKey,
   clear,
 };
+
+export interface StoredUserProfile {
+  userId: string;
+  email?: string | null;
+  name?: string | null;
+  avatarUrl?: string | null;
+  updatedAt?: string | null;
+}
+
+async function saveProfile(profile: StoredUserProfile): Promise<void> {
+  await save(PROFILE_KEY, JSON.stringify(profile));
+}
+
+async function getProfile(): Promise<StoredUserProfile | null> {
+  const raw = await get(PROFILE_KEY);
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as StoredUserProfile;
+  } catch (error) {
+    console.warn("[SecureStore] Failed to parse stored profile", error);
+    return null;
+  }
+}
+
+async function clearProfile(): Promise<void> {
+  await deleteKey(PROFILE_KEY);
+}
 
 /**
  * Token-specific helpers
@@ -214,4 +297,10 @@ export const tokens = {
   async clearAll(): Promise<void> {
     await clear();
   },
+};
+
+export const profileStore = {
+  save: saveProfile,
+  get: getProfile,
+  clear: clearProfile,
 };

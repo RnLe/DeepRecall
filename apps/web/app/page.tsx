@@ -63,14 +63,14 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/review"
+            href="/study"
             className="group p-8 bg-gray-900 border border-gray-800 rounded-lg hover:border-green-500 transition-all duration-200"
           >
             <div className="flex flex-col items-center space-y-4">
               <Brain className="w-12 h-12 text-green-400 group-hover:scale-110 transition-transform" />
-              <h2 className="text-2xl font-semibold">Study</h2>
+              <h2 className="text-2xl font-semibold">Dojo</h2>
               <p className="text-gray-400 text-center">
-                Daily SRS review session
+                Math &amp; Physics training
               </p>
             </div>
           </Link>

@@ -1,7 +1,7 @@
 # Web Deployment Guide (Railway)
 
-**Platform**: Next.js on Railway  
-**Deploy Method**: Auto-deploy on push to `main`  
+**Platform**: Next.js on Railway 
+**Deploy Method**: Auto-deploy on push to `main` 
 **Build Time**: ~5 minutes
 
 This guide covers deploying the DeepRecall web app to Railway.
@@ -69,18 +69,18 @@ Railway uses `apps/web/railway.json`:
 
 ```json
 {
-  "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "cd ../.. && pnpm install && cd apps/web && pnpm run build",
-    "watchPatterns": ["apps/web/**", "packages/**"]
-  },
-  "deploy": {
-    "startCommand": "cd apps/web && pnpm start",
-    "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 100,
-    "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10
-  }
+ "build": {
+ "builder": "NIXPACKS",
+ "buildCommand": "cd ../.. && pnpm install && cd apps/web && pnpm run build",
+ "watchPatterns": ["apps/web/**", "packages/**"]
+ },
+ "deploy": {
+ "startCommand": "cd apps/web && pnpm start",
+ "healthcheckPath": "/api/health",
+ "healthcheckTimeout": 100,
+ "restartPolicyType": "ON_FAILURE",
+ "restartPolicyMaxRetries": 10
+ }
 }
 ```
 
@@ -131,9 +131,9 @@ Migrations run automatically on startup via `apps/web/src/app/layout.tsx`:
 ```typescript
 // Apply migrations on server startup
 if (typeof window === "undefined") {
-  import("@/server/migrations").then(({ applyMigrations }) => {
-    applyMigrations();
-  });
+ import("@/server/migrations").then(({ applyMigrations }) => {
+ applyMigrations();
+ });
 }
 ```
 
@@ -166,7 +166,7 @@ Railway automatically pings `/api/health` every 100 seconds:
 ```typescript
 // apps/web/app/api/health/route.ts
 export async function GET() {
-  return Response.json({ status: "ok", timestamp: Date.now() });
+ return Response.json({ status: "ok", timestamp: Date.now() });
 }
 ```
 
@@ -255,9 +255,9 @@ Open http://localhost:3000 and verify:
 **Fix**: Update OAuth provider authorized redirect URIs:
 
 - Google: https://console.cloud.google.com/apis/credentials
-  - Add: `https://deeprecall-production.up.railway.app/api/auth/callback/google`
+ - Add: `https://deeprecall-production.up.railway.app/api/auth/callback/google`
 - GitHub: https://github.com/settings/developers
-  - Add: `https://deeprecall-production.up.railway.app/api/auth/callback/github`
+ - Add: `https://deeprecall-production.up.railway.app/api/auth/callback/github`
 
 ---
 

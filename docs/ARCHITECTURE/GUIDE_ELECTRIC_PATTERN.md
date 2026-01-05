@@ -10,52 +10,52 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      React Components                       │
-│            (apps/web, apps/desktop, apps/mobile)            │
+│ React Components │
+│ (apps/web, apps/desktop, apps/mobile) │
 └───────────────────────┬──────────────┬──────────────────────┘
-                        │              │
-                 ┌──────▼──────┐  ┌────▼─────┐
-                 │  useWorks() │  │ Create/  │
-                 │  (Merged)   │  │ Update   │
-                 └──────┬──────┘  └────┬─────┘
-                        │              │
+ │ │
+ ┌──────▼──────┐ ┌────▼─────┐
+ │ useWorks() │ │ Create/ │
+ │ (Merged) │ │ Update │
+ └──────┬──────┘ └────┬─────┘
+ │ │
 ┌───────────────────────▼──────────────▼──────────────────────┐
-│              4-File Repository Pattern                      │
-│  ┌─────────────────────┐        ┌────────────────────────┐  │
-│  │   READ PATH         │        │   WRITE PATH           │  │
-│  │   works.merged.ts   │        │   works.local.ts       │  │
-│  │   (synced + local)  │        │   writeBuffer.enqueue()│  │
-│  └──────────┬──────────┘        └──────────┬─────────────┘  │
+│ 4-File Repository Pattern │
+│ ┌─────────────────────┐ ┌────────────────────────┐ │
+│ │ READ PATH │ │ WRITE PATH │ │
+│ │ works.merged.ts │ │ works.local.ts │ │
+│ │ (synced + local) │ │ writeBuffer.enqueue()│ │
+│ └──────────┬──────────┘ └──────────┬─────────────┘ │
 └─────────────┼─────────────────────────────┼────────────────┘
-              │                              │
-   ┌──────────▼────────────┐      ┌──────────▼────────────┐
-   │  works.electric.ts    │      │  WriteBuffer (Dexie)  │
-   │  Electric ShapeStream │      │  DeepRecallWriteBuffer│
-   │  (SSE from Electric)  │      │  - Queue pending      │
-   └──────────┬────────────┘      │  - Retry on failure   │
-              │                   └──────────┬─────────────┘
-              │                              │
-              │                   ┌──────────▼────────────┐
-              │                   │   Background Worker   │
-              │                   │   - Batch changes     │
-              │                   │   - Exponential retry │
-              │                   └──────────┬─────────────┘
-              │                              │ POST
-              │                              │ /api/writes/batch
-        ┌─────▼──────────────────────────────▼─────────┐
-        │          PostgreSQL (Neon)                   │
-        │  - Source of truth                           │
-        │  - RLS owner_id filtering                    │
-        └─────┬──────────────────────────────┬─────────┘
-              │                              │
-              └──────────┬───────────────────┘
-                         │
-                ┌────────▼─────────┐
-                │ Electric Service │
-                │ - SSE broadcast  │
-                └───────────────────┘
-                         │
-                         └──────> All connected clients
+ │ │
+ ┌──────────▼────────────┐ ┌──────────▼────────────┐
+ │ works.electric.ts │ │ WriteBuffer (Dexie) │
+ │ Electric ShapeStream │ │ DeepRecallWriteBuffer│
+ │ (SSE from Electric) │ │ - Queue pending │
+ └──────────┬────────────┘ │ - Retry on failure │
+ │ └──────────┬─────────────┘
+ │ │
+ │ ┌──────────▼────────────┐
+ │ │ Background Worker │
+ │ │ - Batch changes │
+ │ │ - Exponential retry │
+ │ └──────────┬─────────────┘
+ │ │ POST
+ │ │ /api/writes/batch
+ ┌─────▼──────────────────────────────▼─────────┐
+ │ PostgreSQL (Neon) │
+ │ - Source of truth │
+ │ - RLS owner_id filtering │
+ └─────┬──────────────────────────────┬─────────┘
+ │ │
+ └──────────┬───────────────────┘
+ │
+ ┌────────▼─────────┐
+ │ Electric Service │
+ │ - SSE broadcast │
+ └───────────────────┘
+ │
+ └──────> All connected clients
 ```
 
 ---
@@ -70,12 +70,12 @@ Each entity (works, assets, annotations, etc.) uses **4 repository files**:
 
 ```typescript
 export async function createWork(data: WorkInput) {
-  const work = { id: uuid(), ...data, created_at: Date.now() };
-  await db.works_local.add(work); // Instant local write
-  if (isAuthenticated()) {
-    await writeBuffer.enqueue({ table: "works", op: "insert", payload: work });
-  }
-  return work;
+ const work = { id: uuid(), ...data, created_at: Date.now() };
+ await db.works_local.add(work); // Instant local write
+ if (isAuthenticated()) {
+ await writeBuffer.enqueue({ table: "works", op: "insert", payload: work });
+ }
+ return work;
 }
 ```
 
@@ -87,10 +87,10 @@ export async function createWork(data: WorkInput) {
 
 ```typescript
 export function useWorksSync(userId?: string) {
-  return useShape<Work>({
-    table: "works",
-    where: userId ? `owner_id = '${userId}'` : "1 = 0", // Never match for guests
-  });
+ return useShape<Work>({
+ table: "works",
+ where: userId ? `owner_id = '${userId}'` : "1 = 0", // Never match for guests
+ });
 }
 ```
 
@@ -102,14 +102,14 @@ export function useWorksSync(userId?: string) {
 
 ```typescript
 export function useWorks() {
-  const { data: synced } = useLiveQuery(() => db.works.toArray());
-  const { data: local } = useLiveQuery(() => db.works_local.toArray());
+ const { data: synced } = useLiveQuery(() => db.works.toArray());
+ const { data: local } = useLiveQuery(() => db.works_local.toArray());
 
-  return useMemo(() => {
-    const map = new Map(synced?.map((w) => [w.id, w]));
-    local?.forEach((w) => map.set(w.id, w)); // Local overrides synced
-    return Array.from(map.values());
-  }, [synced, local]);
+ return useMemo(() => {
+ const map = new Map(synced?.map((w) => [w.id, w]));
+ local?.forEach((w) => map.set(w.id, w)); // Local overrides synced
+ return Array.from(map.values());
+ }, [synced, local]);
 }
 ```
 
@@ -121,13 +121,13 @@ export function useWorks() {
 
 ```typescript
 export async function cleanupWorks() {
-  const synced = await db.works.toArray();
-  const local = await db.works_local.toArray();
+ const synced = await db.works.toArray();
+ const local = await db.works_local.toArray();
 
-  const syncedIds = new Set(synced.map((w) => w.id));
-  const toDelete = local.filter((w) => syncedIds.has(w.id));
+ const syncedIds = new Set(synced.map((w) => w.id));
+ const toDelete = local.filter((w) => syncedIds.has(w.id));
 
-  await db.works_local.bulkDelete(toDelete.map((w) => w.id));
+ await db.works_local.bulkDelete(toDelete.map((w) => w.id));
 }
 ```
 
@@ -143,18 +143,18 @@ export async function cleanupWorks() {
 
 ```typescript
 interface WriteBuffer {
-  enqueue(change: WriteChange): Promise<WriteChange>;
-  flush(): Promise<void>; // Manual flush
-  size(): Promise<number>;
+ enqueue(change: WriteChange): Promise<WriteChange>;
+ flush(): Promise<void>; // Manual flush
+ size(): Promise<number>;
 }
 
 interface WriteChange {
-  id: string; // UUID
-  table: string; // "works", "assets", etc.
-  op: "insert" | "update" | "delete";
-  payload: any; // Validated data
-  status: "pending" | "syncing" | "applied" | "error";
-  retry_count: number;
+ id: string; // UUID
+ table: string; // "works", "assets", etc.
+ op: "insert" | "update" | "delete";
+ payload: any; // Validated data
+ status: "pending" | "syncing" | "applied" | "error";
+ retry_count: number;
 }
 ```
 

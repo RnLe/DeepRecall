@@ -82,3 +82,7 @@ build-windows:
 migrate-neon:
 	@echo "Running Neon database migrations..."
 	cd apps/desktop && ./migrate-neon.sh
+
+# Upgrade Postgres database to latest schema
+pg-update:
+	@./scripts/pg-migrate.sh

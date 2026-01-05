@@ -1,6 +1,6 @@
 # GUIDE: Desktop Platform (Tauri)
 
-**Platform**: Windows/macOS/Linux (Tauri 2.x + Rust)  
+**Platform**: Windows/macOS/Linux (Tauri 2.x + Rust) 
 **Status**: ✅ Production-ready (November 2025)
 
 ## Overview
@@ -29,30 +29,30 @@ Desktop app is a **self-contained native application** built with Tauri, sharing
 
 ```typescript
 export class TauriBlobStorage implements BlobCAS {
-  async list(): Promise<BlobWithMetadata[]> {
-    return await invoke("list_blobs", { orphanedOnly: false });
-  }
+ async list(): Promise<BlobWithMetadata[]> {
+ return await invoke("list_blobs", { orphanedOnly: false });
+ }
 
-  async put(file: File): Promise<BlobWithMetadata> {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    return await invoke("store_blob", {
-      filename: file.name,
-      bytes: Array.from(uint8Array),
-    });
-  }
+ async put(file: File): Promise<BlobWithMetadata> {
+ const arrayBuffer = await file.arrayBuffer();
+ const uint8Array = new Uint8Array(arrayBuffer);
+ return await invoke("store_blob", {
+ filename: file.name,
+ bytes: Array.from(uint8Array),
+ });
+ }
 
-  async delete(sha256: string): Promise<void> {
-    await invoke("delete_blob", { sha256 });
-  }
+ async delete(sha256: string): Promise<void> {
+ await invoke("delete_blob", { sha256 });
+ }
 
-  getUrl(sha256: string): string {
-    return `asset://blob/${sha256}`;
-  }
+ getUrl(sha256: string): string {
+ return `asset://blob/${sha256}`;
+ }
 
-  async stat(sha256: string): Promise<BlobInfo | null> {
-    return await invoke("stat_blob", { sha256 });
-  }
+ async stat(sha256: string): Promise<BlobInfo | null> {
+ return await invoke("stat_blob", { sha256 });
+ }
 }
 ```
 
@@ -62,10 +62,10 @@ export class TauriBlobStorage implements BlobCAS {
 let casInstance: BlobCAS | null = null;
 
 export function useTauriBlobStorage(): BlobCAS {
-  if (!casInstance) {
-    casInstance = new TauriBlobStorage();
-  }
-  return casInstance;
+ if (!casInstance) {
+ casInstance = new TauriBlobStorage();
+ }
+ return casInstance;
 }
 ```
 
@@ -85,17 +85,17 @@ const { data: orphans } = useOrphanedBlobs(cas);
 
 ```typescript
 const worker = initFlushWorker({
-  flushHandler: async (changes) => {
-    const token = await secureTokens.getAppJWT();
-    const headers = { "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${apiBase}/api/writes/batch`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ changes }),
-    });
-    return res.json();
-  },
+ flushHandler: async (changes) => {
+ const token = await secureTokens.getAppJWT();
+ const headers = { "Content-Type": "application/json" };
+ if (token) headers.Authorization = `Bearer ${token}`;
+ const res = await fetch(`${apiBase}/api/writes/batch`, {
+ method: "POST",
+ headers,
+ body: JSON.stringify({ changes }),
+ });
+ return res.json();
+ },
 });
 ```
 
@@ -109,21 +109,21 @@ const worker = initFlushWorker({
 
 **Location**: `apps/desktop/src-tauri/src/commands/blobs.rs`
 
-**Storage**: `~/DeepRecall/blobs/` (SHA-256 named files)  
+**Storage**: `~/DeepRecall/blobs/` (SHA-256 named files) 
 **Catalog**: `~/DeepRecall/blobs/catalog.db` (SQLite)
 
 **Commands**:
 
-| Command          | Purpose                           | Returns                 |
+| Command | Purpose | Returns |
 | ---------------- | --------------------------------- | ----------------------- |
-| `list_blobs`     | List all blobs with metadata      | `Vec<BlobWithMetadata>` |
-| `stat_blob`      | Get blob metadata                 | `Option<BlobInfo>`      |
-| `store_blob`     | Upload file (SHA-256 hash, dedup) | `BlobWithMetadata`      |
-| `delete_blob`    | Remove blob file + catalog entry  | `Result<(), String>`    |
-| `scan_blobs`     | Scan filesystem, update catalog   | `ScanResult`            |
-| `get_blob_stats` | Storage statistics                | `BlobStats`             |
-| `rename_blob`    | Update filename in catalog        | `Result<(), String>`    |
-| `health_check`   | Verify catalog integrity          | `HealthReport`          |
+| `list_blobs` | List all blobs with metadata | `Vec<BlobWithMetadata>` |
+| `stat_blob` | Get blob metadata | `Option<BlobInfo>` |
+| `store_blob` | Upload file (SHA-256 hash, dedup) | `BlobWithMetadata` |
+| `delete_blob` | Remove blob file + catalog entry | `Result<(), String>` |
+| `scan_blobs` | Scan filesystem, update catalog | `ScanResult` |
+| `get_blob_stats` | Storage statistics | `BlobStats` |
+| `rename_blob` | Update filename in catalog | `Result<(), String>` |
+| `health_check` | Verify catalog integrity | `HealthReport` |
 
 **Key features**:
 
@@ -145,13 +145,13 @@ const worker = initFlushWorker({
 - Connects to Neon Postgres via SSL (`tokio-postgres-rustls`)
 - Reads credentials from env vars (baked at compile time)
 - Type-safe parameter conversion:
-  - Columns ending in `_id` or `_ids` → UUID parsing
-  - Arrays → `Vec<String>` or `Vec<uuid::Uuid>`
-  - JSONB → `postgres_types::Json<Value>`
+ - Columns ending in `_id` or `_ids` → UUID parsing
+ - Arrays → `Vec<String>` or `Vec<uuid::Uuid>`
+ - JSONB → `postgres_types::Json<Value>`
 - Schema transformation:
-  - `camelCase` → `snake_case` for column names
-  - ISO timestamps → epoch milliseconds
-  - Complex fields → JSONB serialization
+ - `camelCase` → `snake_case` for column names
+ - ISO timestamps → epoch milliseconds
+ - Complex fields → JSONB serialization
 - LWW conflict resolution (server-side updates check `updated_at`)
 
 **Critical fixes applied**:
@@ -169,11 +169,11 @@ const worker = initFlushWorker({
 
 **Location**: `apps/desktop/src-tauri/src/commands/avatars.rs`
 
-| Command          | Purpose                              |
+| Command | Purpose |
 | ---------------- | ------------------------------------ |
-| `upload_avatar`  | Store author avatar in local storage |
-| `delete_avatar`  | Remove avatar file                   |
-| `get_avatar_url` | Get Tauri asset URL for avatar       |
+| `upload_avatar` | Store author avatar in local storage |
+| `delete_avatar` | Remove avatar file |
+| `get_avatar_url` | Get Tauri asset URL for avatar |
 
 **Storage**: `~/DeepRecall/avatars/{author_id}.{ext}`
 
@@ -212,18 +212,18 @@ VITE_API_URL=https://deeprecall-production.up.railway.app
 ```rust
 // build.rs
 fn main() {
-    tauri_build::build();
+ tauri_build::build();
 
-    if let Ok(env_path) = std::env::var("CARGO_MANIFEST_DIR") {
-        let env_file = PathBuf::from(env_path).join("../.env.local");
-        if env_file.exists() {
-            for line in read_to_string(&env_file).unwrap().lines() {
-                if let Some((key, value)) = line.split_once('=') {
-                    println!("cargo:rustc-env={}={}", key.trim(), value.trim());
-                }
-            }
-        }
-    }
+ if let Ok(env_path) = std::env::var("CARGO_MANIFEST_DIR") {
+ let env_file = PathBuf::from(env_path).join("../.env.local");
+ if env_file.exists() {
+ for line in read_to_string(&env_file).unwrap().lines() {
+ if let Some((key, value)) = line.split_once('=') {
+ println!("cargo:rustc-env={}={}", key.trim(), value.trim());
+ }
+ }
+ }
+ }
 }
 ```
 
@@ -233,10 +233,10 @@ fn main() {
 
 ```rust
 fn get_pg_config() -> (String, u16, String, String, String, bool) {
-    let host = env::var("VITE_POSTGRES_HOST")
-        .or_else(|_| option_env!("VITE_POSTGRES_HOST").map(String::from).ok_or(()))
-        .unwrap_or_else(|_| "localhost".to_string());
-    // ... same pattern for other vars
+ let host = env::var("VITE_POSTGRES_HOST")
+ .or_else(|_| option_env!("VITE_POSTGRES_HOST").map(String::from).ok_or(()))
+ .unwrap_or_else(|_| "localhost".to_string());
+ // ... same pattern for other vars
 }
 ```
 
@@ -244,7 +244,7 @@ fn get_pg_config() -> (String, u16, String, String, String, bool) {
 
 ```typescript
 const electricUrl =
-  import.meta.env.VITE_ELECTRIC_URL || "http://localhost:5133";
+ import.meta.env.VITE_ELECTRIC_URL || "http://localhost:5133";
 ```
 
 ---
@@ -255,29 +255,29 @@ const electricUrl =
 
 ```typescript
 function ElectricInitializer() {
-  const electricUrl = import.meta.env.VITE_ELECTRIC_URL;
-  const electricSourceId = import.meta.env.VITE_ELECTRIC_SOURCE_ID;
-  const electricSecret = import.meta.env.VITE_ELECTRIC_SOURCE_SECRET;
+ const electricUrl = import.meta.env.VITE_ELECTRIC_URL;
+ const electricSourceId = import.meta.env.VITE_ELECTRIC_SOURCE_ID;
+ const electricSecret = import.meta.env.VITE_ELECTRIC_SOURCE_SECRET;
 
-  useEffect(() => {
-    initElectric({
-      url: electricUrl,
-      sourceId: electricSourceId,
-      secret: electricSecret,
-    });
-  }, []);
+ useEffect(() => {
+ initElectric({
+ url: electricUrl,
+ sourceId: electricSourceId,
+ secret: electricSecret,
+ });
+ }, []);
 
-  return null;
+ return null;
 }
 
 function SyncManager({ userId }: { userId?: string }) {
-  // Call all entity sync hooks exactly once
-  useWorksSync(userId);
-  useAssetsSync(userId);
-  useAnnotationsSync(userId);
-  // ... etc
+ // Call all entity sync hooks exactly once
+ useWorksSync(userId);
+ useAssetsSync(userId);
+ useAnnotationsSync(userId);
+ // ... etc
 
-  return null;
+ return null;
 }
 ```
 
@@ -293,46 +293,46 @@ function SyncManager({ userId }: { userId?: string }) {
 
 ```
 apps/desktop/
-├── src/                           # TypeScript frontend
-│   ├── blob-storage/
-│   │   └── tauri.ts              # TauriBlobStorage (BlobCAS impl)
-│   ├── hooks/
-│   │   └── useBlobStorage.ts     # useTauriBlobStorage() hook
-│   ├── pages/
-│   │   ├── LibraryPage.tsx       # Full library UI (migrated from web)
-│   │   ├── ReaderPage.tsx
-│   │   ├── StudyPage.tsx
-│   │   └── admin/                # DevTools pages
-│   ├── components/
-│   │   ├── Layout.tsx            # Desktop-style navigation
-│   │   └── UserMenu.tsx          # Auth UI (see GUIDE_AUTH_DESKTOP.md)
-│   ├── App.tsx                   # BrowserRouter + routing
-│   ├── providers.tsx             # QueryClient + Electric + SyncManager
-│   └── main.tsx                  # Entry point
+├── src/ # TypeScript frontend
+│ ├── blob-storage/
+│ │ └── tauri.ts # TauriBlobStorage (BlobCAS impl)
+│ ├── hooks/
+│ │ └── useBlobStorage.ts # useTauriBlobStorage() hook
+│ ├── pages/
+│ │ ├── LibraryPage.tsx # Full library UI (migrated from web)
+│ │ ├── ReaderPage.tsx
+│ │ ├── StudyPage.tsx
+│ │ └── admin/ # DevTools pages
+│ ├── components/
+│ │ ├── Layout.tsx # Desktop-style navigation
+│ │ └── UserMenu.tsx # Auth UI (see GUIDE_AUTH_DESKTOP.md)
+│ ├── App.tsx # BrowserRouter + routing
+│ ├── providers.tsx # QueryClient + Electric + SyncManager
+│ └── main.tsx # Entry point
 │
-├── src-tauri/                     # Rust backend
-│   ├── src/
-│   │   ├── commands/
-│   │   │   ├── blobs.rs          # Blob storage (list, store, delete, scan)
-│   │   │   ├── database.rs       # Postgres writes (flush_writes)
-│   │   │   ├── avatars.rs        # Author avatar storage
-│   │   │   ├── auth.rs           # OAuth helpers (see GUIDE_AUTH_DESKTOP.md)
-│   │   │   ├── devtools.rs       # F12 DevTools toggle
-│   │   │   └── oauth_server.rs   # Loopback HTTP for Google PKCE
-│   │   ├── db/
-│   │   │   ├── mod.rs
-│   │   │   ├── catalog.rs        # SQLite blob catalog operations
-│   │   │   └── types.rs          # Blob types (BlobInfo, BlobWithMetadata)
-│   │   ├── logger.rs             # File-based logging
-│   │   ├── lib.rs                # Tauri app initialization
-│   │   └── main.rs               # Binary entry point
-│   ├── build.rs                  # Build script (env var embedding)
-│   ├── Cargo.toml                # Rust dependencies
-│   └── tauri.conf.json           # Tauri configuration
+├── src-tauri/ # Rust backend
+│ ├── src/
+│ │ ├── commands/
+│ │ │ ├── blobs.rs # Blob storage (list, store, delete, scan)
+│ │ │ ├── database.rs # Postgres writes (flush_writes)
+│ │ │ ├── avatars.rs # Author avatar storage
+│ │ │ ├── auth.rs # OAuth helpers (see GUIDE_AUTH_DESKTOP.md)
+│ │ │ ├── devtools.rs # F12 DevTools toggle
+│ │ │ └── oauth_server.rs # Loopback HTTP for Google PKCE
+│ │ ├── db/
+│ │ │ ├── mod.rs
+│ │ │ ├── catalog.rs # SQLite blob catalog operations
+│ │ │ └── types.rs # Blob types (BlobInfo, BlobWithMetadata)
+│ │ ├── logger.rs # File-based logging
+│ │ ├── lib.rs # Tauri app initialization
+│ │ └── main.rs # Binary entry point
+│ ├── build.rs # Build script (env var embedding)
+│ ├── Cargo.toml # Rust dependencies
+│ └── tauri.conf.json # Tauri configuration
 │
-├── .env.local                     # Environment config (gitignored)
-├── package.json                   # Node dependencies
-└── vite.config.ts                 # Vite bundler config
+├── .env.local # Environment config (gitignored)
+├── package.json # Node dependencies
+└── vite.config.ts # Vite bundler config
 ```
 
 **Platform-specific files (only 3!)**:
@@ -408,29 +408,29 @@ pnpm run tauri build -- --target x86_64-pc-windows-msvc
 
 ```
 User clicks "Upload PDF"
-  ↓
+ ↓
 Native file dialog (Tauri plugin)
-  ↓
+ ↓
 Read file as bytes (JavaScript)
-  ↓
+ ↓
 invoke("store_blob", { filename, bytes })
-  ↓
+ ↓
 Rust: SHA-256 hash, check dedup
-  ↓
+ ↓
 Rust: Write to ~/DeepRecall/blobs/{sha256}
-  ↓
+ ↓
 Rust: Insert to catalog.db
-  ↓
+ ↓
 Return BlobWithMetadata to frontend
-  ↓
+ ↓
 coordinateSingleBlob() → Dexie (blobsMeta, deviceBlobs, assets)
-  ↓
+ ↓
 WriteBuffer enqueue → POST /api/writes/batch
-  ↓
+ ↓
 Web API: Authenticated write → Postgres
-  ↓
+ ↓
 Electric syncs back → useBlobsMetaSync()
-  ↓
+ ↓
 UI updates (blob appears in library)
 ```
 
@@ -438,19 +438,19 @@ UI updates (blob appears in library)
 
 ```
 User fills "Create Work" dialog
-  ↓
+ ↓
 createWork() → Dexie (works_local)
-  ↓
+ ↓
 [INSTANT] UI update (optimistic)
-  ↓
+ ↓
 WriteBuffer enqueue → POST /api/writes/batch
-  ↓
+ ↓
 Web API: INSERT INTO works … (Postgres)
-  ↓
+ ↓
 Electric syncs back → useWorksSync()
-  ↓
+ ↓
 Cleanup: Remove from works_local
-  ↓
+ ↓
 UI queries works.merged.ts (shows confirmed work)
 ```
 
@@ -458,15 +458,15 @@ UI queries works.merged.ts (shows confirmed work)
 
 ```
 User creates annotation (not signed in)
-  ↓
+ ↓
 createAnnotation() → Dexie (annotations_local)
-  ↓
+ ↓
 [INSTANT] UI update
-  ↓
+ ↓
 WriteBuffer enqueue skipped (not authenticated)
-  ↓
+ ↓
 Electric sync disabled (userId = undefined)
-  ↓
+ ↓
 Data remains local-only until sign-in
 ```
 
@@ -503,8 +503,8 @@ console.log("Logs at:", logPath);
 
 ```json
 {
-  "windows": [{ "devtools": true }],
-  "app": { "withGlobalTauri": true }
+ "windows": [{ "devtools": true }],
+ "app": { "withGlobalTauri": true }
 }
 ```
 
@@ -546,16 +546,16 @@ tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 
 ## Platform Differences from Web
 
-| Aspect              | Web                            | Desktop                                      |
+| Aspect | Web | Desktop |
 | ------------------- | ------------------------------ | -------------------------------------------- |
-| **Blob Storage**    | API routes + server filesystem | Rust commands + local filesystem             |
-| **Database Writes** | POST `/api/writes/batch`       | POST `/api/writes/batch` (with app JWT)      |
-| **Auth**            | NextAuth (HTTP cookies)        | Native OAuth (OS keychain)                   |
-| **File Upload**     | HTML file input                | Tauri dialog plugin (native)                 |
-| **Environment**     | Runtime API (`/api/config`)    | Build-time embedding (`.env.local` → binary) |
-| **DevTools**        | Browser DevTools               | F12 toggle (Tauri feature)                   |
-| **Logging**         | Console + OpenTelemetry        | File-based (`deeprecall.log`)                |
-| **Offline**         | ServiceWorker + Dexie          | Full offline (no server dependency)          |
+| **Blob Storage** | API routes + server filesystem | Rust commands + local filesystem |
+| **Database Writes** | POST `/api/writes/batch` | POST `/api/writes/batch` (with app JWT) |
+| **Auth** | NextAuth (HTTP cookies) | Native OAuth (OS keychain) |
+| **File Upload** | HTML file input | Tauri dialog plugin (native) |
+| **Environment** | Runtime API (`/api/config`) | Build-time embedding (`.env.local` → binary) |
+| **DevTools** | Browser DevTools | F12 toggle (Tauri feature) |
+| **Logging** | Console + OpenTelemetry | File-based (`deeprecall.log`) |
+| **Offline** | ServiceWorker + Dexie | Full offline (no server dependency) |
 
 ---
 

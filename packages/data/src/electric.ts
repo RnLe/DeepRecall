@@ -41,6 +41,13 @@ const JSONB_COLUMNS_BY_TABLE: Record<string, string[]> = {
   annotations: ["geometry", "style", "metadata"],
   authors: ["avatar_crop_region"],
   folder_sources: ["metadata"],
+  // Dojo tables with JSONB columns
+  dojo_exercise_templates: ["subtasks_json"],
+  dojo_exercise_variants: ["parameter_values"],
+  dojo_exercise_attempts: ["metrics"],
+  dojo_subtask_attempts: ["metrics"],
+  dojo_concept_bricks: ["metrics"],
+  dojo_exercise_bricks: ["metrics"],
   // Add more tables as needed
 };
 

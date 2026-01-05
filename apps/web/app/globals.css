@@ -5,6 +5,7 @@
 
 /* Make Tailwind scan UI package sources */
 @source "../../../packages/ui/src";
+@source "../../../packages/dojo-ui/src";
 
 @layer base {
   * {

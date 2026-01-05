@@ -6,7 +6,7 @@
 >
 > **See also**: `GUIDE_CROSS_DEVICE_REACTIVITY.md` for enabling real-time updates across devices
 
-## 🎯 Core Concept
+## Core Concept
 
 **Problem**: 2-3 second delay from user action → Postgres → Electric → UI update
 
@@ -14,30 +14,30 @@
 
 ```
 User Action → [INSTANT] Local Dexie → [INSTANT] UI
-            ↓ (background, only if authenticated)
-            WriteBuffer → Postgres → Electric → Cleanup
+ ↓ (background, only if authenticated)
+ WriteBuffer → Postgres → Electric → Cleanup
 ```
 
-**Guest Mode**: When not authenticated, writes stay local-only (no WriteBuffer enqueue).  
+**Guest Mode**: When not authenticated, writes stay local-only (no WriteBuffer enqueue). 
 **Authenticated Mode**: Full sync pipeline with background WriteBuffer flush to server.
 
 ## 📁 File Structure (per entity)
 
 ```
 packages/data/src/
-├── auth.ts                        # Global auth state (guest vs authenticated)
+├── auth.ts # Global auth state (guest vs authenticated)
 ├── repos/
-│   ├── annotations.local.ts      # Instant writes to Dexie + WriteBuffer (if auth)
-│   ├── annotations.electric.ts   # Electric shapes (background sync)
-│   ├── annotations.merged.ts     # Merge synced + local data
-│   └── annotations.cleanup.ts    # Remove local after sync confirmation
+│ ├── annotations.local.ts # Instant writes to Dexie + WriteBuffer (if auth)
+│ ├── annotations.electric.ts # Electric shapes (background sync)
+│ ├── annotations.merged.ts # Merge synced + local data
+│ └── annotations.cleanup.ts # Remove local after sync confirmation
 └── hooks/
-    └── useAnnotations.ts          # React hooks returning merged data
+ └── useAnnotations.ts # React hooks returning merged data
 ```
 
 **Key Addition**: `auth.ts` manages global authentication state, used by all local repos to conditionally enqueue server writes.
 
-## ⚠️ Critical Patterns (MUST FOLLOW)
+## Critical Patterns (MUST FOLLOW)
 
 ### Pattern 1: Always Check `isLoading` Before Syncing to Dexie
 
@@ -45,9 +45,9 @@ packages/data/src/
 
 ```typescript
 useEffect(() => {
-  if (electricResult.data !== undefined) {
-    syncElectricToDexie(electricResult.data); // Runs when data === []!
-  }
+ if (electricResult.data !== undefined) {
+ syncElectricToDexie(electricResult.data); // Runs when data === []!
+ }
 }, [electricResult.data]);
 ```
 
@@ -55,9 +55,9 @@ useEffect(() => {
 
 ```typescript
 useEffect(() => {
-  if (!electricResult.isLoading && electricResult.data !== undefined) {
-    syncElectricToDexie(electricResult.data);
-  }
+ if (!electricResult.isLoading && electricResult.data !== undefined) {
+ syncElectricToDexie(electricResult.data);
+ }
 }, [electricResult.isLoading, electricResult.data]);
 ```
 
@@ -71,16 +71,16 @@ useEffect(() => {
 ```typescript
 // Sync
 useEffect(() => {
-  if (!electricResult.isLoading && electricResult.data !== undefined) {
-    syncElectricToDexie(electricResult.data);
-  }
+ if (!electricResult.isLoading && electricResult.data !== undefined) {
+ syncElectricToDexie(electricResult.data);
+ }
 }, [electricResult.isLoading, electricResult.data]);
 
 // Cleanup (ALSO needs isLoading check!)
 useEffect(() => {
-  if (!electricResult.isLoading && electricResult.data) {
-    cleanup(electricResult.data).then(() => refetch());
-  }
+ if (!electricResult.isLoading && electricResult.data) {
+ cleanup(electricResult.data).then(() => refetch());
+ }
 }, [electricResult.isLoading, electricResult.data]);
 ```
 
@@ -92,13 +92,13 @@ useEffect(() => {
 
 ```typescript
 for (const change of local) {
-  if (change._op === "update") {
-    const synced = syncedMap.get(change.id);
-    if (synced) {
-      result.push({ ...synced, ...change.data });
-    }
-    // Second update to same ID? Ignored!
-  }
+ if (change._op === "update") {
+ const synced = syncedMap.get(change.id);
+ if (synced) {
+ result.push({ ...synced, ...change.data });
+ }
+ // Second update to same ID? Ignored!
+ }
 }
 ```
 
@@ -111,43 +111,43 @@ const pendingUpdates = new Map<string, any[]>(); // Array per ID!
 const pendingDeletes = new Set<string>();
 
 for (const change of local) {
-  if (change._op === "insert") {
-    pendingInserts.set(change.id, change);
-  } else if (change._op === "update") {
-    if (!pendingUpdates.has(change.id)) {
-      pendingUpdates.set(change.id, []);
-    }
-    pendingUpdates.get(change.id)!.push(change); // Collect all
-  } else if (change._op === "delete") {
-    pendingDeletes.add(change.id);
-  }
+ if (change._op === "insert") {
+ pendingInserts.set(change.id, change);
+ } else if (change._op === "update") {
+ if (!pendingUpdates.has(change.id)) {
+ pendingUpdates.set(change.id, []);
+ }
+ pendingUpdates.get(change.id)!.push(change); // Collect all
+ } else if (change._op === "delete") {
+ pendingDeletes.add(change.id);
+ }
 }
 
 // Phase 2: Process pending inserts (may have updates)
 for (const [id, insert] of pendingInserts) {
-  if (pendingDeletes.has(id)) continue;
+ if (pendingDeletes.has(id)) continue;
 
-  let merged = insert.data;
-  const updates = pendingUpdates.get(id);
-  if (updates) {
-    for (const update of updates) {
-      merged = { ...merged, ...update.data }; // Apply sequentially
-    }
-  }
-  result.push(merged);
+ let merged = insert.data;
+ const updates = pendingUpdates.get(id);
+ if (updates) {
+ for (const update of updates) {
+ merged = { ...merged, ...update.data }; // Apply sequentially
+ }
+ }
+ result.push(merged);
 }
 
 // Phase 3: Process synced items with updates
 for (const [id, updates] of pendingUpdates) {
-  if (processedIds.has(id)) continue;
-  const synced = syncedMap.get(id);
-  if (synced) {
-    let merged = synced;
-    for (const update of updates) {
-      merged = { ...merged, ...update.data };
-    }
-    result.push(merged);
-  }
+ if (processedIds.has(id)) continue;
+ const synced = syncedMap.get(id);
+ if (synced) {
+ let merged = synced;
+ for (const update of updates) {
+ merged = { ...merged, ...update.data };
+ }
+ result.push(merged);
+ }
 }
 ```
 
@@ -162,13 +162,13 @@ for (const [id, updates] of pendingUpdates) {
 ```typescript
 // Mutation
 onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["items"] });
+ queryClient.invalidateQueries({ queryKey: ["items"] });
 };
 
 // Query (doesn't match!)
 useQuery({
-  queryKey: ["items", "merged", "filtered", id],
-  // ...
+ queryKey: ["items", "merged", "filtered", id],
+ // ...
 });
 ```
 
@@ -177,13 +177,13 @@ useQuery({
 ```typescript
 // Mutation
 onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["items", "merged"] }); // Matches prefix
+ queryClient.invalidateQueries({ queryKey: ["items", "merged"] }); // Matches prefix
 };
 
 // Query
 useQuery({
-  queryKey: ["items", "merged", "filtered", id],
-  // ...
+ queryKey: ["items", "merged", "filtered", id],
+ // ...
 });
 ```
 
@@ -200,12 +200,12 @@ When Postgres schema differs from client schema, **map each field explicitly**:
 ```typescript
 // Client → Postgres
 if (metadata.notes || metadata.title) {
-  result.content = metadata.notes || metadata.title; // Title overwrites notes!
+ result.content = metadata.notes || metadata.title; // Title overwrites notes!
 }
 
 // Postgres → Client
 if (content) {
-  clientMetadata.notes = content; // Title becomes notes!
+ clientMetadata.notes = content; // Title becomes notes!
 }
 ```
 
@@ -214,18 +214,18 @@ if (content) {
 ```typescript
 // Client → Postgres
 if (metadata.notes) {
-  result.content = metadata.notes; // Notes → TEXT column
+ result.content = metadata.notes; // Notes → TEXT column
 }
 if (metadata.title) {
-  result.metadata = { ...result.metadata, title: metadata.title }; // Title → JSONB
+ result.metadata = { ...result.metadata, title: metadata.title }; // Title → JSONB
 }
 
 // Postgres → Client
 if (content) {
-  clientMetadata.notes = content; // TEXT column → notes
+ clientMetadata.notes = content; // TEXT column → notes
 }
 if (metadata?.title) {
-  clientMetadata.title = metadata.title; // JSONB → title
+ clientMetadata.title = metadata.title; // JSONB → title
 }
 ```
 
@@ -237,7 +237,7 @@ if (metadata?.title) {
 
 ---
 
-## 🔧 Implementation Checklist
+## Implementation Checklist
 
 ### 1. Database Schema (Dexie)
 
@@ -252,32 +252,32 @@ annotations_local: "id, _op, _status, _timestamp, data";
 import { isAuthenticated } from "../auth";
 
 export async function createAnnotationLocal(input: CreateAnnotationInput) {
-  const annotation = { ...input, createdAt: Date.now(), updatedAt: Date.now() };
+ const annotation = { ...input, createdAt: Date.now(), updatedAt: Date.now() };
 
-  // Write to local table (instant UI - works for both guest and authenticated)
-  await db.annotations_local.add({
-    id: annotation.id,
-    _op: "insert",
-    _status: "pending",
-    _timestamp: Date.now(),
-    data: annotation,
-  });
+ // Write to local table (instant UI - works for both guest and authenticated)
+ await db.annotations_local.add({
+ id: annotation.id,
+ _op: "insert",
+ _status: "pending",
+ _timestamp: Date.now(),
+ data: annotation,
+ });
 
-  // Enqueue for background sync (only if authenticated)
-  if (isAuthenticated()) {
-    await buffer.enqueue({
-      table: "annotations",
-      op: "insert",
-      payload: annotation,
-    });
-  }
+ // Enqueue for background sync (only if authenticated)
+ if (isAuthenticated()) {
+ await buffer.enqueue({
+ table: "annotations",
+ op: "insert",
+ payload: annotation,
+ });
+ }
 
-  logger.info("db.local", "Created annotation (pending sync)", {
-    annotationId: annotation.id,
-    willSync: isAuthenticated(),
-  });
+ logger.info("db.local", "Created annotation (pending sync)", {
+ annotationId: annotation.id,
+ willSync: isAuthenticated(),
+ });
 
-  return annotation;
+ return annotation;
 }
 ```
 
@@ -287,18 +287,18 @@ export async function createAnnotationLocal(input: CreateAnnotationInput) {
 
 ```typescript
 export async function getMergedPDFAnnotations(sha256: string) {
-  try {
-    const synced = await db.annotations
-      .where("sha256")
-      .equals(sha256)
-      .toArray();
-    const local = await db.annotations_local.toArray();
-    const merged = await mergeAnnotations(synced, local);
-    return merged.filter((a) => a.sha256 === sha256);
-  } catch (error) {
-    console.error("[getMergedPDFAnnotations] Error:", error);
-    return []; // Always return array, never undefined
-  }
+ try {
+ const synced = await db.annotations
+ .where("sha256")
+ .equals(sha256)
+ .toArray();
+ const local = await db.annotations_local.toArray();
+ const merged = await mergeAnnotations(synced, local);
+ return merged.filter((a) => a.sha256 === sha256);
+ } catch (error) {
+ console.error("[getMergedPDFAnnotations] Error:", error);
+ return []; // Always return array, never undefined
+ }
 }
 ```
 
@@ -319,31 +319,31 @@ export async function getMergedPDFAnnotations(sha256: string) {
  * @param userId - Filter annotations by owner_id (multi-tenant isolation)
  */
 export function useAnnotationsSync(userId?: string) {
-  const electricResult = annotationsElectric.useAnnotations(userId);
-  const queryClient = useQueryClient();
+ const electricResult = annotationsElectric.useAnnotations(userId);
+ const queryClient = useQueryClient();
 
-  // CRITICAL: Check isLoading before syncing
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data !== undefined) {
-      syncElectricToDexie(electricResult.data)
-        .then(() => {
-          // Invalidate to trigger cross-device updates
-          queryClient.invalidateQueries({ queryKey: ["annotations"] });
-        })
-        .catch(console.error);
-    }
-  }, [electricResult.isLoading, electricResult.data]);
+ // CRITICAL: Check isLoading before syncing
+ useEffect(() => {
+ if (!electricResult.isLoading && electricResult.data !== undefined) {
+ syncElectricToDexie(electricResult.data)
+ .then(() => {
+ // Invalidate to trigger cross-device updates
+ queryClient.invalidateQueries({ queryKey: ["annotations"] });
+ })
+ .catch(console.error);
+ }
+ }, [electricResult.isLoading, electricResult.data]);
 
-  // Cleanup after sync
-  useEffect(() => {
-    if (!electricResult.isLoading && electricResult.data) {
-      annotationsCleanup
-        .cleanupSyncedAnnotations(electricResult.data)
-        .catch(console.error);
-    }
-  }, [electricResult.isLoading, electricResult.data]);
+ // Cleanup after sync
+ useEffect(() => {
+ if (!electricResult.isLoading && electricResult.data) {
+ annotationsCleanup
+ .cleanupSyncedAnnotations(electricResult.data)
+ .catch(console.error);
+ }
+ }, [electricResult.isLoading, electricResult.data]);
 
-  return electricResult;
+ return electricResult;
 }
 
 // ============================================================================
@@ -355,14 +355,14 @@ export function useAnnotationsSync(userId?: string) {
  * Sync is handled by useAnnotationsSync() in SyncManager.
  */
 export function usePDFAnnotations(sha256: string) {
-  const mergedQuery = useQuery({
-    queryKey: ["annotations", "merged", "pdf", sha256],
-    queryFn: () => annotationsMerged.getMergedPDFAnnotations(sha256),
-    staleTime: 0, // Always check for local changes
-    placeholderData: [], // Prevent loading flicker on navigation
-  });
+ const mergedQuery = useQuery({
+ queryKey: ["annotations", "merged", "pdf", sha256],
+ queryFn: () => annotationsMerged.getMergedPDFAnnotations(sha256),
+ staleTime: 0, // Always check for local changes
+ placeholderData: [], // Prevent loading flicker on navigation
+ });
 
-  return mergedQuery;
+ return mergedQuery;
 }
 ```
 
@@ -371,15 +371,15 @@ export function usePDFAnnotations(sha256: string) {
 ```typescript
 // apps/web/app/providers.tsx (or mobile/desktop equivalent)
 function SyncManager({ userId }: { userId?: string }) {
-  // Call ALL sync hooks once - prevents duplicate Electric connections
-  useWorksSync(userId);
-  useAssetsSync(userId);
-  useActivitiesSync(userId);
-  useAnnotationsSync(userId);
-  useCardsSync(userId);
-  // ... all entities
+ // Call ALL sync hooks once - prevents duplicate Electric connections
+ useWorksSync(userId);
+ useAssetsSync(userId);
+ useActivitiesSync(userId);
+ useAnnotationsSync(userId);
+ useCardsSync(userId);
+ // ... all entities
 
-  return null; // No UI, just sync orchestration
+ return null; // No UI, just sync orchestration
 }
 ```
 
@@ -394,59 +394,59 @@ function SyncManager({ userId }: { userId?: string }) {
 
 ```typescript
 export function useUpdateAnnotation() {
-  const queryClient = useQueryClient();
+ const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (input: UpdateAnnotationInput) => {
-      await annotationsLocal.updateAnnotationLocal(input);
-      return input;
-    },
-    onSuccess: () => {
-      // Invalidate with correct prefix
-      queryClient.invalidateQueries({ queryKey: ["annotations", "merged"] });
-    },
-  });
+ return useMutation({
+ mutationFn: async (input: UpdateAnnotationInput) => {
+ await annotationsLocal.updateAnnotationLocal(input);
+ return input;
+ },
+ onSuccess: () => {
+ // Invalidate with correct prefix
+ queryClient.invalidateQueries({ queryKey: ["annotations", "merged"] });
+ },
+ });
 }
 ```
 
 ---
 
-## 🐛 Common Bugs & Fixes
+## Common Bugs & Fixes
 
 ### Bug: Empty Data After Page Reload
 
-**Symptom**: Data appears after 1-2 seconds  
-**Cause**: Missing `!electricResult.isLoading` check  
+**Symptom**: Data appears after 1-2 seconds 
+**Cause**: Missing `!electricResult.isLoading` check 
 **Fix**: Add check in ALL entity hooks
 
 ### Bug: Only First Update Applies
 
-**Symptom**: Create annotation, update title, update color - color ignored  
-**Cause**: Merge logic doesn't collect multiple updates  
+**Symptom**: Create annotation, update title, update color - color ignored 
+**Cause**: Merge logic doesn't collect multiple updates 
 **Fix**: Use `Map<string, any[]>` to collect all updates per ID
 
 ### Bug: UI Doesn't Update After Mutation
 
-**Symptom**: Query invalidation called but UI stale  
-**Cause**: Query key mismatch  
+**Symptom**: Query invalidation called but UI stale 
+**Cause**: Query key mismatch 
 **Fix**: Ensure consistent `["entity", "merged"]` prefix
 
 ### Bug: Fields Disappear After Sync
 
-**Symptom**: Title becomes notes, or vice versa  
-**Cause**: Schema transform using wrong columns  
+**Symptom**: Title becomes notes, or vice versa 
+**Cause**: Schema transform using wrong columns 
 **Fix**: Map each field to correct Postgres column type
 
 ### Bug: "Query data cannot be undefined" Error
 
-**Symptom**: React Query crashes on deletion  
-**Cause**: Merge function returns `undefined` on error  
+**Symptom**: React Query crashes on deletion 
+**Cause**: Merge function returns `undefined` on error 
 **Fix**: Wrap in try-catch, always return array/value
 
 ### Bug: Data Still Shows After Database Wipe
 
-**Symptom**: After clearing database, files/items still appear until page refresh  
-**Cause**: React Query cache not properly invalidated, or wrong order of operations  
+**Symptom**: After clearing database, files/items still appear until page refresh 
+**Cause**: React Query cache not properly invalidated, or wrong order of operations 
 **Fix**: Clear in correct order:
 
 1. Clear Dexie FIRST (all synced + local tables)
@@ -459,14 +459,14 @@ export function useUpdateAnnotation() {
 ```typescript
 // 1. Clear Dexie first (parallel for speed)
 await db.transaction("rw", [...allTables], async () => {
-  await Promise.all([
-    db.works.clear(),
-    db.assets.clear(),
-    // ... all synced tables
-    db.works_local.clear(),
-    db.assets_local.clear(),
-    // ... all local tables
-  ]);
+ await Promise.all([
+ db.works.clear(),
+ db.assets.clear(),
+ // ... all synced tables
+ db.works_local.clear(),
+ db.assets_local.clear(),
+ // ... all local tables
+ ]);
 });
 
 // 2. Clear React Query cache
@@ -474,9 +474,9 @@ queryClient.clear();
 
 // 3. Force refetch to show empty state
 await Promise.all([
-  queryClient.refetchQueries({ queryKey: ["assets", "merged"] }),
-  queryClient.refetchQueries({ queryKey: ["works", "merged"] }),
-  // ... all entity merged queries
+ queryClient.refetchQueries({ queryKey: ["assets", "merged"] }),
+ queryClient.refetchQueries({ queryKey: ["works", "merged"] }),
+ // ... all entity merged queries
 ]);
 
 // 4. Clear Postgres (background confirmation)
@@ -485,7 +485,7 @@ await fetch("/api/admin/database", { method: "DELETE" });
 
 ### Bug: Loading Spinner on Navigation Between Pages
 
-**Symptom**: When navigating between pages, hooks show loading state briefly even though data should be cached  
+**Symptom**: When navigating between pages, hooks show loading state briefly even though data should be cached 
 **Cause**: Using `initialData: []` with `staleTime: 0` causes React Query to:
 
 - Start with initial data (no loading)
@@ -497,18 +497,18 @@ await fetch("/api/admin/database", { method: "DELETE" });
 ```typescript
 // ❌ WRONG - causes loading flicker
 const mergedQuery = useQuery({
-  queryKey: ["assets", "merged"],
-  queryFn: () => assetsMerged.getAllMergedAssets(),
-  staleTime: 0,
-  initialData: [], // Shows as "fresh" then refetches
+ queryKey: ["assets", "merged"],
+ queryFn: () => assetsMerged.getAllMergedAssets(),
+ staleTime: 0,
+ initialData: [], // Shows as "fresh" then refetches
 });
 
 // ✅ CORRECT - no loading flicker
 const mergedQuery = useQuery({
-  queryKey: ["assets", "merged"],
-  queryFn: () => assetsMerged.getAllMergedAssets(),
-  staleTime: 0,
-  placeholderData: [], // Shows while loading, doesn't count as "fresh"
+ queryKey: ["assets", "merged"],
+ queryFn: () => assetsMerged.getAllMergedAssets(),
+ staleTime: 0,
+ placeholderData: [], // Shows while loading, doesn't count as "fresh"
 });
 ```
 
@@ -516,8 +516,8 @@ const mergedQuery = useQuery({
 
 ### Bug: Continuous Actions (Drawing, Erasing) Feel Laggy
 
-**Symptom**: Interactive tools (brush, eraser) only show results after mouse release, not during gesture  
-**Cause**: Only updating database state on action completion; rendering waits for query refetch  
+**Symptom**: Interactive tools (brush, eraser) only show results after mouse release, not during gesture 
+**Cause**: Only updating database state on action completion; rendering waits for query refetch 
 **Fix**: Dual-layer state for continuous actions:
 
 ```typescript
@@ -529,29 +529,29 @@ const { data: items } = useMergedItems(id);
 
 // Sync database → scene when data changes
 useEffect(() => {
-  orchestrator.clear();
-  items.forEach((item) => orchestrator.add(item));
-  renderScene();
+ orchestrator.clear();
+ items.forEach((item) => orchestrator.add(item));
+ renderScene();
 }, [items]);
 
 // CRITICAL: Update scene immediately during gesture
 const handlePointerMove = (e) => {
-  if (tool === "eraser") {
-    const hits = orchestrator.query(pointerPos);
-    hits.forEach((item) => {
-      orchestrator.remove(item.id); // Instant visual removal
-      eraserHitsRef.current.add(item.id); // Track for DB deletion
-    });
-    renderScene(); // Re-render immediately
-  }
+ if (tool === "eraser") {
+ const hits = orchestrator.query(pointerPos);
+ hits.forEach((item) => {
+ orchestrator.remove(item.id); // Instant visual removal
+ eraserHitsRef.current.add(item.id); // Track for DB deletion
+ });
+ renderScene(); // Re-render immediately
+ }
 };
 
 // Commit to database on gesture end
 const handlePointerUp = () => {
-  if (eraserHitsRef.current.size > 0) {
-    deleteItems.mutate({ ids: Array.from(eraserHitsRef.current) });
-    eraserHitsRef.current.clear();
-  }
+ if (eraserHitsRef.current.size > 0) {
+ deleteItems.mutate({ ids: Array.from(eraserHitsRef.current) });
+ eraserHitsRef.current.clear();
+ }
 };
 ```
 
@@ -565,13 +565,13 @@ const handlePointerUp = () => {
 
 ```
 User Action → Local Dexie (annotations_local) → [INSTANT] UI
-                    ↓
-              Merge Layer (synced + local)
-                    ↓
-              React Query → Component
+ ↓
+ Merge Layer (synced + local)
+ ↓
+ React Query → Component
 
-⚠️ WriteBuffer: SKIPPED (no server sync)
-⚠️ Electric: No sync (userId = undefined)
+ WriteBuffer: SKIPPED (no server sync)
+ Electric: No sync (userId = undefined)
 ✅ Full local functionality preserved
 ```
 
@@ -579,20 +579,20 @@ User Action → Local Dexie (annotations_local) → [INSTANT] UI
 
 ```
 User Action → Local Dexie (annotations_local) → [INSTANT] UI
-                    ↓                    ↓
-              Merge Layer          WriteBuffer (enqueue)
-                    ↓                    ↓
-              React Query          POST /api/writes/batch
-                    ↓                    ↓
-              Component            Postgres (LWW)
-                                        ↓
-                                   Electric Sync
-                                        ↓
-                                   useShape() (filtered by userId)
-                                        ↓
-                                   syncElectricToDexie()
-                                        ↓
-                              annotations (synced) → Cleanup
+ ↓ ↓
+ Merge Layer WriteBuffer (enqueue)
+ ↓ ↓
+ React Query POST /api/writes/batch
+ ↓ ↓
+ Component Postgres (LWW)
+ ↓
+ Electric Sync
+ ↓
+ useShape() (filtered by userId)
+ ↓
+ syncElectricToDexie()
+ ↓
+ annotations (synced) → Cleanup
 ```
 
 ### Auth State Management
@@ -605,21 +605,21 @@ let _isAuthenticated = false;
 let _userId: string | null = null;
 
 export function setAuthState(
-  authenticated: boolean,
-  userId: string | null,
-  deviceId: string | null = null
+ authenticated: boolean,
+ userId: string | null,
+ deviceId: string | null = null
 ): void {
-  _isAuthenticated = authenticated;
-  _userId = userId;
-  // Triggers cleanup/scan logic as needed
+ _isAuthenticated = authenticated;
+ _userId = userId;
+ // Triggers cleanup/scan logic as needed
 }
 
 export function isAuthenticated(): boolean {
-  return _isAuthenticated;
+ return _isAuthenticated;
 }
 
 export function getUserId(): string | null {
-  return _userId;
+ return _userId;
 }
 ```
 
@@ -628,17 +628,17 @@ export function getUserId(): string | null {
 ```typescript
 // apps/web/app/providers.tsx
 function AuthStateManager({ children }) {
-  const { data: session, status } = useSession();
+ const { data: session, status } = useSession();
 
-  useEffect(() => {
-    if (status === "authenticated" && session) {
-      setAuthState(true, session.user.id, deviceId);
-    } else if (status === "unauthenticated") {
-      setAuthState(false, null, deviceId);
-    }
-  }, [session, status]);
+ useEffect(() => {
+ if (status === "authenticated" && session) {
+ setAuthState(true, session.user.id, deviceId);
+ } else if (status === "unauthenticated") {
+ setAuthState(false, null, deviceId);
+ }
+ }, [session, status]);
 
-  return <>{children}</>;
+ return <>{children}</>;
 }
 ```
 
@@ -650,114 +650,114 @@ function AuthStateManager({ children }) {
 4. WriteBuffer starts flushing pending changes
 5. Electric syncs with new user filter
 
-## �📊 Data Flow Diagram (Authenticated Mode)
+## � Data Flow Diagram (Authenticated Mode)
 
 ```
 ┌─────────────┐
 │ User Action │
 └──────┬──────┘
-       │
-       ▼
-┌──────────────────┐      ┌─────────────────┐
+ │
+ ▼
+┌──────────────────┐ ┌─────────────────┐
 │ Local Repository │─────▶│ isAuthenticated │
-│ (*.local.ts)     │      │ check           │
-└────────┬─────────┘      └────────┬────────┘
-         │                         │ YES
-         │ Write to                │
-         │ Dexie                   ▼
-         │                ┌─────────────────┐
-         ▼                │ WriteBuffer     │
-┌──────────────────┐      │ (enqueue)       │
-│ annotations_     │      └────────┬────────┘
-│   local          │               │ Background
-└────────┬─────────┘               │ Flush
-         │                         ▼
-         │                ┌─────────────────┐
-         │                │ POST /api/      │
-         │                │   writes/batch  │
-         │                └────────┬────────┘
-         │                         │
-         │                         ▼
-         │                ┌─────────────────┐
-         │                │ Postgres INSERT │
-         │                │ (LWW resolution)│
-         │                └────────┬────────┘
-         │                         │
-         │                         ▼
-         │                ┌─────────────────┐
-         │                │ Electric Sync   │
-         │                │ (SSE stream)    │
-         │                └────────┬────────┘
-         │                         │
-         │                         ▼
-         │                ┌─────────────────┐
-         │                │ useAnnotations  │
-         │                │ Sync(userId)    │
-         │                │ (SyncManager)   │
-         │                └────────┬────────┘
-         │                         │
-         │                         ▼
-         │                ┌─────────────────┐
-         │                │ syncElectric    │
-         │                │   ToDexie()     │
-         │                └────────┬────────┘
-         │                         │
-         │                         ▼
-         │                ┌─────────────────┐
-         └───────────────▶│ annotations     │
-                          │ (synced)        │
-                          └────────┬────────┘
-                                   │
-                                   ▼
-                          ┌─────────────────┐
-                          │ Merge Layer     │
-                          │ (*.merged.ts)   │
-                          └────────┬────────┘
-                                   │
-                                   ▼
-                          ┌─────────────────┐
-                          │ React Query     │
-                          │ (UI sees merged)│
-                          └─────────────────┘
-                                   │
-                                   ▼
-                          ┌─────────────────┐
-                          │ Cleanup Layer   │
-                          │ (remove local)  │
-                          └─────────────────┘
+│ (*.local.ts) │ │ check │
+└────────┬─────────┘ └────────┬────────┘
+ │ │ YES
+ │ Write to │
+ │ Dexie ▼
+ │ ┌─────────────────┐
+ ▼ │ WriteBuffer │
+┌──────────────────┐ │ (enqueue) │
+│ annotations_ │ └────────┬────────┘
+│ local │ │ Background
+└────────┬─────────┘ │ Flush
+ │ ▼
+ │ ┌─────────────────┐
+ │ │ POST /api/ │
+ │ │ writes/batch │
+ │ └────────┬────────┘
+ │ │
+ │ ▼
+ │ ┌─────────────────┐
+ │ │ Postgres INSERT │
+ │ │ (LWW resolution)│
+ │ └────────┬────────┘
+ │ │
+ │ ▼
+ │ ┌─────────────────┐
+ │ │ Electric Sync │
+ │ │ (SSE stream) │
+ │ └────────┬────────┘
+ │ │
+ │ ▼
+ │ ┌─────────────────┐
+ │ │ useAnnotations │
+ │ │ Sync(userId) │
+ │ │ (SyncManager) │
+ │ └────────┬────────┘
+ │ │
+ │ ▼
+ │ ┌─────────────────┐
+ │ │ syncElectric │
+ │ │ ToDexie() │
+ │ └────────┬────────┘
+ │ │
+ │ ▼
+ │ ┌─────────────────┐
+ └───────────────▶│ annotations │
+ │ (synced) │
+ └────────┬────────┘
+ │
+ ▼
+ ┌─────────────────┐
+ │ Merge Layer │
+ │ (*.merged.ts) │
+ └────────┬────────┘
+ │
+ ▼
+ ┌─────────────────┐
+ │ React Query │
+ │ (UI sees merged)│
+ └─────────────────┘
+ │
+ ▼
+ ┌─────────────────┐
+ │ Cleanup Layer │
+ │ (remove local) │
+ └─────────────────┘
 ```
 
 ---
 
-## 🌐 Production Environment Setup
+## Production Environment Setup
 
 ### Current Deployment Architecture
 
-| Platform    | Environment     | Postgres | Electric             | Deployment   |
+| Platform | Environment | Postgres | Electric | Deployment |
 | ----------- | --------------- | -------- | -------------------- | ------------ |
-| **Web**     | Dev + Prod      | Neon DB  | Electric Cloud (SSE) | Railway      |
-| **Mobile**  | Dev + Prod      | Neon DB  | Electric Cloud (SSE) | TestFlight   |
-| **Desktop** | Production only | Neon DB  | Electric Cloud (SSE) | Local binary |
+| **Web** | Dev + Prod | Neon DB | Electric Cloud (SSE) | Railway |
+| **Mobile** | Dev + Prod | Neon DB | Electric Cloud (SSE) | TestFlight |
+| **Desktop** | Production only | Neon DB | Electric Cloud (SSE) | Local binary |
 
 **Key Architecture Decisions**:
 
 1. **Shared Neon Database**: All environments (dev + prod) use the same Neon Postgres instance
 
-   - ✅ True multi-device testing in development
-   - ✅ No schema drift between dev and prod
-   - ✅ RLS (Row-Level Security) provides user isolation
-   - ⚠️ Dev writes go to production database (acceptable with proper RLS filtering by `owner_id`)
+ - ✅ True multi-device testing in development
+ - ✅ No schema drift between dev and prod
+ - ✅ RLS (Row-Level Security) provides user isolation
+ - Dev writes go to production database (acceptable with proper RLS filtering by `owner_id`)
 
 2. **Electric Cloud**: All apps connect to Electric Cloud service
 
-   - ✅ Managed SSE streaming (no self-hosting needed)
-   - ✅ Consistent sync behavior across platforms
-   - ✅ Authentication via `sourceId` and `secret`
+ - ✅ Managed SSE streaming (no self-hosting needed)
+ - ✅ Consistent sync behavior across platforms
+ - ✅ Authentication via `sourceId` and `secret`
 
 3. **No Docker in Dev**: Direct connection to production services
-   - ✅ Simplified local development setup
-   - ✅ Instant sync testing across devices
-   - ✅ Realistic network conditions (not localhost)
+ - ✅ Simplified local development setup
+ - ✅ Instant sync testing across devices
+ - ✅ Realistic network conditions (not localhost)
 
 ### Electric Sync Configuration
 
@@ -788,9 +788,9 @@ const response = await fetch("/api/config");
 const config = await response.json();
 
 initElectric({
-  url: config.electricUrl, // Electric Cloud URL
-  sourceId: config.electricSourceId, // Electric Cloud source ID
-  secret: config.electricSecret, // Electric Cloud source secret
+ url: config.electricUrl, // Electric Cloud URL
+ sourceId: config.electricSourceId, // Electric Cloud source ID
+ secret: config.electricSecret, // Electric Cloud source secret
 });
 ```
 
@@ -813,10 +813,10 @@ All Electric shapes are filtered by `owner_id`:
 
 ```typescript
 export function useWorks(userId?: string) {
-  return useShape<Work>({
-    table: "works",
-    where: userId ? `owner_id = '${userId}'` : undefined,
-  });
+ return useShape<Work>({
+ table: "works",
+ where: userId ? `owner_id = '${userId}'` : undefined,
+ });
 }
 ```
 
@@ -866,7 +866,7 @@ After implementing optimistic updates:
 
 ---
 
-## 🔗 Related Files
+## Related Files
 
 - `OPTIMISTIC_UPDATES_MIGRATION.md` - Full migration checklist with all entities
 - `packages/data/src/writeBuffer.ts` - Background sync implementation

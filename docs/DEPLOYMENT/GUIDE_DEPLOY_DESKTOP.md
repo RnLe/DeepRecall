@@ -1,7 +1,7 @@
 # Desktop Deployment Guide (Tauri)
 
-**Platform**: Tauri (Windows/macOS/Linux)  
-**Deploy Method**: Manual builds + distribution  
+**Platform**: Tauri (Windows/macOS/Linux) 
+**Deploy Method**: Manual builds + distribution 
 **Build Time**: ~10 minutes
 
 This guide covers building and distributing the DeepRecall desktop app.
@@ -12,9 +12,9 @@ This guide covers building and distributing the DeepRecall desktop app.
 
 - Rust toolchain installed
 - Platform-specific build tools:
-  - **Windows**: Visual Studio Build Tools
-  - **macOS**: Xcode Command Line Tools
-  - **Linux**: build-essential, libssl-dev, libgtk-3-dev
+ - **Windows**: Visual Studio Build Tools
+ - **macOS**: Xcode Command Line Tools
+ - **Linux**: build-essential, libssl-dev, libgtk-3-dev
 - Code signing certificate (for distribution)
 
 ---
@@ -151,25 +151,25 @@ pnpm tauri build --target x86_64-pc-windows-gnu
 ```toml
 # apps/desktop/src-tauri/tauri.conf.json
 {
-  "bundle": {
-    "windows": {
-      "certificateThumbprint": null,
-      "digestAlgorithm": "sha256",
-      "timestampUrl": "http://timestamp.digicert.com",
-      "signCommand": {
-        "cmd": "signtool",
-        "args": [
-          "sign",
-          "/f", "path/to/certificate.pfx",
-          "/p", "%CERT_PASSWORD%",
-          "/fd", "sha256",
-          "/tr", "http://timestamp.digicert.com",
-          "/td", "sha256",
-          "%1"
-        ]
-      }
-    }
-  }
+ "bundle": {
+ "windows": {
+ "certificateThumbprint": null,
+ "digestAlgorithm": "sha256",
+ "timestampUrl": "http://timestamp.digicert.com",
+ "signCommand": {
+ "cmd": "signtool",
+ "args": [
+ "sign",
+ "/f", "path/to/certificate.pfx",
+ "/p", "%CERT_PASSWORD%",
+ "/fd", "sha256",
+ "/tr", "http://timestamp.digicert.com",
+ "/td", "sha256",
+ "%1"
+ ]
+ }
+ }
+ }
 }
 ```
 
@@ -194,15 +194,15 @@ pnpm tauri build
 ```toml
 # apps/desktop/src-tauri/tauri.conf.json
 {
-  "bundle": {
-    "macOS": {
-      "signingIdentity": "Developer ID Application: Your Name (TEAM_ID)",
-      "entitlements": null,
-      "exceptionDomain": null,
-      "hardenedRuntime": true,
-      "providerShortName": null
-    }
-  }
+ "bundle": {
+ "macOS": {
+ "signingIdentity": "Developer ID Application: Your Name (TEAM_ID)",
+ "entitlements": null,
+ "exceptionDomain": null,
+ "hardenedRuntime": true,
+ "providerShortName": null
+ }
+ }
 }
 ```
 
@@ -216,10 +216,10 @@ pnpm tauri build
 
 ```bash
 xcrun notarytool submit \
-  src-tauri/target/release/bundle/dmg/DeepRecall_1.0.0_x64.dmg \
-  --apple-id your@email.com \
-  --team-id YOUR_TEAM_ID \
-  --password app-specific-password
+ src-tauri/target/release/bundle/dmg/DeepRecall_1.0.0_x64.dmg \
+ --apple-id your@email.com \
+ --team-id YOUR_TEAM_ID \
+ --password app-specific-password
 ```
 
 ---
@@ -249,14 +249,14 @@ gpg --armor --detach-sign DeepRecall_1.0.0_amd64.deb
 ```bash
 # Create release
 gh release create v1.0.0 \
-  --title "DeepRecall v1.0.0" \
-  --notes "Release notes here"
+ --title "DeepRecall v1.0.0" \
+ --notes "Release notes here"
 
 # Upload binaries
 gh release upload v1.0.0 \
-  src-tauri/target/release/bundle/msi/DeepRecall_1.0.0_x64_en-US.msi \
-  src-tauri/target/release/bundle/dmg/DeepRecall_1.0.0_x64.dmg \
-  src-tauri/target/release/bundle/deb/deep-recall_1.0.0_amd64.deb
+ src-tauri/target/release/bundle/msi/DeepRecall_1.0.0_x64_en-US.msi \
+ src-tauri/target/release/bundle/dmg/DeepRecall_1.0.0_x64.dmg \
+ src-tauri/target/release/bundle/deb/deep-recall_1.0.0_amd64.deb
 ```
 
 ---
@@ -284,7 +284,7 @@ Tauri supports auto-updates via `tauri-updater`:
 
 ```json
 {
-  "version": "1.0.0"
+ "version": "1.0.0"
 }
 ```
 
@@ -309,23 +309,23 @@ Key settings:
 
 ```json
 {
-  "productName": "DeepRecall",
-  "version": "1.0.0",
-  "identifier": "com.renlephy.deeprecall",
-  "build": {
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
-    "devUrl": "http://localhost:5173",
-    "frontendDist": "../dist"
-  },
-  "bundle": {
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
-  }
+ "productName": "DeepRecall",
+ "version": "1.0.0",
+ "identifier": "com.renlephy.deeprecall",
+ "build": {
+ "beforeDevCommand": "pnpm dev",
+ "beforeBuildCommand": "pnpm build",
+ "devUrl": "http://localhost:5173",
+ "frontendDist": "../dist"
+ },
+ "bundle": {
+ "icon": [
+ "icons/32x32.png",
+ "icons/128x128.png",
+ "icons/icon.icns",
+ "icons/icon.ico"
+ ]
+ }
 }
 ```
 
@@ -339,12 +339,12 @@ Key settings:
 // Reads .env.local at compile time
 // Emits as Rust env vars
 fn main() {
-    if let Ok(entries) = dotenvy::from_filename(".env.local") {
-        for (key, value) in entries {
-            println!("cargo:rustc-env={}={}", key, value);
-        }
-    }
-    tauri_build::build()
+ if let Ok(entries) = dotenvy::from_filename(".env.local") {
+ for (key, value) in entries {
+ println!("cargo:rustc-env={}={}", key, value);
+ }
+ }
+ tauri_build::build()
 }
 ```
 
@@ -476,7 +476,7 @@ strip = true
 ```typescript
 // Only load when needed (first PDF opened)
 const loadPdfWorker = async () => {
-  await import("@deeprecall/pdf");
+ await import("@deeprecall/pdf");
 };
 ```
 

@@ -10,6 +10,7 @@ import * as folderSourcesMerged from "../repos/folder-sources.merged";
 import * as folderSourcesElectric from "../repos/folder-sources.electric";
 import type { MergedFolderSource } from "../repos/folder-sources.merged";
 import { db } from "../db";
+import { cleanupSyncedFolderSources } from "../repos/folder-sources.cleanup";
 
 const ACTIVE_STATUSES = new Set(["idle", "scanning", "syncing", "degraded"]);
 
@@ -55,7 +56,10 @@ export function useFolderSourcesSync(userId?: string): null {
       return;
     }
 
-    syncElectricToDexie(electricResult.data)
+    syncElectricToDexie(electricResult.data ?? [])
+      .then(() => {
+        return cleanupSyncedFolderSources(electricResult.data ?? []);
+      })
       .then(() => {
         queryClient.invalidateQueries({
           queryKey: ["folderSources", "merged"],

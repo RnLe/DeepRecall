@@ -15,6 +15,9 @@
   },
   "dependencies": {
     "@deeprecall/core": "workspace:*",
+    "@deeprecall/dojo-core": "workspace:*",
+    "@deeprecall/dojo-data": "workspace:*",
+    "@deeprecall/dojo-ui": "workspace:*",
     "@deeprecall/pdf": "workspace:*",
     "@deeprecall/telemetry": "workspace:*",
     "@tanstack/react-query": "^5.90.3",

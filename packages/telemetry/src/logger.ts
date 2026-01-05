@@ -24,6 +24,7 @@ export type Domain =
   | "blob.download"
   | "blob.bridge"
   | "server.api"
+  | "api.dojo"
   | "pdf"
   | "ink"
   | "whiteboard"

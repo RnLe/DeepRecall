@@ -3,7 +3,11 @@
  * Handles loading, refreshing, and clearing authentication sessions
  */
 
-import { tokens as secureTokens } from "./secure-store";
+import {
+  tokens as secureTokens,
+  profileStore,
+  type StoredUserProfile,
+} from "./secure-store";
 import { refreshGoogleSession } from "./google";
 
 export interface SessionInfo {
@@ -14,7 +18,11 @@ export interface SessionInfo {
   appJWT?: string;
   email?: string;
   name?: string;
+  avatarUrl?: string | null;
 }
+
+let cachedProfile: StoredUserProfile | null = null;
+let inFlightProfile: Promise<StoredUserProfile | null> | null = null;
 
 /**
  * Parse JWT payload without verification (client-side only)
@@ -88,12 +96,17 @@ export async function initializeSession(): Promise<SessionInfo> {
     // JWT is still valid
     console.log("[Session] JWT is valid");
 
+    const profile = await hydrateUserProfile(payload.userId, appJWT);
+
     return {
       status: "authenticated",
       userId: payload.userId,
       deviceId: payload.deviceId,
       provider: payload.provider as "google" | "github",
       appJWT,
+      email: profile?.email ?? undefined,
+      name: profile?.name ?? undefined,
+      avatarUrl: profile?.avatarUrl ?? null,
     };
   } catch (error) {
     console.error("[Session] Initialization error:", error);
@@ -135,12 +148,21 @@ export async function refreshSession(): Promise<SessionInfo | null> {
 
       console.log("[Session] Refreshed successfully");
 
+      const profile = await persistProfileFromAuthResult({
+        userId: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+      });
+
       return {
         status: "authenticated",
         userId: result.user.id,
         deviceId,
         provider: "google",
         appJWT: result.app_jwt,
+        email: profile?.email ?? result.user.email,
+        name: profile?.name ?? result.user.name,
+        avatarUrl: profile?.avatarUrl ?? null,
       };
     } else if (provider === "github") {
       const { refreshGitHubSession } = await import("./github");
@@ -157,12 +179,21 @@ export async function refreshSession(): Promise<SessionInfo | null> {
 
       console.log("[Session] Refreshed successfully");
 
+      const profile = await persistProfileFromAuthResult({
+        userId: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+      });
+
       return {
         status: "authenticated",
         userId: result.user.id,
         deviceId,
         provider: "github",
         appJWT: result.app_jwt,
+        email: profile?.email ?? result.user.email,
+        name: profile?.name ?? result.user.name,
+        avatarUrl: profile?.avatarUrl ?? null,
       };
     } else {
       console.error("[Session] Unknown provider:", provider);
@@ -249,11 +280,15 @@ export async function clearSession(): Promise<void> {
 
     // Clear secure tokens last
     await secureTokens.clearAll();
+    cachedProfile = null;
+    inFlightProfile = null;
 
     console.log("[Session] Cleared successfully");
   } catch (error) {
     console.error("[Session] Clear error:", error);
     await secureTokens.clearAll();
+    cachedProfile = null;
+    inFlightProfile = null;
     throw error;
   }
 }
@@ -271,4 +306,94 @@ export async function getOrCreateDeviceId(): Promise<string> {
   }
 
   return deviceId;
+}
+
+async function hydrateUserProfile(
+  userId: string,
+  appJWT: string
+): Promise<StoredUserProfile | null> {
+  if (cachedProfile && cachedProfile.userId === userId) {
+    return cachedProfile;
+  }
+
+  const stored = await profileStore.get();
+
+  if (stored && stored.userId === userId) {
+    cachedProfile = stored;
+    return stored;
+  }
+
+  if (!appJWT) {
+    return null;
+  }
+
+  if (!inFlightProfile) {
+    inFlightProfile = fetchRemoteProfile(userId, appJWT).finally(() => {
+      inFlightProfile = null;
+    });
+  }
+
+  const remote = await inFlightProfile;
+  if (remote) {
+    cachedProfile = remote;
+  }
+  return remote;
+}
+
+async function fetchRemoteProfile(
+  userId: string,
+  appJWT: string
+): Promise<StoredUserProfile | null> {
+  try {
+    const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    const response = await fetch(`${apiBase}/api/profile`, {
+      headers: {
+        Authorization: `Bearer ${appJWT}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.warn("[Session] Profile fetch failed", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const user = data?.user;
+
+    if (!user) {
+      return null;
+    }
+
+    const profile: StoredUserProfile = {
+      userId: userId,
+      email: user.email ?? null,
+      name: user.displayName ?? user.name ?? null,
+      avatarUrl: user.avatarUrl ?? null,
+      updatedAt: user.updatedAt ?? new Date().toISOString(),
+    };
+
+    await profileStore.save(profile);
+    return profile;
+  } catch (error) {
+    console.warn("[Session] Failed to hydrate profile", error);
+    return null;
+  }
+}
+
+async function persistProfileFromAuthResult(profile: {
+  userId: string;
+  email?: string;
+  name?: string;
+}): Promise<StoredUserProfile | null> {
+  const stored: StoredUserProfile = {
+    userId: profile.userId,
+    email: profile.email ?? null,
+    name: profile.name ?? null,
+    avatarUrl: cachedProfile?.avatarUrl ?? null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await profileStore.save(stored);
+  cachedProfile = stored;
+  return stored;
 }

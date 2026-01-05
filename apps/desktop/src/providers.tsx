@@ -6,6 +6,7 @@ import {
   initializeDeviceId,
   setAuthState,
   getDeviceId,
+  getUserId,
   handleSignIn,
   debugAccountStatus,
   useSystemMonitoring,
@@ -19,11 +20,13 @@ import {
   useCollectionsSync,
   useDeviceBlobsSync,
   useEdgesSync,
+  useFolderSourcesSync,
   useReplicationJobsSync,
   useReviewLogsSync,
   useWorksSync,
   useBoardsSync,
   useStrokesSync,
+  subscribeToAuthState,
   setFolderSourcesRemoteEnqueueEnabled,
 } from "@deeprecall/data";
 import { configurePdfWorker } from "@deeprecall/pdf";
@@ -224,7 +227,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <GuestModeInitializer />
         <SystemMonitoringProvider />
         <ElectricInitializer />
-        <SyncManager />
+        <ConditionalSyncManager />
         {children}
       </AuthStateManager>
     </QueryClientProvider>
@@ -500,6 +503,37 @@ function ElectricInitializer() {
 }
 
 /**
+ * Ensure user-specific sync hooks only run after auth completes.
+ * Blob metadata syncs still run for guests so CAS stays consistent.
+ */
+function ConditionalSyncManager() {
+  const [authUserId, setAuthUserId] = useState<string | undefined>(() => {
+    const initial = getUserId();
+    return initial ?? undefined;
+  });
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthState(() => {
+      const nextUserId = getUserId();
+      setAuthUserId(nextUserId ?? undefined);
+    });
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
+  // Always sync blob metadata for CAS coordination (guest or auth)
+  useBlobsMetaSync(authUserId);
+  useDeviceBlobsSync(authUserId);
+
+  if (!authUserId) {
+    return null;
+  }
+
+  return <SyncManager userId={authUserId} />;
+}
+
+/**
  * SyncManager: Centralized Electric → Dexie sync coordinator
  *
  * CRITICAL: Runs ALL sync hooks exactly ONCE to prevent race conditions.
@@ -509,23 +543,22 @@ function ElectricInitializer() {
  *
  * Same implementation as web app - platform agnostic!
  */
-function SyncManager() {
+function SyncManager({ userId }: { userId: string }) {
   // Sync hooks (alphabetical order)
-  useActivitiesSync();
-  useAnnotationsSync();
-  useAssetsSync();
-  useAuthorsSync();
-  useBlobsMetaSync();
-  useBoardsSync();
-  useCardsSync();
-  useCollectionsSync();
-  useDeviceBlobsSync();
-  useEdgesSync();
-  usePresetsSync();
-  useReplicationJobsSync();
-  useReviewLogsSync();
-  useStrokesSync();
-  useWorksSync();
+  useActivitiesSync(userId);
+  useAnnotationsSync(userId);
+  useAssetsSync(userId);
+  useAuthorsSync(userId);
+  useBoardsSync(userId);
+  useCardsSync(userId);
+  useCollectionsSync(userId);
+  useEdgesSync(userId);
+  useFolderSourcesSync(userId);
+  usePresetsSync(userId);
+  useReplicationJobsSync(userId);
+  useReviewLogsSync(userId);
+  useStrokesSync(userId);
+  useWorksSync(userId);
 
   return null;
 }

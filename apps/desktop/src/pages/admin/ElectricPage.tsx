@@ -17,6 +17,7 @@ const ELECTRIC_TABLES = [
   { key: "strokes", label: "Strokes" },
   { key: "blobsMeta", label: "Blobs Meta" },
   { key: "deviceBlobs", label: "Device Blobs" },
+  { key: "folderSources", label: "Folder Sources" },
 ] as const;
 
 export default function ElectricPage() {

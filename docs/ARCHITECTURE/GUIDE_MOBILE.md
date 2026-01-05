@@ -1,7 +1,7 @@
 # Mobile Platform Architecture Guide (Capacitor/iOS)
 
-**Platform**: Capacitor (iOS) - React UI in WKWebView with native plugins  
-**Status**: MVP Complete (Library + Reader functional)  
+**Platform**: Capacitor (iOS) - React UI in WKWebView with native plugins 
+**Status**: MVP Complete (Library + Reader functional) 
 **Last Updated**: November 2025
 
 This guide covers mobile-specific implementation details for the DeepRecall iOS app. For general architecture patterns, see [GUIDE_DATA_ARCHITECTURE.md](./GUIDE_DATA_ARCHITECTURE.md).
@@ -48,24 +48,24 @@ The mobile app implements the `BlobCAS` interface using Capacitor's Filesystem A
 
 ```typescript
 export class CapacitorBlobStorage implements BlobCAS {
-  private readonly BLOB_DIR = resolveBlobDir(); // "blobs" (production) or "apps/mobile/data" (dev)
-  private catalog: Map<string, BlobInfo> = new Map();
+ private readonly BLOB_DIR = resolveBlobDir(); // "blobs" (production) or "apps/mobile/data" (dev)
+ private catalog: Map<string, BlobInfo> = new Map();
 
-  // Core CAS operations
-  async put(
-    blob: Blob,
-    options?: { filename?: string; mime?: string }
-  ): Promise<BlobWithMetadata>;
-  async getUrl(sha256: string): Promise<string>; // Returns "capacitor://localhost/blobs/{sha256}"
-  async delete(sha256: string): Promise<void>;
-  async has(sha256: string): Promise<boolean>;
-  async stat(sha256: string): Promise<BlobInfo | null>;
-  async list(): Promise<BlobWithMetadata[]>;
+ // Core CAS operations
+ async put(
+ blob: Blob,
+ options?: { filename?: string; mime?: string }
+ ): Promise<BlobWithMetadata>;
+ async getUrl(sha256: string): Promise<string>; // Returns "capacitor://localhost/blobs/{sha256}"
+ async delete(sha256: string): Promise<void>;
+ async has(sha256: string): Promise<boolean>;
+ async stat(sha256: string): Promise<BlobInfo | null>;
+ async list(): Promise<BlobWithMetadata[]>;
 
-  // Admin operations
-  async scan(): Promise<ScanResult>;
-  async rename(sha256: string, filename: string): Promise<void>;
-  async healthCheck(): Promise<HealthReport>;
+ // Admin operations
+ async scan(): Promise<ScanResult>;
+ async rename(sha256: string, filename: string): Promise<void>;
+ async healthCheck(): Promise<HealthReport>;
 }
 ```
 
@@ -91,8 +91,8 @@ const pdfUrl = await cas.getUrl(asset.sha256); // Returns Capacitor file URL
 
 ```typescript
 function resolveBlobDir(): string {
-  if (CUSTOM_BLOB_DIR) return CUSTOM_BLOB_DIR; // Custom env var (optional)
-  return import.meta.env.DEV ? "apps/mobile/data" : "blobs"; // Dev vs production
+ if (CUSTOM_BLOB_DIR) return CUSTOM_BLOB_DIR; // Custom env var (optional)
+ return import.meta.env.DEV ? "apps/mobile/data" : "blobs"; // Dev vs production
 }
 ```
 
@@ -107,10 +107,10 @@ Unlike desktop (which uses Rust commands for direct Postgres writes), the mobile
 ```typescript
 // Initialize WriteBuffer with HTTP API endpoint
 const worker = initFlushWorker({
-  apiBase: getApiBaseUrl(), // "http://localhost:3000" (dev) or production URL
-  batchSize: 10,
-  retryDelay: 1000,
-  maxRetries: 5,
+ apiBase: getApiBaseUrl(), // "http://localhost:3000" (dev) or production URL
+ batchSize: 10,
+ retryDelay: 1000,
+ maxRetries: 5,
 });
 
 // Start flush worker with 5-second interval
@@ -146,20 +146,20 @@ export async function fetchBlobContent(sha256: string): Promise<string>;
 
 // Create markdown blob with title/content
 export async function createMarkdownBlob(
-  content: string,
-  title: string
+ content: string,
+ title: string
 ): Promise<BlobWithMetadata>;
 
 // Update existing blob content
 export async function updateBlobContent(
-  sha256: string,
-  content: string
+ sha256: string,
+ content: string
 ): Promise<void>;
 
 // Rename blob in catalog
 export async function renameBlobFile(
-  sha256: string,
-  newFilename: string
+ sha256: string,
+ newFilename: string
 ): Promise<void>;
 ```
 
@@ -171,15 +171,15 @@ export async function renameBlobFile(
 
 ### Installed Plugins
 
-| Plugin                              | Purpose                        | Status |
+| Plugin | Purpose | Status |
 | ----------------------------------- | ------------------------------ | ------ |
-| `@capacitor/filesystem`             | Blob storage (Documents dir)   | ✅     |
-| `@capacitor/preferences`            | Device ID, session storage     | ✅     |
-| `@capawesome/capacitor-file-picker` | PDF/image upload               | ✅     |
-| `@capacitor/camera`                 | Document scanning (future)     | ⏳     |
-| `@capacitor/share`                  | Share PDFs via iOS share sheet | ⏳     |
-| `@capacitor/haptics`                | Tactile feedback               | ⏳     |
-| `@capacitor/status-bar`             | iOS status bar styling         | ⏳     |
+| `@capacitor/filesystem` | Blob storage (Documents dir) | ✅ |
+| `@capacitor/preferences` | Device ID, session storage | ✅ |
+| `@capawesome/capacitor-file-picker` | PDF/image upload | ✅ |
+| `@capacitor/camera` | Document scanning (future) | ⏳ |
+| `@capacitor/share` | Share PDFs via iOS share sheet | ⏳ |
+| `@capacitor/haptics` | Tactile feedback | ⏳ |
+| `@capacitor/status-bar` | iOS status bar styling | ⏳ |
 
 ### File Upload Flow
 
@@ -187,37 +187,37 @@ export async function renameBlobFile(
 
 ```typescript
 export function useFileUpload() {
-  const cas = useCapacitorBlobStorage();
+ const cas = useCapacitorBlobStorage();
 
-  const uploadFiles = async () => {
-    // 1. Open native iOS file picker
-    const result = await FilePicker.pickFiles({
-      types: ["application/pdf", "image/png", "image/jpeg", "text/markdown"],
-      readData: true, // Get base64 data
-    });
+ const uploadFiles = async () => {
+ // 1. Open native iOS file picker
+ const result = await FilePicker.pickFiles({
+ types: ["application/pdf", "image/png", "image/jpeg", "text/markdown"],
+ readData: true, // Get base64 data
+ });
 
-    for (const file of result.files) {
-      // 2. Convert base64 → Blob
-      const blob = new Blob([bytes], { type: file.mimeType });
+ for (const file of result.files) {
+ // 2. Convert base64 → Blob
+ const blob = new Blob([bytes], { type: file.mimeType });
 
-      // 3. Upload to CAS (SHA-256 hashing + filesystem write)
-      const blobMetadata = await cas.put(blob, {
-        filename: file.name,
-        mime: file.mimeType,
-      });
+ // 3. Upload to CAS (SHA-256 hashing + filesystem write)
+ const blobMetadata = await cas.put(blob, {
+ filename: file.name,
+ mime: file.mimeType,
+ });
 
-      // 4. Create asset in database (optimistic update)
-      await assets.createAsset({
-        kind: "asset",
-        sha256: blobMetadata.sha256,
-        filename: file.name,
-        bytes: file.size,
-        mime: file.mimeType,
-      });
-    }
-  };
+ // 4. Create asset in database (optimistic update)
+ await assets.createAsset({
+ kind: "asset",
+ sha256: blobMetadata.sha256,
+ filename: file.name,
+ bytes: file.size,
+ mime: file.mimeType,
+ });
+ }
+ };
 
-  return { uploadFiles };
+ return { uploadFiles };
 }
 ```
 
@@ -233,8 +233,8 @@ export function useFileUpload() {
 
 ```bash
 # API Base URL (Next.js backend for write flushing)
-VITE_API_BASE_URL=http://localhost:3000  # Dev
-# VITE_API_BASE_URL=https://deeprecall-production.up.railway.app  # Production
+VITE_API_BASE_URL=http://localhost:3000 # Dev
+# VITE_API_BASE_URL=https://deeprecall-production.up.railway.app # Production
 
 # Electric Cloud (Real-time Sync via API proxy)
 VITE_ELECTRIC_URL=https://deeprecall-production.up.railway.app/api/electric/v1/shape
@@ -275,26 +275,26 @@ VITE_MOBILE_BLOB_DIR=blobs
 
 ```typescript
 const config: CapacitorConfig = {
-  appId: "com.renlephy.deeprecall",
-  appName: "DeepRecall",
-  webDir: "dist", // Vite output directory
+ appId: "com.renlephy.deeprecall",
+ appName: "DeepRecall",
+ webDir: "dist", // Vite output directory
 
-  server: {
-    androidScheme: "https",
-    iosScheme: "https", // Required for OAuth custom URL scheme
-    allowNavigation: ["deeprecall-production.up.railway.app"], // CORS
-  },
+ server: {
+ androidScheme: "https",
+ iosScheme: "https", // Required for OAuth custom URL scheme
+ allowNavigation: ["deeprecall-production.up.railway.app"], // CORS
+ },
 
-  ios: {
-    contentInset: "automatic", // Respects safe area (notch, home indicator)
-    scrollEnabled: true, // Allow vertical scrolling
-  },
+ ios: {
+ contentInset: "automatic", // Respects safe area (notch, home indicator)
+ scrollEnabled: true, // Allow vertical scrolling
+ },
 
-  plugins: {
-    SplashScreen: {
-      launchShowDuration: 0, // No splash screen for MVP
-    },
-  },
+ plugins: {
+ SplashScreen: {
+ launchShowDuration: 0, // No splash screen for MVP
+ },
+ },
 };
 ```
 
@@ -332,20 +332,20 @@ The mobile app uses **identical Electric sync setup** to desktop, with query par
 ```typescript
 // Initialize Electric client on app startup
 const client = await initElectric({
-  url: import.meta.env.VITE_ELECTRIC_URL,
-  sourceId: import.meta.env.VITE_ELECTRIC_SOURCE_ID,
-  secret: import.meta.env.VITE_ELECTRIC_SOURCE_SECRET,
+ url: import.meta.env.VITE_ELECTRIC_URL,
+ sourceId: import.meta.env.VITE_ELECTRIC_SOURCE_ID,
+ secret: import.meta.env.VITE_ELECTRIC_SOURCE_SECRET,
 });
 
 // SyncManager: Start syncing all entities (one writer per table)
 function SyncManager() {
-  useWorksSync();
-  useAssetsSync();
-  useAnnotationsSync();
-  useActivitiesSync();
-  useBoardsSync();
-  useStrokesSync();
-  // ... 12 total synced tables
+ useWorksSync();
+ useAssetsSync();
+ useAnnotationsSync();
+ useActivitiesSync();
+ useBoardsSync();
+ useStrokesSync();
+ // ... 12 total synced tables
 }
 ```
 
@@ -370,8 +370,8 @@ GET https://your-app.railway.app/api/electric/v1/shape?table=works&source_id={so
 
 ```typescript
 const config = {
-  liveSse: false, // Polling mode (more reliable for cloud)
-  pollingInterval: 10000, // 10 seconds
+ liveSse: false, // Polling mode (more reliable for cloud)
+ pollingInterval: 10000, // 10 seconds
 };
 ```
 
@@ -392,48 +392,48 @@ The mobile app has minimal platform-specific files (most code is in `packages/`)
 ```
 apps/mobile/
 ├── src/
-│   ├── App.tsx                         # Main app entry point (React Router)
-│   ├── providers.tsx                   # QueryClient + Electric + WriteBuffer + AuthState
-│   ├── config/
-│   │   └── api.ts                      # API base URL resolution (dev vs prod)
-│   ├── blob-storage/
-│   │   └── capacitor.ts                # BlobCAS implementation (Filesystem API)
-│   ├── hooks/
-│   │   └── useBlobStorage.ts           # useCapacitorBlobStorage() singleton
-│   ├── auth/
-│   │   └── session.ts                  # Session management (Capacitor Preferences)
-│   ├── utils/
-│   │   └── fileUpload.ts               # File picker + upload logic
-│   ├── pages/
-│   │   ├── library/
-│   │   │   ├── LibraryPage.tsx         # Orchestrator (imports UI + wrappers)
-│   │   │   └── _components/            # 3 platform wrappers
-│   │   │       ├── WorkCardDetailed.tsx
-│   │   │       ├── WorkCardCompact.tsx
-│   │   │       └── UploadButton.tsx
-│   │   └── reader/
-│   │       ├── index.tsx               # Orchestrator (imports UI + wrappers)
-│   │       └── _components/            # 10 platform wrappers
-│   │           ├── PDFViewer.tsx       # 650-line virtualized PDF viewer
-│   │           ├── AnnotationEditor.tsx
-│   │           ├── MarkdownPreview.tsx
-│   │           └── ... (7 more)
-│   └── components/
-│       ├── Layout.tsx                  # Navigation bar + indicators
-│       ├── GPUIndicator.tsx            # Local IndexedDB status
-│       ├── ElectricIndicator.tsx       # Electric sync status
-│       └── PostgresIndicator.tsx       # WriteBuffer flush status
-├── ios/                                # Native iOS project (auto-generated by Capacitor)
-│   └── App/
-│       ├── App.xcodeproj               # Xcode project
-│       └── App/
-│           ├── Info.plist              # iOS permissions, URL schemes (OAuth)
-│           └── Assets.xcassets/        # App icons, launch screens
+│ ├── App.tsx # Main app entry point (React Router)
+│ ├── providers.tsx # QueryClient + Electric + WriteBuffer + AuthState
+│ ├── config/
+│ │ └── api.ts # API base URL resolution (dev vs prod)
+│ ├── blob-storage/
+│ │ └── capacitor.ts # BlobCAS implementation (Filesystem API)
+│ ├── hooks/
+│ │ └── useBlobStorage.ts # useCapacitorBlobStorage() singleton
+│ ├── auth/
+│ │ └── session.ts # Session management (Capacitor Preferences)
+│ ├── utils/
+│ │ └── fileUpload.ts # File picker + upload logic
+│ ├── pages/
+│ │ ├── library/
+│ │ │ ├── LibraryPage.tsx # Orchestrator (imports UI + wrappers)
+│ │ │ └── _components/ # 3 platform wrappers
+│ │ │ ├── WorkCardDetailed.tsx
+│ │ │ ├── WorkCardCompact.tsx
+│ │ │ └── UploadButton.tsx
+│ │ └── reader/
+│ │ ├── index.tsx # Orchestrator (imports UI + wrappers)
+│ │ └── _components/ # 10 platform wrappers
+│ │ ├── PDFViewer.tsx # 650-line virtualized PDF viewer
+│ │ ├── AnnotationEditor.tsx
+│ │ ├── MarkdownPreview.tsx
+│ │ └── ... (7 more)
+│ └── components/
+│ ├── Layout.tsx # Navigation bar + indicators
+│ ├── GPUIndicator.tsx # Local IndexedDB status
+│ ├── ElectricIndicator.tsx # Electric sync status
+│ └── PostgresIndicator.tsx # WriteBuffer flush status
+├── ios/ # Native iOS project (auto-generated by Capacitor)
+│ └── App/
+│ ├── App.xcodeproj # Xcode project
+│ └── App/
+│ ├── Info.plist # iOS permissions, URL schemes (OAuth)
+│ └── Assets.xcassets/ # App icons, launch screens
 ├── public/
-│   └── pdf.worker.min.mjs              # PDF.js worker (served by Capacitor)
-├── capacitor.config.ts                 # Capacitor configuration
-├── vite.config.ts                      # Vite build configuration
-└── .env.local                          # Environment variables (gitignored)
+│ └── pdf.worker.min.mjs # PDF.js worker (served by Capacitor)
+├── capacitor.config.ts # Capacitor configuration
+├── vite.config.ts # Vite build configuration
+└── .env.local # Environment variables (gitignored)
 ```
 
 **Only 3 mobile-specific implementation files**:
@@ -457,12 +457,12 @@ Everything else is either:
 ```bash
 # Terminal 1: Run Next.js backend (for /api/writes/batch)
 cd apps/web
-pnpm run dev  # Starts on http://localhost:3000
+pnpm run dev # Starts on http://localhost:3000
 
 # Terminal 2: Run mobile app in iOS Simulator
 cd apps/mobile
-pnpm run dev  # Vite dev server with live reload
-pnpm cap run ios  # Launch in iOS Simulator
+pnpm run dev # Vite dev server with live reload
+pnpm cap run ios # Launch in iOS Simulator
 
 # Mobile app connects to:
 # - HTTP API: http://localhost:3000 (Next.js)
@@ -483,10 +483,10 @@ pnpm cap run ios  # Launch in iOS Simulator
 ```bash
 # Build web assets
 cd apps/mobile
-pnpm run build  # Vite bundles to dist/
+pnpm run build # Vite bundles to dist/
 
 # Sync Capacitor plugins
-pnpm cap sync  # Copy dist/ to iOS project + sync plugins
+pnpm cap sync # Copy dist/ to iOS project + sync plugins
 
 # Open in Xcode
 pnpm cap open ios
@@ -530,27 +530,27 @@ pnpm cap run ios --target="iPhone 15 Pro"
 
 ```
 1. User taps UploadButton
-   ↓
+ ↓
 2. FilePicker.pickFiles() → Native iOS file picker
-   ↓
+ ↓
 3. User selects PDF from Files app
-   ↓
+ ↓
 4. Base64 data returned to JavaScript
-   ↓
+ ↓
 5. Convert base64 → Blob
-   ↓
+ ↓
 6. cas.put(blob) → SHA-256 hash + write to Documents/blobs/{hash}
-   ↓
+ ↓
 7. assets.createAsset() → Optimistic Dexie write (WriteBuffer)
-   ↓
+ ↓
 8. FlushWorker detects pending write
-   ↓
+ ↓
 9. HTTP POST /api/writes/batch (Next.js API)
-   ↓
+ ↓
 10. Next.js writes to Postgres
-    ↓
+ ↓
 11. Electric Cloud detects change → Syncs back to mobile
-    ↓
+ ↓
 12. Dexie updated (Electric hook) → UI re-renders with new work
 ```
 
@@ -569,21 +569,21 @@ pnpm cap run ios --target="iPhone 15 Pro"
 
 ```
 1. User taps PDF page in PDFViewer
-   ↓
+ ↓
 2. AnnotationEditor creates annotation object
-   ↓
+ ↓
 3. annotations.createAnnotation() → Optimistic Dexie write (WriteBuffer)
-   ↓
+ ↓
 4. UI immediately shows annotation (optimistic)
-   ↓
+ ↓
 5. FlushWorker batches write
-   ↓
+ ↓
 6. HTTP POST /api/writes/batch (Next.js)
-   ↓
+ ↓
 7. Next.js writes to Postgres
-   ↓
+ ↓
 8. Electric syncs back → Confirms annotation created
-   ↓
+ ↓
 9. Other devices (Desktop, Web) see annotation in real-time
 ```
 
@@ -597,21 +597,21 @@ pnpm cap run ios --target="iPhone 15 Pro"
 
 ```
 1. User enables airplane mode
-   ↓
+ ↓
 2. FlushWorker detects network failure (HTTP POST fails)
-   ↓
+ ↓
 3. PostgresIndicator shows "Offline" (yellow dot)
-   ↓
+ ↓
 4. User creates annotation → Optimistic write to Dexie
-   ↓
+ ↓
 5. WriteBuffer accumulates pending writes
-   ↓
+ ↓
 6. User disables airplane mode
-   ↓
+ ↓
 7. FlushWorker auto-retries (5-second interval)
-   ↓
+ ↓
 8. HTTP POST succeeds → WriteBuffer cleared
-   ↓
+ ↓
 9. PostgresIndicator shows "Synced" (green dot)
 ```
 
@@ -725,8 +725,8 @@ pnpm cap run ios
 ```typescript
 // PDFViewer.tsx logs render times
 logger.debug("pdf.render", "Rendered page", {
-  pageNum,
-  renderTime: performance.now() - startTime,
+ pageNum,
+ renderTime: performance.now() - startTime,
 });
 ```
 
@@ -735,9 +735,9 @@ logger.debug("pdf.render", "Rendered page", {
 ```typescript
 // Electric sync logs in @deeprecall/data
 logger.info("sync.electric", "Sync completed", {
-  table: "works",
-  rowsReceived: 42,
-  duration: 1234,
+ table: "works",
+ rowsReceived: 42,
+ duration: 1234,
 });
 ```
 
@@ -747,17 +747,17 @@ logger.info("sync.electric", "Sync completed", {
 
 ### Mobile vs Desktop vs Web
 
-| Feature                 | Web (Next.js)    | Desktop (Tauri)      | Mobile (Capacitor)  |
+| Feature | Web (Next.js) | Desktop (Tauri) | Mobile (Capacitor) |
 | ----------------------- | ---------------- | -------------------- | ------------------- |
-| **BlobCAS**             | API routes       | Rust commands        | Filesystem API      |
-| **WriteBuffer Flush**   | API routes       | Rust Postgres client | HTTP API (Next.js)  |
-| **Electric Auth**       | Query params     | Query params         | Query params        |
-| **PDF Rendering**       | PDF.js (browser) | PDF.js (webview)     | PDF.js (WKWebView)  |
-| **Storage Location**    | R2/API           | Local filesystem     | iOS Documents dir   |
-| **Offline Support**     | Service Worker   | Native (Rust)        | Dexie + WriteBuffer |
-| **Native Features**     | None             | OS keychain, dialogs | Camera, file picker |
-| **Build Output**        | Vercel deploy    | .exe/.app            | .ipa (App Store)    |
-| **Environment Loading** | Next.js runtime  | Rust build-time      | Vite build-time     |
+| **BlobCAS** | API routes | Rust commands | Filesystem API |
+| **WriteBuffer Flush** | API routes | Rust Postgres client | HTTP API (Next.js) |
+| **Electric Auth** | Query params | Query params | Query params |
+| **PDF Rendering** | PDF.js (browser) | PDF.js (webview) | PDF.js (WKWebView) |
+| **Storage Location** | R2/API | Local filesystem | iOS Documents dir |
+| **Offline Support** | Service Worker | Native (Rust) | Dexie + WriteBuffer |
+| **Native Features** | None | OS keychain, dialogs | Camera, file picker |
+| **Build Output** | Vercel deploy | .exe/.app | .ipa (App Store) |
+| **Environment Loading** | Next.js runtime | Rust build-time | Vite build-time |
 
 **Key Insight**: Mobile shares HTTP API path with web, but uses native plugins (like desktop uses Rust).
 
@@ -768,24 +768,24 @@ logger.info("sync.electric", "Sync completed", {
 ### Mobile-Specific Optimizations
 
 1. **PDF Virtualization** (PDFViewer.tsx):
-   - Only visible pages + 2-page buffer rendered
-   - Reduces memory usage on iPhone (limited RAM vs desktop)
-   - Smooth 60fps scrolling even with 1000+ page PDFs
+ - Only visible pages + 2-page buffer rendered
+ - Reduces memory usage on iPhone (limited RAM vs desktop)
+ - Smooth 60fps scrolling even with 1000+ page PDFs
 
 2. **Blob Catalog (In-Memory)**:
-   - No filesystem stats on every `list()` call
-   - Faster library loading (100+ works)
-   - Trade-off: Catalog loaded on app startup (~100ms for 1000 blobs)
+ - No filesystem stats on every `list()` call
+ - Faster library loading (100+ works)
+ - Trade-off: Catalog loaded on app startup (~100ms for 1000 blobs)
 
 3. **Polling vs SSE**:
-   - 10-second Electric polling interval
-   - Battery impact: ~1% per hour (acceptable for research app)
-   - Future: iOS Background Fetch for better battery life
+ - 10-second Electric polling interval
+ - Battery impact: ~1% per hour (acceptable for research app)
+ - Future: iOS Background Fetch for better battery life
 
 4. **HTTP API Batching**:
-   - WriteBuffer batches up to 10 writes per flush
-   - Reduces HTTP requests (fewer network wake-ups)
-   - 5-second flush interval balances latency vs battery
+ - WriteBuffer batches up to 10 writes per flush
+ - Reduces HTTP requests (fewer network wake-ups)
+ - 5-second flush interval balances latency vs battery
 
 ---
 
@@ -802,11 +802,11 @@ logger.info("sync.electric", "Sync completed", {
 ```typescript
 // PDFViewer.tsx - Virtual scrolling
 const visiblePages = useMemo(() => {
-  const buffer = 2; // Render 2 pages above/below viewport
-  return pages.slice(
-    Math.max(0, currentPage - buffer),
-    Math.min(totalPages, currentPage + buffer + 1)
-  );
+ const buffer = 2; // Render 2 pages above/below viewport
+ return pages.slice(
+ Math.max(0, currentPage - buffer),
+ Math.min(totalPages, currentPage + buffer + 1)
+ );
 }, [currentPage, totalPages]);
 ```
 
@@ -817,24 +817,24 @@ const visiblePages = useMemo(() => {
 ### Core Mobile Implementation
 
 1. **`apps/mobile/src/blob-storage/capacitor.ts`** (600 lines)
-   - BlobCAS implementation (Filesystem API)
-   - Helper functions (fetchBlobContent, createMarkdownBlob, etc.)
-   - Catalog management (in-memory Map)
+ - BlobCAS implementation (Filesystem API)
+ - Helper functions (fetchBlobContent, createMarkdownBlob, etc.)
+ - Catalog management (in-memory Map)
 
 2. **`apps/mobile/src/providers.tsx`** (456 lines)
-   - Electric initialization
-   - WriteBuffer flush worker (HTTP API)
-   - SyncManager (12 entity sync hooks)
-   - AuthStateManager (guest→user upgrade)
+ - Electric initialization
+ - WriteBuffer flush worker (HTTP API)
+ - SyncManager (12 entity sync hooks)
+ - AuthStateManager (guest→user upgrade)
 
 3. **`apps/mobile/capacitor.config.ts`**
-   - App ID, schemes (OAuth), CORS
-   - iOS-specific settings (safe area, scrolling)
+ - App ID, schemes (OAuth), CORS
+ - iOS-specific settings (safe area, scrolling)
 
 4. **`apps/mobile/src/utils/fileUpload.ts`**
-   - File picker integration
-   - Base64 → Blob conversion
-   - Upload to CAS + create asset
+ - File picker integration
+ - Base64 → Blob conversion
+ - Upload to CAS + create asset
 
 ---
 
@@ -886,8 +886,8 @@ The mobile app achieves **platform abstraction** through:
 - ✅ **Pro**: Minimal platform-specific code (~1000 lines total)
 - ✅ **Pro**: Reuses all UI logic from web/desktop
 - ✅ **Pro**: Live reload works in iOS Simulator (fast iteration)
-- ⚠️ **Con**: Requires Next.js backend running (no offline-first writes like desktop)
-- ⚠️ **Con**: Battery impact from 10-second polling (optimizable with Background Fetch)
+- **Con**: Requires Next.js backend running (no offline-first writes like desktop)
+- **Con**: Battery impact from 10-second polling (optimizable with Background Fetch)
 
 **Future Enhancements**:
 

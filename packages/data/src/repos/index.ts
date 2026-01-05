@@ -15,6 +15,7 @@ export * as presets from "./presets";
 export * as works from "./works";
 export * as folderSourcesLocal from "./folder-sources.local";
 export * as folderSourcesMerged from "./folder-sources.merged";
+export * as folderSourcesCleanup from "./folder-sources.cleanup";
 
 // Export Electric-enabled repos separately
 export * as activitiesElectric from "./activities.electric";

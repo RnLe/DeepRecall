@@ -70,19 +70,19 @@ Controls point spacing along the stroke.
 **Algorithms**:
 
 - **`distance`**: Add point when distance threshold met
-  - Use for: Uniform tools (highlighter)
-  - Pro: Consistent spacing
-  - Con: Can over-sample at slow speeds
+ - Use for: Uniform tools (highlighter)
+ - Pro: Consistent spacing
+ - Con: Can over-sample at slow speeds
 
 - **`time`**: Add point when time threshold met
-  - Use for: Time-based effects (rare)
-  - Pro: Predictable rate
-  - Con: Can under-sample at fast speeds
+ - Use for: Time-based effects (rare)
+ - Pro: Predictable rate
+ - Con: Can under-sample at fast speeds
 
 - **`hybrid`**: Require BOTH distance AND time
-  - Use for: Quality tools (pen, pencil, marker)
-  - Pro: Best quality, adaptive to speed
-  - Con: Slightly more complex
+ - Use for: Quality tools (pen, pencil, marker)
+ - Pro: Best quality, adaptive to speed
+ - Con: Slightly more complex
 
 **Speed Adaptive**: Dynamically adjust thresholds based on velocity.
 
@@ -106,26 +106,26 @@ Interpolates between accepted points for visual quality.
 **Algorithms**:
 
 - **`catmull-rom`**: Spline interpolation
-  - Quality: Excellent (smooth curves, passes through points)
-  - Performance: ~2-4ms / 100 points
-  - Point multiplication: 10-20x
-  - Use for: Final quality (pen, marker, highlighter)
+ - Quality: Excellent (smooth curves, passes through points)
+ - Performance: ~2-4ms / 100 points
+ - Point multiplication: 10-20x
+ - Use for: Final quality (pen, marker, highlighter)
 
 - **`exponential`**: Moving average
-  - Quality: Good (subtle smoothing)
-  - Performance: ~0.5ms / 100 points
-  - Point multiplication: 1x (no increase)
-  - Use for: Real-time preview (pencil)
+ - Quality: Good (subtle smoothing)
+ - Performance: ~0.5ms / 100 points
+ - Point multiplication: 1x (no increase)
+ - Use for: Real-time preview (pencil)
 
 - **`bezier`**: Cubic bezier (not yet implemented)
-  - Quality: Excellent (parametric curves)
-  - Performance: TBD
-  - Use for: Future high-quality rendering
+ - Quality: Excellent (parametric curves)
+ - Performance: TBD
+ - Use for: Future high-quality rendering
 
 - **`none`**: No smoothing
-  - Quality: Raw polyline
-  - Performance: Instant
-  - Use for: Debug, special effects
+ - Quality: Raw polyline
+ - Performance: Instant
+ - Use for: Debug, special effects
 
 **Parameters**:
 
@@ -153,19 +153,19 @@ Maps pen pressure (0-1) to stroke width.
 **Curves**:
 
 - **`constant`**: Ignore pressure, fixed width
-  - Use for: Highlighter, technical drawing
+ - Use for: Highlighter, technical drawing
 
 - **`linear`**: Direct 1:1 mapping
-  - Use for: Neutral pressure feel
+ - Use for: Neutral pressure feel
 
 - **`ease-in`**: Gradual increase (slow start)
-  - Use for: Pencil (requires more pressure for full width)
+ - Use for: Pencil (requires more pressure for full width)
 
 - **`ease-out`**: Quick increase (fast start)
-  - Use for: Pen (responsive to light touch)
+ - Use for: Pen (responsive to light touch)
 
 - **`ease-in-out`**: S-curve (balanced)
-  - Use for: Natural feel (future)
+ - Use for: Natural feel (future)
 
 **Parameters**:
 
@@ -177,19 +177,19 @@ Maps pen pressure (0-1) to stroke width.
 
 ```typescript
 function ease-out(t: number): number {
-  return 1 - (1 - t) * (1 - t);  // Quadratic
+ return 1 - (1 - t) * (1 - t); // Quadratic
 }
 
 function ease-in(t: number): number {
-  return t * t;  // Quadratic
+ return t * t; // Quadratic
 }
 
 function linear(t: number): number {
-  return t;
+ return t;
 }
 
 function constant(t: number): number {
-  return 1;  // Ignore pressure
+ return 1; // Ignore pressure
 }
 ```
 
@@ -265,9 +265,9 @@ The `livePoint` in `StrokeUpdate` provides real-time cursor feedback without aff
 
 ```typescript
 interface StrokeUpdate {
-  accepted: boolean; // Was a point committed?
-  points: StrokePoint[]; // Immutable committed points
-  livePoint: Point; // Current cursor (always updates)
+ accepted: boolean; // Was a point committed?
+ points: StrokePoint[]; // Immutable committed points
+ livePoint: Point; // Current cursor (always updates)
 }
 ```
 
@@ -317,17 +317,17 @@ const visual = smoothCurve(stored); // 200-1000 points
 ### Bottlenecks
 
 1. **Smoothing** (most expensive):
-   - Catmull-Rom: O(n × segmentsPerSpan)
-   - Exponential: O(n)
-   - Solution: Use exponential for real-time, catmull-rom for final
+ - Catmull-Rom: O(n × segmentsPerSpan)
+ - Exponential: O(n)
+ - Solution: Use exponential for real-time, catmull-rom for final
 
 2. **Hit Detection** (not in inking, but related):
-   - R-tree spatial index: O(log n)
-   - Solution: Query bounds first, then precise hit test
+ - R-tree spatial index: O(log n)
+ - Solution: Query bounds first, then precise hit test
 
 3. **Rendering** (GPU-bound):
-   - PixiJS batching: Very efficient
-   - Solution: Use stroke graphics cache
+ - PixiJS batching: Very efficient
+ - Solution: Use stroke graphics cache
 
 ### Measurement
 
@@ -336,13 +336,13 @@ const start = performance.now();
 
 engine.start(samples[0]);
 for (let i = 1; i < samples.length; i++) {
-  engine.addSample(samples[i]);
+ engine.addSample(samples[i]);
 }
 const points = engine.finalize();
 
 const elapsed = performance.now() - start;
 console.log(
-  `${samples.length} samples → ${points.length} points in ${elapsed.toFixed(2)}ms`
+ `${samples.length} samples → ${points.length} points in ${elapsed.toFixed(2)}ms`
 );
 ```
 
@@ -361,18 +361,18 @@ console.log(
 private debug = true;
 
 addSample(sample: PointerSample): StrokeUpdate {
-  const distance = this.calculateDistance(sample);
-  const timeDelta = sample.timestamp - this.lastTimestamp;
+ const distance = this.calculateDistance(sample);
+ const timeDelta = sample.timestamp - this.lastTimestamp;
 
-  if (this.debug) {
-    console.log({
-      distance: distance.toFixed(2),
-      timeDelta,
-      threshold: this.config.pointDistribution.minDistance,
-      accepted: distance >= threshold,
-    });
-  }
-  // ...
+ if (this.debug) {
+ console.log({
+ distance: distance.toFixed(2),
+ timeDelta,
+ threshold: this.config.pointDistribution.minDistance,
+ accepted: distance >= threshold,
+ });
+ }
+ // ...
 }
 ```
 
@@ -382,12 +382,12 @@ addSample(sample: PointerSample): StrokeUpdate {
 // Draw accepted vs rejected samples
 ctx.fillStyle = "green";
 for (const point of acceptedPoints) {
-  ctx.fillRect(point.x - 2, point.y - 2, 4, 4);
+ ctx.fillRect(point.x - 2, point.y - 2, 4, 4);
 }
 
 ctx.fillStyle = "red";
 for (const sample of rejectedSamples) {
-  ctx.fillRect(sample.x - 1, sample.y - 1, 2, 2);
+ ctx.fillRect(sample.x - 1, sample.y - 1, 2, 2);
 }
 ```
 
@@ -398,9 +398,9 @@ let accepted = 0;
 let rejected = 0;
 
 for (const sample of samples) {
-  const update = engine.addSample(sample);
-  if (update.accepted) accepted++;
-  else rejected++;
+ const update = engine.addSample(sample);
+ if (update.accepted) accepted++;
+ else rejected++;
 }
 
 console.log(`Ratio: ${((accepted / samples.length) * 100).toFixed(1)}%`);
@@ -415,27 +415,27 @@ console.log(`Ratio: ${((accepted / samples.length) * 100).toFixed(1)}%`);
 let previewEngine: InkingEngine | null = null;
 
 onPointerDown(e) {
-  const tool = getInkingTool("pen");
-  previewEngine = createInkingEngine(tool.inking, tool.visual.baseWidth);
-  previewEngine.start(normalizePointerEvent(e, canvasRect));
+ const tool = getInkingTool("pen");
+ previewEngine = createInkingEngine(tool.inking, tool.visual.baseWidth);
+ previewEngine.start(normalizePointerEvent(e, canvasRect));
 }
 
 onPointerMove(e) {
-  if (!previewEngine) return;
+ if (!previewEngine) return;
 
-  const samples = getCoalescedSamples(e, canvasRect);
-  for (const sample of samples) {
-    const update = previewEngine.addSample(sample);
-    renderPreview(update.points, update.livePoint);
-  }
+ const samples = getCoalescedSamples(e, canvasRect);
+ for (const sample of samples) {
+ const update = previewEngine.addSample(sample);
+ renderPreview(update.points, update.livePoint);
+ }
 }
 
 onPointerUp() {
-  if (!previewEngine) return;
+ if (!previewEngine) return;
 
-  const finalPoints = previewEngine.finalize();
-  await persistStroke(finalPoints);
-  previewEngine = null;
+ const finalPoints = previewEngine.finalize();
+ await persistStroke(finalPoints);
+ previewEngine = null;
 }
 ```
 
@@ -445,15 +445,15 @@ onPointerUp() {
 let currentTool: InkingToolId = "pen";
 
 function switchTool(newTool: InkingToolId) {
-  // Cancel active stroke if any
-  if (previewEngine) {
-    previewEngine.reset();
-    previewEngine = null;
-    clearPreview();
-  }
+ // Cancel active stroke if any
+ if (previewEngine) {
+ previewEngine.reset();
+ previewEngine = null;
+ clearPreview();
+ }
 
-  currentTool = newTool;
-  updateToolbarUI(newTool);
+ currentTool = newTool;
+ updateToolbarUI(newTool);
 }
 ```
 
@@ -464,11 +464,11 @@ function switchTool(newTool: InkingToolId) {
 const testPressures = [0, 0.25, 0.5, 0.75, 1.0];
 
 for (const curve of ["constant", "linear", "ease-in", "ease-out"]) {
-  console.log(`Curve: ${curve}`);
-  for (const p of testPressures) {
-    const factor = applyCurve(p, curve);
-    console.log(`  p=${p} → factor=${factor.toFixed(2)}`);
-  }
+ console.log(`Curve: ${curve}`);
+ for (const p of testPressures) {
+ const factor = applyCurve(p, curve);
+ console.log(` p=${p} → factor=${factor.toFixed(2)}`);
+ }
 }
 ```
 

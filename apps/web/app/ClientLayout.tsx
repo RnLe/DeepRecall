@@ -53,7 +53,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                   href="/study"
                   className="text-gray-400 hover:text-gray-100 transition-colors"
                 >
-                  Study
+                  Dojo
                 </Link>
                 <Link
                   href="/admin/cas"

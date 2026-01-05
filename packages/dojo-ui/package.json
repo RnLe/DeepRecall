@@ -1,0 +1,42 @@
+{
+  "name": "@deeprecall/dojo-ui",
+  "version": "0.1.0",
+  "description": "React UI components for DeepRecall Dojo - math/physics problem solving",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./solve": "./src/solve/index.ts",
+    "./dashboard": "./src/dashboard/index.ts",
+    "./exercises": "./src/exercises/index.ts",
+    "./components": "./src/components/index.ts",
+    "./hooks": "./src/hooks/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deeprecall/core": "workspace:*",
+    "@deeprecall/dojo-core": "workspace:*",
+    "@deeprecall/dojo-data": "workspace:*",
+    "@deeprecall/telemetry": "workspace:*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.546.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

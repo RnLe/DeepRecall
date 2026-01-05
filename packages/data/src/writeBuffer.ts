@@ -44,7 +44,17 @@ export type WriteTable =
   | "replication_jobs"
   | "boards"
   | "strokes"
-  | "folder_sources";
+  | "folder_sources"
+  // Dojo tables
+  | "dojo_concept_nodes"
+  | "dojo_exercise_templates"
+  | "dojo_exercise_variants"
+  | "dojo_exercise_attempts"
+  | "dojo_subtask_attempts"
+  | "dojo_sessions"
+  | "dojo_concept_bricks"
+  | "dojo_exercise_bricks"
+  | "dojo_scheduler_items";
 
 /**
  * A single write change to be synced

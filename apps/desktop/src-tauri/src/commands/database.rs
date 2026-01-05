@@ -805,7 +805,7 @@ pub async fn query_postgres_table(table: String) -> Result<Vec<Value>, String> {
     
     // Validate table name (security: prevent SQL injection)
     let valid_tables = [
-        "works", "assets", "activities", "collections", "edges", "presets",
+        "works", "assets", "activities", "collections", "edges", "folder_sources", "presets",
         "authors", "annotations", "cards", "review_logs", "boards", "strokes",
         "blobs_meta", "device_blobs"
     ];
@@ -838,7 +838,7 @@ pub async fn query_all_postgres_tables() -> Result<HashMap<String, Vec<Value>>, 
     let client = get_pg_client().await?;
     
     let valid_tables = [
-        "works", "assets", "activities", "collections", "edges", "presets",
+        "works", "assets", "activities", "collections", "edges", "folder_sources", "presets",
         "authors", "annotations", "cards", "review_logs", "boards", "strokes",
         "blobs_meta", "device_blobs"
     ];
