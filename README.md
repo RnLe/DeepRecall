@@ -1,8 +1,24 @@
-# DeepRecall
+<p align="center">
+  <img src=".github/assets/deeprecall-icon.png" alt="DeepRecall" width="100">
+</p>
 
-**A unified platform for academic reading, annotation, note-taking, and spaced repetition learning.**
+<h1 align="center">DeepRecall</h1>
 
-DeepRecall aims to combine the functionality of **Anki + GoodNotes + PDF Expert + Google Scholar** into a single, offline-first application — designed to reduce friction between reading papers, taking notes, and creating study material.
+---
+
+<p align="center">
+  <strong>A unified platform for academic reading, annotation, note-taking, and spaced repetition learning.</strong>
+</p>
+
+<p align="center">
+  <img src=".github/assets/deeprecall_vision.svg" alt="DeepRecall Vision" width="800">
+</p>
+
+<p align="center">
+  <em>Combines spaced repetition, handwritten notes, PDF annotation, and academic paper management into one offline-first app.</em>
+</p>
+
+---
 
 ## Vision
 
